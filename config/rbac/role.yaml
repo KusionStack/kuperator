@@ -1,0 +1,110 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - apps.kafed.io
+  resources:
+  - operationjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kafed.io
+  resources:
+  - operationjobs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kafed.io
+  resources:
+  - operationjobs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kafed.io
+  resources:
+  - resourcedecorations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kafed.io
+  resources:
+  - resourcedecorations/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kafed.io
+  resources:
+  - resourcedecorations/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kafed.io
+  resources:
+  - rulesets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kafed.io
+  resources:
+  - rulesets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kafed.io
+  resources:
+  - rulesets/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.korbito.io
+  resources:
+  - collasets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.korbito.io
+  resources:
+  - collasets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.korbito.io
+  resources:
+  - collasets/status
+  verbs:
+  - get
+  - patch
+  - update
