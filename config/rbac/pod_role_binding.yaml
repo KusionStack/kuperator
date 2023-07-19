@@ -1,0 +1,25 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pod-writer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: korbito-pod-writer
+subjects:
+- kind: ServiceAccount
+  name: korbito-controller-manager
+  namespace: korbito-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pod-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: korbito-pod-reader
+subjects:
+- kind: ServiceAccount
+  name: korbito-controller-manager
+  namespace: korbito-system
