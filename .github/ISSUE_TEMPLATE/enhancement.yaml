@@ -1,0 +1,17 @@
+name: Enhancement
+description: As a KusionStack developer, I want to make an enhancement.
+title: "Enhancement: "
+labels: ["kind/feature", "kafed"]
+body:
+  - type: textarea
+    id: content
+    attributes:
+      label: What would you like to be added?
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: Why is this needed?
+    validations:
+      required: true
