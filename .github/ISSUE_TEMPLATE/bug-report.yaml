@@ -1,0 +1,36 @@
+name: Bug Report
+description: As a User, I want to report a Bug.
+title: "Bug: "
+labels: ["kind/bug", "kafed"]
+assignees:
+- wu8685
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  - type: textarea
+    id: reproduce-step
+    attributes:
+      label: Minimal reproduce step
+      placeholder: a step by step guide for reproducing the bug.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to see?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What did you see instead
+    validations:
+      required: true
+  - type: textarea
+    id: version
+    attributes:
+      label: What is your KusionStack components and its version?
+    validations:
+      required: true
