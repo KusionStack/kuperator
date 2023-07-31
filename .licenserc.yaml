@@ -59,5 +59,8 @@ header:
     - '**/zz_generated.deepcopy.go'
     - '**/*.pb.go'
     - '**/*.proto'
+    - '**/PROJECT'
+    - '**/Dockerfile'
+    - '**/.dockerignore'
   comment: never
   license-location-threshold: 80

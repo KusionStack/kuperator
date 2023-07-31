@@ -43,7 +43,6 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 	}
 	if handler, exist := MutatingTypeHandlerMap[key]; exist {
 		return handler.Handle(ctx, req, h.Client, h.Decoder)
-	} else {
 	}
 
 	// do nothing
