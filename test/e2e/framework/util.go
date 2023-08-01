@@ -24,7 +24,6 @@ import (
 	"io"
 	"math/rand"
 	"net"
-	"net/url"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -910,10 +909,6 @@ func isTimeout(err error) bool {
 	switch err := err.(type) {
 	case net.Error:
 		if err.Timeout() {
-			return true
-		}
-	case *url.Error:
-		if err, ok := err.Err.(net.Error); ok && err.Timeout() {
 			return true
 		}
 	}
