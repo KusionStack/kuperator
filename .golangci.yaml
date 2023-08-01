@@ -1,0 +1,10 @@
+run:
+  skip-files:
+  - ".*_test.go"
+  skip-dirs:
+  - vendor/
+
+linters:
+  disable:
+  - errcheck
+  - unused
