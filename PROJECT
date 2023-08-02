@@ -6,7 +6,7 @@ domain: kafed.io
 layout:
 - go.kubebuilder.io/v3
 projectName: kafed
-repo: gitlab.alipay-inc.com/paas-core/korbito
+repo: kusionstack.io/kafed
 resources:
 - api:
     crdVersion: v1
@@ -15,7 +15,7 @@ resources:
   domain: kafed.io
   group: apps
   kind: RuleSet
-  path: gitlab.alipay-inc.com/paas-core/korbito/apis/apps/v1alpha1
+  path: kusionstack.io/kafed/apis/apps/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -24,7 +24,7 @@ resources:
   domain: kafed.io
   group: apps
   kind: CollaSet
-  path: gitlab.alipay-inc.com/paas-core/korbito/apis/apps/v1alpha1
+  path: kusionstack.io/kafed/apis/apps/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -33,7 +33,7 @@ resources:
   domain: kafed.io
   group: apps
   kind: ResourceContext
-  path: gitlab.alipay-inc.com/paas-core/korbito/apis/apps/v1alpha1
+  path: kusionstack.io/kafed/apis/apps/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -42,7 +42,7 @@ resources:
   domain: kafed.io
   group: apps
   kind: OperationJob
-  path: gitlab.alipay-inc.com/paas-core/korbito/apis/apps/v1alpha1
+  path: kusionstack.io/kafed/apis/apps/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -51,6 +51,6 @@ resources:
   domain: kafed.io
   group: apps
   kind: ResourceDecoration
-  path: gitlab.alipay-inc.com/paas-core/korbito/apis/apps/v1alpha1
+  path: kusionstack.io/kafed/apis/apps/v1alpha1
   version: v1alpha1
 version: "3"
