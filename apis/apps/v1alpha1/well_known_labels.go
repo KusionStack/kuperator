@@ -19,3 +19,20 @@ package v1alpha1
 const (
 	PodScalingInPhaseLabel = "cafed.kusionstack.io/scaling-in" // indicate a pod is scaling in
 )
+
+const (
+	LabelPodOperating           = "operating.kafed.kusionstack.io"
+	LabelPodOperationType       = "operation-type.kafed.kusionstack.io"
+	LabelPodOperationPermission = "operation-permission.kafed.kusionstack.io"
+	LabelPodUndoOperationType   = "undo-operation-type.kafed.kusionstack.io"
+	LabelPodDoneOperationType   = "done-operation-type.kafed.kusionstack.io"
+
+	LabelPodPreCheck    = "pre-check.lifecycle.kafed.kusionstack.io"
+	LabelPodPreChecked  = "pre-checked.lifecycle.kafed.kusionstack.io"
+	LabelPodPrepare     = "prepare.lifecycle.kafed.kusionstack.io"
+	LabelPodOperate     = "operate.lifecycle.kafed.kusionstack.io"
+	LabelPodOperated    = "operated.lifecycle.kafed.kusionstack.io"
+	LabelPodPostCheck   = "post-check.lifecycle.kafed.kusionstack.io"
+	LabelPodPostChecked = "post-checked.lifecycle.kafed.kusionstack.io"
+	LabelPodComplete    = "complete.lifecycle.kafed.kusionstack.io"
+)
