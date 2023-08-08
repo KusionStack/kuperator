@@ -85,16 +85,10 @@ var _ reconcile.Reconciler = &ReconcilePodOpsLifecycle{}
 
 type ReconcilePodOpsLifecycle struct {
 	client.Client
-	logger     *log.Logger
-	includedNs string
+	logger *log.Logger
 }
 
 func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	if r.includedNs != "" && r.includedNs != request.Namespace {
-		r.logger.V(0).Infof("no included namespace %s", r.includedNs)
-		return reconcile.Result{}, nil
-	}
-
 	key := fmt.Sprintf("%s/%s", request.Namespace, request.Name)
 	r.logger.V(0).Infof("Reconcile Pod %s", key)
 

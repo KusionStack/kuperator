@@ -33,34 +33,21 @@ import (
 )
 
 var (
-	pairLabelPrefixesMap       = map[string]string{} // some labels must exist together and have the same id, and they are a pair
-	coexistingLabelPrefixesMap = map[string]string{} // some labels must exist together
+	// some labels must exist together and have the same id, and they are a pair
+	pairLabelPrefixesMap = map[string]string{
+		v1alpha1.PodOperatingLabelPrefix:     v1alpha1.PodOperationTypeLabelPrefix,
+		v1alpha1.PodOperationTypeLabelPrefix: v1alpha1.PodOperatingLabelPrefix,
+
+		v1alpha1.PodOperatedLabelPrefix:          v1alpha1.PodDoneOperationTypeLabelPrefix,
+		v1alpha1.PodDoneOperationTypeLabelPrefix: v1alpha1.PodOperatedLabelPrefix,
+	}
+
+	// some labels must exist together
+	coexistingLabelPrefixesMap = map[string]string{
+		v1alpha1.PodPreCheckLabelPrefix:            v1alpha1.PodOperationPermissionLabelPrefix,
+		v1alpha1.PodOperationPermissionLabelPrefix: v1alpha1.PodPreCheckLabelPrefix,
+	}
 )
-
-func init() {
-	pairLabelPrefixes := []struct {
-		label1 string
-		label2 string
-	}{
-		{v1alpha1.PodOperatingLabelPrefix, v1alpha1.PodOperationTypeLabelPrefix},
-		{v1alpha1.PodOperatedLabelPrefix, v1alpha1.PodDoneOperationTypeLabelPrefix},
-	}
-	for _, v := range pairLabelPrefixes {
-		pairLabelPrefixesMap[v.label1] = v.label2
-		pairLabelPrefixesMap[v.label2] = v.label1
-	}
-
-	coexistingLabelPrefixes := []struct {
-		label1 string
-		label2 string
-	}{
-		{v1alpha1.PodPreCheckLabelPrefix, v1alpha1.PodOperationPermissionLabelPrefix},
-	}
-	for _, v := range coexistingLabelPrefixes {
-		coexistingLabelPrefixesMap[v.label1] = v.label2
-		coexistingLabelPrefixesMap[v.label2] = v.label1
-	}
-}
 
 type ReadyToUpgrade func(pod *corev1.Pod) (bool, []string, *time.Duration)
 type SatisfyExpectedFinalizers func(pod *corev1.Pod) (bool, []string, error)

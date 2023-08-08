@@ -21,18 +21,9 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"kusionstack.io/kafed/apis/apps/v1alpha1"
 )
-
-func KeyFunc(obj metav1.Object) string {
-	return Key(obj.GetNamespace(), obj.GetName())
-}
-
-func Key(namespace, name string) string {
-	return fmt.Sprintf("%s/%s", namespace, name)
-}
 
 // PodIDAndTypesMap returns a map of pod id to labels map and a map of operation type to number of pods.
 func PodIDAndTypesMap(pod *v1.Pod) (map[string]map[string]string, map[string]int, error) {
