@@ -144,5 +144,5 @@ func (i *ResourceVersionExpectationItem) Fulfilled(resourceVersion string) bool 
 }
 
 func (i *ResourceVersionExpectationItem) isExpired() bool {
-	return time.Now().Sub(i.timestamp) > ExpectationsTimeout
+	return time.Since(i.timestamp) > ExpectationsTimeout
 }

@@ -21,18 +21,24 @@ const (
 )
 
 const (
-	LabelPodOperating           = "operating.kafed.kusionstack.io"
-	LabelPodOperationType       = "operation-type.kafed.kusionstack.io"
-	LabelPodOperationPermission = "operation-permission.kafed.kusionstack.io"
-	LabelPodUndoOperationType   = "undo-operation-type.kafed.kusionstack.io"
-	LabelPodDoneOperationType   = "done-operation-type.kafed.kusionstack.io"
+	PodOperatingLabelPrefix           = "operating.kafed.kusionstack.io"            // indicate a pod is operating
+	PodOperationTypeLabelPrefix       = "operation-type.kafed.kusionstack.io"       // indicate the type of operation
+	PodOperationPermissionLabelPrefix = "operation-permission.kafed.kusionstack.io" // indicate the permission of operation
+	PodUndoOperationTypeLabelPrefix   = "undo-operation-type.kafed.kusionstack.io"  // indicate the type of operation has been canceled
+	PodDoneOperationTypeLabelPrefix   = "done-operation-type.kafed.kusionstack.io"  // indicate the type of operation has been done
 
-	LabelPodPreCheck    = "pre-check.lifecycle.kafed.kusionstack.io"
-	LabelPodPreChecked  = "pre-checked.lifecycle.kafed.kusionstack.io"
-	LabelPodPrepare     = "prepare.lifecycle.kafed.kusionstack.io"
-	LabelPodOperate     = "operate.lifecycle.kafed.kusionstack.io"
-	LabelPodOperated    = "operated.lifecycle.kafed.kusionstack.io"
-	LabelPodPostCheck   = "post-check.lifecycle.kafed.kusionstack.io"
-	LabelPodPostChecked = "post-checked.lifecycle.kafed.kusionstack.io"
-	LabelPodComplete    = "complete.lifecycle.kafed.kusionstack.io"
+	PodPreCheckLabelPrefix    = "pre-check.lifecycle.kafed.kusionstack.io"    // indicate a pod is in pre-check phase
+	PodPreCheckedLabelPrefix  = "pre-checked.lifecycle.kafed.kusionstack.io"  // indicate a pod has finished pre-check phase
+	PodPrepareLabelPrefix     = "prepare.lifecycle.kafed.kusionstack.io"      // indicate a pod is in prepare phase
+	PodOperateLabelPrefix     = "operate.lifecycle.kafed.kusionstack.io"      // indicate a pod is in operate phase
+	PodOperatedLabelPrefix    = "operated.lifecycle.kafed.kusionstack.io"     // indicate a pod has finished operate phase
+	PodPostCheckLabelPrefix   = "post-check.lifecycle.kafed.kusionstack.io"   // indicate a pod is in post-check phase
+	PodPostCheckedLabelPrefix = "post-checked.lifecycle.kafed.kusionstack.io" // indicate a pod has finished post-check phase
+	PodCompleteLabelPrefix    = "complete.lifecycle.kafed.kusionstack.io"     // indicate a pod has finished all phases
+)
+
+var (
+	WellKnownLabelPrefixesWithID = []string{PodOperatingLabelPrefix, PodOperationTypeLabelPrefix, PodPreCheckLabelPrefix, PodPreCheckedLabelPrefix,
+		PodPrepareLabelPrefix, PodUndoOperationTypeLabelPrefix, PodOperateLabelPrefix, PodOperatedLabelPrefix, PodPostCheckLabelPrefix,
+		PodPostCheckedLabelPrefix, PodCompleteLabelPrefix}
 )

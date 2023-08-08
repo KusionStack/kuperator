@@ -17,6 +17,5 @@ limitations under the License.
 package apis
 
 const (
-	EnvTestMode               = "ENV_TEST_MODE"
-	EnvOnlyReconcileNamespace = "ONLY_RECONCILE_NAMESPACE"
+	EnvTestMode = "ENV_TEST_MODE"
 )

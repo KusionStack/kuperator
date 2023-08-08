@@ -57,9 +57,8 @@ func New(logger logr.Logger) *Logger {
 
 func (l *Logger) V(v int) *InfoLogger {
 	// zap has no verbosity, always log info as 0 level
-	v = 0
 	return &InfoLogger{
-		V:          v,
+		V:          0,
 		rootLogger: l,
 	}
 }

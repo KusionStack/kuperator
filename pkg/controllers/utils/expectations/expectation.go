@@ -112,7 +112,7 @@ func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) boo
 // TODO: Make this possible to disable in tests.
 // TODO: Support injection of clock.
 func (exp *ControlleeExpectations) isExpired() bool {
-	return time.Now().Sub(exp.timestamp) > ExpectationsTimeout
+	return time.Since(exp.timestamp) > ExpectationsTimeout
 }
 
 // Not thread safe

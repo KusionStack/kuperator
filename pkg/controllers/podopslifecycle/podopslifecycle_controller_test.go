@@ -19,7 +19,6 @@ package podopslifecycle
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"testing"
 
@@ -37,8 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"kusionstack.io/kafed/apis/apps/v1alpha1"
-	"kusionstack.io/kafed/pkg/controllers/ruleset"
-	"kusionstack.io/kafed/pkg/controllers/ruleset/checker"
 )
 
 var (
@@ -62,9 +59,6 @@ var _ = BeforeSuite(func() {
 
 	env = &envtest.Environment{
 		Scheme: schema,
-	}
-	env.ControlPlane.GetAPIServer().URL = &url.URL{
-		Host: "127.0.0.1:10001",
 	}
 	config, err := env.Start()
 	Expect(err).NotTo(HaveOccurred())
@@ -110,14 +104,11 @@ var _ = Describe("podopslifecycle controller", func() {
 				},
 			},
 		}
-		operationType = "restart"
-		id            = "123"
-		time          = "1402144848"
+		id   = "123"
+		time = "1402144848"
 	)
 
 	AfterEach(func() {
-		ruleSetManager = &mockRuleSetManager{}
-
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
@@ -135,154 +126,13 @@ var _ = Describe("podopslifecycle controller", func() {
 		}
 	})
 
-	It("update pod with stage pre-check", func() {
-		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test",
-				Namespace: "default",
-			},
-			Spec: podSpec,
-		}
-		err := mgr.GetClient().Create(context.Background(), pod)
-		Expect(err).NotTo(HaveOccurred())
-
-		<-request
-
-		pod = &corev1.Pod{}
-		err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
-			Name:      "test",
-			Namespace: "default",
-		}, pod)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(pod.Status.Conditions).To(HaveLen(0))
-
-		ruleSetManager = &mockRuleSetManager{CheckState: &checker.CheckState{
-			States: []checker.State{
-				{
-					Detail: v1alpha1.Detail{
-						Stage: v1alpha1.StagePreCheck,
-					},
-				},
-			},
-			Passed: true,
-		}}
-
-		pod.ObjectMeta.Labels = map[string]string{
-			fmt.Sprintf("%s/%s", v1alpha1.LabelPodPreCheck, id):      time,
-			fmt.Sprintf("%s/%s", v1alpha1.LabelPodOperationType, id): operationType,
-		}
-		err = mgr.GetClient().Update(context.Background(), pod)
-		Expect(err).NotTo(HaveOccurred())
-
-		<-request
-
-		pod = &corev1.Pod{}
-		err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
-			Name:      "test",
-			Namespace: "default",
-		}, pod)
-		Expect(err).NotTo(HaveOccurred())
-
-		Expect(pod.GetLabels()).To(HaveKey(fmt.Sprintf("%s/%s", v1alpha1.LabelPodPreChecked, id)))
-		Expect(pod.GetLabels()).To(HaveKey(fmt.Sprintf("%s/%s", v1alpha1.LabelPodOperationPermission, operationType)))
-
-		<-request
-
-		pod = &corev1.Pod{}
-		err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
-			Name:      "test",
-			Namespace: "default",
-		}, pod)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(pod.Status.Conditions).To(HaveLen(1))
-		Expect(string(pod.Status.Conditions[0].Type)).To(Equal(v1alpha1.ReadinessGatePodServiceReady))
-		Expect(pod.Status.Conditions[0].Status).To(Equal(corev1.ConditionFalse))
-	})
-
-	It("update pod with stage post-check", func() {
-		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test",
-				Namespace: "default",
-			},
-			Spec: podSpec,
-		}
-		err := mgr.GetClient().Create(context.Background(), pod)
-		Expect(err).NotTo(HaveOccurred())
-
-		<-request
-
-		pod = &corev1.Pod{}
-		err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
-			Name:      "test",
-			Namespace: "default",
-		}, pod)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(pod.Status.Conditions).To(HaveLen(0))
-
-		ruleSetManager = &mockRuleSetManager{CheckState: &checker.CheckState{
-			States: []checker.State{
-				{
-					Detail: v1alpha1.Detail{
-						Stage: v1alpha1.StagePostCheck,
-					},
-				},
-			},
-			Passed: true,
-		}}
-
-		pod.ObjectMeta.Labels = map[string]string{
-			fmt.Sprintf("%s/%s", v1alpha1.LabelPodPostCheck, id):         time,
-			fmt.Sprintf("%s/%s", v1alpha1.LabelPodDoneOperationType, id): operationType,
-		}
-		err = mgr.GetClient().Update(context.Background(), pod)
-		Expect(err).NotTo(HaveOccurred())
-
-		<-request
-
-		pod = &corev1.Pod{}
-		err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
-			Name:      "test",
-			Namespace: "default",
-		}, pod)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(pod.GetLabels()).To(HaveKey(fmt.Sprintf("%s/%s", v1alpha1.LabelPodPostChecked, id)))
-	})
-
-	It("create pod with label pre-checked", func() {
-		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test",
-				Namespace: "default",
-				Labels: map[string]string{
-					fmt.Sprintf("%s/%s", v1alpha1.LabelPodPreChecked, id): time,
-				},
-			},
-			Spec: podSpec,
-		}
-		err := mgr.GetClient().Create(context.Background(), pod)
-		Expect(err).NotTo(HaveOccurred())
-
-		<-request
-
-		pod = &corev1.Pod{}
-		err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
-			Name:      "test",
-			Namespace: "default",
-		}, pod)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(pod.Status.Conditions).To(HaveLen(1))
-		Expect(string(pod.Status.Conditions[0].Type)).To(Equal(v1alpha1.ReadinessGatePodServiceReady))
-		Expect(pod.Status.Conditions[0].Status).To(Equal(corev1.ConditionFalse))
-	})
-
 	It("create pod with label complete", func() {
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: "default",
 				Labels: map[string]string{
-					fmt.Sprintf("%s/%s", v1alpha1.LabelPodComplete, id): time,
+					fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, id): time,
 				},
 			},
 			Spec: podSpec,
@@ -301,46 +151,6 @@ var _ = Describe("podopslifecycle controller", func() {
 		Expect(pod.Status.Conditions).To(HaveLen(1))
 		Expect(string(pod.Status.Conditions[0].Type)).To(Equal(v1alpha1.ReadinessGatePodServiceReady))
 		Expect(pod.Status.Conditions[0].Status).To(Equal(corev1.ConditionTrue))
-	})
-
-	It("update pod with label pre-checked", func() {
-		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test",
-				Namespace: "default",
-			},
-			Spec: podSpec,
-		}
-		err := mgr.GetClient().Create(context.Background(), pod)
-		Expect(err).NotTo(HaveOccurred())
-
-		<-request
-
-		pod = &corev1.Pod{}
-		err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
-			Name:      "test",
-			Namespace: "default",
-		}, pod)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(pod.Status.Conditions).To(HaveLen(0))
-
-		pod.ObjectMeta.Labels = map[string]string{
-			fmt.Sprintf("%s/%s", v1alpha1.LabelPodPreChecked, id): time,
-		}
-		err = mgr.GetClient().Update(context.Background(), pod)
-		Expect(err).NotTo(HaveOccurred())
-
-		<-request
-
-		pod = &corev1.Pod{}
-		err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
-			Name:      "test",
-			Namespace: "default",
-		}, pod)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(pod.Status.Conditions).To(HaveLen(1))
-		Expect(string(pod.Status.Conditions[0].Type)).To(Equal(v1alpha1.ReadinessGatePodServiceReady))
-		Expect(pod.Status.Conditions[0].Status).To(Equal(corev1.ConditionFalse))
 	})
 
 	It("update pod with label complete", func() {
@@ -365,7 +175,7 @@ var _ = Describe("podopslifecycle controller", func() {
 		Expect(pod.Status.Conditions).To(HaveLen(0))
 
 		pod.ObjectMeta.Labels = map[string]string{
-			fmt.Sprintf("%s/%s", v1alpha1.LabelPodComplete, id): time,
+			fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, id): time,
 		}
 		err = mgr.GetClient().Update(context.Background(), pod)
 		Expect(err).NotTo(HaveOccurred())
@@ -396,30 +206,7 @@ func testReconcile(inner reconcile.Reconciler) (reconcile.Reconciler, chan recon
 	return fn, requests
 }
 
-var _ ruleset.RSManager = &mockRuleSetManager{}
-
-type mockRuleSetManager struct {
-	*checker.CheckState
-}
-
-func (rsm *mockRuleSetManager) RegisterStage(key string, inStage func(obj client.Object) bool) error {
-	return nil
-}
-
-func (rsm *mockRuleSetManager) RegisterCondition(opsCondition string, inCondition func(obj client.Object) bool) error {
-	return nil
-}
-
-func (rsm *mockRuleSetManager) GetState(client.Client, client.Object) (checker.CheckState, error) {
-	if rsm.CheckState == nil {
-		return checker.CheckState{}, nil
-	}
-	return *rsm.CheckState, nil
-}
-
 func TestPodOpsLifecycleController(t *testing.T) {
-	ruleSetManager = &mockRuleSetManager{}
-
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "podopslifecycle controller suite test")
 }

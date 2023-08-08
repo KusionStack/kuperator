@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package podopslifecycle
 
 import (
 	"fmt"
@@ -26,10 +26,6 @@ import (
 	"kusionstack.io/kafed/apis/apps/v1alpha1"
 )
 
-const (
-	MaxConcurrencyReconcileTimes float64 = 1
-)
-
 func KeyFunc(obj metav1.Object) string {
 	return Key(obj.GetNamespace(), obj.GetName())
 }
@@ -38,16 +34,13 @@ func Key(namespace, name string) string {
 	return fmt.Sprintf("%s/%s", namespace, name)
 }
 
+// PodIDAndTypesMap returns a map of pod id to labels map and a map of operation type to number of pods.
 func PodIDAndTypesMap(pod *v1.Pod) (map[string]map[string]string, map[string]int, error) {
 	idToLabelsMap := map[string]map[string]string{}
 	typeToNumsMap := map[string]int{}
 
-	wellKnownlabels := []string{v1alpha1.LabelPodOperating, v1alpha1.LabelPodOperationType, v1alpha1.LabelPodPreCheck, v1alpha1.LabelPodPreChecked,
-		v1alpha1.LabelPodPrepare, v1alpha1.LabelPodUndoOperationType, v1alpha1.LabelPodOperate, v1alpha1.LabelPodOperated, v1alpha1.LabelPodPostCheck,
-		v1alpha1.LabelPodPostChecked, v1alpha1.LabelPodComplete}
-
 	for k, v := range pod.Labels {
-		if strings.HasPrefix(k, v1alpha1.LabelPodOperationType) {
+		if strings.HasPrefix(k, v1alpha1.PodOperationTypeLabelPrefix) {
 			if _, ok := typeToNumsMap[v]; !ok {
 				typeToNumsMap[v] = 1
 			} else {
@@ -55,7 +48,7 @@ func PodIDAndTypesMap(pod *v1.Pod) (map[string]map[string]string, map[string]int
 			}
 		}
 
-		for _, label := range wellKnownlabels {
+		for _, label := range v1alpha1.WellKnownLabelPrefixesWithID {
 			if !strings.HasPrefix(k, label) {
 				continue
 			}

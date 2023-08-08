@@ -19,7 +19,6 @@ package podopslifecycle
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -36,11 +35,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"kusionstack.io/kafed/apis"
 	"kusionstack.io/kafed/apis/apps/v1alpha1"
 	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
 	"kusionstack.io/kafed/pkg/log"
-	"kusionstack.io/kafed/pkg/utils"
 )
 
 const (
@@ -60,15 +57,14 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	expectation = expectations.NewResourceVersionExpectation(logger)
 
 	r := &ReconcilePodOpsLifecycle{
-		Client:     mgr.GetClient(),
-		logger:     logger,
-		includedNs: strings.TrimSpace(os.Getenv(apis.EnvOnlyReconcileNamespace)),
+		Client: mgr.GetClient(),
+		logger: logger,
 	}
 	return r
 }
 
 func AddToMgr(mgr manager.Manager, r reconcile.Reconciler) error {
-	c, err := controller.New(controllerName, mgr, controller.Options{MaxConcurrentReconciles: 20, Reconciler: r}) // Increasing will conversely pull down the performance.
+	c, err := controller.New(controllerName, mgr, controller.Options{MaxConcurrentReconciles: 5, Reconciler: r})
 	if err != nil {
 		return err
 	}
@@ -118,14 +114,14 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 		return reconcile.Result{}, nil
 	}
 
-	idToLabelsMap, _, err := utils.PodIDAndTypesMap(pod)
+	idToLabelsMap, _, err := PodIDAndTypesMap(pod)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
 	expected := map[string]bool{
-		v1alpha1.LabelPodPreChecked: false, // set readiness gate to false
-		v1alpha1.LabelPodComplete:   true,  // set readiness gate to true
+		v1alpha1.PodPrepareLabelPrefix:  false, // set readiness gate to false
+		v1alpha1.PodCompleteLabelPrefix: true,  // set readiness gate to true
 	}
 	for _, labels := range idToLabelsMap {
 		for k, v := range expected {
@@ -142,6 +138,7 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 
 						return reconcile.Result{}, err
 					}
+					break
 				}
 				return reconcile.Result{}, nil // only need set once
 			}
@@ -196,7 +193,7 @@ func (r *ReconcilePodOpsLifecycle) setServiceReadiness(pod *corev1.Pod, isReady 
 }
 
 func (r *ReconcilePodOpsLifecycle) stagePreCheck(pod *corev1.Pod) (labels map[string]string, err error) {
-	idToLabelsMap, _, err := utils.PodIDAndTypesMap(pod)
+	idToLabelsMap, _, err := PodIDAndTypesMap(pod)
 	if err != nil {
 		return nil, err
 	}
@@ -204,17 +201,17 @@ func (r *ReconcilePodOpsLifecycle) stagePreCheck(pod *corev1.Pod) (labels map[st
 	labels = map[string]string{}
 	currentTime := strconv.FormatInt(time.Now().Unix(), 10)
 	for k, v := range idToLabelsMap {
-		t, ok := v[v1alpha1.LabelPodOperationType]
+		t, ok := v[v1alpha1.PodOperationTypeLabelPrefix]
 		if !ok {
 			continue
 		}
 
-		key := fmt.Sprintf("%s/%s", v1alpha1.LabelPodOperationPermission, t)
+		key := fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, t)
 		if _, ok := pod.GetLabels()[key]; !ok {
 			labels[key] = currentTime
 		}
 
-		key = fmt.Sprintf("%s/%s", v1alpha1.LabelPodPreChecked, k)
+		key = fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, k)
 		if _, ok := pod.GetLabels()[key]; !ok {
 			labels[key] = currentTime
 		}
@@ -224,7 +221,7 @@ func (r *ReconcilePodOpsLifecycle) stagePreCheck(pod *corev1.Pod) (labels map[st
 }
 
 func (r *ReconcilePodOpsLifecycle) stagePostCheck(pod *corev1.Pod) (labels map[string]string, err error) {
-	idToLabelsMap, _, err := utils.PodIDAndTypesMap(pod)
+	idToLabelsMap, _, err := PodIDAndTypesMap(pod)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +229,7 @@ func (r *ReconcilePodOpsLifecycle) stagePostCheck(pod *corev1.Pod) (labels map[s
 	labels = map[string]string{}
 	currentTime := strconv.FormatInt(time.Now().Unix(), 10)
 	for k := range idToLabelsMap {
-		key := fmt.Sprintf("%s/%s", v1alpha1.LabelPodPostChecked, k)
+		key := fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, k)
 		if _, ok := pod.GetLabels()[key]; !ok {
 			labels[key] = currentTime
 		}

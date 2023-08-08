@@ -28,37 +28,37 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/kafed/apis/apps/v1alpha1"
+	"kusionstack.io/kafed/pkg/controllers/podopslifecycle"
 	"kusionstack.io/kafed/pkg/log"
-	"kusionstack.io/kafed/pkg/utils"
 )
 
 var (
-	pairLabelsMap       = map[string]string{}
-	coexistingLabelsMap = map[string]string{}
+	pairLabelPrefixesMap       = map[string]string{} // some labels must exist together and have the same id, and they are a pair
+	coexistingLabelPrefixesMap = map[string]string{} // some labels must exist together
 )
 
 func init() {
-	pairLabels := []struct {
+	pairLabelPrefixes := []struct {
 		label1 string
 		label2 string
 	}{
-		{v1alpha1.LabelPodOperating, v1alpha1.LabelPodOperationType},
-		{v1alpha1.LabelPodOperated, v1alpha1.LabelPodDoneOperationType},
+		{v1alpha1.PodOperatingLabelPrefix, v1alpha1.PodOperationTypeLabelPrefix},
+		{v1alpha1.PodOperatedLabelPrefix, v1alpha1.PodDoneOperationTypeLabelPrefix},
 	}
-	for _, v := range pairLabels {
-		pairLabelsMap[v.label1] = v.label2
-		pairLabelsMap[v.label2] = v.label1
+	for _, v := range pairLabelPrefixes {
+		pairLabelPrefixesMap[v.label1] = v.label2
+		pairLabelPrefixesMap[v.label2] = v.label1
 	}
 
-	coexistingLabels := []struct {
+	coexistingLabelPrefixes := []struct {
 		label1 string
 		label2 string
 	}{
-		{v1alpha1.LabelPodPreCheck, v1alpha1.LabelPodOperationPermission},
+		{v1alpha1.PodPreCheckLabelPrefix, v1alpha1.PodOperationPermissionLabelPrefix},
 	}
-	for _, v := range coexistingLabels {
-		coexistingLabelsMap[v.label1] = v.label2
-		coexistingLabelsMap[v.label2] = v.label1
+	for _, v := range coexistingLabelPrefixes {
+		coexistingLabelPrefixesMap[v.label1] = v.label2
+		coexistingLabelPrefixesMap[v.label2] = v.label1
 	}
 }
 
@@ -86,9 +86,10 @@ func New(readyToUpgrade ReadyToUpgrade, satisfyExpectedFinalizers SatisfyExpecte
 
 func (lc *OpsLifecycle) Validating(ctx context.Context, pod *corev1.Pod, logger *log.Logger) error {
 	expectedLabels := make(map[string]struct{})
+	foundLabels := make(map[string]struct{})
 
 	for label := range pod.Labels {
-		for _, v := range pairLabelsMap { // labels must exist together and have the same id
+		for _, v := range pairLabelPrefixesMap { // labels must exist together and have the same id
 			if !strings.HasPrefix(label, v) {
 				continue
 			}
@@ -100,7 +101,7 @@ func (lc *OpsLifecycle) Validating(ctx context.Context, pod *corev1.Pod, logger 
 			id := s[1]
 
 			if id != "" {
-				label := fmt.Sprintf("%s/%s", pairLabelsMap[v], id)
+				label := fmt.Sprintf("%s/%s", pairLabelPrefixesMap[v], id)
 				_, ok := pod.Labels[label]
 				if !ok {
 					return fmt.Errorf("not found label %s", label)
@@ -108,34 +109,36 @@ func (lc *OpsLifecycle) Validating(ctx context.Context, pod *corev1.Pod, logger 
 			}
 		}
 
-		expected := false
+		found := false
 		for v := range expectedLabels {
 			if strings.HasPrefix(label, v) {
-				delete(expectedLabels, v)
+				foundLabels[v] = struct{}{}
 			}
-			expected = true
+			found = true
 			break
 		}
-		if expected {
+		if found {
 			continue
 		}
 
-		for _, v := range coexistingLabelsMap { // labels must exist together
+		for _, v := range coexistingLabelPrefixesMap { // labels must exist together
 			if !strings.HasPrefix(label, v) {
 				continue
 			}
-			expectedLabels[coexistingLabelsMap[v]] = struct{}{}
+			expectedLabels[coexistingLabelPrefixesMap[v]] = struct{}{}
 		}
 	}
 
-	if len(expectedLabels) > 0 {
-		return fmt.Errorf("not found labels %v", expectedLabels)
+	if len(expectedLabels) != len(foundLabels) {
+		return fmt.Errorf("not found the expected label prefixes: %v", expectedLabels)
 	}
 	return nil
 }
 
 func (lc *OpsLifecycle) Mutating(ctx context.Context, oldPod, newPod *corev1.Pod, _ client.Client, logger *log.Logger) error {
-	newIdToLabelsMap, typeToNumsMap, err := utils.PodIDAndTypesMap(newPod)
+	lc.addReadinessGates(newPod, v1alpha1.ReadinessGatePodServiceReady)
+
+	newIdToLabelsMap, typeToNumsMap, err := podopslifecycle.PodIDAndTypesMap(newPod)
 	if err != nil {
 		return err
 	}
@@ -143,7 +146,7 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, oldPod, newPod *corev1.Pod
 	var operatingCount, operateCount, completeCount int
 	var undoTypeToNumsMap = map[string]int{}
 	for id, labels := range newIdToLabelsMap {
-		if undoOperationType, ok := labels[v1alpha1.LabelPodUndoOperationType]; ok {
+		if undoOperationType, ok := labels[v1alpha1.PodUndoOperationTypeLabelPrefix]; ok { // operation is canceled
 			if _, ok := undoTypeToNumsMap[undoOperationType]; !ok {
 				undoTypeToNumsMap[undoOperationType] = 1
 			} else {
@@ -151,58 +154,58 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, oldPod, newPod *corev1.Pod
 			}
 
 			// clean up these labels with id
-			for _, v := range []string{v1alpha1.LabelPodOperating, v1alpha1.LabelPodOperationType, v1alpha1.LabelPodPreCheck, v1alpha1.LabelPodPreChecked, v1alpha1.LabelPodPrepare, v1alpha1.LabelPodOperate} {
+			for _, v := range []string{v1alpha1.PodOperatingLabelPrefix, v1alpha1.PodOperationTypeLabelPrefix, v1alpha1.PodPreCheckLabelPrefix, v1alpha1.PodPreCheckedLabelPrefix, v1alpha1.PodPrepareLabelPrefix, v1alpha1.PodOperateLabelPrefix} {
 				delete(newPod.Labels, fmt.Sprintf("%s/%s", v, id))
 			}
 
-			delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.LabelPodUndoOperationType, id))
+			delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodUndoOperationTypeLabelPrefix, id))
 			continue
 		}
 
-		if _, ok := labels[v1alpha1.LabelPodOperating]; ok {
+		if _, ok := labels[v1alpha1.PodOperatingLabelPrefix]; ok { // operating
 			operatingCount++
 
-			if _, ok := labels[v1alpha1.LabelPodPreChecked]; ok {
-				if _, ok := labels[v1alpha1.LabelPodPrepare]; !ok {
-					lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.LabelPodPrepare, id))
+			if _, ok := labels[v1alpha1.PodPreCheckedLabelPrefix]; ok {
+				if _, ok := labels[v1alpha1.PodPrepareLabelPrefix]; !ok {
+					lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, id))
 				}
-				if _, ok := labels[v1alpha1.LabelPodOperate]; !ok {
+				if _, ok := labels[v1alpha1.PodOperateLabelPrefix]; !ok {
 					if ready, _, _ := lc.readyToUpgrade(newPod); ready {
-						lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.LabelPodOperate, id))
+						lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id))
 					}
 				}
 			} else {
-				if _, ok := labels[v1alpha1.LabelPodPreCheck]; !ok {
-					lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.LabelPodPreCheck, id))
+				if _, ok := labels[v1alpha1.PodPreCheckLabelPrefix]; !ok {
+					lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, id))
 				}
 			}
 		}
 
-		if _, ok := labels[v1alpha1.LabelPodOperate]; ok {
+		if _, ok := labels[v1alpha1.PodOperateLabelPrefix]; ok {
 			operateCount++
 			continue
 		}
 
-		if _, ok := labels[v1alpha1.LabelPodOperated]; ok {
-			if _, ok := labels[v1alpha1.LabelPodPostChecked]; ok {
-				if _, ok := labels[v1alpha1.LabelPodComplete]; !ok {
-					lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.LabelPodComplete, id))
+		if _, ok := labels[v1alpha1.PodOperatedLabelPrefix]; ok { // operated
+			if _, ok := labels[v1alpha1.PodPostCheckedLabelPrefix]; ok {
+				if _, ok := labels[v1alpha1.PodCompleteLabelPrefix]; !ok {
+					lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, id))
 				}
 			} else {
-				if _, ok := labels[v1alpha1.LabelPodPostCheck]; !ok {
-					lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.LabelPodPostCheck, id))
+				if _, ok := labels[v1alpha1.PodPostCheckLabelPrefix]; !ok {
+					lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, id))
 				}
 			}
 		}
 
-		if _, ok := labels[v1alpha1.LabelPodComplete]; ok {
+		if _, ok := labels[v1alpha1.PodCompleteLabelPrefix]; ok { // complete
 			completeCount++
 		}
 	}
 
 	for t, num := range undoTypeToNumsMap {
 		if num == typeToNumsMap[t] { // reset the permission with type t if all operating with type t are canceled
-			delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.LabelPodOperationPermission, t))
+			delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, t))
 		}
 	}
 
@@ -210,36 +213,36 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, oldPod, newPod *corev1.Pod
 		return nil
 	}
 
-	if operateCount == len(newIdToLabelsMap) {
-		oldIdToLabelsMap, _, err := utils.PodIDAndTypesMap(oldPod)
+	if operateCount == len(newIdToLabelsMap) { // all operations are prepared
+		oldIdToLabelsMap, _, err := podopslifecycle.PodIDAndTypesMap(oldPod)
 		if err != nil {
 			return err
 		}
 
 		for id := range newIdToLabelsMap {
-			for _, v := range []string{v1alpha1.LabelPodPreCheck, v1alpha1.LabelPodPreChecked, v1alpha1.LabelPodPrepare, v1alpha1.LabelPodOperate} {
+			for _, v := range []string{v1alpha1.PodPreCheckLabelPrefix, v1alpha1.PodPreCheckedLabelPrefix, v1alpha1.PodPrepareLabelPrefix, v1alpha1.PodOperateLabelPrefix} {
 				delete(newPod.Labels, fmt.Sprintf("%s/%s", v, id))
 			}
-			lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.LabelPodOperated, id))
+			lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, id))
 
-			t, ok := oldIdToLabelsMap[id][v1alpha1.LabelPodOperationType]
+			t, ok := oldIdToLabelsMap[id][v1alpha1.PodOperationTypeLabelPrefix]
 			if !ok {
-				return fmt.Errorf("pod %s/%s label %s not found", oldPod.Namespace, oldPod.Name, fmt.Sprintf("%s/%s", v1alpha1.LabelPodPreChecked, id))
+				return fmt.Errorf("pod %s/%s label %s not found", oldPod.Namespace, oldPod.Name, fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, id))
 			}
 
-			delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.LabelPodOperationPermission, t))
-			newPod.Labels[fmt.Sprintf("%s/%s", v1alpha1.LabelPodDoneOperationType, id)] = t
+			delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, t))
+			newPod.Labels[fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, id)] = t
 		}
 	}
 
-	if completeCount == len(newIdToLabelsMap) {
+	if completeCount == len(newIdToLabelsMap) { // all operations are done
 		satisfied, _, err := lc.satisfyExpectedFinalizers(newPod)
 		if err != nil {
 			return err
 		}
 		if satisfied {
 			for id := range newIdToLabelsMap {
-				for _, v := range []string{v1alpha1.LabelPodOperated, v1alpha1.LabelPodDoneOperationType, v1alpha1.LabelPodPostCheck, v1alpha1.LabelPodPostChecked, v1alpha1.LabelPodComplete} {
+				for _, v := range []string{v1alpha1.PodOperatedLabelPrefix, v1alpha1.PodDoneOperationTypeLabelPrefix, v1alpha1.PodPostCheckLabelPrefix, v1alpha1.PodPostCheckedLabelPrefix, v1alpha1.PodCompleteLabelPrefix} {
 					delete(newPod.Labels, fmt.Sprintf("%s/%s", v, id))
 				}
 			}
@@ -254,4 +257,15 @@ func (lc *OpsLifecycle) addLabelWithTime(newPod *corev1.Pod, key string) {
 		newPod.Labels = make(map[string]string)
 	}
 	newPod.Labels[key] = lc.timeLabelValue()
+}
+
+func (lc *OpsLifecycle) addReadinessGates(newPod *corev1.Pod, conditionType corev1.PodConditionType) {
+	for _, v := range newPod.Spec.ReadinessGates {
+		if v.ConditionType == conditionType {
+			return
+		}
+	}
+	newPod.Spec.ReadinessGates = append(newPod.Spec.ReadinessGates, corev1.PodReadinessGate{
+		ConditionType: conditionType,
+	})
 }
