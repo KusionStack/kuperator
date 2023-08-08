@@ -14,8 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apis
+package controllers
 
-const (
-	EnvTestMode = "ENV_TEST_MODE"
+import (
+	"kusionstack.io/kafed/pkg/controllers/podopslifecycle"
+	"kusionstack.io/kafed/pkg/features"
+	"kusionstack.io/kafed/pkg/utils/feature"
 )
+
+func init() {
+	if feature.DefaultFeatureGate.Enabled(features.PodOpsLifecycle) {
+		AddToManagerFuncs = append(AddToManagerFuncs, podopslifecycle.Add)
+	}
+}
