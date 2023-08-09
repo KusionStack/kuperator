@@ -65,7 +65,7 @@ func Add(mgr ctrl.Manager) error {
 	return AddToMgr(mgr, NewReconciler(mgr))
 }
 
-// newReconciler returns a new reconcile.Reconciler
+// NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr ctrl.Manager) reconcile.Reconciler {
 	recorder := mgr.GetEventRecorderFor(controllerName)
 
@@ -73,7 +73,7 @@ func NewReconciler(mgr ctrl.Manager) reconcile.Reconciler {
 	podControl = podcontrol.NewRealPodControl(mgr.GetClient(), mgr.GetScheme())
 	syncControl = synccontrol.NewRealSyncControl(mgr.GetClient(), podControl, recorder)
 
-	utils.InitExpectations(mgr.GetClient())
+	collasetutils.InitExpectations(mgr.GetClient())
 
 	return &CollaSetReconciler{
 		Client:   mgr.GetClient(),
@@ -91,7 +91,6 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to RuleSet
 	err = c.Watch(&source.Kind{Type: &appsv1alpha1.CollaSet{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
@@ -119,7 +118,7 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
 		if !errors.IsNotFound(err) {
 			klog.Error("fail to find CollaSet %s: %s", req, err)
-			utils.ActiveExpectations.Delete(req.Namespace, req.Name)
+			collasetutils.ActiveExpectations.Delete(req.Namespace, req.Name)
 			return reconcile.Result{}, err
 		}
 
@@ -128,7 +127,7 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// if expectation not satisfied, shortcut this reconciling till informer cache is updated.
-	if satisfied, err := utils.ActiveExpectations.IsSatisfied(instance); err != nil {
+	if satisfied, err := collasetutils.ActiveExpectations.IsSatisfied(instance); err != nil {
 		return ctrl.Result{}, err
 	} else if !satisfied {
 		klog.Warningf("CollaSet %s is not satisfied to reconcile.", req)
@@ -260,7 +259,7 @@ func (r *CollaSetReconciler) updateStatus(ctx context.Context, instance *appsv1a
 
 	err := r.Status().Update(ctx, instance)
 	if err == nil {
-		if err := utils.ActiveExpectations.ExpectUpdate(instance, expectations.CollaSet, instance.Name, instance.ResourceVersion); err != nil {
+		if err := collasetutils.ActiveExpectations.ExpectUpdate(instance, expectations.CollaSet, instance.Name, instance.ResourceVersion); err != nil {
 			return err
 		}
 	}

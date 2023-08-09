@@ -18,7 +18,6 @@ package synccontrol
 
 import (
 	"fmt"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -166,7 +165,7 @@ func (sc *RealSyncControl) Scale(set *appsv1alpha1.CollaSet, podWrappers []*coll
 
 			if pod, err := sc.podControl.CreatePod(newPod, updatedRevision); err == nil {
 				// add an expectation for this pod creation, before next reconciling
-				if err := utils.ActiveExpectations.ExpectCreate(set, expectations.Pod, pod.Name); err != nil {
+				if err := collasetutils.ActiveExpectations.ExpectCreate(set, expectations.Pod, pod.Name); err != nil {
 					return err
 				}
 			}
@@ -204,7 +203,7 @@ func (sc *RealSyncControl) Scale(set *appsv1alpha1.CollaSet, podWrappers []*coll
 				return fmt.Errorf("fail to begin PodOpsLifecycle for Scaling in Pod %s/%s: %s", pod.Namespace, pod.Name, err)
 			} else if updated {
 				// add an expectation for this pod creation, before next reconciling
-				if err := utils.ActiveExpectations.ExpectUpdate(set, expectations.Pod, pod.Name, pod.ResourceVersion); err != nil {
+				if err := collasetutils.ActiveExpectations.ExpectUpdate(set, expectations.Pod, pod.Name, pod.ResourceVersion); err != nil {
 					return err
 				}
 			}
@@ -258,7 +257,7 @@ func (sc *RealSyncControl) Scale(set *appsv1alpha1.CollaSet, podWrappers []*coll
 		succCount, err = controllerutils.SlowStartBatch(len(podCh), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 			pod := <-podCh
 			if err := sc.podControl.DeletePod(pod.Pod); err == nil {
-				if err := utils.ActiveExpectations.ExpectDelete(set, expectations.Pod, pod.Name); err != nil {
+				if err := collasetutils.ActiveExpectations.ExpectDelete(set, expectations.Pod, pod.Name); err != nil {
 					return err
 				}
 			}
@@ -345,7 +344,7 @@ func (sc *RealSyncControl) Update(instance *appsv1alpha1.CollaSet, podWrapers []
 			return fmt.Errorf("fail to begin PodOpsLifecycle for updating Pod %s/%s: %s", podInfo.Namespace, podInfo.Name, err)
 		} else if updated {
 			// add an expectation for this pod update, before next reconciling
-			if err := utils.ActiveExpectations.ExpectUpdate(instance, expectations.Pod, podInfo.Name, podInfo.ResourceVersion); err != nil {
+			if err := collasetutils.ActiveExpectations.ExpectUpdate(instance, expectations.Pod, podInfo.Name, podInfo.ResourceVersion); err != nil {
 				return err
 			}
 		}
@@ -448,7 +447,7 @@ func (sc *RealSyncControl) Update(instance *appsv1alpha1.CollaSet, podWrapers []
 				return fmt.Errorf("fail to finish PodOpsLifecycle for updating Pod %s/%s: %s", podInfo.Namespace, podInfo.Name, err)
 			} else if updated {
 				// add an expectation for this pod update, before next reconciling
-				if err := utils.ActiveExpectations.ExpectUpdate(instance, expectations.Pod, podInfo.Name, podInfo.ResourceVersion); err != nil {
+				if err := collasetutils.ActiveExpectations.ExpectUpdate(instance, expectations.Pod, podInfo.Name, podInfo.ResourceVersion); err != nil {
 					return err
 				}
 				sc.recorder.Eventf(podInfo.Pod, corev1.EventTypeNormal, "UpdateReady", "pod %s/%s update finished", podInfo.Namespace, podInfo.Name)

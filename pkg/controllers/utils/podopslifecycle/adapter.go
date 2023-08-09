@@ -25,6 +25,7 @@ type OperationType string
 var (
 	OpsLifecycleTypeUpdate  OperationType = "update"
 	OpsLifecycleTypeScaleIn OperationType = "scaleIn"
+	OpsLifecycleTypeDelete  OperationType = "delete"
 )
 
 // LifecycleAdapter helps CRD Operators to easily access PodOpsLifecycle

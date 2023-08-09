@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -126,7 +127,7 @@ func Finish(c client.Client, adapter LifecycleAdapter, obj client.Object) (updat
 func checkOperatingID(adapter LifecycleAdapter, obj client.Object) (val string, ok bool) {
 	labelID := fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, adapter.GetID())
 	val, ok = obj.GetLabels()[labelID]
-	return
+	return adapter.GetID(), ok
 }
 
 func checkOperationType(adapter LifecycleAdapter, obj client.Object) (val OperationType, ok bool) {
@@ -147,7 +148,7 @@ func checkOperate(adapter LifecycleAdapter, obj client.Object) (val string, ok b
 
 func setOperatingID(adapter LifecycleAdapter, obj client.Object) (val string, ok bool) {
 	labelID := fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, adapter.GetID())
-	obj.GetLabels()[labelID] = adapter.GetID()
+	obj.GetLabels()[labelID] = fmt.Sprintf("%d", time.Now().UnixNano())
 	return
 }
 

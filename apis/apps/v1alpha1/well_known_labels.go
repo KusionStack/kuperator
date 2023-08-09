@@ -42,6 +42,8 @@ const (
 	PodScalingInLabelKey           = "apps.kafed.kusionstack.io/scaling-in"
 
 	// --- End: Labels for CollaSet ---
+
+	PodDeletionIndicationLabelKey = "kafed.kusionstack.io/to-delete" // Users can use this label to indicate a pod to delete
 )
 
 var (

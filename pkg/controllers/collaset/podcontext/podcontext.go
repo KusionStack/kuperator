@@ -19,6 +19,8 @@ package podcontext
 import (
 	"context"
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"kusionstack.io/kafed/pkg/controllers/collaset/utils"
 	"sort"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -26,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
-	"kusionstack.io/kafed/pkg/controllers/collaset/utils"
 	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
 )
 
@@ -38,16 +39,15 @@ const (
 func AllocateID(c client.Client, instance *appsv1alpha1.CollaSet, defaultRevision string, replicas int) (map[int]*appsv1alpha1.ContextDetail, error) {
 	contextName := getContextName(instance)
 	podContext := &appsv1alpha1.ResourceContext{}
+	notFound := false
 	if err := c.Get(context.TODO(), types.NamespacedName{Namespace: instance.Namespace, Name: contextName}, podContext); err != nil {
 		if !errors.IsNotFound(err) {
 			return nil, fmt.Errorf("fail to find ResourceContext %s/%s for owner %s: %s", instance.Namespace, contextName, instance.Name, err)
 		}
 
+		notFound = true
 		podContext.Namespace = instance.Namespace
 		podContext.Name = contextName
-		if err := c.Create(context.TODO(), podContext); err != nil {
-			return nil, fmt.Errorf("fail to create ResourceContext %s/%s for owner %s after not found: %s", instance.Namespace, contextName, instance.Name, err)
-		}
 	}
 
 	// store all the IDs crossing Multiple workload
@@ -92,7 +92,11 @@ func AllocateID(c client.Client, instance *appsv1alpha1.CollaSet, defaultRevisio
 		ownedIDs[candidateID] = detail
 	}
 
-	return ownedIDs, doUpdateToPodContext(c, instance, ownedIDs, podContext, instance.Name)
+	if notFound {
+		return ownedIDs, doCreatePodContext(c, instance, ownedIDs)
+	}
+
+	return ownedIDs, doUpdatePodContext(c, instance, ownedIDs, podContext)
 }
 
 func UpdateToPodContext(c client.Client, instance *appsv1alpha1.CollaSet, ownedIDs map[int]*appsv1alpha1.ContextDetail) error {
@@ -103,17 +107,36 @@ func UpdateToPodContext(c client.Client, instance *appsv1alpha1.CollaSet, ownedI
 			return fmt.Errorf("fail to find ResourceContext %s/%s: %s", instance.Namespace, contextName, err)
 		}
 
-		podContext.Namespace = instance.Namespace
-		podContext.Name = contextName
-		if err := c.Create(context.TODO(), podContext); err != nil {
+		if err := doCreatePodContext(c, instance, ownedIDs); err != nil {
 			return fmt.Errorf("fail to create ResourceContext %s/%s after not found: %s", instance.Namespace, contextName, err)
 		}
 	}
 
-	return doUpdateToPodContext(c, instance, ownedIDs, podContext, instance.Name)
+	return doUpdatePodContext(c, instance, ownedIDs, podContext)
 }
 
-func doUpdateToPodContext(c client.Client, instance *appsv1alpha1.CollaSet, ownedIDs map[int]*appsv1alpha1.ContextDetail, podContext *appsv1alpha1.ResourceContext, owner string) error {
+func doCreatePodContext(c client.Client, instance *appsv1alpha1.CollaSet, ownerIDs map[int]*appsv1alpha1.ContextDetail) error {
+	contextName := getContextName(instance)
+	podContext := &appsv1alpha1.ResourceContext{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: instance.Namespace,
+			Name:      contextName,
+		},
+		Spec: appsv1alpha1.ResourceContextSpec{
+			Contexts: make([]appsv1alpha1.ContextDetail, len(ownerIDs)),
+		},
+	}
+
+	i := 0
+	for _, detail := range ownerIDs {
+		podContext.Spec.Contexts[i] = *detail
+		i++
+	}
+
+	return c.Create(context.TODO(), podContext)
+}
+
+func doUpdatePodContext(c client.Client, instance client.Object, ownedIDs map[int]*appsv1alpha1.ContextDetail, podContext *appsv1alpha1.ResourceContext) error {
 	// store all IDs crossing all workload
 	existingIDs := map[int]*appsv1alpha1.ContextDetail{}
 	for k, detail := range ownedIDs {
@@ -122,7 +145,7 @@ func doUpdateToPodContext(c client.Client, instance *appsv1alpha1.CollaSet, owne
 
 	for i := range podContext.Spec.Contexts {
 		detail := podContext.Spec.Contexts[i]
-		if detail.Contains(OwnerContextKey, owner) {
+		if detail.Contains(OwnerContextKey, instance.GetName()) {
 			continue
 		}
 
