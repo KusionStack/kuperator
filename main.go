@@ -30,9 +30,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"kusionstack.io/kafed/apis"
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
 	"kusionstack.io/kafed/pkg/controllers"
 	"kusionstack.io/kafed/pkg/utils/feature"
+	"kusionstack.io/kafed/pkg/utils/inject"
 	"kusionstack.io/kafed/pkg/webhook"
 
 	_ "kusionstack.io/kafed/pkg/features"
@@ -83,6 +85,7 @@ func main() {
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "5d84702b.kafed.io",
 		CertDir:                certDir,
+		NewCache:               inject.NewCacheWithFieldIndex,
 
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
@@ -98,6 +101,11 @@ func main() {
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+
+	if err = apis.AddToScheme(mgr.GetScheme()); err != nil {
+		setupLog.Error(err, "unable to add APIs scheme")
 		os.Exit(1)
 	}
 

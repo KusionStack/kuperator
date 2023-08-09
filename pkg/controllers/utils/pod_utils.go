@@ -395,7 +395,7 @@ func IsServiceAvailable(pod *corev1.Pod) bool {
 		return false
 	}
 
-	_, exist := pod.Labels[appsv1alpha1.PodLabelServiceAvailable]
+	_, exist := pod.Labels[appsv1alpha1.PodServiceAvailableLabel]
 	return exist
 }
 
