@@ -14,19 +14,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
-
-const (
-	PodAvailableConditionsAnnotation = "kafed.kusionstack.io/available-conditions" // indicate the available conditions of a pod
-	// --- Begin: Annotations for RuleSet ---
-
-	AnnotationPodSkipRuleConditions = "apps.kafed.io/skip-rule-conditions"
-
-	// --- End: Annotations for RuleSet ---
-
-	// --- Begin: Annotations for CollaSet ---
-
-	LastPodStatusAnnotationKey = "kafed.kusionstack.io/last-pod-status"
-
-	// --- End: Annotations for CollaSet
-)
+package revision
