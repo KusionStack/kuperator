@@ -62,26 +62,22 @@ func NewRefManager(client client.Writer, selector *metav1.LabelSelector, owner m
 
 func (mgr *RefManager) ClaimOwned(objs []client.Object) ([]client.Object, error) {
 	match := func(obj metav1.Object) bool {
-		if !mgr.selector.Matches(labels.Set(obj.GetLabels())) {
-			return false
-		}
-
-		return true
+		return mgr.selector.Matches(labels.Set(obj.GetLabels()))
 	}
 
-	claimObjs := []client.Object{}
-	errlist := []error{}
+	var claimObjs []client.Object
+	var errList []error
 	for _, obj := range objs {
 		ok, err := mgr.ClaimObject(obj, match)
 		if err != nil {
-			errlist = append(errlist, err)
+			errList = append(errList, err)
 			continue
 		}
 		if ok {
 			claimObjs = append(claimObjs, obj)
 		}
 	}
-	return claimObjs, utilerrors.NewAggregate(errlist)
+	return claimObjs, utilerrors.NewAggregate(errList)
 }
 
 func (mgr *RefManager) canAdoptOnce() error {

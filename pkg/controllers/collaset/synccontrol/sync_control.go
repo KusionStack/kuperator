@@ -61,7 +61,7 @@ type RealSyncControl struct {
 }
 
 // SyncPods is used to reclaim Pod instance ID
-func (sc *RealSyncControl) SyncPods(instance *appsv1alpha1.CollaSet, filteredPods []*corev1.Pod, updatedRevision *appsv1.ControllerRevision, newStatus *appsv1alpha1.CollaSetStatus) (bool, []*collasetutils.PodWrapper, map[int]*appsv1alpha1.ContextDetail, error) {
+func (sc *RealSyncControl) SyncPods(instance *appsv1alpha1.CollaSet, filteredPods []*corev1.Pod, updatedRevision *appsv1.ControllerRevision, _ *appsv1alpha1.CollaSetStatus) (bool, []*collasetutils.PodWrapper, map[int]*appsv1alpha1.ContextDetail, error) {
 	// get owned IDs
 	var ownedIDs map[int]*appsv1alpha1.ContextDetail
 	var err error
@@ -174,17 +174,15 @@ func (sc *RealSyncControl) Scale(set *appsv1alpha1.CollaSet, podWrappers []*coll
 
 		if err != nil {
 			collasetutils.AddOrUpdateCondition(newStatus, appsv1alpha1.CollaSetScale, err, "ScaleOutFailed", err.Error())
-			return scaling, err
+			return succCount > 0, err
 		} else {
 			collasetutils.AddOrUpdateCondition(newStatus, appsv1alpha1.CollaSetScale, nil, "ScaleOut", "")
 		}
 
-		// TODO record pod current revision
-
-		return succCount != 0, err
+		return succCount > 0, err
 	} else if diff < 0 {
 		// chose the pods to scale in
-		podsToScaleIn := getPodsToDelete(podWrappers, ownedIDs, diff*-1)
+		podsToScaleIn := getPodsToDelete(podWrappers, diff*-1)
 		// filter out Pods need to trigger PodOpsLifecycle
 		podCh := make(chan *collasetutils.PodWrapper, len(podsToScaleIn))
 		for i := range podsToScaleIn {

@@ -19,13 +19,12 @@ package synccontrol
 import (
 	"sort"
 
-	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
 	collasetutils "kusionstack.io/kafed/pkg/controllers/collaset/utils"
 	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
 	"kusionstack.io/kafed/pkg/controllers/utils/podopslifecycle"
 )
 
-func getPodsToDelete(filteredPods []*collasetutils.PodWrapper, ownedIDs map[int]*appsv1alpha1.ContextDetail, diff int) []*collasetutils.PodWrapper {
+func getPodsToDelete(filteredPods []*collasetutils.PodWrapper, diff int) []*collasetutils.PodWrapper {
 	sort.Sort(ActivePodsForDeletion(filteredPods))
 	start := len(filteredPods) - diff
 	if start < 0 {

@@ -19,10 +19,10 @@ package revision
 
 import (
 	"hash"
+	"k8s.io/klog/v2"
 
 	"github.com/davecgh/go-spew/spew"
 	corev1 "k8s.io/api/core/v1"
-
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -39,5 +39,7 @@ func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) {
 		DisableMethods: true,
 		SpewKeys:       true,
 	}
-	printer.Fprintf(hasher, "%#v", objectToWrite)
+	if _, err := printer.Fprintf(hasher, "%#v", objectToWrite); err != nil {
+		klog.Error("fail to deep hash: %s", err)
+	}
 }

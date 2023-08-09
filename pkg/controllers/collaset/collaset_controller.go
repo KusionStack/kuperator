@@ -118,12 +118,11 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
 		if !errors.IsNotFound(err) {
 			klog.Error("fail to find CollaSet %s: %s", req, err)
-			collasetutils.ActiveExpectations.Delete(req.Namespace, req.Name)
 			return reconcile.Result{}, err
 		}
 
 		klog.Infof("CollaSet %s is deleted", req)
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, collasetutils.ActiveExpectations.Delete(req.Namespace, req.Name)
 	}
 
 	// if expectation not satisfied, shortcut this reconciling till informer cache is updated.
@@ -134,7 +133,7 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	newStatus, err := DoReconcile(ctx, instance)
+	newStatus, err := DoReconcile(instance)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -146,7 +145,7 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	return ctrl.Result{}, nil
 }
 
-func DoReconcile(ctx context.Context, instance *appsv1alpha1.CollaSet) (*appsv1alpha1.CollaSetStatus, error) {
+func DoReconcile(instance *appsv1alpha1.CollaSet) (*appsv1alpha1.CollaSetStatus, error) {
 	newStatus := instance.Status.DeepCopy()
 
 	currentRevision, updatedRevision, revisions, collisionCount, _, err := revisionManager.ConstructRevisions(instance, false)

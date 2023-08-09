@@ -19,10 +19,8 @@ package poddeletion
 import (
 	"context"
 	"fmt"
-	corev1 "k8s.io/api/core/v1"
-	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
-	"kusionstack.io/kafed/pkg/controllers/utils/podopslifecycle"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -34,6 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"kusionstack.io/kafed/pkg/controllers/collaset/utils"
+	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
+	"kusionstack.io/kafed/pkg/controllers/utils/podopslifecycle"
 )
 
 const (
@@ -88,12 +88,11 @@ func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
 		if !errors.IsNotFound(err) {
 			klog.Error("fail to find Pod %s: %s", req, err)
-			utils.ActiveExpectations.Delete(req.Namespace, req.Name)
 			return reconcile.Result{}, err
 		}
 
 		klog.Infof("Pod %s is deleted", req)
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, utils.ActiveExpectations.Delete(req.Namespace, req.Name)
 	}
 
 	// if expectation not satisfied, shortcut this reconciling till informer cache is updated.

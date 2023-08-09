@@ -85,7 +85,7 @@ func decidePodToUpdate(cls *appsv1alpha1.CollaSet, podInfos []*PodUpdateInfo) []
 	return decidePodToUpdateByPartition(cls, podInfos)
 }
 
-func decidePodToUpdateByLabel(cls *appsv1alpha1.CollaSet, podInfos []*PodUpdateInfo) (podToUpdate []*PodUpdateInfo) {
+func decidePodToUpdateByLabel(_ *appsv1alpha1.CollaSet, podInfos []*PodUpdateInfo) (podToUpdate []*PodUpdateInfo) {
 	for i := range podInfos {
 		if _, exist := podInfos[i].Labels[appsv1alpha1.CollaSetUpdateIndicateLabelKey]; exist {
 			podToUpdate = append(podToUpdate, podInfos[i])
@@ -182,10 +182,9 @@ func (u *InPlaceIfPossibleUpdater) AnalyseAndGetUpdatedPod(cls *appsv1alpha1.Col
 
 	// 2. compare current and updated pods. Only pod image and metadata are supported to update in-place
 	// TODO: use cache
-	inPlaceSetUpdateSupport := true
-	inPlaceSetUpdateSupport, onlyMetadataChanged = u.diffPod(currentPod, updatedPod)
+	inPlaceUpdateSupport, onlyMetadataChanged = u.diffPod(currentPod, updatedPod)
 	// 2.1 if pod has changes more than metadata and image
-	if !inPlaceSetUpdateSupport {
+	if !inPlaceUpdateSupport {
 		return false, onlyMetadataChanged, nil, nil
 	}
 
@@ -221,7 +220,7 @@ func (u *InPlaceIfPossibleUpdater) AnalyseAndGetUpdatedPod(cls *appsv1alpha1.Col
 
 		podStatusStr, err := json.Marshal(podStatus)
 		if err != nil {
-			return inPlaceSetUpdateSupport, onlyMetadataChanged, updatedPod, err
+			return inPlaceUpdateSupport, onlyMetadataChanged, updatedPod, err
 		}
 
 		if updatedPod.Annotations == nil {
@@ -329,23 +328,23 @@ func (u *InPlaceIfPossibleUpdater) GetPodUpdateFinishStatus(pod *corev1.Pod) (fi
 type InPlaceOnlyPodUpdater struct {
 }
 
-func (u *InPlaceOnlyPodUpdater) AnalyseAndGetUpdatedPod(cls *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, podUpdateInfo *PodUpdateInfo) (inPlaceUpdateSupport bool, onlyMetadataChanged bool, updatedPod *corev1.Pod, err error) {
+func (u *InPlaceOnlyPodUpdater) AnalyseAndGetUpdatedPod(_ *appsv1alpha1.CollaSet, _ *appsv1.ControllerRevision, _ *PodUpdateInfo) (inPlaceUpdateSupport bool, onlyMetadataChanged bool, updatedPod *corev1.Pod, err error) {
 
 	return
 }
 
-func (u *InPlaceOnlyPodUpdater) GetPodUpdateFinishStatus(pod *corev1.Pod) (finished bool, msg string, err error) {
+func (u *InPlaceOnlyPodUpdater) GetPodUpdateFinishStatus(_ *corev1.Pod) (finished bool, msg string, err error) {
 	return
 }
 
 type RecreatePodUpdater struct {
 }
 
-func (u *RecreatePodUpdater) AnalyseAndGetUpdatedPod(cls *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, podUpdateInfo *PodUpdateInfo) (inPlaceUpdateSupport bool, onlyMetadataChanged bool, updatedPod *corev1.Pod, err error) {
+func (u *RecreatePodUpdater) AnalyseAndGetUpdatedPod(_ *appsv1alpha1.CollaSet, _ *appsv1.ControllerRevision, _ *PodUpdateInfo) (inPlaceUpdateSupport bool, onlyMetadataChanged bool, updatedPod *corev1.Pod, err error) {
 	return false, false, nil, nil
 }
 
-func (u *RecreatePodUpdater) GetPodUpdateFinishStatus(pod *corev1.Pod) (finished bool, msg string, err error) {
+func (u *RecreatePodUpdater) GetPodUpdateFinishStatus(_ *corev1.Pod) (finished bool, msg string, err error) {
 	// Recreate policy alway treat Pod as update finished
 	return true, "", nil
 }

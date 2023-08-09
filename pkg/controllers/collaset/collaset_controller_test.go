@@ -20,9 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"kusionstack.io/kafed/pkg/controllers/collaset/synccontrol"
-	"kusionstack.io/kafed/pkg/controllers/utils/podopslifecycle"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -34,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -47,7 +45,9 @@ import (
 
 	"kusionstack.io/kafed/apis"
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
+	"kusionstack.io/kafed/pkg/controllers/collaset/synccontrol"
 	collasetutils "kusionstack.io/kafed/pkg/controllers/collaset/utils"
+	"kusionstack.io/kafed/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/kafed/pkg/utils/inject"
 )
 

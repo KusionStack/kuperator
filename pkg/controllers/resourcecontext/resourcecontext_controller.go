@@ -18,7 +18,6 @@ package resourcecontext
 
 import (
 	"context"
-	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
@@ -32,6 +31,7 @@ import (
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
 	"kusionstack.io/kafed/pkg/controllers/collaset/utils"
+	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
 )
 
 const (
@@ -92,12 +92,11 @@ func (r *ResourceContextReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
 		if !errors.IsNotFound(err) {
 			klog.Error("fail to find ResourceContext %s: %s", req, err)
-			utils.ActiveExpectations.Delete(req.Namespace, req.Name)
 			return reconcile.Result{}, err
 		}
 
 		klog.Infof("ResourceContext %s is deleted", req)
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, utils.ActiveExpectations.Delete(req.Namespace, req.Name)
 	}
 
 	// if expectation not satisfied, shortcut this reconciling till informer cache is updated.

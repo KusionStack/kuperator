@@ -25,82 +25,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
 	revisionutils "kusionstack.io/kafed/pkg/controllers/utils/revision"
 )
-
-type PodDeletionHostStatusType string
-
-const (
-	podDeletionHostStatusTypeHosted  PodDeletionHostStatusType = "hosted"
-	podDeletionHostStatusTypeWaiting PodDeletionHostStatusType = "waiting"
-
-	sigmaAnnoPodDeletionHostStatusKey = "hosting.delivery.sigma.alipay.com/pod-deletion"
-)
-
-type PodDeletionHostStatus struct {
-	Status PodDeletionHostStatusType `json:"status,omitempty"`
-}
-
-// IsPodDeletionHosted check Pod is deletion hosted by Sigma in contract https://yuque.antfin-inc.com/antsigma/ypy7xs/zmm0c6#zkjwP
-func IsPodDeletionHosted(pod client.Object) (bool, error) {
-	if pod.GetDeletionTimestamp() == nil {
-		return false, nil
-	}
-
-	if pod.GetAnnotations() == nil {
-		return false, nil
-	}
-
-	val, exist := pod.GetAnnotations()[sigmaAnnoPodDeletionHostStatusKey]
-	if !exist {
-		return false, nil
-	}
-
-	status := &PodDeletionHostStatus{}
-	if err := json.Unmarshal([]byte(val), status); err != nil {
-		return false, fmt.Errorf("malformed Sigma pod deletion host annotation value [%s] in key [%s]: %s", val, sigmaAnnoPodDeletionHostStatusKey, err)
-	}
-
-	return status.Status == podDeletionHostStatusTypeHosted, nil
-}
-
-var patchCodec = scheme.Codecs.LegacyCodec(appsv1alpha1.GroupVersion)
-
-func ApplyPatch(target runtime.Object, podPatch *[]byte) (runtime.Object, error) {
-	patched, err := strategicpatch.StrategicMergePatch([]byte(runtime.EncodeOrDie(patchCodec, target)), *podPatch, target)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(patched, target)
-	if err != nil {
-		return nil, err
-	}
-	return target, nil
-}
-
-func GetPodFromTemplate(template *corev1.PodTemplateSpec) (*corev1.Pod, error) {
-	desiredLabels := getPodsLabelSet(template)
-	desiredFinalizers := getPodsFinalizers(template)
-	desiredAnnotations := getPodsAnnotationSet(template)
-
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:      desiredLabels,
-			Annotations: desiredAnnotations,
-			Finalizers:  desiredFinalizers,
-		},
-	}
-
-	pod.Spec = *template.Spec.DeepCopy()
-	return pod, nil
-}
 
 func GetPodRevisionPatch(revision *appsv1.ControllerRevision) ([]byte, error) {
 	var raw map[string]interface{}
@@ -188,29 +118,6 @@ func GetPodFromRevision(revision *appsv1.ControllerRevision) (*corev1.Pod, error
 	}
 
 	return pod, nil
-}
-
-func getPodsLabelSet(template *corev1.PodTemplateSpec) labels.Set {
-	desiredLabels := make(labels.Set)
-	for k, v := range template.Labels {
-		desiredLabels[k] = v
-	}
-	return desiredLabels
-}
-
-func getPodsFinalizers(template *corev1.PodTemplateSpec) []string {
-	desiredFinalizers := make([]string, len(template.Finalizers))
-	copy(desiredFinalizers, template.Finalizers)
-	return desiredFinalizers
-}
-
-func getPodsAnnotationSet(template *corev1.PodTemplateSpec) map[string]string {
-	desiredAnnotations := make(map[string]string)
-	for k, v := range template.Annotations {
-		desiredAnnotations[k] = v
-	}
-
-	return desiredAnnotations
 }
 
 func GetPodsPrefix(controllerName string) string {
@@ -301,51 +208,6 @@ func GetPodScheduledCondition(status corev1.PodStatus) *corev1.PodCondition {
 	return condition
 }
 
-var IsContainersReadyFn = IsContainersReady
-
-func IsContainersReady(pod *corev1.Pod) (bool, string) {
-	_, condition := GetPodCondition(&pod.Status, corev1.ContainersReady)
-	if condition == nil {
-		return false, "no containers ready condition"
-	}
-
-	if condition.Status != corev1.ConditionTrue {
-		return false, condition.Message
-	}
-
-	return true, ""
-}
-
-func ContainerReadyTime(pod *corev1.Pod) *metav1.Time {
-	_, condition := GetPodCondition(&pod.Status, corev1.ContainersReady)
-	if condition == nil {
-		return nil
-	}
-
-	if condition.Status != corev1.ConditionTrue {
-		return nil
-	}
-
-	return &condition.LastTransitionTime
-}
-
-func IsPodNotReady(pod *corev1.Pod) (string, bool) {
-	if IsPodReadyConditionTrue(pod.Status) {
-		return "", false
-	}
-	// Try best not to depend on kube-scheduler
-	// If no SchedulerCondition, skip it
-	if cond := GetPodScheduledCondition(pod.Status); cond != nil && cond.Status == corev1.ConditionFalse {
-		return fmt.Sprintf("%s: %s", cond.Reason, cond.Message), true
-	}
-	cond := GetPodReadyCondition(pod.Status)
-	if cond == nil {
-		return "no Ready Condition", true
-	}
-
-	return fmt.Sprintf("%s: %s", cond.Reason, cond.Message), true
-}
-
 // IsPodReady returns true if a pod is ready; false otherwise.
 func IsPodReady(pod *corev1.Pod) bool {
 	return IsPodReadyConditionTrue(pod.Status)
@@ -386,9 +248,6 @@ func GetPodConditionFromList(conditions []corev1.PodCondition, conditionType cor
 	}
 	return -1, nil
 }
-
-var ScheduledReplicas, ReadyReplicas, AvailableReplicas, Replicas, UpdatedReplicas, OperatingReplicas,
-	UpdatedReadyReplicas, UpdatedAvailableReplicas int32
 
 func IsServiceAvailable(pod *corev1.Pod) bool {
 	if pod.Labels == nil {

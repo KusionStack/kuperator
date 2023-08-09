@@ -18,6 +18,7 @@ package resourcecontext
 
 import (
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
@@ -43,8 +44,10 @@ func (h *ExpectationEventHandler) Create(event.CreateEvent, workqueue.RateLimiti
 func (h *ExpectationEventHandler) Update(event.UpdateEvent, workqueue.RateLimitingInterface) {}
 
 // Delete is called in response to a delete event - e.g. Pod Deleted.
-func (h *ExpectationEventHandler) Delete(e event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	activeExpectations.Delete(e.Object.GetNamespace(), e.Object.GetName())
+func (h *ExpectationEventHandler) Delete(e event.DeleteEvent, _ workqueue.RateLimitingInterface) {
+	if err := activeExpectations.Delete(e.Object.GetNamespace(), e.Object.GetName()); err != nil {
+		klog.Error("fail to delete expectation in ResourceContextController for %s/%s: %s", e.Object.GetNamespace(), e.Object.GetName(), err)
+	}
 }
 
 // Generic is called in response to an event of an unknown type or a synthetic event triggered as a cron or
