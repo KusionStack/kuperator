@@ -17,9 +17,5 @@ limitations under the License.
 package v1alpha1
 
 const (
-	// --- Begin: Annotations for RuleSet ---
-
-	AnnotationPodSkipRuleConditions = "apps.kafed.io/skip-rule-conditions"
-
-	// --- End: Annotations for RuleSet ---
+	PodAvailableConditionsAnnotation = "cafed.kusionstack.io/available-conditions" // indicate the available conditions of a pod
 )

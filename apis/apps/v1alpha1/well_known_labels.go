@@ -18,9 +18,7 @@ package v1alpha1
 
 const (
 	PodScalingInPhaseLabel = "cafed.kusionstack.io/scaling-in" // indicate a pod is scaling in
-)
 
-const (
 	PodOperatingLabelPrefix           = "operating.kafed.kusionstack.io"            // indicate a pod is operating
 	PodOperationTypeLabelPrefix       = "operation-type.kafed.kusionstack.io"       // indicate the type of operation
 	PodOperationPermissionLabelPrefix = "operation-permission.kafed.kusionstack.io" // indicate the permission of operation
@@ -35,6 +33,8 @@ const (
 	PodPostCheckLabelPrefix   = "post-check.lifecycle.kafed.kusionstack.io"   // indicate a pod is in post-check phase
 	PodPostCheckedLabelPrefix = "post-checked.lifecycle.kafed.kusionstack.io" // indicate a pod has finished post-check phase
 	PodCompleteLabelPrefix    = "complete.lifecycle.kafed.kusionstack.io"     // indicate a pod has finished all phases
+
+	PodServiceAvailableLabel = "kafed.kusionstack.io/service-available" // indicate a pod is available to serve
 )
 
 var (
