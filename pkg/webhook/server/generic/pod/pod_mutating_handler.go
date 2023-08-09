@@ -45,10 +45,10 @@ type MutatingHandler struct {
 	opsLifecycle  *opslifecycle.OpsLifecycle
 }
 
-func NewMutatingHandler(needLifecycle NeedOpsLifecycle, readyToUpgrade opslifecycle.ReadyToUpgrade, satisfyExpectedFinalizers opslifecycle.SatisfyExpectedFinalizers) *MutatingHandler {
+func NewMutatingHandler(needLifecycle NeedOpsLifecycle, readyToUpgrade opslifecycle.ReadyToUpgrade) *MutatingHandler {
 	return &MutatingHandler{
 		needLifecycle: needLifecycle,
-		opsLifecycle:  opslifecycle.New(readyToUpgrade, satisfyExpectedFinalizers),
+		opsLifecycle:  opslifecycle.New(readyToUpgrade),
 	}
 }
 

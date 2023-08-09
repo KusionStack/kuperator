@@ -30,9 +30,9 @@ type PodWebhook struct {
 	validatingHandler *ValidatingHandler
 }
 
-func NewPodWebhook(needLifecycle NeedOpsLifecycle, readyToUpgrade opslifecycle.ReadyToUpgrade, satisfyExpectedFinalizers opslifecycle.SatisfyExpectedFinalizers) *PodWebhook {
+func NewPodWebhook(needLifecycle NeedOpsLifecycle, readyToUpgrade opslifecycle.ReadyToUpgrade) *PodWebhook {
 	return &PodWebhook{
-		mutatingHandler:   NewMutatingHandler(needLifecycle, readyToUpgrade, satisfyExpectedFinalizers),
+		mutatingHandler:   NewMutatingHandler(needLifecycle, readyToUpgrade),
 		validatingHandler: NewValidatingHandler(needLifecycle),
 	}
 }

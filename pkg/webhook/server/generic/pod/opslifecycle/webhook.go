@@ -18,6 +18,7 @@ package opslifecycle
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -25,6 +26,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/kafed/apis/apps/v1alpha1"
@@ -50,21 +52,17 @@ var (
 )
 
 type ReadyToUpgrade func(pod *corev1.Pod) (bool, []string, *time.Duration)
-type SatisfyExpectedFinalizers func(pod *corev1.Pod) (bool, []string, error)
 type TimeLabelValue func() string
 
 type OpsLifecycle struct {
-	readyToUpgrade            ReadyToUpgrade
-	satisfyExpectedFinalizers SatisfyExpectedFinalizers
+	readyToUpgrade ReadyToUpgrade
 
 	timeLabelValue TimeLabelValue
 }
 
-func New(readyToUpgrade ReadyToUpgrade, satisfyExpectedFinalizers SatisfyExpectedFinalizers) *OpsLifecycle {
+func New(readyToUpgrade ReadyToUpgrade) *OpsLifecycle {
 	return &OpsLifecycle{
-		readyToUpgrade:            readyToUpgrade,
-		satisfyExpectedFinalizers: satisfyExpectedFinalizers,
-
+		readyToUpgrade: readyToUpgrade,
 		timeLabelValue: func() string {
 			return strconv.FormatInt(time.Now().Unix(), 10)
 		},
@@ -227,32 +225,76 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, oldPod, newPod *corev1.Pod
 		if err != nil {
 			return err
 		}
-		if satisfied {
+		if satisfied { // all operations are done and all expected finalizers are satisfied, then remove all unuseful labels, and add service available label
 			for id := range newIdToLabelsMap {
 				for _, v := range []string{v1alpha1.PodOperatedLabelPrefix, v1alpha1.PodDoneOperationTypeLabelPrefix, v1alpha1.PodPostCheckLabelPrefix, v1alpha1.PodPostCheckedLabelPrefix, v1alpha1.PodCompleteLabelPrefix} {
 					delete(newPod.Labels, fmt.Sprintf("%s/%s", v, id))
 				}
 			}
+			lc.addLabelWithTime(newPod, v1alpha1.PodServiceAvailableLabel)
 		}
 	}
 
 	return nil
 }
 
-func (lc *OpsLifecycle) addLabelWithTime(newPod *corev1.Pod, key string) {
-	if newPod.Labels == nil {
-		newPod.Labels = make(map[string]string)
+func (lc *OpsLifecycle) addLabelWithTime(pod *corev1.Pod, key string) {
+	if pod.Labels == nil {
+		pod.Labels = make(map[string]string)
 	}
-	newPod.Labels[key] = lc.timeLabelValue()
+	pod.Labels[key] = lc.timeLabelValue()
 }
 
-func (lc *OpsLifecycle) addReadinessGates(newPod *corev1.Pod, conditionType corev1.PodConditionType) {
-	for _, v := range newPod.Spec.ReadinessGates {
+func (lc *OpsLifecycle) addReadinessGates(pod *corev1.Pod, conditionType corev1.PodConditionType) {
+	for _, v := range pod.Spec.ReadinessGates {
 		if v.ConditionType == conditionType {
 			return
 		}
 	}
-	newPod.Spec.ReadinessGates = append(newPod.Spec.ReadinessGates, corev1.PodReadinessGate{
+	pod.Spec.ReadinessGates = append(pod.Spec.ReadinessGates, corev1.PodReadinessGate{
 		ConditionType: conditionType,
 	})
+}
+
+func (lc *OpsLifecycle) satisfyExpectedFinalizers(pod *corev1.Pod) (bool, []string, error) {
+	satisfy := true
+	var expectedFinalizer []string // expected finalizers that are not satisfied
+
+	availableConditions, err := lc.podAvailableConditions(pod)
+	if err != nil {
+		return satisfy, expectedFinalizer, err
+	}
+
+	if availableConditions != nil && len(availableConditions.ExpectedFinalizers) != 0 {
+		existFinalizers := sets.String{}
+		for _, finalizer := range pod.Finalizers {
+			existFinalizers.Insert(finalizer)
+		}
+
+		for _, finalizer := range availableConditions.ExpectedFinalizers {
+			if !existFinalizers.Has(finalizer) {
+				satisfy = false
+				expectedFinalizer = append(expectedFinalizer, finalizer)
+			}
+		}
+	}
+
+	return satisfy, expectedFinalizer, nil
+}
+
+func (lc *OpsLifecycle) podAvailableConditions(pod *corev1.Pod) (*v1alpha1.PodAvailableConditions, error) {
+	if pod.Annotations == nil {
+		return nil, nil
+	}
+
+	anno, ok := pod.Annotations[v1alpha1.PodAvailableConditionsAnnotation]
+	if !ok {
+		return nil, nil
+	}
+
+	availableConditions := &v1alpha1.PodAvailableConditions{}
+	if err := json.Unmarshal([]byte(anno), availableConditions); err != nil {
+		return nil, err
+	}
+	return availableConditions, nil
 }
