@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"kusionstack.io/kafed/pkg/controllers/collaset/utils"
 	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
 	"kusionstack.io/kafed/pkg/controllers/utils/podopslifecycle"
 )
@@ -92,7 +91,7 @@ func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 
 		klog.Infof("Pod %s is deleted", req)
-		return ctrl.Result{}, utils.ActiveExpectations.Delete(req.Namespace, req.Name)
+		return ctrl.Result{}, activeExpectations.Delete(req.Namespace, req.Name)
 	}
 
 	// if expectation not satisfied, shortcut this reconciling till informer cache is updated.
