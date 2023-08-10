@@ -73,8 +73,8 @@ var _ = Describe("ResourceContext controller", func() {
 				Name:      "foo",
 			},
 			Spec: appsv1alpha1.CollaSetSpec{
-				Replicas: 2,
-				Selector: metav1.LabelSelector{
+				Replicas: int32Pointer(2),
+				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"app": "foo",
 					},
@@ -150,7 +150,7 @@ var _ = Describe("ResourceContext controller", func() {
 		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, resourceContext)).Should(BeNil())
 
 		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
-			cls.Spec.Replicas = 0
+			cls.Spec.Replicas = int32Pointer(0)
 			return true
 		})).Should(BeNil())
 
@@ -345,4 +345,8 @@ func createNamespace(c client.Client, namespaceName string) error {
 	}
 
 	return c.Create(context.TODO(), ns)
+}
+
+func int32Pointer(val int32) *int32 {
+	return &val
 }

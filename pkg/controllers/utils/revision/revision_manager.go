@@ -46,7 +46,7 @@ type OwnerAdapter interface {
 	GetCollisionCount(obj metav1.Object) *int32
 	GetHistoryLimit(obj metav1.Object) int32
 	GetPatch(obj metav1.Object) ([]byte, error)
-	GetOwneeLabels(obj metav1.Object) map[string]string
+	GetSelectorLabels(obj metav1.Object) map[string]string
 	GetCurrentRevision(obj metav1.Object) string
 	IsInUsed(obj metav1.Object, controllerRevision string) bool
 }
@@ -289,7 +289,7 @@ func (rm *RevisionManager) newRevision(set metav1.Object, revision int64, collis
 		return nil, err
 	}
 
-	revisionLabels := rm.ownerGetter.GetOwneeLabels(set)
+	revisionLabels := rm.ownerGetter.GetSelectorLabels(set)
 	if revisionLabels == nil {
 		revisionLabels = map[string]string{}
 	}

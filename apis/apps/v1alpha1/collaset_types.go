@@ -72,11 +72,11 @@ type CollaSetSpec struct {
 	// same Template, but individual replicas also have a consistent identity.
 	// If unspecified, defaults to 0.
 	// +optional
-	Replicas int32 `json:"replicas,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 
 	// Selector is a label query over pods that should match the replica count.
 	// It must match the pod template's labels.
-	Selector metav1.LabelSelector `json:"selector,omitempty"`
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected. Each pod stamped out by the CollaSet

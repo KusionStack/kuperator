@@ -66,7 +66,7 @@ func (sc *RealSyncControl) SyncPods(instance *appsv1alpha1.CollaSet, filteredPod
 	var ownedIDs map[int]*appsv1alpha1.ContextDetail
 	var err error
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		ownedIDs, err = podcontext.AllocateID(sc.client, instance, updatedRevision.Name, int(instance.Spec.Replicas))
+		ownedIDs, err = podcontext.AllocateID(sc.client, instance, updatedRevision.Name, int(replicasRealValue(instance.Spec.Replicas)))
 		return err
 	}); err != nil {
 		return false, nil, ownedIDs, fmt.Errorf("fail to allocate %d IDs using context when sync Pods: %s", instance.Spec.Replicas, err)
@@ -131,7 +131,7 @@ func (sc *RealSyncControl) SyncPods(instance *appsv1alpha1.CollaSet, filteredPod
 }
 
 func (sc *RealSyncControl) Scale(set *appsv1alpha1.CollaSet, podWrappers []*collasetutils.PodWrapper, revisions []*appsv1.ControllerRevision, updatedRevision *appsv1.ControllerRevision, ownedIDs map[int]*appsv1alpha1.ContextDetail, newStatus *appsv1alpha1.CollaSetStatus) (scaled bool, err error) {
-	diff := int(set.Spec.Replicas) - len(podWrappers)
+	diff := int(replicasRealValue(set.Spec.Replicas)) - len(podWrappers)
 	scaling := false
 
 	if diff > 0 {
@@ -458,4 +458,12 @@ func (sc *RealSyncControl) Update(instance *appsv1alpha1.CollaSet, podWrapers []
 	})
 
 	return updating || succCount > 0, err
+}
+
+func replicasRealValue(replcias *int32) int32 {
+	if replcias == nil {
+		return 0
+	}
+
+	return *replcias
 }

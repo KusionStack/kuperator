@@ -57,7 +57,7 @@ type revisionOwnerAdapter struct {
 
 func (roa *revisionOwnerAdapter) GetSelector(obj metav1.Object) *metav1.LabelSelector {
 	ips, _ := obj.(*appsalphav1.CollaSet)
-	return &ips.Spec.Selector
+	return ips.Spec.Selector
 }
 
 func (roa *revisionOwnerAdapter) GetCollisionCount(obj metav1.Object) *int32 {
@@ -75,7 +75,7 @@ func (roa *revisionOwnerAdapter) GetPatch(obj metav1.Object) ([]byte, error) {
 	return getCollaSetPatch(cs)
 }
 
-func (roa *revisionOwnerAdapter) GetOwneeLabels(obj metav1.Object) map[string]string {
+func (roa *revisionOwnerAdapter) GetSelectorLabels(obj metav1.Object) map[string]string {
 	ips, _ := obj.(*appsalphav1.CollaSet)
 	labels := map[string]string{}
 	for k, v := range ips.Spec.Template.Labels {

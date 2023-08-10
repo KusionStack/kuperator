@@ -133,65 +133,51 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	newStatus, err := DoReconcile(instance)
+	currentRevision, updatedRevision, revisions, collisionCount, _, err := revisionManager.ConstructRevisions(instance, false)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("fail to construct revision for CollaSet %s/%s: %s", instance.Namespace, instance.Name, err)
 	}
 
+	newStatus := &appsv1alpha1.CollaSetStatus{
+		// record collisionCount
+		CollisionCount:  collisionCount,
+		CurrentRevision: currentRevision.Name,
+		UpdatedRevision: updatedRevision.Name,
+	}
+
+	newStatus, err = DoReconcile(instance, updatedRevision, revisions, newStatus)
+	// update status anyway
 	if err := r.updateStatus(ctx, instance, newStatus); err != nil {
 		return ctrl.Result{}, fmt.Errorf("fail to update status of CollaSet %s: %s", req, err)
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, err
 }
 
-func DoReconcile(instance *appsv1alpha1.CollaSet) (*appsv1alpha1.CollaSetStatus, error) {
-	newStatus := instance.Status.DeepCopy()
-
-	currentRevision, updatedRevision, revisions, collisionCount, _, err := revisionManager.ConstructRevisions(instance, false)
-	if err != nil {
-		return newStatus, fmt.Errorf("fail to construct revision for CollaSet %s/%s: %s", instance.Namespace, instance.Name, err)
-	}
-
-	// record collisionCount
-	newStatus.CollisionCount = collisionCount
-	newStatus.CurrentRevision = currentRevision.Name
-	newStatus.UpdatedRevision = updatedRevision.Name
-
+func DoReconcile(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, revisions []*appsv1.ControllerRevision, newStatus *appsv1alpha1.CollaSetStatus) (*appsv1alpha1.CollaSetStatus, error) {
 	podWrappers, newStatus, syncErr := doSync(instance, updatedRevision, revisions, newStatus)
-
-	newStatus = calculateStatus(instance, newStatus, updatedRevision, podWrappers, syncErr)
-	if syncErr != nil {
-		return newStatus, syncErr
-	}
-
-	return newStatus, nil
+	return calculateStatus(instance, newStatus, updatedRevision, podWrappers, syncErr), syncErr
 }
 
 func doSync(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, revisions []*appsv1.ControllerRevision, newStatus *appsv1alpha1.CollaSetStatus) ([]*collasetutils.PodWrapper, *appsv1alpha1.CollaSetStatus, error) {
-	filteredPods, err := podControl.GetFilteredPods(&instance.Spec.Selector, instance)
+	filteredPods, err := podControl.GetFilteredPods(instance.Spec.Selector, instance)
 	if err != nil {
 		return nil, newStatus, err
 	}
 
 	synced, podWrappers, ownedIDs, err := syncControl.SyncPods(instance, filteredPods, updatedRevision, newStatus)
-	if err != nil {
-		return podWrappers, newStatus, err
-	} else if synced {
-		return podWrappers, newStatus, nil
-	}
-
-	if scaling, err := syncControl.Scale(instance, podWrappers, revisions, updatedRevision, ownedIDs, newStatus); err != nil {
-		return podWrappers, newStatus, err
-	} else if scaling {
-		return podWrappers, newStatus, nil
-	}
-
-	if _, err := syncControl.Update(instance, podWrappers, revisions, updatedRevision, ownedIDs, newStatus); err != nil {
+	if err != nil || synced {
 		return podWrappers, newStatus, err
 	}
 
-	return podWrappers, newStatus, nil
+	scaling, err := syncControl.Scale(instance, podWrappers, revisions, updatedRevision, ownedIDs, newStatus)
+	if err != nil || scaling {
+		return podWrappers, newStatus, err
+	}
+
+	_, err = syncControl.Update(instance, podWrappers, revisions, updatedRevision, ownedIDs, newStatus)
+
+	return podWrappers, newStatus, err
 }
 
 func calculateStatus(instance *appsv1alpha1.CollaSet, newStatus *appsv1alpha1.CollaSetStatus, updatedRevision *appsv1.ControllerRevision, podWrappers []*collasetutils.PodWrapper, syncErr error) *appsv1alpha1.CollaSetStatus {
@@ -242,7 +228,8 @@ func calculateStatus(instance *appsv1alpha1.CollaSet, newStatus *appsv1alpha1.Co
 	newStatus.UpdatedReadyReplicas = updatedReadyReplicas
 	newStatus.UpdatedAvailableReplicas = updatedAvailableReplicas
 
-	if newStatus.UpdatedAvailableReplicas == instance.Spec.Replicas {
+	if (instance.Spec.Replicas == nil && newStatus.UpdatedAvailableReplicas == 0) ||
+		*instance.Spec.Replicas == newStatus.UpdatedAvailableReplicas {
 		newStatus.CurrentRevision = updatedRevision.Name
 	}
 

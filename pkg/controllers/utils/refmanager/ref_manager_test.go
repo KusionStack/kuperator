@@ -45,8 +45,8 @@ func Test(t *testing.T) {
 			UID:       types.UID("fake-uid"),
 		},
 		Spec: appsv1alpha1.CollaSetSpec{
-			Replicas: 2,
-			Selector: metav1.LabelSelector{
+			Replicas: int32Pointer(2),
+			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app":  "foo",
 					"case": testcase,
@@ -92,7 +92,7 @@ func Test(t *testing.T) {
 		},
 	}
 
-	ref, err := NewRefManager(&MockClient{}, &cs.Spec.Selector, cs, scheme)
+	ref, err := NewRefManager(&MockClient{}, cs.Spec.Selector, cs, scheme)
 	g.Expect(err).Should(gomega.BeNil())
 
 	podObjects := make([]client.Object, len(pods))
@@ -141,4 +141,8 @@ func (c *MockClient) Patch(ctx context.Context, obj client.Object, patch client.
 
 func (c *MockClient) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {
 	return nil
+}
+
+func int32Pointer(val int32) *int32 {
+	return &val
 }
