@@ -20,7 +20,6 @@ package utils
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"sync"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -48,10 +47,6 @@ func NewRefManager(client client.Writer, selector *metav1.LabelSelector, owner m
 		return nil, err
 	}
 
-	ownerType := reflect.TypeOf(owner)
-	if ownerType.Kind() == reflect.Ptr {
-		ownerType = ownerType.Elem()
-	}
 	return &RefManager{
 		client:   client,
 		selector: s,

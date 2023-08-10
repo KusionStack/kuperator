@@ -84,6 +84,9 @@ func controlledHistories(c client.Client, owner client.Object, labelSelector *me
 
 	// Use ControllerRefManager to adopt/orphan as needed.
 	cm, err := refmanagerutil.NewRefManager(c, labelSelector, owner, scheme)
+	if err != nil {
+		return nil, err
+	}
 	mts := make([]client.Object, len(histories.Items))
 	for i, pod := range histories.Items {
 		mts[i] = pod.DeepCopy()

@@ -96,7 +96,7 @@ func (ae *ActiveExpectations) expect(subject metav1.Object, kind ExpectedReosurc
 	}
 
 	if action == Update {
-		panic(fmt.Sprintf("update action is not supported by this method"))
+		panic("update action is not supported by this method")
 	}
 
 	key := fmt.Sprintf("%s/%s", subject.GetNamespace(), subject.GetName())
@@ -275,7 +275,7 @@ type ActiveExpectation struct {
 
 func (ae *ActiveExpectation) expect(kind ExpectedReosurceType, name string, action ActiveExpectationAction) error {
 	if action == Update {
-		panic(fmt.Sprintf("update action is not supported by this method"))
+		panic("update action is not supported by this method")
 	}
 
 	key := fmt.Sprintf("%s/%s", kind, name)
@@ -334,7 +334,7 @@ func (ae *ActiveExpectation) isSatisfied() (satisfied bool, err error) {
 				if satisfied {
 					ae.items.Delete(item)
 				} else if ae.recordTimestamp.Add(ExpectationsTimeout).Before(time.Now()) {
-					panic(fmt.Sprintf("expected panic for active expectation"))
+					panic("expected panic for active expectation")
 				}
 			}()
 

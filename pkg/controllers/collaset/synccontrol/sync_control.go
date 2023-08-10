@@ -140,7 +140,7 @@ func (sc *RealSyncControl) Scale(set *appsv1alpha1.CollaSet, podWrappers []*coll
 		// find IDs and their contexts which have not been used by owned Pods
 		availableContext := extractAvailableContexts(diff, ownedIDs, podInstanceIDSet)
 
-		succCount, err := controllerutils.SlowStartBatch(diff, controllerutils.SlowStartInitialBatchSize, false, func(idx int, err error) error {
+		succCount, err := controllerutils.SlowStartBatch(diff, controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) error {
 			availableIDContext := availableContext[idx]
 			// use revision recorded in Context
 			revision := updatedRevision

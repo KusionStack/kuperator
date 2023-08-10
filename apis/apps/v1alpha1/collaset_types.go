@@ -82,6 +82,8 @@ type CollaSetSpec struct {
 	// insufficient replicas are detected. Each pod stamped out by the CollaSet
 	// will fulfill this Template, but have a unique identity from the rest
 	// of the CollaSet.
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
 	Template corev1.PodTemplateSpec `json:"template,omitempty"`
 
 	// VolumeClaimTemplates is a list of claims that pods are allowed to reference.

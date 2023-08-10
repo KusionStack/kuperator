@@ -100,7 +100,7 @@ func Finish(c client.Client, adapter LifecycleAdapter, obj client.Object) (updat
 	operationType, hasType := checkOperationType(adapter, obj)
 
 	if hasType && operationType != adapter.GetType() {
-		err = fmt.Errorf("operatingID %s has invalid operationType %s", operatingID, operationType)
+		return false, fmt.Errorf("operatingID %s has invalid operationType %s", operatingID, operationType)
 	}
 
 	var needUpdate bool
@@ -126,7 +126,7 @@ func Finish(c client.Client, adapter LifecycleAdapter, obj client.Object) (updat
 
 func checkOperatingID(adapter LifecycleAdapter, obj client.Object) (val string, ok bool) {
 	labelID := fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, adapter.GetID())
-	val, ok = obj.GetLabels()[labelID]
+	_, ok = obj.GetLabels()[labelID]
 	return adapter.GetID(), ok
 }
 
