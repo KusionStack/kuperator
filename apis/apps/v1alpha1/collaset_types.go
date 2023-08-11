@@ -203,7 +203,7 @@ type CollaSetStatus struct {
 	// Replicas is the most recently observed number of replicas.
 	Replicas int32 `json:"replicas,omitempty"`
 
-	// The number of pods in current version.
+	// The number of pods in updated version.
 	UpdatedReplicas int32 `json:"updatedReplicas,omitempty"`
 
 	// OperatingReplicas indicates the number of pods during pod ops lifecycle and not finish update-phase.
@@ -256,7 +256,7 @@ type CollaSetCondition struct {
 // +kubebuilder:printcolumn:name="CURRENT_REVISION",type="string",JSONPath=".status.currentRevision",description="The current revision."
 // +kubebuilder:printcolumn:name="UPDATED_REVISION",type="string",JSONPath=".status.updatedRevision",description="The updated revision."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
-// +resource:path=collasets,strategy=CollaSetStrategy
+// +resource:path=collasets
 type CollaSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

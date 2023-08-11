@@ -552,7 +552,7 @@ spec:
                 format: int32
                 type: integer
               updatedReplicas:
-                description: The number of pods in current version.
+                description: The number of pods in updated version.
                 format: int32
                 type: integer
               updatedRevision:
