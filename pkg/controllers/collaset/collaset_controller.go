@@ -159,10 +159,14 @@ func DoReconcile(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.Contro
 	return calculateStatus(instance, newStatus, updatedRevision, podWrappers, syncErr), syncErr
 }
 
+// doSync is responsible for reconcile Pods with CollaSet spec.
+// 1. sync Pods to prepare information, especially IDs, for following Scale and Update
+// 2. scale Pods to match the Pod number indicated in `spec.replcas`. if an error thrown out or Pods is not matched recently, update will be skipped.
+// 3. update Pods, to update each Pod to the updated revision indicated by `spec.template`
 func doSync(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, revisions []*appsv1.ControllerRevision, newStatus *appsv1alpha1.CollaSetStatus) ([]*collasetutils.PodWrapper, *appsv1alpha1.CollaSetStatus, error) {
 	filteredPods, err := podControl.GetFilteredPods(instance.Spec.Selector, instance)
 	if err != nil {
-		return nil, newStatus, err
+		return nil, newStatus, fmt.Errorf("fail to get filtered Pods: %s", err)
 	}
 
 	synced, podWrappers, ownedIDs, err := syncControl.SyncPods(instance, filteredPods, updatedRevision, newStatus)

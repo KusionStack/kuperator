@@ -17,9 +17,6 @@ limitations under the License.
 package utils
 
 import (
-	"fmt"
-	"time"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
@@ -94,12 +91,7 @@ func (a *CollaSetScaleInOpsLifecycleAdapter) AllowMultiType() bool {
 
 // WhenBegin will be executed when begin a lifecycle
 func (a *CollaSetScaleInOpsLifecycleAdapter) WhenBegin(pod client.Object) (bool, error) {
-	if _, exist := pod.GetLabels()[appsv1alpha1.PodScalingInLabelKey]; exist {
-		return false, nil
-	}
-
-	pod.GetLabels()[appsv1alpha1.PodScalingInLabelKey] = fmt.Sprintf("%d", time.Now().UnixNano())
-	return true, nil
+	return false, nil
 }
 
 // WhenFinish will be executed when finish a lifecycle

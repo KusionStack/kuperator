@@ -80,8 +80,9 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 	return nil
 }
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
+// Reconcile aims to delete Pod through PodOpsLifecycle. It will watch Pod with label `kafed.kusionstack.io/to-delete`.
+// If a Pod is labeled, controller will first trigger a deletion PodOpsLifecycle. If all conditions are satisfied,
+// it will then delete Pod.
 func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	instance := &corev1.Pod{}
 	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {

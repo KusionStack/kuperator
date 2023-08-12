@@ -20,22 +20,19 @@ import (
 	"context"
 	"fmt"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
-	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
 	refmanagerutil "kusionstack.io/kafed/pkg/controllers/utils/refmanager"
 	"kusionstack.io/kafed/pkg/utils/inject"
 )
 
 type Interface interface {
 	GetFilteredPods(selector *metav1.LabelSelector, owner client.Object) ([]*corev1.Pod, error)
-	CreatePod(pod *corev1.Pod, revision *appsv1.ControllerRevision) (*corev1.Pod, error)
+	CreatePod(pod *corev1.Pod) (*corev1.Pod, error)
 	DeletePod(pod *corev1.Pod) error
 	UpdatePod(pod *corev1.Pod) error
 }
@@ -70,9 +67,9 @@ func (pc *RealPodControl) GetFilteredPods(selector *metav1.LabelSelector, owner 
 	return filteredPods, nil
 }
 
-func (pc *RealPodControl) CreatePod(pod *corev1.Pod, revision *appsv1.ControllerRevision) (*corev1.Pod, error) {
+func (pc *RealPodControl) CreatePod(pod *corev1.Pod) (*corev1.Pod, error) {
 	if err := pc.client.Create(context.TODO(), pod); err != nil {
-		return nil, fmt.Errorf("fail to create Pod with revision %s: %s", revision.Name, err)
+		return nil, fmt.Errorf("fail to create Pod: %s", err)
 	}
 
 	return pod, nil
@@ -126,19 +123,4 @@ func FilterOutInactivePod(pods []corev1.Pod) []*corev1.Pod {
 
 func IsPodInactive(pod *corev1.Pod) bool {
 	return pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed
-}
-
-func NewPodFrom(cs *appsv1alpha1.CollaSet, revision *appsv1.ControllerRevision) (*corev1.Pod, error) {
-	pod, err := controllerutils.GetPodFromRevision(revision)
-	if err != nil {
-		return pod, err
-	}
-
-	pod.Namespace = cs.Namespace
-	pod.GenerateName = controllerutils.GetPodsPrefix(cs.Name)
-	pod.OwnerReferences = append(pod.OwnerReferences, *metav1.NewControllerRef(cs, appsv1alpha1.GroupVersion.WithKind("CollaSet")))
-
-	pod.Labels[appsv1.ControllerRevisionHashLabelKey] = revision.Name
-
-	return pod, nil
 }

@@ -84,8 +84,7 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 	return nil
 }
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
+// Reconcile aims to reclaim ResourceContext which is not in used which means the ResourceContext contains no Context.
 func (r *ResourceContextReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	instance := &appsv1alpha1.ResourceContext{}
 	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
