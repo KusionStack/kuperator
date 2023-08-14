@@ -42,7 +42,7 @@ const (
 )
 
 type Interface interface {
-	SyncPods(instance *appsv1alpha1.CollaSet, filteredPods []*corev1.Pod, updatedRevision *appsv1.ControllerRevision, newStatus *appsv1alpha1.CollaSetStatus) (bool, []*collasetutils.PodWrapper, map[int]*appsv1alpha1.ContextDetail, error)
+	SyncPods(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, newStatus *appsv1alpha1.CollaSetStatus) (bool, []*collasetutils.PodWrapper, map[int]*appsv1alpha1.ContextDetail, error)
 	Scale(instance *appsv1alpha1.CollaSet, filteredPods []*collasetutils.PodWrapper, revisions []*appsv1.ControllerRevision, updatedRevision *appsv1.ControllerRevision, ownedIDs map[int]*appsv1alpha1.ContextDetail, newStatus *appsv1alpha1.CollaSetStatus) (bool, error)
 	Update(instance *appsv1alpha1.CollaSet, filteredPods []*collasetutils.PodWrapper, revisions []*appsv1.ControllerRevision, updatedRevision *appsv1.ControllerRevision, ownedIDs map[int]*appsv1alpha1.ContextDetail, newStatus *appsv1alpha1.CollaSetStatus) (bool, error)
 }
@@ -62,10 +62,14 @@ type RealSyncControl struct {
 }
 
 // SyncPods is used to reclaim Pod instance ID
-func (sc *RealSyncControl) SyncPods(instance *appsv1alpha1.CollaSet, filteredPods []*corev1.Pod, updatedRevision *appsv1.ControllerRevision, _ *appsv1alpha1.CollaSetStatus) (bool, []*collasetutils.PodWrapper, map[int]*appsv1alpha1.ContextDetail, error) {
+func (sc *RealSyncControl) SyncPods(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, _ *appsv1alpha1.CollaSetStatus) (bool, []*collasetutils.PodWrapper, map[int]*appsv1alpha1.ContextDetail, error) {
+	filteredPods, err := sc.podControl.GetFilteredPods(instance.Spec.Selector, instance)
+	if err != nil {
+		return false, nil, nil, fmt.Errorf("fail to get filtered Pods: %s", err)
+	}
+
 	// get owned IDs
 	var ownedIDs map[int]*appsv1alpha1.ContextDetail
-	var err error
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		ownedIDs, err = podcontext.AllocateID(sc.client, instance, updatedRevision.Name, int(replicasRealValue(instance.Spec.Replicas)))
 		return err

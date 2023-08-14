@@ -48,17 +48,13 @@ const (
 	controllerName = "collaset-controller"
 )
 
-var (
-	revisionManager *revision.RevisionManager
-	podControl      podcontrol.Interface
-	syncControl     synccontrol.Interface
-)
-
 // CollaSetReconciler reconciles a CollaSet object
 type CollaSetReconciler struct {
 	client.Client
 
-	recorder record.EventRecorder
+	recorder        record.EventRecorder
+	revisionManager *revision.RevisionManager
+	syncControl     synccontrol.Interface
 }
 
 func Add(mgr ctrl.Manager) error {
@@ -67,17 +63,14 @@ func Add(mgr ctrl.Manager) error {
 
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr ctrl.Manager) reconcile.Reconciler {
-	recorder := mgr.GetEventRecorderFor(controllerName)
-
-	revisionManager = revision.NewRevisionManager(mgr.GetClient(), mgr.GetScheme(), &revisionOwnerAdapter{})
-	podControl = podcontrol.NewRealPodControl(mgr.GetClient(), mgr.GetScheme())
-	syncControl = synccontrol.NewRealSyncControl(mgr.GetClient(), podControl, recorder)
-
 	collasetutils.InitExpectations(mgr.GetClient())
 
+	recorder := mgr.GetEventRecorderFor(controllerName)
 	return &CollaSetReconciler{
-		Client:   mgr.GetClient(),
-		recorder: recorder,
+		Client:          mgr.GetClient(),
+		recorder:        recorder,
+		revisionManager: revision.NewRevisionManager(mgr.GetClient(), mgr.GetScheme(), &revisionOwnerAdapter{}),
+		syncControl:     synccontrol.NewRealSyncControl(mgr.GetClient(), podcontrol.NewRealPodControl(mgr.GetClient(), mgr.GetScheme()), recorder),
 	}
 }
 
@@ -133,7 +126,7 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	currentRevision, updatedRevision, revisions, collisionCount, _, err := revisionManager.ConstructRevisions(instance, false)
+	currentRevision, updatedRevision, revisions, collisionCount, _, err := r.revisionManager.ConstructRevisions(instance, false)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("fail to construct revision for CollaSet %s/%s: %s", instance.Namespace, instance.Name, err)
 	}
@@ -145,7 +138,7 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		UpdatedRevision: updatedRevision.Name,
 	}
 
-	newStatus, err = DoReconcile(instance, updatedRevision, revisions, newStatus)
+	newStatus, err = r.DoReconcile(instance, updatedRevision, revisions, newStatus)
 	// update status anyway
 	if err := r.updateStatus(ctx, instance, newStatus); err != nil {
 		return ctrl.Result{}, fmt.Errorf("fail to update status of CollaSet %s: %s", req, err)
@@ -154,8 +147,8 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	return ctrl.Result{}, err
 }
 
-func DoReconcile(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, revisions []*appsv1.ControllerRevision, newStatus *appsv1alpha1.CollaSetStatus) (*appsv1alpha1.CollaSetStatus, error) {
-	podWrappers, newStatus, syncErr := doSync(instance, updatedRevision, revisions, newStatus)
+func (r *CollaSetReconciler) DoReconcile(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, revisions []*appsv1.ControllerRevision, newStatus *appsv1alpha1.CollaSetStatus) (*appsv1alpha1.CollaSetStatus, error) {
+	podWrappers, newStatus, syncErr := r.doSync(instance, updatedRevision, revisions, newStatus)
 	return calculateStatus(instance, newStatus, updatedRevision, podWrappers, syncErr), syncErr
 }
 
@@ -163,23 +156,18 @@ func DoReconcile(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.Contro
 // 1. sync Pods to prepare information, especially IDs, for following Scale and Update
 // 2. scale Pods to match the Pod number indicated in `spec.replcas`. if an error thrown out or Pods is not matched recently, update will be skipped.
 // 3. update Pods, to update each Pod to the updated revision indicated by `spec.template`
-func doSync(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, revisions []*appsv1.ControllerRevision, newStatus *appsv1alpha1.CollaSetStatus) ([]*collasetutils.PodWrapper, *appsv1alpha1.CollaSetStatus, error) {
-	filteredPods, err := podControl.GetFilteredPods(instance.Spec.Selector, instance)
-	if err != nil {
-		return nil, newStatus, fmt.Errorf("fail to get filtered Pods: %s", err)
-	}
-
-	synced, podWrappers, ownedIDs, err := syncControl.SyncPods(instance, filteredPods, updatedRevision, newStatus)
+func (r *CollaSetReconciler) doSync(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, revisions []*appsv1.ControllerRevision, newStatus *appsv1alpha1.CollaSetStatus) ([]*collasetutils.PodWrapper, *appsv1alpha1.CollaSetStatus, error) {
+	synced, podWrappers, ownedIDs, err := r.syncControl.SyncPods(instance, updatedRevision, newStatus)
 	if err != nil || synced {
 		return podWrappers, newStatus, err
 	}
 
-	scaling, err := syncControl.Scale(instance, podWrappers, revisions, updatedRevision, ownedIDs, newStatus)
+	scaling, err := r.syncControl.Scale(instance, podWrappers, revisions, updatedRevision, ownedIDs, newStatus)
 	if err != nil || scaling {
 		return podWrappers, newStatus, err
 	}
 
-	_, err = syncControl.Update(instance, podWrappers, revisions, updatedRevision, ownedIDs, newStatus)
+	_, err = r.syncControl.Update(instance, podWrappers, revisions, updatedRevision, ownedIDs, newStatus)
 
 	return podWrappers, newStatus, err
 }
