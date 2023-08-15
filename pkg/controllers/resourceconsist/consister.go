@@ -62,10 +62,10 @@ func (r *Consist) diffEmployer(expectEmployer, currentEmployer []IEmployerStatus
 		currentEmployerMap[current.GetEmployerId()] = current
 	}
 
-	toCreate := make([]IEmployerStatus, len(expectEmployer), len(expectEmployer))
-	toUpdate := make([]IEmployerStatus, len(currentEmployer), len(currentEmployer))
-	toDelete := make([]IEmployerStatus, len(currentEmployer), len(currentEmployer))
-	unchanged := make([]IEmployerStatus, len(currentEmployer), len(currentEmployer))
+	toCreate := make([]IEmployerStatus, len(expectEmployer))
+	toUpdate := make([]IEmployerStatus, len(currentEmployer))
+	toDelete := make([]IEmployerStatus, len(currentEmployer))
+	unchanged := make([]IEmployerStatus, len(currentEmployer))
 	toCreateIdx, toUpdateIdx, toDeleteIdx, unchangedIdx := 0, 0, 0, 0
 
 	for expectId, expect := range expectEmployerMap {
@@ -119,10 +119,10 @@ func (r *Consist) diffEmployees(expectEmployees, currentEmployees []IEmployeeSta
 		currentEmployeesMap[current.GetEmployeeId()] = current
 	}
 
-	toCreate := make([]IEmployeeStatus, len(expectEmployees), len(expectEmployees))
-	toUpdate := make([]IEmployeeStatus, len(currentEmployees), len(currentEmployees))
-	toDelete := make([]IEmployeeStatus, len(currentEmployees), len(currentEmployees))
-	unchanged := make([]IEmployeeStatus, len(currentEmployees), len(currentEmployees))
+	toCreate := make([]IEmployeeStatus, len(expectEmployees))
+	toUpdate := make([]IEmployeeStatus, len(currentEmployees))
+	toDelete := make([]IEmployeeStatus, len(currentEmployees))
+	unchanged := make([]IEmployeeStatus, len(currentEmployees))
 	toCreateIdx, toUpdateIdx, toDeleteIdx, unchangedIdx := 0, 0, 0, 0
 
 	for expectId, expect := range expectEmployeesMap {
@@ -292,8 +292,8 @@ func (r *Consist) ensureLifecycleFinalizer(ctx context.Context, ns, lifecycleFlz
 }
 
 func (r *Consist) getToAddDeleteLifecycleFlzEmployees(succCreate, failCreate, succDelete, failDelete, succUpdate, unchanged []IEmployeeStatus) ([]string, []string) {
-	toAddLifecycleFlz := make([]string, len(succCreate)+len(succUpdate)+len(unchanged), len(succCreate)+len(succUpdate)+len(unchanged))
-	toDeleteLifecycleFlz := make([]string, len(succDelete)+len(succUpdate)+len(unchanged), len(succDelete)+len(succUpdate)+len(unchanged))
+	toAddLifecycleFlz := make([]string, len(succCreate)+len(succUpdate)+len(unchanged))
+	toDeleteLifecycleFlz := make([]string, len(succDelete)+len(succUpdate)+len(unchanged))
 	toAddIdx, toDeleteIdx := 0, 0
 
 	if !isPod(r.adapter.EmployeeResource()) || r.adapter.NotFollowPodOpsLifeCycle() {
