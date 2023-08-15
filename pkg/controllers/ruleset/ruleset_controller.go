@@ -182,45 +182,8 @@ func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Req
 		}
 	}
 
-	stages := r.GetStages()
-	wg := sync.WaitGroup{}
-	wg.Add(len(stages))
-	mu := sync.RWMutex{}
-	var ruleStates []*appsv1alpha1.RuleState
-	var interval *time.Duration
-	var shouldRetry bool
-	details := map[string]*appsv1alpha1.Detail{}
-	oldDetails := map[string]*appsv1alpha1.Detail{}
-
-	for i, de := range ruleSet.Status.Details {
-		oldDetails[de.Name] = ruleSet.Status.Details[i]
-	}
-
-	for _, stage := range stages {
-		currentStage := stage
-		go func() {
-			defer wg.Done()
-			res := processor.NewRuleProcessor(r.Client, currentStage, ruleSet, r.Logger).Process(targetPods)
-			mu.Lock()
-			defer mu.Unlock()
-			if res.Interval != nil {
-				if interval == nil || *interval > *res.Interval {
-					interval = res.Interval
-				}
-			}
-			if res.RuleStates != nil {
-				ruleStates = append(ruleStates, res.RuleStates...)
-			}
-			if res.Retry {
-				shouldRetry = true
-			}
-			updateDetail(details, res, currentStage)
-		}()
-	}
-
-	// TODO: webhook processor
-
-	wg.Wait()
+	// process rules
+	shouldRetry, interval, details, ruleStates := r.process(ruleSet, targetPods)
 
 	res := reconcile.Result{
 		Requeue: shouldRetry,
@@ -261,8 +224,44 @@ func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Req
 		}
 	}
 
+	oldDetails := map[string]*appsv1alpha1.Detail{}
+
+	for i, de := range ruleSet.Status.Details {
+		oldDetails[de.Name] = ruleSet.Status.Details[i]
+	}
 	addQueues(ruleSet, details, oldDetails)
 	return res, nil
+}
+
+func (r *RuleSetReconciler) process(rs *appsv1alpha1.RuleSet, pods map[string]*corev1.Pod) (shouldRetry bool, interval *time.Duration, details map[string]*appsv1alpha1.Detail, ruleStates []*appsv1alpha1.RuleState) {
+	stages := r.GetStages()
+	wg := sync.WaitGroup{}
+	wg.Add(len(stages))
+	mu := sync.RWMutex{}
+	details = map[string]*appsv1alpha1.Detail{}
+	for _, stage := range stages {
+		currentStage := stage
+		go func() {
+			defer wg.Done()
+			res := processor.NewRuleProcessor(r.Client, currentStage, rs, r.Logger).Process(pods)
+			mu.Lock()
+			defer mu.Unlock()
+			if res.Interval != nil {
+				if interval == nil || *interval > *res.Interval {
+					interval = res.Interval
+				}
+			}
+			if res.RuleStates != nil {
+				ruleStates = append(ruleStates, res.RuleStates...)
+			}
+			if res.Retry {
+				shouldRetry = true
+			}
+			updateDetail(details, res, currentStage)
+		}()
+	}
+	wg.Wait()
+	return shouldRetry, interval, details, ruleStates
 }
 
 func addQueues(rs *appsv1alpha1.RuleSet, details map[string]*appsv1alpha1.Detail, oldDetails map[string]*appsv1alpha1.Detail) {
