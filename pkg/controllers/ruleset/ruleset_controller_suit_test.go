@@ -60,6 +60,7 @@ func TestMain(m *testing.M) {
 	env.ControlPlane.GetAPIServer().URL = &url.URL{
 		Host: "127.0.0.1:10001",
 	}
+	initRulesetManager()
 	config, err := env.Start()
 	if err != nil {
 		panic(err)
@@ -74,8 +75,6 @@ func TestMain(m *testing.M) {
 		_, err = addToMgr(mgr, r)
 
 		c = mgr.GetClient()
-
-		initRulesetManager()
 
 		defer wg.Done()
 		err = mgr.Start(ctx)

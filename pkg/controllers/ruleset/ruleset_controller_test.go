@@ -50,11 +50,6 @@ func TestRuleset(t *testing.T) {
 	for _, po := range pods {
 		g.Expect(c.Create(context.TODO(), po)).NotTo(gomega.HaveOccurred())
 	}
-	defer func() {
-		for _, po := range pods {
-			c.Delete(context.TODO(), po)
-		}
-	}()
 	istr := intstr.FromString("50%")
 	stage := PreTrafficOffStage
 	rs := &appsv1alpha1.RuleSet{
@@ -82,8 +77,13 @@ func TestRuleset(t *testing.T) {
 		},
 	}
 	g.Expect(c.Create(context.TODO(), rs)).NotTo(gomega.HaveOccurred())
-	defer c.Delete(context.TODO(), rs)
 	waitProcessFinished(request)
+	defer func() {
+		for _, po := range pods {
+			g.Expect(c.Delete(context.TODO(), po)).NotTo(gomega.HaveOccurred())
+		}
+		g.Expect(c.Delete(context.TODO(), rs)).NotTo(gomega.HaveOccurred())
+	}()
 	podList := &corev1.PodList{}
 	g.Expect(c.List(context.TODO(), podList, &client.ListOptions{
 		LabelSelector: labels.SelectorFromSet(rs.Spec.Selector.MatchLabels),
@@ -132,7 +132,6 @@ func initRulesetManager() {
 		_, ok := pod.GetLabels()[UnavailableLabel]
 		return ok, nil
 	})
-
 	RuleSetManager().RegisterStage(PreTrafficOffStage, func(po client.Object) bool {
 		if po.GetLabels() == nil {
 			return false

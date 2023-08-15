@@ -43,12 +43,8 @@ type checker struct {
 }
 
 func (c *checker) GetState(client client.Client, item client.Object) (CheckState, error) {
-	/*
-		Check Current Stage
-	*/
 
 	result := CheckState{
-		//Item:   item,
 		Passed: true,
 	}
 	stage := c.policy.Stage(item)

@@ -106,6 +106,7 @@ func inFunc(obj client.Object, keys sets.String, cache *FuncCache) string {
 		for _, f := range fs {
 			if !f(obj) {
 				needCheck = false
+				break
 			}
 		}
 		if needCheck {

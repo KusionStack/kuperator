@@ -95,7 +95,6 @@ type rsManager struct {
 	register   register.Register
 	checker    checker.Check
 	controller controller.Controller
-	watchKinds []*source.Kind
 }
 
 func (m *rsManager) RegisterStage(key string, needCheck func(obj client.Object) bool) error {
@@ -112,21 +111,5 @@ func (m *rsManager) GetState(c client.Client, item client.Object) (checker.Check
 
 func (m *rsManager) SetupRuleSetController(mgr manager.Manager) (err error) {
 	m.controller, err = addToMgr(mgr, newReconciler(mgr))
-	if err != nil {
-		return err
-	}
-	for i := range m.watchKinds {
-		if err = m.controller.Watch(m.watchKinds[i], &EventHandler{}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (m *rsManager) Watch(src *source.Kind) error {
-	if m.controller == nil {
-		m.watchKinds = append(m.watchKinds, src)
-		return nil
-	}
-	return m.controller.Watch(src, &EventHandler{})
+	return err
 }
