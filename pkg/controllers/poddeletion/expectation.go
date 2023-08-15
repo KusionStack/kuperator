@@ -14,10 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package poddeletion
 
-const (
-	PodAvailableConditionsAnnotation = "kafed.kusionstack.io/available-conditions" // indicate the available conditions of a pod
+import (
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	LastPodStatusAnnotationKey = "collaset.kafed.kusionstack.io/last-pod-status"
+	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
 )
+
+var (
+	// activeExpectations is used to check the cache in informer is updated, before reconciling.
+	activeExpectations *expectations.ActiveExpectations
+)
+
+func InitExpectations(c client.Client) {
+	activeExpectations = expectations.NewActiveExpectations(c)
+}
