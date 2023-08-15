@@ -492,7 +492,7 @@ spec:
                   current state.
                 items:
                   properties:
-                    last_transition_time:
+                    lastTransitionTime:
                       description: Last time the condition transitioned from one status
                         to another.
                       format: date-time
