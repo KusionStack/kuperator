@@ -147,7 +147,9 @@ func newPodUpdater(cls *appsv1alpha1.CollaSet) PodUpdater {
 	case appsv1alpha1.CollaSetRecreatePodUpdateStrategyType:
 		return &RecreatePodUpdater{}
 	case appsv1alpha1.CollaSetInPlaceOnlyPodUpdateStrategyType:
-		return &InPlaceOnlyPodUpdater{}
+		// In case of using native K8s, Pod is only allowed to update with container image, so InPlaceOnly policy is
+		// implemented with InPlaceIfPossible policy as default for compatibility.
+		return &InPlaceIfPossibleUpdater{}
 	default:
 		return &InPlaceIfPossibleUpdater{}
 	}
