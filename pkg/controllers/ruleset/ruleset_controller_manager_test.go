@@ -14,12 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package ruleset
 
-const (
-	PodAvailableConditionsAnnotation = "kafed.kusionstack.io/available-conditions" // indicate the available conditions of a pod
+import (
+	"testing"
 
-	LastPodStatusAnnotationKey = "collaset.kafed.kusionstack.io/last-pod-status"
-
-	AnnotationPodSkipRuleConditions = "ruleset.kafed.kusionstack.io/skip-rule-conditions"
+	"github.com/onsi/gomega"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+func TestManager(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+	g.Expect(RuleSetManager().RegisterStage("PreTrafficOff", func(obj client.Object) bool {
+		return false
+	})).Should(gomega.BeNil())
+	g.Expect(RuleSetManager().RegisterCondition("DeletePod", func(obj client.Object) bool {
+		return false
+	})).Should(gomega.BeNil())
+}

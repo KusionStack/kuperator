@@ -31,3 +31,29 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - apps.kafed.io
+  resources:
+  - rulesets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kafed.io
+  resources:
+  - rulesets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kafed.io
+  resources:
+  - rulesets/status
+  verbs:
+  - get
+  - patch
+  - update
