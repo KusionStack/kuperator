@@ -92,8 +92,9 @@ func (r *ResourceVersionExpectation) ExpectUpdate(controllerKey string, resource
 	} else if exists {
 		exp.Set(resourceVersion)
 	} else {
-		r.SetExpectations(controllerKey, resourceVersion)
+		return r.SetExpectations(controllerKey, resourceVersion)
 	}
+
 	return nil
 }
 

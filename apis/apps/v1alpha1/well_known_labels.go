@@ -35,6 +35,11 @@ const (
 	PodCompleteLabelPrefix    = "complete.lifecycle.kafed.kusionstack.io"     // indicate a pod has finished all phases
 
 	PodServiceAvailableLabel = "kafed.kusionstack.io/service-available" // indicate a pod is available to serve
+
+	CollaSetUpdateIndicateLabelKey = "collaset.kafed.kusionstack.io/update-included"
+
+	PodInstanceIDLabelKey         = "kafed.kusionstack.io/pod-instance-id"
+	PodDeletionIndicationLabelKey = "kafed.kusionstack.io/to-delete" // Users can use this label to indicate a pod to delete
 )
 
 var (

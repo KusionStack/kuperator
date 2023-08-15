@@ -14,10 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package apis
 
-const (
-	PodAvailableConditionsAnnotation = "kafed.kusionstack.io/available-conditions" // indicate the available conditions of a pod
-
-	LastPodStatusAnnotationKey = "collaset.kafed.kusionstack.io/last-pod-status"
+import (
+	api "kusionstack.io/kafed/apis/apps/v1alpha1"
 )
+
+func init() {
+	// Register the types with the Scheme so the components can map objects to GroupVersionKinds and back
+	AddToSchemes = append(AddToSchemes, api.SchemeBuilder.AddToScheme)
+}

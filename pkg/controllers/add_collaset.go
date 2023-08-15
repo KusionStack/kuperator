@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package controllers
 
-const (
-	PodAvailableConditionsAnnotation = "kafed.kusionstack.io/available-conditions" // indicate the available conditions of a pod
+import "kusionstack.io/kafed/pkg/controllers/collaset"
 
-	LastPodStatusAnnotationKey = "collaset.kafed.kusionstack.io/last-pod-status"
-)
+func init() {
+	AddToManagerFuncs = append(AddToManagerFuncs, collaset.Add)
+}
