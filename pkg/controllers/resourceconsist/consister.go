@@ -29,6 +29,9 @@ import (
 
 func (r *Consist) syncEmployer(ctx context.Context, employer client.Object, expectEmployerStatus, currentEmployerStatus []IEmployerStatus) (bool, error) {
 	toCudEmployer, err := r.diffEmployer(expectEmployerStatus, currentEmployerStatus)
+	if err != nil {
+		return false, fmt.Errorf("diff employer failed, err: %s", err.Error())
+	}
 	succCreate, _, err := r.adapter.CreateEmployer(employer, toCudEmployer.ToCreate)
 	if err != nil {
 		return false, fmt.Errorf("syncCreate failed, err: %s", err.Error())
