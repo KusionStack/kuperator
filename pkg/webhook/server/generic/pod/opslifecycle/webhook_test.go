@@ -107,7 +107,8 @@ func TestMutating(t *testing.T) {
 		newPodLabels   map[string]string
 		expectedLabels map[string]string
 
-		readyToUpgrade ReadyToUpgrade
+		satisfyExpectedFinalizers SatisfyExpectedFinalizers
+		readyToUpgrade            ReadyToUpgrade
 
 		keyWords string // used to check the error message
 	}{
@@ -377,6 +378,27 @@ func TestMutating(t *testing.T) {
 		},
 
 		{
+			notes: "wait for removing finalizers",
+			newPodLabels: map[string]string{
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "123"): "upgrade",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "123"):         "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, "123"):       "1402144848",
+
+				fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, "123"): "1402144848",
+			},
+			expectedLabels: map[string]string{
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "123"): "upgrade",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "123"):         "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, "123"):       "1402144848",
+
+				fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, "123"): "1402144848",
+			},
+			satisfyExpectedFinalizers: satifyExpectedFinalizersReturnFalse,
+		},
+
+		{
 			notes: "all finished",
 			newPodLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1402144848",
@@ -423,6 +445,11 @@ func TestMutating(t *testing.T) {
 			opslifecycle.readyToUpgrade = readyToUpgradeReturnTrue
 		}
 
+		opslifecycle.satisfyExpectedFinalizers = v.satisfyExpectedFinalizers
+		if opslifecycle.satisfyExpectedFinalizers == nil {
+			opslifecycle.satisfyExpectedFinalizers = satifyExpectedFinalizersReturnTrue
+		}
+
 		t.Logf("notes: %s", v.notes)
 		err := opslifecycle.Mutating(context.Background(), oldPod, newPod, nil, nil)
 		if v.keyWords == "" {
@@ -441,5 +468,13 @@ func readyToUpgradeReturnTrue(pod *corev1.Pod) (bool, []string, *time.Duration) 
 }
 
 func readyToUpgradeReturnFalse(pod *corev1.Pod) (bool, []string, *time.Duration) {
+	return false, nil, nil
+}
+
+func satifyExpectedFinalizersReturnTrue(pod *corev1.Pod) (bool, []string, error) {
+	return true, nil, nil
+}
+
+func satifyExpectedFinalizersReturnFalse(pod *corev1.Pod) (bool, []string, error) {
 	return false, nil, nil
 }

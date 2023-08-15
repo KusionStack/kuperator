@@ -22,6 +22,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"kusionstack.io/kafed/pkg/webhook/server/generic"
+	_ "kusionstack.io/kafed/pkg/webhook/server/generic/pod"
 )
 
 func init() {

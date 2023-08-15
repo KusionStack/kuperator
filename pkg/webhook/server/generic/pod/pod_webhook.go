@@ -19,25 +19,24 @@ package pod
 import (
 	v1 "k8s.io/api/core/v1"
 
+	"kusionstack.io/kafed/apis/apps/v1alpha1"
 	"kusionstack.io/kafed/pkg/webhook/server/generic"
-	"kusionstack.io/kafed/pkg/webhook/server/generic/pod/opslifecycle"
 )
 
 type NeedOpsLifecycle func(oldPod, newPod *v1.Pod) bool
 
-type PodWebhook struct {
-	mutatingHandler   *MutatingHandler
-	validatingHandler *ValidatingHandler
+func init() {
+	generic.MutatingTypeHandlerMap["Pod"] = NewMutatingHandler(ControlledByKafed)
+	generic.ValidatingTypeHandlerMap["Pod"] = NewValidatingHandler(ControlledByKafed)
 }
 
-func NewPodWebhook(needLifecycle NeedOpsLifecycle, readyToUpgrade opslifecycle.ReadyToUpgrade) *PodWebhook {
-	return &PodWebhook{
-		mutatingHandler:   NewMutatingHandler(needLifecycle, readyToUpgrade),
-		validatingHandler: NewValidatingHandler(needLifecycle),
+func ControlledByKafed(oldPod, newPod *v1.Pod) bool {
+	if newPod == nil || newPod.Labels == nil {
+		return false
 	}
-}
+	if v, ok := newPod.Labels[v1alpha1.KafedSystemLabel]; !ok || v != "true" {
+		return false
+	}
 
-func (h *PodWebhook) RegisterToDispatcher() {
-	generic.MutatingTypeHandlerMap["Pod"] = h.mutatingHandler
-	generic.ValidatingTypeHandlerMap["Pod"] = h.validatingHandler
+	return true
 }

@@ -41,14 +41,14 @@ var (
 )
 
 type MutatingHandler struct {
-	needLifecycle NeedOpsLifecycle
-	opsLifecycle  *opslifecycle.OpsLifecycle
+	needOpsLifecycle NeedOpsLifecycle
+	opsLifecycle     *opslifecycle.OpsLifecycle
 }
 
-func NewMutatingHandler(needLifecycle NeedOpsLifecycle, readyToUpgrade opslifecycle.ReadyToUpgrade) *MutatingHandler {
+func NewMutatingHandler(needOpsLifecycle NeedOpsLifecycle) *MutatingHandler {
 	return &MutatingHandler{
-		needLifecycle: needLifecycle,
-		opsLifecycle:  opslifecycle.New(readyToUpgrade),
+		needOpsLifecycle: needOpsLifecycle,
+		opsLifecycle:     opslifecycle.New(),
 	}
 }
 
@@ -69,7 +69,7 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request, c c
 	}
 
 	if req.Operation == admissionv1.Create {
-		if !h.needLifecycle(nil, pod) {
+		if h.needOpsLifecycle != nil && !h.needOpsLifecycle(nil, pod) {
 			return admission.Patched("Not need opslifecycle mutating")
 		}
 	}
@@ -80,7 +80,7 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request, c c
 			return admission.Errored(http.StatusBadRequest, fmt.Errorf("fail to unmarshal old object: %s", err))
 		}
 
-		if !h.needLifecycle(old, pod) {
+		if h.needOpsLifecycle != nil && !h.needOpsLifecycle(old, pod) {
 			return admission.Patched("Not need opslifecycle mutating")
 		}
 

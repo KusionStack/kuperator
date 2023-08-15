@@ -51,8 +51,8 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request, c
 		s, _ := json.Marshal(req)
 		return admission.Errored(http.StatusBadRequest, fmt.Errorf("fail to decode old object from request %s: %s", s, err))
 	}
-	if !h.needOpsLifecycle(nil, obj) {
-		return admission.Allowed("pod is allowed by opslifecycle")
+	if h.needOpsLifecycle != nil && !h.needOpsLifecycle(nil, obj) {
+		return admission.Allowed("pod is ignored by opslifecycle")
 	}
 
 	if err := h.opslifecycle.Validating(ctx, obj, logger); err != nil {

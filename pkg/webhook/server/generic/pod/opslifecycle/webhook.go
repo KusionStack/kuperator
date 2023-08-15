@@ -34,6 +34,10 @@ import (
 	"kusionstack.io/kafed/pkg/log"
 )
 
+const (
+	waitingForLifecycleSeconds int64 = 5
+)
+
 var (
 	// some labels must exist together and have the same id, and they are a pair
 	pairLabelPrefixesMap = map[string]string{
@@ -52,17 +56,19 @@ var (
 )
 
 type ReadyToUpgrade func(pod *corev1.Pod) (bool, []string, *time.Duration)
+type SatisfyExpectedFinalizers func(pod *corev1.Pod) (bool, []string, error)
 type TimeLabelValue func() string
 
 type OpsLifecycle struct {
-	readyToUpgrade ReadyToUpgrade
-
-	timeLabelValue TimeLabelValue
+	readyToUpgrade            ReadyToUpgrade // for testing
+	satisfyExpectedFinalizers SatisfyExpectedFinalizers
+	timeLabelValue            TimeLabelValue
 }
 
-func New(readyToUpgrade ReadyToUpgrade) *OpsLifecycle {
+func New() *OpsLifecycle {
 	return &OpsLifecycle{
-		readyToUpgrade: readyToUpgrade,
+		readyToUpgrade:            hasNoBlockingFinalizer,
+		satisfyExpectedFinalizers: satisfyExpectedFinalizers,
 		timeLabelValue: func() string {
 			return strconv.FormatInt(time.Now().Unix(), 10)
 		},
@@ -121,7 +127,7 @@ func (lc *OpsLifecycle) Validating(ctx context.Context, pod *corev1.Pod, logger 
 }
 
 func (lc *OpsLifecycle) Mutating(ctx context.Context, oldPod, newPod *corev1.Pod, _ client.Client, logger *log.Logger) error {
-	lc.addReadinessGates(newPod, v1alpha1.ReadinessGatePodServiceReady)
+	addReadinessGates(newPod, v1alpha1.ReadinessGatePodServiceReady)
 
 	newIdToLabelsMap, typeToNumsMap, err := podopslifecycle.PodIDAndTypesMap(newPod)
 	if err != nil {
@@ -245,7 +251,7 @@ func (lc *OpsLifecycle) addLabelWithTime(pod *corev1.Pod, key string) {
 	pod.Labels[key] = lc.timeLabelValue()
 }
 
-func (lc *OpsLifecycle) addReadinessGates(pod *corev1.Pod, conditionType corev1.PodConditionType) {
+func addReadinessGates(pod *corev1.Pod, conditionType corev1.PodConditionType) {
 	for _, v := range pod.Spec.ReadinessGates {
 		if v.ConditionType == conditionType {
 			return
@@ -256,11 +262,11 @@ func (lc *OpsLifecycle) addReadinessGates(pod *corev1.Pod, conditionType corev1.
 	})
 }
 
-func (lc *OpsLifecycle) satisfyExpectedFinalizers(pod *corev1.Pod) (bool, []string, error) {
+func satisfyExpectedFinalizers(pod *corev1.Pod) (bool, []string, error) {
 	satisfy := true
 	var expectedFinalizer []string // expected finalizers that are not satisfied
 
-	availableConditions, err := lc.podAvailableConditions(pod)
+	availableConditions, err := podAvailableConditions(pod)
 	if err != nil {
 		return satisfy, expectedFinalizer, err
 	}
@@ -282,7 +288,7 @@ func (lc *OpsLifecycle) satisfyExpectedFinalizers(pod *corev1.Pod) (bool, []stri
 	return satisfy, expectedFinalizer, nil
 }
 
-func (lc *OpsLifecycle) podAvailableConditions(pod *corev1.Pod) (*v1alpha1.PodAvailableConditions, error) {
+func podAvailableConditions(pod *corev1.Pod) (*v1alpha1.PodAvailableConditions, error) {
 	if pod.Annotations == nil {
 		return nil, nil
 	}
@@ -297,4 +303,42 @@ func (lc *OpsLifecycle) podAvailableConditions(pod *corev1.Pod) (*v1alpha1.PodAv
 		return nil, err
 	}
 	return availableConditions, nil
+}
+
+func hasNoBlockingFinalizer(pod *corev1.Pod) (bool, []string, *time.Duration) {
+	if pod == nil {
+		return true, nil, nil
+	}
+
+	hasReadinessGate := false
+	if pod.Spec.ReadinessGates != nil {
+		for _, readinessGate := range pod.Spec.ReadinessGates {
+			if readinessGate.ConditionType == v1alpha1.ReadinessGatePodServiceReady {
+				hasReadinessGate = true
+				break
+			}
+		}
+	}
+	if !hasReadinessGate {
+		// if has no service-ready ReadinessGate, treat it as normal pod.
+		return true, nil, nil
+	}
+
+	if pod.ObjectMeta.Finalizers == nil || len(pod.ObjectMeta.Finalizers) == 0 {
+		return true, nil, nil
+	}
+
+	var finalizers []string
+	for _, f := range pod.ObjectMeta.Finalizers {
+		if strings.HasPrefix(f, v1alpha1.PodOperationProtectionFinalizerPrefix) {
+			finalizers = append(finalizers, f)
+		}
+	}
+
+	if len(finalizers) > 0 {
+		requeneAfter := time.Duration(waitingForLifecycleSeconds) * time.Second
+		return false, finalizers, &requeneAfter
+	}
+
+	return true, nil, nil
 }
