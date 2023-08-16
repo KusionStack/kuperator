@@ -20,4 +20,6 @@ const (
 	PodAvailableConditionsAnnotation = "kafed.kusionstack.io/available-conditions" // indicate the available conditions of a pod
 
 	LastPodStatusAnnotationKey = "collaset.kafed.kusionstack.io/last-pod-status"
+
+	AnnotationPodSkipRuleConditions = "ruleset.kafed.kusionstack.io/skip-rule-conditions"
 )
