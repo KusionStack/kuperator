@@ -97,12 +97,12 @@ type rsManager struct {
 	controller controller.Controller
 }
 
-func (m *rsManager) RegisterStage(key string, needCheck func(obj client.Object) bool) error {
-	return m.register.RegisterStage(key, needCheck)
+func (m *rsManager) RegisterStage(key string, needCheck func(obj client.Object) bool) {
+	m.register.RegisterStage(key, needCheck)
 }
 
-func (m *rsManager) RegisterCondition(opsCondition string, inCondition func(obj client.Object) bool) error {
-	return m.register.RegisterCondition(opsCondition, inCondition)
+func (m *rsManager) RegisterCondition(opsCondition string, inCondition func(obj client.Object) bool) {
+	m.register.RegisterCondition(opsCondition, inCondition)
 }
 
 func (m *rsManager) GetState(c client.Client, item client.Object) (checker.CheckState, error) {

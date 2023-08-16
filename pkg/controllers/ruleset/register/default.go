@@ -37,6 +37,6 @@ type Policy interface {
 }
 
 type Register interface {
-	RegisterStage(key string, inStage func(obj client.Object) bool) error
-	RegisterCondition(opsCondition string, inCondition func(obj client.Object) bool) error
+	RegisterStage(key string, inStage func(obj client.Object) bool)
+	RegisterCondition(opsCondition string, inCondition func(obj client.Object) bool)
 }

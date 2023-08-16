@@ -298,12 +298,10 @@ type mockRuleSetManager struct {
 	*checker.CheckState
 }
 
-func (rsm *mockRuleSetManager) RegisterStage(key string, inStage func(obj client.Object) bool) error {
-	return nil
+func (rsm *mockRuleSetManager) RegisterStage(key string, inStage func(obj client.Object) bool) {
 }
 
-func (rsm *mockRuleSetManager) RegisterCondition(opsCondition string, inCondition func(obj client.Object) bool) error {
-	return nil
+func (rsm *mockRuleSetManager) RegisterCondition(opsCondition string, inCondition func(obj client.Object) bool) {
 }
 
 func (rsm *mockRuleSetManager) SetupRuleSetController(manager.Manager) error {
