@@ -16,30 +16,30 @@ limitations under the License.
 
 package v1alpha1
 
+// pod ops lifecyle labels
 const (
-	PodScalingInPhaseLabel = "cafed.kusionstack.io/scaling-in" // indicate a pod is scaling in
+	PodOperatingLabelPrefix           = "operating.podopslifecycle.kusionstack.io"            // indicate a pod is operating
+	PodOperationTypeLabelPrefix       = "operation-type.podopslifecycle.kusionstack.io"       // indicate the type of operation
+	PodOperationPermissionLabelPrefix = "operation-permission.podopslifecycle.kusionstack.io" // indicate the permission of operation
+	PodUndoOperationTypeLabelPrefix   = "undo-operation-type.podopslifecycle.kusionstack.io"  // indicate the type of operation has been canceled
+	PodDoneOperationTypeLabelPrefix   = "done-operation-type.podopslifecycle.kusionstack.io"  // indicate the type of operation has been done
 
-	PodOperatingLabelPrefix           = "operating.kafed.kusionstack.io"            // indicate a pod is operating
-	PodOperationTypeLabelPrefix       = "operation-type.kafed.kusionstack.io"       // indicate the type of operation
-	PodOperationPermissionLabelPrefix = "operation-permission.kafed.kusionstack.io" // indicate the permission of operation
-	PodUndoOperationTypeLabelPrefix   = "undo-operation-type.kafed.kusionstack.io"  // indicate the type of operation has been canceled
-	PodDoneOperationTypeLabelPrefix   = "done-operation-type.kafed.kusionstack.io"  // indicate the type of operation has been done
+	PodPreCheckLabelPrefix    = "pre-check.podopslifecycle.kusionstack.io"    // indicate a pod is in pre-check phase
+	PodPreCheckedLabelPrefix  = "pre-checked.podopslifecycle.kusionstack.io"  // indicate a pod has finished pre-check phase
+	PodPrepareLabelPrefix     = "prepare.podopslifecycle.kusionstack.io"      // indicate a pod is in prepare phase
+	PodOperateLabelPrefix     = "operate.podopslifecycle.kusionstack.io"      // indicate a pod is in operate phase
+	PodOperatedLabelPrefix    = "operated.podopslifecycle.kusionstack.io"     // indicate a pod has finished operate phase
+	PodPostCheckLabelPrefix   = "post-check.podopslifecycle.kusionstack.io"   // indicate a pod is in post-check phase
+	PodPostCheckedLabelPrefix = "post-checked.podopslifecycle.kusionstack.io" // indicate a pod has finished post-check phase
+	PodCompleteLabelPrefix    = "complete.podopslifecycle.kusionstack.io"     // indicate a pod has finished all phases
 
-	PodPreCheckLabelPrefix    = "pre-check.lifecycle.kafed.kusionstack.io"    // indicate a pod is in pre-check phase
-	PodPreCheckedLabelPrefix  = "pre-checked.lifecycle.kafed.kusionstack.io"  // indicate a pod has finished pre-check phase
-	PodPrepareLabelPrefix     = "prepare.lifecycle.kafed.kusionstack.io"      // indicate a pod is in prepare phase
-	PodOperateLabelPrefix     = "operate.lifecycle.kafed.kusionstack.io"      // indicate a pod is in operate phase
-	PodOperatedLabelPrefix    = "operated.lifecycle.kafed.kusionstack.io"     // indicate a pod has finished operate phase
-	PodPostCheckLabelPrefix   = "post-check.lifecycle.kafed.kusionstack.io"   // indicate a pod is in post-check phase
-	PodPostCheckedLabelPrefix = "post-checked.lifecycle.kafed.kusionstack.io" // indicate a pod has finished post-check phase
-	PodCompleteLabelPrefix    = "complete.lifecycle.kafed.kusionstack.io"     // indicate a pod has finished all phases
+	PodServiceAvailableLabel      = "podopslifecycle.kusionstack.io/service-available" // indicate a pod is available to serve
+	PodInstanceIDLabelKey         = "podopslifecycle.kusionstack.io/pod-instance-id"
+	PodDeletionIndicationLabelKey = "podopslifecycle.kusionstack.io/to-delete" // Users can use this label to indicate a pod to delete
+)
 
-	PodServiceAvailableLabel = "kafed.kusionstack.io/service-available" // indicate a pod is available to serve
-
-	CollaSetUpdateIndicateLabelKey = "collaset.kafed.kusionstack.io/update-included"
-
-	PodInstanceIDLabelKey         = "kafed.kusionstack.io/pod-instance-id"
-	PodDeletionIndicationLabelKey = "kafed.kusionstack.io/to-delete" // Users can use this label to indicate a pod to delete
+const (
+	CollaSetUpdateIndicateLabelKey = "collaset.kusionstack.io/update-included"
 )
 
 var (

@@ -17,5 +17,5 @@ limitations under the License.
 package v1alpha1
 
 const (
-	ReadinessGatePodServiceReady = "kafed.kusionstack.io/service-ready"
+	ReadinessGatePodServiceReady = "pod.kusionstack.io/service-ready"
 )

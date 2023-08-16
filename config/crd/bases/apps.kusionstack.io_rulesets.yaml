@@ -5,9 +5,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
-  name: rulesets.apps.kafed.io
+  name: rulesets.apps.kusionstack.io
 spec:
-  group: apps.kafed.io
+  group: apps.kusionstack.io
   names:
     kind: RuleSet
     listKind: RuleSetList

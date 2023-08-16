@@ -3,7 +3,7 @@ kind: MutatingWebhookConfiguration
 metadata:
   name: controller-manager-mutating
 webhooks:
-  - name: mutating-generic.apps.kafed.io
+  - name: mutating-generic.apps.kusionstack.io
     sideEffects: NoneOnDryRun
     admissionReviewVersions: ["v1", "v1beta1"]
     clientConfig:
@@ -31,7 +31,7 @@ kind: ValidatingWebhookConfiguration
 metadata:
   name: controller-manager-validating
 webhooks:
-  - name: validating-generic.apps.kafed.io
+  - name: validating-generic.apps.kusionstack.io
     sideEffects: NoneOnDryRun
     admissionReviewVersions: ["v1", "v1beta1"]
     clientConfig:

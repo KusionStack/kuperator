@@ -100,9 +100,9 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 	return nil
 }
 
-//+kubebuilder:rbac:groups=apps.kafed.io,resources=collasets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=apps.kafed.io,resources=collasets/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=apps.kafed.io,resources=collasets/finalizers,verbs=update
+//+kubebuilder:rbac:groups=apps.kusionstack.io,resources=collasets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps.kusionstack.io,resources=collasets/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=apps.kusionstack.io,resources=collasets/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
