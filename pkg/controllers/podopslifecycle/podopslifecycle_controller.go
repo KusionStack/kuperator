@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -36,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"kusionstack.io/kafed/apis/apps/v1alpha1"
+	"kusionstack.io/kafed/pkg/controllers/ruleset"
 	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
 	"kusionstack.io/kafed/pkg/log"
 )
@@ -50,17 +52,6 @@ var (
 
 func Add(mgr manager.Manager) error {
 	return AddToMgr(mgr, NewReconciler(mgr))
-}
-
-func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
-	logger := log.New(logf.Log.WithName("podopslifecycle-controller"))
-	expectation = expectations.NewResourceVersionExpectation(logger)
-
-	r := &ReconcilePodOpsLifecycle{
-		Client: mgr.GetClient(),
-		logger: logger,
-	}
-	return r
 }
 
 func AddToMgr(mgr manager.Manager, r reconcile.Reconciler) error {
@@ -83,9 +74,29 @@ func AddToMgr(mgr manager.Manager, r reconcile.Reconciler) error {
 
 var _ reconcile.Reconciler = &ReconcilePodOpsLifecycle{}
 
+func NewReconciler(mgr manager.Manager) *ReconcilePodOpsLifecycle {
+	logger := log.New(logf.Log.WithName("podopslifecycle-controller"))
+	expectation = expectations.NewResourceVersionExpectation(logger)
+
+	r := &ReconcilePodOpsLifecycle{
+		Client:         mgr.GetClient(),
+		ruleSetManager: ruleset.RuleSetManager(),
+
+		logger:      logger,
+		recorder:    mgr.GetEventRecorderFor(controllerName),
+		expectation: expectation,
+	}
+	r.registerStages()
+
+	return r
+}
+
 type ReconcilePodOpsLifecycle struct {
 	client.Client
-	logger *log.Logger
+	ruleSetManager ruleset.ManagerInterface
+	logger         *log.Logger
+	recorder       record.EventRecorder
+	expectation    *expectations.ResourceVersionExpectation
 }
 
 func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
@@ -97,13 +108,42 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 	if err != nil {
 		r.logger.Warningf("failed to get pod %s: %s", key, err)
 		if errors.IsNotFound(err) {
-			expectation.DeleteExpectations(key)
+			r.expectation.DeleteExpectations(key)
 			return reconcile.Result{}, nil
 		}
 		return reconcile.Result{}, err
 	}
 
-	if !expectation.SatisfiedExpectations(key, pod.ResourceVersion) {
+	state, err := r.ruleSetManager.GetState(r.Client, pod)
+	if err != nil {
+		r.logger.Errorf("failed to get pod %s state: %s", key, err)
+		return reconcile.Result{}, err
+	}
+	if state.Passed {
+		var labels map[string]string
+		if state.InStage(v1alpha1.PodOpsLifecyclePreCheckStage) {
+			labels, err = r.preCheckStage(pod)
+		} else if state.InStage(v1alpha1.PodOpsLifecyclePostCheckStage) {
+			labels, err = r.postCheckStage(pod)
+		}
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+
+		if len(labels) > 0 {
+			expectation.ExpectUpdate(key, pod.ResourceVersion)
+			err = r.addLabels(ctx, pod, labels)
+			if err != nil {
+				r.logger.Errorf("failed to update pod %s: %s", key, err)
+				expectation.DeleteExpectations(key)
+
+				return reconcile.Result{}, err
+			}
+			return reconcile.Result{}, nil
+		}
+	}
+
+	if !r.expectation.SatisfiedExpectations(key, pod.ResourceVersion) {
 		r.logger.V(2).Infof("skip pod %s with no satisfied", key)
 		return reconcile.Result{}, nil
 	}
@@ -112,6 +152,7 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 	if err != nil {
 		return reconcile.Result{}, err
 	}
+	fmt.Println(idToLabelsMap)
 
 	expected := map[string]bool{
 		v1alpha1.PodPrepareLabelPrefix:  false, // set readiness gate to false
@@ -119,23 +160,25 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 	}
 	for _, labels := range idToLabelsMap {
 		for k, v := range expected {
-			if _, ok := labels[k]; ok {
-				needUpdate, _ := r.setServiceReadiness(pod, v)
-				if needUpdate {
-					expectation.ExpectUpdate(key, pod.ResourceVersion)
-
-					if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-						return r.Client.Status().Update(ctx, pod)
-					}); err != nil {
-						r.logger.Errorf("failed to update pod status %s: %s", key, err)
-						expectation.DeleteExpectations(key)
-
-						return reconcile.Result{}, err
-					}
-					break
-				}
-				return reconcile.Result{}, nil // only need set once
+			if _, ok := labels[k]; !ok {
+				continue
 			}
+
+			needUpdate, _ := r.setServiceReadiness(pod, v)
+			if needUpdate {
+				r.expectation.ExpectUpdate(key, pod.ResourceVersion)
+
+				if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					return r.Client.Status().Update(ctx, pod)
+				}); err != nil {
+					r.logger.Errorf("failed to update pod status %s: %s", key, err)
+					r.expectation.DeleteExpectations(key)
+
+					return reconcile.Result{}, err
+				}
+				break
+			}
+			return reconcile.Result{}, nil // only need set once
 		}
 	}
 
@@ -186,7 +229,7 @@ func (r *ReconcilePodOpsLifecycle) setServiceReadiness(pod *corev1.Pod, isReady 
 	return true, fmt.Sprintf("update service readiness gate to: %s", string(status))
 }
 
-func (r *ReconcilePodOpsLifecycle) stagePreCheck(pod *corev1.Pod) (labels map[string]string, err error) {
+func (r *ReconcilePodOpsLifecycle) preCheckStage(pod *corev1.Pod) (labels map[string]string, err error) {
 	idToLabelsMap, _, err := PodIDAndTypesMap(pod)
 	if err != nil {
 		return nil, err
@@ -214,7 +257,7 @@ func (r *ReconcilePodOpsLifecycle) stagePreCheck(pod *corev1.Pod) (labels map[st
 	return
 }
 
-func (r *ReconcilePodOpsLifecycle) stagePostCheck(pod *corev1.Pod) (labels map[string]string, err error) {
+func (r *ReconcilePodOpsLifecycle) postCheckStage(pod *corev1.Pod) (labels map[string]string, err error) {
 	idToLabelsMap, _, err := PodIDAndTypesMap(pod)
 	if err != nil {
 		return nil, err
@@ -242,6 +285,23 @@ func (r *ReconcilePodOpsLifecycle) addLabels(ctx context.Context, pod *corev1.Po
 
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return r.Client.Update(ctx, pod)
+	})
+}
+
+func (r *ReconcilePodOpsLifecycle) registerStages() {
+	r.ruleSetManager.RegisterStage(v1alpha1.PodOpsLifecyclePreCheckStage, func(po client.Object) bool {
+		labels := po.GetLabels()
+		if labels == nil {
+			return false
+		}
+		return labelHasPrefix(labels, v1alpha1.PodPreCheckLabelPrefix)
+	})
+	r.ruleSetManager.RegisterStage(v1alpha1.PodOpsLifecyclePostCheckStage, func(po client.Object) bool {
+		labels := po.GetLabels()
+		if labels == nil {
+			return false
+		}
+		return labelHasPrefix(labels, v1alpha1.PodPostCheckLabelPrefix)
 	})
 }
 

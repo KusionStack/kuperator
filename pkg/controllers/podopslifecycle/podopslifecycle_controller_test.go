@@ -36,12 +36,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"kusionstack.io/kafed/apis/apps/v1alpha1"
+	"kusionstack.io/kafed/pkg/controllers/ruleset"
+	"kusionstack.io/kafed/pkg/controllers/ruleset/checker"
 )
 
 var (
-	env     *envtest.Environment
-	mgr     manager.Manager
-	request chan reconcile.Request
+	env             *envtest.Environment
+	podOpsLifecycle *ReconcilePodOpsLifecycle
+	mgr             manager.Manager
+	request         chan reconcile.Request
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -69,8 +72,11 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
+	podOpsLifecycle = NewReconciler(mgr)
+	podOpsLifecycle.ruleSetManager = &mockRuleSetManager{}
+
 	var r reconcile.Reconciler
-	r, request = testReconcile(NewReconciler(mgr))
+	r, request = testReconcile(podOpsLifecycle)
 	err = AddToMgr(mgr, r)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -104,8 +110,9 @@ var _ = Describe("podopslifecycle controller", func() {
 				},
 			},
 		}
-		id   = "123"
-		time = "1402144848"
+		operationType = "restart"
+		id            = "123"
+		time          = "1402144848"
 	)
 
 	AfterEach(func() {
@@ -124,6 +131,85 @@ var _ = Describe("podopslifecycle controller", func() {
 			}
 			<-request
 		}
+	})
+
+	It("update pod with stage pre-check", func() {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "default",
+			},
+			Spec: podSpec,
+		}
+		err := mgr.GetClient().Create(context.Background(), pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		<-request
+
+		pod = &corev1.Pod{}
+		err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
+			Name:      "test",
+			Namespace: "default",
+		}, pod)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pod.Status.Conditions).To(HaveLen(0))
+
+		podOpsLifecycle.ruleSetManager = &mockRuleSetManager{CheckState: &checker.CheckState{
+			States: []checker.State{
+				{
+					Detail: v1alpha1.Detail{
+						Stage: v1alpha1.PodOpsLifecyclePreCheckStage,
+					},
+				},
+			},
+			Passed: true,
+		}}
+
+		pod.ObjectMeta.Labels = map[string]string{
+			fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, id):      time,
+			fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, id): operationType,
+		}
+		err = mgr.GetClient().Update(context.Background(), pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		<-request
+
+		pod = &corev1.Pod{}
+		err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
+			Name:      "test",
+			Namespace: "default",
+		}, pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(pod.GetLabels()).To(HaveKey(fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, id)))
+		Expect(pod.GetLabels()).To(HaveKey(fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, operationType)))
+	})
+
+	It("create pod with label prepare", func() {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "default",
+				Labels: map[string]string{
+					fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, id): time,
+				},
+			},
+			Spec: podSpec,
+		}
+		err := mgr.GetClient().Create(context.Background(), pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		<-request
+
+		pod = &corev1.Pod{}
+		err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
+			Name:      "test",
+			Namespace: "default",
+		}, pod)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pod.Status.Conditions).To(HaveLen(1))
+		Expect(string(pod.Status.Conditions[0].Type)).To(Equal(v1alpha1.ReadinessGatePodServiceReady))
+		Expect(pod.Status.Conditions[0].Status).To(Equal(corev1.ConditionFalse))
 	})
 
 	It("create pod with label complete", func() {
@@ -204,6 +290,31 @@ func testReconcile(inner reconcile.Reconciler) (reconcile.Reconciler, chan recon
 		return result, err
 	})
 	return fn, requests
+}
+
+var _ ruleset.ManagerInterface = &mockRuleSetManager{}
+
+type mockRuleSetManager struct {
+	*checker.CheckState
+}
+
+func (rsm *mockRuleSetManager) RegisterStage(key string, inStage func(obj client.Object) bool) error {
+	return nil
+}
+
+func (rsm *mockRuleSetManager) RegisterCondition(opsCondition string, inCondition func(obj client.Object) bool) error {
+	return nil
+}
+
+func (rsm *mockRuleSetManager) SetupRuleSetController(manager.Manager) error {
+	return nil
+}
+
+func (rsm *mockRuleSetManager) GetState(client.Client, client.Object) (checker.CheckState, error) {
+	if rsm.CheckState == nil {
+		return checker.CheckState{}, nil
+	}
+	return *rsm.CheckState, nil
 }
 
 func TestPodOpsLifecycleController(t *testing.T) {
