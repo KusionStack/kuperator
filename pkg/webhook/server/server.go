@@ -33,7 +33,7 @@ func Add(mgr manager.Manager) error {
 	// register admission handlers
 	for name, handler := range generic.HandlerMap {
 		if len(name) == 0 {
-			klog.Warningf("Skip no-name handler.")
+			klog.Warningf("Skip registering handlers without a name")
 			continue
 		}
 

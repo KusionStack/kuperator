@@ -36,6 +36,5 @@ var ValidatingTypeHandlerMap = map[string]webhookdmission.DispatchHandler{}
 
 func init() {
 	MutatingTypeHandlerMap["Pod"] = pod.NewMutatingHandler()
-
 	ValidatingTypeHandlerMap["Pod"] = pod.NewValidatingHandler()
 }

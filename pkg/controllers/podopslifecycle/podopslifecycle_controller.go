@@ -291,7 +291,7 @@ func (r *ReconcilePodOpsLifecycle) addLabels(ctx context.Context, pod *corev1.Po
 func (r *ReconcilePodOpsLifecycle) registerStages() {
 	r.ruleSetManager.RegisterStage(v1alpha1.PodOpsLifecyclePreCheckStage, func(po client.Object) bool {
 		labels := po.GetLabels()
-		return labels == nil && labelHasPrefix(labels, v1alpha1.PodPreCheckLabelPrefix)
+		return labels != nil && labelHasPrefix(labels, v1alpha1.PodPreCheckLabelPrefix)
 	})
 	r.ruleSetManager.RegisterStage(v1alpha1.PodOpsLifecyclePostCheckStage, func(po client.Object) bool {
 		labels := po.GetLabels()

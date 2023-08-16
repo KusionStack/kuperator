@@ -24,8 +24,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 
 	"kusionstack.io/kafed/apis/apps/v1alpha1"
 )
@@ -54,7 +52,6 @@ var (
 type ReadyToUpgrade func(pod *corev1.Pod) (bool, []string, *time.Duration)
 type SatisfyExpectedFinalizers func(pod *corev1.Pod) (bool, []string, error)
 type TimeLabelValue func() string
-type NeedOpsLifecycle func(oldPod, newPod *corev1.Pod) bool
 
 type OpsLifecycle struct {
 	readyToUpgrade            ReadyToUpgrade // for testing
@@ -173,10 +170,4 @@ func hasNoBlockingFinalizer(pod *corev1.Pod) (bool, []string, *time.Duration) {
 	}
 
 	return true, nil, nil
-}
-
-var _ inject.Client = &OpsLifecycle{}
-
-func (lc *OpsLifecycle) InjectClient(c client.Client) error {
-	return nil
 }
