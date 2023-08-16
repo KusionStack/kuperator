@@ -50,7 +50,7 @@ var _ inject.Client = &ValidatingHandler{}
 // InjectClient injects the client into the ValidatingHandler
 func (h *ValidatingHandler) InjectClient(c client.Client) error {
 	h.Client = c
-	for i := range MutatingTypeHandlerMap {
+	for i := range ValidatingTypeHandlerMap {
 		if _, err := inject.ClientInto(h.Client, ValidatingTypeHandlerMap[i]); err != nil {
 			return err
 		}
@@ -63,7 +63,7 @@ var _ admission.DecoderInjector = &ValidatingHandler{}
 // InjectDecoder injects the decoder into the ValidatingHandler
 func (h *ValidatingHandler) InjectDecoder(d *admission.Decoder) error {
 	h.Decoder = d
-	for i := range MutatingTypeHandlerMap {
+	for i := range ValidatingTypeHandlerMap {
 		if _, err := admission.InjectDecoderInto(d, ValidatingTypeHandlerMap[i]); err != nil {
 			return err
 		}
