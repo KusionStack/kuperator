@@ -17,8 +17,8 @@ limitations under the License.
 package resourceconsist
 
 const (
-	controllerName = "podopslifecycle-controller"
+	controllerName = "resource-consist-controller"
 
-	cleanFinalizerPrefix     = "kafed.cafe/clean-" // todo, replace api
-	lifecycleFinalizerPrefix = "prot.kafed.cafe/lifecycle-"
+	cleanFinalizerPrefix     = "kafed.kusionstack.io/clean-"                    // todo, to be replaced by api
+	lifecycleFinalizerPrefix = "prot.lifecycle.kafed.kusionstack.io/lifecycle-" // todo, to be replaced by api
 )

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -174,6 +175,10 @@ func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, exp
 	if err != nil {
 		return false, err
 	}
+
+	// todo, to be removed, for demo
+	r.recorder.Eventf(employer, v1.EventTypeNormal, "diffEmployees", "toCreate: %v, toUpdate: %v, toDelete: %v, unchanged: %v",
+		toCudEmployees.ToCreate, toCudEmployees.ToUpdate, toCudEmployees.ToDelete, toCudEmployees.Unchanged)
 
 	succCreate, failCreate, err := r.adapter.CreateEmployees(employer, toCudEmployees.ToCreate)
 	if err != nil {
