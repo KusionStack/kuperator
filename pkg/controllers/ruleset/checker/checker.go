@@ -54,7 +54,6 @@ func (c *checker) GetState(client client.Client, item client.Object) (CheckState
 	}
 
 	rulesetNames := utils.GetRuleSets(item)
-	fmt.Printf("%d\n", len(rulesetNames))
 	// TODO: list ruleset, check match ruleset
 	// TODO: add ruleset anno by webhook
 

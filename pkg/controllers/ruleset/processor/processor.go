@@ -17,6 +17,7 @@ limitations under the License.
 package processor
 
 import (
+	"math"
 	"os"
 	"reflect"
 	"sort"
@@ -91,7 +92,7 @@ func (p *Processor) Process(targets map[string]*corev1.Pod) *ProcessResult {
 	rejected := map[string]RejectInfo{}
 	var ruleStates []*appsv1alpha1.RuleState
 
-	minInterval := time.Duration(MaxInt32) * time.Second
+	minInterval := time.Duration(math.MaxInt32) * time.Second
 	retry := false
 
 	for po := range processingPods {
@@ -172,7 +173,7 @@ func (p *Processor) Process(targets map[string]*corev1.Pod) *ProcessResult {
 		RuleStates: ruleStates,
 	}
 
-	if minInterval != time.Duration(MaxInt32) {
+	if minInterval != time.Duration(math.MaxInt32) {
 		res.Interval = &minInterval
 	}
 	return res
@@ -194,7 +195,6 @@ type RejectInfo struct {
 }
 
 const (
-	MaxInt32            = int64(0x3f3f3f3f)
 	EnvSkipRuleSetRules = "SKIP_RULESET_RULES"
 )
 
