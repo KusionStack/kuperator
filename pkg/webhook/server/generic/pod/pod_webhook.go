@@ -17,26 +17,25 @@ limitations under the License.
 package pod
 
 import (
-	v1 "k8s.io/api/core/v1"
+	"context"
 
-	"kusionstack.io/kafed/apis/apps/v1alpha1"
-	"kusionstack.io/kafed/pkg/webhook/server/generic"
+	admissionv1 "k8s.io/api/admission/v1"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"kusionstack.io/kafed/pkg/webhook/server/generic/pod/opslifecycle"
 )
 
-type NeedOpsLifecycle func(oldPod, newPod *v1.Pod) bool
+var (
+	webhooks []AdmissionWebhook
+)
 
-func init() {
-	generic.MutatingTypeHandlerMap["Pod"] = NewMutatingHandler(ControlledByKafed)
-	generic.ValidatingTypeHandlerMap["Pod"] = NewValidatingHandler(ControlledByKafed)
+type AdmissionWebhook interface {
+	Name() string
+	Mutating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) error
+	Validating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) error
 }
 
-func ControlledByKafed(oldPod, newPod *v1.Pod) bool {
-	if newPod == nil || newPod.Labels == nil {
-		return false
-	}
-	if v, ok := newPod.Labels[v1alpha1.KafedSystemLabel]; !ok || v != "true" {
-		return false
-	}
-
-	return true
+func init() {
+	webhooks = append(webhooks, opslifecycle.New())
 }

@@ -22,12 +22,8 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-)
 
-var (
-	// HandlerMap contains all admission webhook handlers.
-	HandlerMap = map[string]admission.Handler{}
+	"kusionstack.io/kafed/pkg/webhook/server/generic"
 )
 
 // Add adds itself to the manager
@@ -35,7 +31,7 @@ func Add(mgr manager.Manager) error {
 	server := mgr.GetWebhookServer()
 
 	// register admission handlers
-	for name, handler := range HandlerMap {
+	for name, handler := range generic.HandlerMap {
 		if len(name) == 0 {
 			klog.Warningf("Skip no-name handler.")
 			continue
