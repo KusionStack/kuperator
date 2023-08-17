@@ -29,7 +29,7 @@ import (
 )
 
 func (lc *OpsLifecycle) Validating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) error {
-	if !utils.ControlledByKafed(newPod) {
+	if !utils.ControlledByPodOpsLifecycle(newPod) {
 		return nil
 	}
 	expectedLabels := make(map[string]struct{})

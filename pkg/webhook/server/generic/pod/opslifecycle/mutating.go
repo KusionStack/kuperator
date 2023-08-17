@@ -30,7 +30,7 @@ import (
 )
 
 func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) error {
-	if !utils.ControlledByKafed(newPod) || operation != admissionv1.Update {
+	if !utils.ControlledByPodOpsLifecycle(newPod) || operation != admissionv1.Update {
 		return nil
 	}
 	addReadinessGates(newPod, v1alpha1.ReadinessGatePodServiceReady)
