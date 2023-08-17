@@ -16,6 +16,18 @@ limitations under the License.
 
 package v1alpha1
 
+// well known readiness gate
 const (
 	ReadinessGatePodServiceReady = "pod.kusionstack.io/service-ready"
+)
+
+// well known finalizer
+const (
+	PodOperationProtectionFinalizerPrefix = "prot.podopslifecycle.kusionstack.io"
+)
+
+// well known variables
+const (
+	PodOpsLifecyclePreCheckStage  = "pre-check"
+	PodOpsLifecyclePostCheckStage = "post-check"
 )
