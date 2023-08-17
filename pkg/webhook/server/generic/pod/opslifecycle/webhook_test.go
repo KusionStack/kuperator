@@ -37,28 +37,24 @@ func TestValidating(t *testing.T) {
 	}{
 		{
 			labels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                         "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):     "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
 			},
 		},
 		{
 			labels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                     "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"): "1402144848",
 			},
 			keyWords: fmt.Sprintf("not found label %s", fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123")),
 		},
 		{
 			labels: map[string]string{
-				v1alpha1.KafedSystemLabel: "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
 			},
 			keyWords: fmt.Sprintf("not found label %s", fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123")),
 		},
 		{
 			labels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                         "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):     "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
 
@@ -69,29 +65,42 @@ func TestValidating(t *testing.T) {
 
 		{
 			labels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                                   "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "123"):                "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "upgrade"): "1402144848",
 			},
 		},
 		{
 			labels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                    "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "123"): "true",
 			},
 			keyWords: v1alpha1.PodOperationPermissionLabelPrefix,
 		},
 		{
 			labels: map[string]string{
-				v1alpha1.KafedSystemLabel: "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "upgrade"): "1402144848",
 			},
 			keyWords: v1alpha1.PodPreCheckLabelPrefix,
+		},
+		{
+			labels: map[string]string{
+				v1alpha1.PodOperatingLabelPrefix: "1402144848",
+			},
+			keyWords: "invalid label",
+		},
+		{
+			labels: map[string]string{
+				v1alpha1.PodOperatingLabelPrefix:                                  "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
+			},
+			keyWords: "invalid label",
 		},
 	}
 
 	lifecycle := &OpsLifecycle{}
 	for _, v := range inputs {
+		if v.labels != nil {
+			v.labels[v1alpha1.ControlledByPodOpsLifecycle] = "true"
+		}
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: v.labels,
@@ -110,44 +119,23 @@ func TestValidating(t *testing.T) {
 
 func TestMutating(t *testing.T) {
 	inputs := []struct {
-		notes          string
+		notes    string
+		keyWords string // used to check the error message
+
 		oldPodLabels   map[string]string
 		newPodLabels   map[string]string
 		expectedLabels map[string]string
 
 		satisfyExpectedFinalizers SatisfyExpectedFinalizers
 		readyToUpgrade            ReadyToUpgrade
-
-		keyWords string // used to check the error message
 	}{
-		{
-			notes: "invalid label",
-			newPodLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                         "true",
-				v1alpha1.PodOperatingLabelPrefix:                                  "1402144848",
-				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
-			},
-			keyWords: fmt.Sprintf("invalid label %s", v1alpha1.PodOperatingLabelPrefix),
-		},
-		{
-			notes: "invalid label",
-			newPodLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                         "true",
-				v1alpha1.PodPreCheckLabelPrefix:                                   "1402144848",
-				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
-			},
-			keyWords: fmt.Sprintf("invalid label %s", v1alpha1.PodPreCheckLabelPrefix),
-		},
-
 		{
 			notes: "pre-check",
 			newPodLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                         "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):     "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
 			},
 			expectedLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                         "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):     "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
 
@@ -157,7 +145,6 @@ func TestMutating(t *testing.T) {
 		{
 			notes: "pre-check",
 			newPodLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                         "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):     "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
 
@@ -165,7 +152,6 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "456"): "upgrade",
 			},
 			expectedLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                         "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):     "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
 
@@ -181,7 +167,6 @@ func TestMutating(t *testing.T) {
 		{
 			notes: "prepare",
 			newPodLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                                   "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):               "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"):           "upgrade",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "123"):                "1402144848",
@@ -189,7 +174,6 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "upgrade"): "1402144848",
 			},
 			expectedLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                                   "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):               "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"):           "upgrade",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "123"):                "1402144848",
@@ -205,7 +189,6 @@ func TestMutating(t *testing.T) {
 		{
 			notes: "prepare, undo",
 			newPodLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                                   "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):               "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"):           "upgrade",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "123"):                "1402144848",
@@ -214,15 +197,12 @@ func TestMutating(t *testing.T) {
 
 				fmt.Sprintf("%s/%s", v1alpha1.PodUndoOperationTypeLabelPrefix, "123"): "upgrade",
 			},
-			expectedLabels: map[string]string{
-				v1alpha1.KafedSystemLabel: "true",
-			},
+			expectedLabels: map[string]string{},
 		},
 
 		{
 			notes: "prepare, operate, undo",
 			newPodLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                                   "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):               "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"):           "upgrade",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "123"):                "1402144848",
@@ -238,7 +218,6 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "replace"): "1402144848",
 			},
 			expectedLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                                   "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "456"):               "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "456"):           "replace",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "456"):                "1402144848",
@@ -253,7 +232,6 @@ func TestMutating(t *testing.T) {
 		{
 			notes: "prepare, pre-check",
 			newPodLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                                   "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):               "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"):           "upgrade",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "123"):                "1402144848",
@@ -264,7 +242,6 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "456"): "replace",
 			},
 			expectedLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                                   "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):               "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"):           "upgrade",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "123"):                "1402144848",
@@ -285,7 +262,6 @@ func TestMutating(t *testing.T) {
 		{
 			notes: "prepare, operate",
 			newPodLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                                   "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):               "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"):           "upgrade",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "123"):                "1402144848",
@@ -293,7 +269,6 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "upgrade"): "1402144848",
 			},
 			expectedLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                                   "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):               "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"):           "upgrade",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "123"):                "1402144848",
@@ -308,7 +283,6 @@ func TestMutating(t *testing.T) {
 		{
 			notes: "operated",
 			oldPodLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                         "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):     "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
 
@@ -319,7 +293,6 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, "123"):                 "1402144848",
 			},
 			newPodLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                                   "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "123"):                "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, "123"):              "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "upgrade"): "1402144848",
@@ -327,7 +300,7 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, "123"):                 "1402144848",
 			},
 			expectedLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                             "true",
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "123"):           "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "123"): "upgrade",
 			},
@@ -336,7 +309,6 @@ func TestMutating(t *testing.T) {
 		{
 			notes: "post-check, but wait for operating",
 			oldPodLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                         "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):     "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
 
@@ -344,35 +316,36 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "456"): "upgrade",
 			},
 			newPodLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                         "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):     "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
 			},
 			expectedLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                         "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):     "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
 
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "123"): "1402144848",
 			},
 		},
+
 		{
 			notes: "post-check",
 			newPodLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                             "true",
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "123"):           "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "123"): "upgrade",
 
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "456"):           "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "456"):          "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "456"): "upgrade",
 			},
 			expectedLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                             "true",
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "123"):           "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "123"): "upgrade",
 
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "123"): "1402144848",
 
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "456"):           "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "456"):          "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "456"): "upgrade",
 
@@ -383,19 +356,20 @@ func TestMutating(t *testing.T) {
 		{
 			notes: "complete",
 			newPodLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                             "true",
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "123"):           "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "123"): "upgrade",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "123"):         "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, "123"):       "1402144848",
 
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "456"):           "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "456"):          "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "456"): "upgrade",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "456"):         "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, "456"):       "1402144848",
 			},
 			expectedLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                             "true",
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "123"):           "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "123"): "upgrade",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "123"):         "1402144848",
@@ -403,6 +377,7 @@ func TestMutating(t *testing.T) {
 
 				fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, "123"): "1402144848",
 
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "456"):           "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "456"):          "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "456"): "upgrade",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "456"):         "1402144848",
@@ -415,7 +390,6 @@ func TestMutating(t *testing.T) {
 		{
 			notes: "wait for removing finalizers",
 			newPodLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                             "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "123"): "upgrade",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "123"):         "1402144848",
@@ -424,7 +398,6 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, "123"): "1402144848",
 			},
 			expectedLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                             "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "123"): "upgrade",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "123"):         "1402144848",
@@ -438,7 +411,7 @@ func TestMutating(t *testing.T) {
 		{
 			notes: "all finished",
 			newPodLabels: map[string]string{
-				v1alpha1.KafedSystemLabel:                                             "true",
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "123"):           "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "123"): "upgrade",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "123"):         "1402144848",
@@ -446,6 +419,7 @@ func TestMutating(t *testing.T) {
 
 				fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, "123"): "1402144848",
 
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "456"):           "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "456"):          "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "456"): "upgrade",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "456"):         "1402144848",
@@ -455,7 +429,6 @@ func TestMutating(t *testing.T) {
 			},
 			expectedLabels: map[string]string{
 				v1alpha1.PodServiceAvailableLabel: "1402144848",
-				v1alpha1.KafedSystemLabel:         "true",
 			},
 		},
 	}
@@ -466,12 +439,19 @@ func TestMutating(t *testing.T) {
 		},
 	}
 	for _, v := range inputs {
+		if v.oldPodLabels != nil {
+			v.oldPodLabels[v1alpha1.ControlledByPodOpsLifecycle] = "true"
+		}
 		oldPod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "old",
 				Namespace: "kafed",
 				Labels:    v.oldPodLabels,
 			},
+		}
+
+		if v.newPodLabels != nil {
+			v.newPodLabels[v1alpha1.ControlledByPodOpsLifecycle] = "true"
 		}
 		newPod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -496,9 +476,14 @@ func TestMutating(t *testing.T) {
 		if v.keyWords == "" {
 			assert.Nil(t, err)
 		} else {
-			assert.NotNil(t, err)
-			assert.Contains(t, err.Error(), v.keyWords)
+			if assert.NotNil(t, err) {
+				assert.Contains(t, err.Error(), v.keyWords)
+			}
 			continue
+		}
+
+		if v.expectedLabels != nil {
+			v.expectedLabels[v1alpha1.ControlledByPodOpsLifecycle] = "true"
 		}
 		assert.Equal(t, v.expectedLabels, newPod.Labels)
 	}

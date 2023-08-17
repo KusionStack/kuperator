@@ -26,6 +26,6 @@ func ControlledByKafed(obj client.Object) bool {
 	if obj == nil || obj.GetLabels() == nil {
 		return false
 	}
-	v, ok := obj.GetLabels()[v1alpha1.KafedSystemLabel]
+	v, ok := obj.GetLabels()[v1alpha1.ControlledByPodOpsLifecycle]
 	return ok && v == "true"
 }

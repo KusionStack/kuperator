@@ -166,6 +166,7 @@ var _ = Describe("podopslifecycle controller", func() {
 		}}
 
 		pod.ObjectMeta.Labels = map[string]string{
+			fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):       time,
 			fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, id):      time,
 			fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, id): operationType,
 		}
@@ -191,7 +192,8 @@ var _ = Describe("podopslifecycle controller", func() {
 				Name:      "test",
 				Namespace: "default",
 				Labels: map[string]string{
-					fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, id): time,
+					fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, id): time,
+					fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, id):   time,
 				},
 			},
 			Spec: podSpec,
@@ -218,6 +220,7 @@ var _ = Describe("podopslifecycle controller", func() {
 				Name:      "test",
 				Namespace: "default",
 				Labels: map[string]string{
+					fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):  time,
 					fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, id): time,
 				},
 			},
@@ -261,6 +264,7 @@ var _ = Describe("podopslifecycle controller", func() {
 		Expect(pod.Status.Conditions).To(HaveLen(0))
 
 		pod.ObjectMeta.Labels = map[string]string{
+			fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):  time,
 			fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, id): time,
 		}
 		err = mgr.GetClient().Update(context.Background(), pod)
@@ -315,7 +319,7 @@ func (rsm *mockRuleSetManager) GetState(client.Client, client.Object) (checker.C
 	return *rsm.CheckState, nil
 }
 
-func TestPodOpsLifecycleController(t *testing.T) {
+func TestControlledByPodOpsLifecycleler(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "podopslifecycle controller suite test")
 }

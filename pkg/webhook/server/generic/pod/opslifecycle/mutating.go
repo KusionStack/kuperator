@@ -80,7 +80,6 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 
 		if _, ok := labels[v1alpha1.PodOperateLabelPrefix]; ok {
 			operateCount++
-			continue
 		}
 
 		if _, ok := labels[v1alpha1.PodOperatedLabelPrefix]; ok { // operated
@@ -106,30 +105,8 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 		}
 	}
 
-	if operatingCount != 0 { // wait for all operatings to be done
+	if operatingCount != 0 { // wait for all operations to be done
 		return nil
-	}
-
-	if operateCount == len(newIdToLabelsMap) { // all operations are prepared
-		oldIdToLabelsMap, _, err := podopslifecycle.PodIDAndTypesMap(oldPod)
-		if err != nil {
-			return err
-		}
-
-		for id := range newIdToLabelsMap {
-			for _, v := range []string{v1alpha1.PodPreCheckLabelPrefix, v1alpha1.PodPreCheckedLabelPrefix, v1alpha1.PodPrepareLabelPrefix, v1alpha1.PodOperateLabelPrefix} {
-				delete(newPod.Labels, fmt.Sprintf("%s/%s", v, id))
-			}
-			lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, id))
-
-			t, ok := oldIdToLabelsMap[id][v1alpha1.PodOperationTypeLabelPrefix]
-			if !ok {
-				return fmt.Errorf("pod %s/%s label %s not found", oldPod.Namespace, oldPod.Name, fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, id))
-			}
-
-			delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, t))
-			newPod.Labels[fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, id)] = t
-		}
 	}
 
 	if completeCount == len(newIdToLabelsMap) { // all operations are done
@@ -139,11 +116,36 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 		}
 		if satisfied { // all operations are done and all expected finalizers are satisfied, then remove all unuseful labels, and add service available label
 			for id := range newIdToLabelsMap {
-				for _, v := range []string{v1alpha1.PodOperatedLabelPrefix, v1alpha1.PodDoneOperationTypeLabelPrefix, v1alpha1.PodPostCheckLabelPrefix, v1alpha1.PodPostCheckedLabelPrefix, v1alpha1.PodCompleteLabelPrefix} {
+				for _, v := range []string{v1alpha1.PodOperateLabelPrefix, v1alpha1.PodOperatedLabelPrefix, v1alpha1.PodDoneOperationTypeLabelPrefix, v1alpha1.PodPostCheckLabelPrefix, v1alpha1.PodPostCheckedLabelPrefix, v1alpha1.PodCompleteLabelPrefix} {
 					delete(newPod.Labels, fmt.Sprintf("%s/%s", v, id))
 				}
 			}
 			lc.addLabelWithTime(newPod, v1alpha1.PodServiceAvailableLabel)
+		}
+		return nil
+	}
+
+	if operateCount == len(newIdToLabelsMap) { // all operations are prepared
+		oldIdToLabelsMap, _, err := podopslifecycle.PodIDAndTypesMap(oldPod)
+		if err != nil {
+			return err
+		}
+
+		for id, labels := range newIdToLabelsMap {
+			for _, v := range []string{v1alpha1.PodPreCheckLabelPrefix, v1alpha1.PodPreCheckedLabelPrefix, v1alpha1.PodPrepareLabelPrefix} {
+				delete(newPod.Labels, fmt.Sprintf("%s/%s", v, id))
+			}
+
+			if _, ok := labels[v1alpha1.PodOperatedLabelPrefix]; !ok {
+				lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, id))
+			}
+
+			t, ok := oldIdToLabelsMap[id][v1alpha1.PodOperationTypeLabelPrefix]
+			if !ok {
+				continue
+			}
+			delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, t))
+			newPod.Labels[fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, id)] = t
 		}
 	}
 

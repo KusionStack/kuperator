@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"kusionstack.io/kafed/apis/apps/v1alpha1"
 )
@@ -30,34 +31,40 @@ func PodIDAndTypesMap(pod *v1.Pod) (map[string]map[string]string, map[string]int
 	idToLabelsMap := map[string]map[string]string{}
 	typeToNumsMap := map[string]int{}
 
-	for k, v := range pod.Labels {
-		if strings.HasPrefix(k, v1alpha1.PodOperationTypeLabelPrefix) {
-			if _, ok := typeToNumsMap[v]; !ok {
-				typeToNumsMap[v] = 1
-			} else {
-				typeToNumsMap[v] = typeToNumsMap[v] + 1
-			}
-		}
-
-		for _, label := range v1alpha1.WellKnownLabelPrefixesWithID {
-			if !strings.HasPrefix(k, label) {
-				continue
-			}
-
+	ids := sets.String{}
+	for k := range pod.Labels {
+		if strings.HasPrefix(k, v1alpha1.PodOperatingLabelPrefix) || strings.HasPrefix(k, v1alpha1.PodOperateLabelPrefix) {
 			s := strings.Split(k, "/")
 			if len(s) < 2 {
 				return nil, nil, fmt.Errorf("invalid label %s", k)
 			}
-			id := s[1]
+			ids.Insert(s[1])
+		}
+	}
+
+	for id := range ids {
+		operationType, ok := pod.Labels[fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, id)]
+		if ok {
+			if _, ok := typeToNumsMap[operationType]; !ok {
+				typeToNumsMap[operationType] = 1
+			} else {
+				typeToNumsMap[operationType] = typeToNumsMap[operationType] + 1
+			}
+		}
+
+		for _, prefix := range v1alpha1.WellKnownLabelPrefixesWithID {
+			label := fmt.Sprintf("%s/%s", prefix, id)
+			value, ok := pod.Labels[label]
+			if !ok {
+				continue
+			}
 
 			labelsMap, ok := idToLabelsMap[id]
 			if !ok {
 				labelsMap = make(map[string]string)
 				idToLabelsMap[id] = labelsMap
 			}
-			labelsMap[label] = v
-
-			break
+			labelsMap[prefix] = value
 		}
 	}
 	return idToLabelsMap, typeToNumsMap, nil
