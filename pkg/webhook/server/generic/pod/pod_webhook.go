@@ -17,27 +17,25 @@ limitations under the License.
 package pod
 
 import (
-	v1 "k8s.io/api/core/v1"
+	"context"
 
-	"kusionstack.io/kafed/pkg/webhook/server/generic"
+	admissionv1 "k8s.io/api/admission/v1"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"kusionstack.io/kafed/pkg/webhook/server/generic/pod/opslifecycle"
 )
 
-type NeedOpsLifecycle func(oldPod, newPod *v1.Pod) bool
+var (
+	webhooks []AdmissionWebhook
+)
 
-type PodWebhook struct {
-	mutatingHandler   *MutatingHandler
-	validatingHandler *ValidatingHandler
+type AdmissionWebhook interface {
+	Name() string
+	Mutating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) error
+	Validating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) error
 }
 
-func NewPodWebhook(needLifecycle NeedOpsLifecycle, readyToUpgrade opslifecycle.ReadyToUpgrade) *PodWebhook {
-	return &PodWebhook{
-		mutatingHandler:   NewMutatingHandler(needLifecycle, readyToUpgrade),
-		validatingHandler: NewValidatingHandler(needLifecycle),
-	}
-}
-
-func (h *PodWebhook) RegisterToDispatcher() {
-	generic.MutatingTypeHandlerMap["Pod"] = h.mutatingHandler
-	generic.ValidatingTypeHandlerMap["Pod"] = h.validatingHandler
+func init() {
+	webhooks = append(webhooks, opslifecycle.New())
 }

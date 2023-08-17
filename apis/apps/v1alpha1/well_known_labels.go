@@ -18,6 +18,8 @@ package v1alpha1
 
 // pod ops lifecyle labels
 const (
+	ControlledByPodOpsLifecycle = "podopslifecycle.kusionstack.io/control" // indicate a pod is controlled by podopslifecycle
+
 	PodOperatingLabelPrefix           = "operating.podopslifecycle.kusionstack.io"            // indicate a pod is operating
 	PodOperationTypeLabelPrefix       = "operation-type.podopslifecycle.kusionstack.io"       // indicate the type of operation
 	PodOperationPermissionLabelPrefix = "operation-permission.podopslifecycle.kusionstack.io" // indicate the permission of operation
@@ -44,6 +46,6 @@ const (
 
 var (
 	WellKnownLabelPrefixesWithID = []string{PodOperatingLabelPrefix, PodOperationTypeLabelPrefix, PodPreCheckLabelPrefix, PodPreCheckedLabelPrefix,
-		PodPrepareLabelPrefix, PodUndoOperationTypeLabelPrefix, PodOperateLabelPrefix, PodOperatedLabelPrefix, PodPostCheckLabelPrefix,
+		PodPrepareLabelPrefix, PodDoneOperationTypeLabelPrefix, PodUndoOperationTypeLabelPrefix, PodOperateLabelPrefix, PodOperatedLabelPrefix, PodPostCheckLabelPrefix,
 		PodPostCheckedLabelPrefix, PodCompleteLabelPrefix}
 )

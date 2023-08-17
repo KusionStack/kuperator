@@ -1,12 +1,9 @@
 /*
  Copyright 2023 The KusionStack Authors.
-
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
-
      http://www.apache.org/licenses/LICENSE-2.0
-
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,24 +11,12 @@
  limitations under the License.
 */
 
-package register
+package controllers
 
 import (
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"kusionstack.io/kafed/pkg/controllers/ruleset"
 )
 
-type KindCache struct {
-	newFunc map[string]func() client.Object
-}
-
-func (k *KindCache) AddNewKind(gvk string, newFunc func() client.Object) {
-	k.newFunc[gvk] = newFunc
-}
-
-func (k *KindCache) GetNewObject(gvk string) client.Object {
-	f, ok := k.newFunc[gvk]
-	if !ok {
-		return nil
-	}
-	return f()
+func init() {
+	AddToManagerFuncs = append(AddToManagerFuncs, ruleset.RuleSetManager().SetupRuleSetController)
 }

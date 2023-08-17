@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	webhookdmission "kusionstack.io/kafed/pkg/webhook/admission"
+	"kusionstack.io/kafed/pkg/webhook/server/generic/pod"
 )
 
 var (
@@ -32,3 +33,8 @@ var (
 
 var MutatingTypeHandlerMap = map[string]webhookdmission.DispatchHandler{}
 var ValidatingTypeHandlerMap = map[string]webhookdmission.DispatchHandler{}
+
+func init() {
+	MutatingTypeHandlerMap["Pod"] = pod.NewMutatingHandler()
+	ValidatingTypeHandlerMap["Pod"] = pod.NewValidatingHandler()
+}

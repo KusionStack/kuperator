@@ -14,29 +14,26 @@
  limitations under the License.
 */
 
-package register
+package utils
 
 import (
+	"encoding/json"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"kusionstack.io/kafed/apis/apps/v1alpha1"
 )
 
-func DefaultPolicy() Policy {
-	return defaultCache
+// DumpJSON returns the JSON encoding
+func DumpJSON(o interface{}) string {
+	j, _ := json.Marshal(o)
+	return string(j)
 }
 
-func DefaultRegister() Register {
-	return defaultCache
-}
-
-type Policy interface {
-	Stage(obj client.Object) string
-	InStage(obj client.Object, key string) bool
-	GetStages() []string
-	Conditions(obj client.Object) []string
-	MatchConditions(obj client.Object, conditions ...string) []string
-}
-
-type Register interface {
-	RegisterStage(key string, inStage func(obj client.Object) bool)
-	RegisterCondition(opsCondition string, inCondition func(obj client.Object) bool)
+func ControlledByPodOpsLifecycle(obj client.Object) bool {
+	if obj == nil || obj.GetLabels() == nil {
+		return false
+	}
+	v, ok := obj.GetLabels()[v1alpha1.ControlledByPodOpsLifecycle]
+	return ok && v == "true"
 }

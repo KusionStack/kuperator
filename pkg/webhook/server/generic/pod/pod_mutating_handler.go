@@ -24,35 +24,26 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
-	"kusionstack.io/kafed/pkg/log"
-	"kusionstack.io/kafed/pkg/webhook/server/generic/pod/opslifecycle"
 )
 
 const (
 	mutatingName = "pod-mutating-webhook"
 )
 
-var (
-	logger = log.New(logf.Log.WithName(mutatingName).WithValues("kind", "pod-mutating-webhook"))
-)
-
 type MutatingHandler struct {
-	needLifecycle NeedOpsLifecycle
-	opsLifecycle  *opslifecycle.OpsLifecycle
+	client.Client
+	*admission.Decoder
 }
 
-func NewMutatingHandler(needLifecycle NeedOpsLifecycle, readyToUpgrade opslifecycle.ReadyToUpgrade) *MutatingHandler {
-	return &MutatingHandler{
-		needLifecycle: needLifecycle,
-		opsLifecycle:  opslifecycle.New(readyToUpgrade),
-	}
+func NewMutatingHandler() *MutatingHandler {
+	return &MutatingHandler{}
 }
 
-func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request, c client.Client, decoder *admission.Decoder) (resp admission.Response) {
+func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
 	if req.Kind.Kind != "Pod" {
 		return admission.Patched("Invalid kind")
 	}
@@ -62,39 +53,46 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request, c c
 	}
 
 	pod := &corev1.Pod{}
-	err := decoder.Decode(req, pod)
+	err := h.Decode(req, pod)
 	if err != nil {
-		logger.Errorf(fmt.Sprintf("decode request failed, error: %s", err))
+		klog.Errorf("decode request failed, %v", err)
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-
-	if req.Operation == admissionv1.Create {
-		if !h.needLifecycle(nil, pod) {
-			return admission.Patched("Not need opslifecycle mutating")
+	var oldPod *corev1.Pod
+	if req.Operation == admissionv1.Update || req.Operation == admissionv1.Delete {
+		oldPod = &corev1.Pod{}
+		if err = h.DecodeRaw(req.OldObject, oldPod); err != nil {
+			return admission.Errored(http.StatusBadRequest, fmt.Errorf("fail to unmarshal old object: %s", err))
 		}
 	}
 
-	if req.Operation == admissionv1.Update {
-		old := &corev1.Pod{}
-		if err := decoder.DecodeRaw(req.OldObject, old); err != nil {
-			return admission.Errored(http.StatusBadRequest, fmt.Errorf("fail to unmarshal old object: %s", err))
-		}
-
-		if !h.needLifecycle(old, pod) {
-			return admission.Patched("Not need opslifecycle mutating")
-		}
-
-		if err := h.opsLifecycle.Mutating(ctx, old, pod, c, logger); err != nil {
-			logger.Errorf("fail to start over new opslifecycle for pod %s/%s: %s", pod.Namespace, pod.Name, err)
-			return admission.Errored(http.StatusBadRequest, err)
+	for _, webhook := range webhooks {
+		// mutating on new pod
+		if err = webhook.Mutating(ctx, h.Client, oldPod, pod, req.Operation); err != nil {
+			klog.Errorf("failed to mutate pod, %v", err)
+			return admission.Errored(http.StatusInternalServerError, err)
 		}
 	}
 
 	marshalled, err := json.Marshal(pod)
 	if err != nil {
-		logger.Errorf(fmt.Sprintf("marshal Pod failed, error: %s", err))
+		klog.Errorf("marshal Pod failed, %v", err)
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
 	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
+}
+
+var _ inject.Client = &MutatingHandler{}
+
+func (h *MutatingHandler) InjectClient(c client.Client) error {
+	h.Client = c
+	return nil
+}
+
+var _ admission.DecoderInjector = &MutatingHandler{}
+
+func (h *MutatingHandler) InjectDecoder(d *admission.Decoder) error {
+	h.Decoder = d
+	return nil
 }

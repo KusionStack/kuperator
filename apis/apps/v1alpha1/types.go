@@ -16,6 +16,13 @@ limitations under the License.
 
 package v1alpha1
 
+const (
+	PodOperationProtectionFinalizerPrefix = "prot.lifecycle.kafed.kusionstack.io"
+
+	PodOpsLifecyclePreCheckStage  = "pre-check"
+	PodOpsLifecyclePostCheckStage = "post-check"
+)
+
 // +kubebuilder:object:generate=false
 type PodAvailableConditions struct {
 	ExpectedFinalizers []string `json:"expectedFinalizers,omitempty"` // indicate the expected finalizers of a pod

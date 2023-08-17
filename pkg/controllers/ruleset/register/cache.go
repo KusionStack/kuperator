@@ -50,21 +50,19 @@ type cache struct {
 	mu sync.Mutex
 }
 
-func (r *cache) RegisterStage(stage string, inStage func(obj client.Object) bool) error {
+func (r *cache) RegisterStage(stage string, inStage func(obj client.Object) bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.stages = append(r.stages, stage)
 	r.stageKey.Insert(stage)
 	r.inStageFunc.Add(stage, inStage)
-	return nil
 }
 
-func (r *cache) RegisterCondition(opsCondition string, inCondition func(obj client.Object) bool) error {
+func (r *cache) RegisterCondition(opsCondition string, inCondition func(obj client.Object) bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.conditionKey.Insert(opsCondition)
 	r.condition.Add(opsCondition, inCondition)
-	return nil
 }
 
 func (r *cache) Stage(obj client.Object) string {
