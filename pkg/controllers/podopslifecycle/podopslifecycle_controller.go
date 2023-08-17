@@ -55,7 +55,10 @@ func Add(mgr manager.Manager) error {
 }
 
 func AddToMgr(mgr manager.Manager, r reconcile.Reconciler) error {
-	c, err := controller.New(controllerName, mgr, controller.Options{MaxConcurrentReconciles: 5, Reconciler: r})
+	c, err := controller.New(controllerName, mgr, controller.Options{
+		MaxConcurrentReconciles: 5,
+		Reconciler:              r,
+	})
 	if err != nil {
 		return err
 	}
@@ -99,6 +102,8 @@ type ReconcilePodOpsLifecycle struct {
 	expectation    *expectations.ResourceVersionExpectation
 }
 
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
 func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	key := fmt.Sprintf("%s/%s", request.Namespace, request.Name)
 	r.logger.V(0).Infof("Reconcile Pod %s", key)
@@ -150,7 +155,6 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	fmt.Println(idToLabelsMap)
 
 	expected := map[string]bool{
 		v1alpha1.PodPrepareLabelPrefix:  false, // set readiness gate to false

@@ -24,7 +24,7 @@ type OperationType string
 
 var (
 	OpsLifecycleTypeUpdate  OperationType = "update"
-	OpsLifecycleTypeScaleIn OperationType = "scaleIn"
+	OpsLifecycleTypeScaleIn OperationType = "scale-in"
 	OpsLifecycleTypeDelete  OperationType = "delete"
 )
 

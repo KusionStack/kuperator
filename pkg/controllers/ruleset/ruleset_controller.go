@@ -51,10 +51,8 @@ import (
 const (
 	controllerName          = "ruleset-controller"
 	resourceName            = "RuleSet"
-	maxConcurrentReconciles = 10
-	cleanUpFinalizer        = "ruleset.kafed.kusionstack.io/need-clean-up"
-
-	rulesetTerminatingLabel = "ruleset.kafed.kusionstack.io/terminating"
+	cleanUpFinalizer        = "ruleset.kusionstack.io/need-clean-up"
+	rulesetTerminatingLabel = "ruleset.kusionstack.io/terminating"
 )
 
 var (
@@ -74,7 +72,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 func addToMgr(mgr manager.Manager, r reconcile.Reconciler) (controller.Controller, error) {
 	// Create a new controller
 	c, err := controller.New(controllerName, mgr, controller.Options{
-		MaxConcurrentReconciles: maxConcurrentReconciles,
+		MaxConcurrentReconciles: 5,
 		Reconciler:              r,
 	})
 	if err != nil {
