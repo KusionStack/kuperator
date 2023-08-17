@@ -16,6 +16,3 @@ resources:
 - auth_proxy_role.yaml
 - auth_proxy_role_binding.yaml
 - auth_proxy_client_clusterrole.yaml
-- pod_writer_role.yaml
-- pod_reader_role.yaml
-- pod_role_binding.yaml

@@ -80,6 +80,9 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 	return nil
 }
 
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
+
 // Reconcile aims to delete Pod through PodOpsLifecycle. It will watch Pod with label `kafed.kusionstack.io/to-delete`.
 // If a Pod is labeled, controller will first trigger a deletion PodOpsLifecycle. If all conditions are satisfied,
 // it will then delete Pod.

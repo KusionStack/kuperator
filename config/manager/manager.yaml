@@ -6,8 +6,8 @@ metadata:
     app.kubernetes.io/name: namespace
     app.kubernetes.io/instance: system
     app.kubernetes.io/component: manager
-    app.kubernetes.io/created-by: korbito
-    app.kubernetes.io/part-of: korbito
+    app.kubernetes.io/created-by: kusionstack
+    app.kubernetes.io/part-of: kusionstack
     app.kubernetes.io/managed-by: kustomize
   name: system
 ---
@@ -21,8 +21,8 @@ metadata:
     app.kubernetes.io/name: deployment
     app.kubernetes.io/instance: controller-manager
     app.kubernetes.io/component: manager
-    app.kubernetes.io/created-by: korbito
-    app.kubernetes.io/part-of: korbito
+    app.kubernetes.io/created-by: kusionstack
+    app.kubernetes.io/part-of: kusionstack
     app.kubernetes.io/managed-by: kustomize
 spec:
   selector:
@@ -71,7 +71,7 @@ spec:
         image: controller:latest
         args:
         - "--leader-elect"
-        - "--cert-dir=/korbito-webhook-certs"
+        - "--cert-dir=/webhook-certs"
         - "--health-probe-bind-address=:8081"
         - "--metrics-bind-address=127.0.0.1:8080"
         name: manager
@@ -102,12 +102,12 @@ spec:
             cpu: 10m
             memory: 64Mi
         volumeMounts:
-        - name: korbito-webhook-certs
-          mountPath: "/korbito-webhook-certs"
+        - name: webhook-certs
+          mountPath: "/webhook-certs"
           readOnly: true
       serviceAccountName: controller-manager
-      terminationGracePeriodSeconds: 10
+      terminationGracePeriodSeconds: 0
       volumes:
-      - name: korbito-webhook-certs
+      - name: webhook-certs
         secret:
-          secretName: korbito-webhook-certs
+          secretName: webhook-certs

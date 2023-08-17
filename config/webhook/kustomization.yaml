@@ -1,0 +1,4 @@
+resources:
+- secret.yaml
+- service.yaml
+- webhook.yaml

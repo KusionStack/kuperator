@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: korbito-controller-manager
-  namespace: korbito-system
+  name: controller-manager
+  namespace: kusionstack-system
 spec:
   ports:
     - port: 443
