@@ -32,6 +32,7 @@ func (lc *OpsLifecycle) Validating(ctx context.Context, c client.Client, oldPod,
 	if !utils.ControlledByPodOpsLifecycle(newPod) {
 		return nil
 	}
+
 	expectedLabels := make(map[string]struct{})
 	foundLabels := make(map[string]struct{})
 	for label := range newPod.Labels {
@@ -41,27 +42,27 @@ func (lc *OpsLifecycle) Validating(ctx context.Context, c client.Client, oldPod,
 			}
 
 			s := strings.Split(label, "/")
-			if len(s) < 2 {
+			if len(s) != 2 {
 				return fmt.Errorf("invalid label %s", label)
 			}
 			id := s[1]
 
 			if id != "" {
-				label := fmt.Sprintf("%s/%s", pairLabelPrefixesMap[v], id)
-				_, ok := newPod.Labels[label]
+				pairLabel := fmt.Sprintf("%s/%s", pairLabelPrefixesMap[v], id)
+				_, ok := newPod.Labels[pairLabel]
 				if !ok {
-					return fmt.Errorf("not found label %s", label)
+					return fmt.Errorf("not found label %s", pairLabel)
 				}
 			}
 		}
 
 		found := false
-		for v := range expectedLabels {
+		for v := range expectedLabels { // try to find the expected another label prefixes
 			if strings.HasPrefix(label, v) {
 				foundLabels[v] = struct{}{}
+				found = true
+				break
 			}
-			found = true
-			break
 		}
 		if found {
 			continue

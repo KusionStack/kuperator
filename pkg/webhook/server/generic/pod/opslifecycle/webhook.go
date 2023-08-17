@@ -44,8 +44,8 @@ var (
 
 	// some labels must exist together
 	coexistingLabelPrefixesMap = map[string]string{
-		v1alpha1.PodPreCheckLabelPrefix:            v1alpha1.PodOperationPermissionLabelPrefix,
-		v1alpha1.PodOperationPermissionLabelPrefix: v1alpha1.PodPreCheckLabelPrefix,
+		v1alpha1.PodPreCheckedLabelPrefix:          v1alpha1.PodOperationPermissionLabelPrefix,
+		v1alpha1.PodOperationPermissionLabelPrefix: v1alpha1.PodPreCheckedLabelPrefix,
 	}
 )
 

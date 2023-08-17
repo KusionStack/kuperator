@@ -64,13 +64,13 @@ func TestValidating(t *testing.T) {
 
 		{
 			labels: map[string]string{
-				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "123"):                "true",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, "123"):              "true",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "upgrade"): "1402144848",
 			},
 		},
 		{
 			labels: map[string]string{
-				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "123"): "true",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, "123"): "true",
 			},
 			keyWords: v1alpha1.PodOperationPermissionLabelPrefix,
 		},
@@ -78,7 +78,7 @@ func TestValidating(t *testing.T) {
 			labels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "upgrade"): "1402144848",
 			},
-			keyWords: v1alpha1.PodPreCheckLabelPrefix,
+			keyWords: v1alpha1.PodPreCheckedLabelPrefix,
 		},
 		{
 			labels: map[string]string{

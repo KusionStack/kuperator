@@ -33,6 +33,7 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 	if !utils.ControlledByPodOpsLifecycle(newPod) || operation != admissionv1.Update {
 		return nil
 	}
+
 	addReadinessGates(newPod, v1alpha1.ReadinessGatePodServiceReady)
 
 	newIdToLabelsMap, typeToNumsMap, err := podopslifecycle.PodIDAndTypesMap(newPod)
