@@ -1,4 +1,4 @@
-apiVersion: apps.kafed.io/v1alpha1
+apiVersion: apps.kusionstack.io/v1alpha1
 kind: OperationJob
 metadata:
   labels:

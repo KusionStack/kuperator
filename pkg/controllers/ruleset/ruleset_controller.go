@@ -104,9 +104,9 @@ type RuleSetReconciler struct {
 	logr.Logger
 }
 
-//+kubebuilder:rbac:groups=apps.kafed.io,resources=rulesets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=apps.kafed.io,resources=rulesets/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=apps.kafed.io,resources=rulesets/finalizers,verbs=update
+//+kubebuilder:rbac:groups=apps.kusionstack.io,resources=rulesets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps.kusionstack.io,resources=rulesets/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=apps.kusionstack.io,resources=rulesets/finalizers,verbs=update
 
 func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, reconcileErr error) {
 
