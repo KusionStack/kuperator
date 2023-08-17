@@ -19,8 +19,8 @@ package v1alpha1
 const (
 	PodOperationProtectionFinalizerPrefix = "prot.lifecycle.kafed.kusionstack.io"
 
-	PodOpsLifecyclePreCheckStage  = "precheck"
-	PodOpsLifecyclePostCheckStage = "postcheck"
+	PodOpsLifecyclePreCheckStage  = "pre-check"
+	PodOpsLifecyclePostCheckStage = "post-check"
 )
 
 // +kubebuilder:object:generate=false

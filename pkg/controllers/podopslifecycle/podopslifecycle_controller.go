@@ -136,10 +136,8 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 			if err != nil {
 				r.logger.Errorf("failed to update pod %s: %s", key, err)
 				expectation.DeleteExpectations(key)
-
-				return reconcile.Result{}, err
 			}
-			return reconcile.Result{}, nil
+			return reconcile.Result{}, err
 		}
 	}
 

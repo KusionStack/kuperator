@@ -51,7 +51,12 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 			}
 
 			// clean up these labels with id
-			for _, v := range []string{v1alpha1.PodOperatingLabelPrefix, v1alpha1.PodOperationTypeLabelPrefix, v1alpha1.PodPreCheckLabelPrefix, v1alpha1.PodPreCheckedLabelPrefix, v1alpha1.PodPrepareLabelPrefix, v1alpha1.PodOperateLabelPrefix} {
+			for _, v := range []string{v1alpha1.PodOperatingLabelPrefix,
+				v1alpha1.PodOperationTypeLabelPrefix,
+				v1alpha1.PodPreCheckLabelPrefix,
+				v1alpha1.PodPreCheckedLabelPrefix,
+				v1alpha1.PodPrepareLabelPrefix,
+				v1alpha1.PodOperateLabelPrefix} {
 				delete(newPod.Labels, fmt.Sprintf("%s/%s", v, id))
 			}
 
@@ -67,7 +72,7 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 					lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, id))
 				}
 				if _, ok := labels[v1alpha1.PodOperateLabelPrefix]; !ok {
-					if ready, _, _ := lc.readyToUpgrade(newPod); ready {
+					if ready, _ := lc.readyToUpgrade(newPod); ready {
 						lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id))
 					}
 				}
@@ -116,7 +121,12 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 		}
 		if satisfied { // all operations are done and all expected finalizers are satisfied, then remove all unuseful labels, and add service available label
 			for id := range newIdToLabelsMap {
-				for _, v := range []string{v1alpha1.PodOperateLabelPrefix, v1alpha1.PodOperatedLabelPrefix, v1alpha1.PodDoneOperationTypeLabelPrefix, v1alpha1.PodPostCheckLabelPrefix, v1alpha1.PodPostCheckedLabelPrefix, v1alpha1.PodCompleteLabelPrefix} {
+				for _, v := range []string{v1alpha1.PodOperateLabelPrefix,
+					v1alpha1.PodOperatedLabelPrefix,
+					v1alpha1.PodDoneOperationTypeLabelPrefix,
+					v1alpha1.PodPostCheckLabelPrefix,
+					v1alpha1.PodPostCheckedLabelPrefix,
+					v1alpha1.PodCompleteLabelPrefix} {
 					delete(newPod.Labels, fmt.Sprintf("%s/%s", v, id))
 				}
 			}
@@ -132,7 +142,9 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 		}
 
 		for id, labels := range newIdToLabelsMap {
-			for _, v := range []string{v1alpha1.PodPreCheckLabelPrefix, v1alpha1.PodPreCheckedLabelPrefix, v1alpha1.PodPrepareLabelPrefix} {
+			for _, v := range []string{v1alpha1.PodPreCheckLabelPrefix,
+				v1alpha1.PodPreCheckedLabelPrefix,
+				v1alpha1.PodPrepareLabelPrefix} {
 				delete(newPod.Labels, fmt.Sprintf("%s/%s", v, id))
 			}
 

@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -489,12 +488,12 @@ func TestMutating(t *testing.T) {
 	}
 }
 
-func readyToUpgradeReturnTrue(pod *corev1.Pod) (bool, []string, *time.Duration) {
-	return true, nil, nil
+func readyToUpgradeReturnTrue(pod *corev1.Pod) (bool, []string) {
+	return true, nil
 }
 
-func readyToUpgradeReturnFalse(pod *corev1.Pod) (bool, []string, *time.Duration) {
-	return false, nil, nil
+func readyToUpgradeReturnFalse(pod *corev1.Pod) (bool, []string) {
+	return false, nil
 }
 
 func satifyExpectedFinalizersReturnTrue(pod *corev1.Pod) (bool, []string, error) {

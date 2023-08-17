@@ -49,7 +49,7 @@ var (
 	}
 )
 
-type ReadyToUpgrade func(pod *corev1.Pod) (bool, []string, *time.Duration)
+type ReadyToUpgrade func(pod *corev1.Pod) (bool, []string)
 type SatisfyExpectedFinalizers func(pod *corev1.Pod) (bool, []string, error)
 type TimeLabelValue func() string
 
@@ -70,7 +70,7 @@ func New() *OpsLifecycle {
 }
 
 func (lc *OpsLifecycle) Name() string {
-	return "PodLifecycleWebhook"
+	return "PodOpsLifecycleWebhook"
 }
 
 func (lc *OpsLifecycle) addLabelWithTime(pod *corev1.Pod, key string) {
@@ -134,9 +134,9 @@ func podAvailableConditions(pod *corev1.Pod) (*v1alpha1.PodAvailableConditions, 
 	return availableConditions, nil
 }
 
-func hasNoBlockingFinalizer(pod *corev1.Pod) (bool, []string, *time.Duration) {
+func hasNoBlockingFinalizer(pod *corev1.Pod) (bool, []string) {
 	if pod == nil {
-		return true, nil, nil
+		return true, nil
 	}
 
 	hasReadinessGate := false
@@ -150,11 +150,11 @@ func hasNoBlockingFinalizer(pod *corev1.Pod) (bool, []string, *time.Duration) {
 	}
 	if !hasReadinessGate {
 		// if has no service-ready ReadinessGate, treat it as normal pod.
-		return true, nil, nil
+		return true, nil
 	}
 
 	if pod.ObjectMeta.Finalizers == nil || len(pod.ObjectMeta.Finalizers) == 0 {
-		return true, nil, nil
+		return true, nil
 	}
 
 	var finalizers []string
@@ -165,9 +165,8 @@ func hasNoBlockingFinalizer(pod *corev1.Pod) (bool, []string, *time.Duration) {
 	}
 
 	if len(finalizers) > 0 {
-		requeneAfter := time.Duration(waitingForLifecycleSeconds) * time.Second
-		return false, finalizers, &requeneAfter
+		return false, finalizers
 	}
 
-	return true, nil, nil
+	return true, nil
 }
