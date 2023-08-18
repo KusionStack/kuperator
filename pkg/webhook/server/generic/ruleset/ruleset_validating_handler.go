@@ -80,6 +80,9 @@ func (h *ValidatingHandler) validate(rs *appsv1alpha1.RuleSet) error {
 		if rule.LabelCheck != nil && rule.LabelCheck.Requires == nil {
 			errList = append(errList, field.Invalid(fRule.Child(rule.Name), nil, "nil label check required"))
 		}
+		if rule.AvailablePolicy != nil && rule.AvailablePolicy.MaxUnavailableValue == nil && rule.AvailablePolicy.MinAvailableValue == nil {
+			errList = append(errList, field.Invalid(fRule.Child(rule.Name), nil, "minAvailableValue and maxUnavailableValue must have at least one configured"))
+		}
 	}
 	return errList.ToAggregate()
 }

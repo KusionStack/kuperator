@@ -113,6 +113,10 @@ const (
 	// Fail means that an error calling the webhook causes the admission to fail.
 	Fail FailurePolicyType = "Fail"
 )
+const (
+	DefaultWebhookInterval = int64(5)
+	DefaultWebhookTimeout  = int64(60)
+)
 
 // ResourceParameter is representing the request body of resource parameter
 type ResourceParameter struct {
