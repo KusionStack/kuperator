@@ -19,7 +19,11 @@ package v1alpha1
 const (
 	PodAvailableConditionsAnnotation = "pod.kusionstack.io/available-conditions" // indicate the available conditions of a pod
 
-	AnnotationPodSkipRuleConditions = "ruleset.kusionstack.io/skip-rule-conditions"
-
 	LastPodStatusAnnotationKey = "collaset.kusionstack.io/last-pod-status"
+)
+
+// RuleSet Annotation
+const (
+	AnnotationRuleSets              = "ruleset.kusionstack.io/rulesets"
+	AnnotationPodSkipRuleConditions = "ruleset.kusionstack.io/skip-rule-conditions"
 )

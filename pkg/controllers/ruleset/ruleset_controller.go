@@ -123,7 +123,7 @@ func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Req
 		return reconcile.Result{}, nil
 	}
 
-	selector, _ := metav1.LabelSelectorAsSelector(&ruleSet.Spec.Selector)
+	selector, _ := metav1.LabelSelectorAsSelector(ruleSet.Spec.Selector)
 	selectedPods := &corev1.PodList{}
 	if err := r.List(context.TODO(), selectedPods, &client.ListOptions{Namespace: ruleSet.Namespace, LabelSelector: selector}); err != nil {
 		r.Error(err, fmt.Sprintf("fail to list pods by ruleset %s", request.NamespacedName.String()))
@@ -133,7 +133,7 @@ func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Req
 	// Delete
 	if ruleSet.DeletionTimestamp != nil {
 		if _, find := ruleSet.Labels[rulesetTerminatingLabel]; find || !r.hasRunningPod(selectedPods) {
-			if err := r.cleanUpPod(ruleSet); err != nil {
+			if err := r.cleanUpRuleSetPods(ctx, ruleSet); err != nil {
 				return reconcile.Result{}, err
 			}
 			return reconcile.Result{}, utils.RemoveFinalizer(ctx, r.Client, ruleSet, cleanUpFinalizer)
@@ -164,9 +164,7 @@ func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Req
 			continue
 		}
 
-		if err := r.updateRuleSetOnPod(ruleSet.Name,
-			&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ruleSet.Namespace}},
-			rulesetutils.MoveRulesetAnno); err != nil {
+		if _, err := r.updateRuleSetOnPod(ctx, ruleSet.Name, name, ruleSet.Namespace, rulesetutils.MoveRulesetAnno); err != nil {
 			r.Info(fmt.Sprintf("fail to remove ruleset on pod %s, %v", name, err))
 			return result, err
 		}
@@ -174,10 +172,12 @@ func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Req
 
 	// own selected pods
 	for name, pod := range targetPods {
-		if err := r.updateRuleSetOnPod(ruleSet.Name, pod, rulesetutils.AddRuleSetAnno); err != nil {
+		newPod, err := r.updateRuleSetOnPod(ctx, ruleSet.Name, pod.Name, pod.Namespace, rulesetutils.AddRuleSetAnno)
+		if err != nil {
 			r.Info(fmt.Sprintf("fail to add ruleset on pod %s, %v", name, err))
 			return result, err
 		}
+		targetPods[name] = newPod
 	}
 
 	// process rules
@@ -297,35 +297,23 @@ func addToEveryQueue(namespace, name string) {
 	}
 }
 
-func (r *RuleSetReconciler) cleanUpPod(ruleSet *appsv1alpha1.RuleSet) error {
+func (r *RuleSetReconciler) cleanUpRuleSetPods(ctx context.Context, ruleSet *appsv1alpha1.RuleSet) error {
 	for _, name := range ruleSet.Status.Targets {
-		pod := &corev1.Pod{}
-		if err := r.Get(context.TODO(), types.NamespacedName{Namespace: ruleSet.Namespace, Name: name}, pod); err != nil {
-			if errors.IsNotFound(err) {
-				continue
-			}
-			return err
-		}
-		if err := r.updateRuleSetOnPod(ruleSet.Name, pod, rulesetutils.MoveRulesetAnno); err != nil {
+		if _, err := r.updateRuleSetOnPod(ctx, ruleSet.Name, name, ruleSet.Namespace, rulesetutils.MoveRulesetAnno); err != nil && !errors.IsNotFound(err) {
 			return fmt.Errorf("fail to remove RuleSet %s on pod %s: %v", utils.ObjectKey(ruleSet), name, err)
 		}
 	}
 	return nil
 }
 
-func (r *RuleSetReconciler) updateRuleSetOnPod(ruleSet string, pod *corev1.Pod, fn func(pod *corev1.Pod, name string) bool) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		if err := r.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, pod); err != nil {
-			if errors.IsNotFound(err) {
-				return nil
-			}
+func (r *RuleSetReconciler) updateRuleSetOnPod(ctx context.Context, ruleSet, name, namespace string, fn func(pod *corev1.Pod, name string) bool) (*corev1.Pod, error) {
+	pod := &corev1.Pod{}
+	return pod, retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, pod); err != nil {
 			return err
 		}
 		if fn(pod, ruleSet) {
-			err := r.Update(context.TODO(), pod)
-			if errors.IsNotFound(err) {
-				return nil
-			}
+			return r.Update(ctx, pod)
 		}
 		return nil
 	})

@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/kafed/pkg/webhook/server/generic/pod/opslifecycle"
+	"kusionstack.io/kafed/pkg/webhook/server/generic/pod/ruleset"
 )
 
 var (
@@ -38,4 +39,5 @@ type AdmissionWebhook interface {
 
 func init() {
 	webhooks = append(webhooks, opslifecycle.New())
+	webhooks = append(webhooks, ruleset.New())
 }

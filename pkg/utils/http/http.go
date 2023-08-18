@@ -100,9 +100,9 @@ func buildReq(method, url string, body interface{}, header map[string]string) (*
 	return req, nil
 }
 
-var DefaultClient = NewSharedClient()
+var DefaultClient = newSharedClient()
 
-func NewSharedClient() *clientSet {
+func newSharedClient() *clientSet {
 	return &clientSet{
 		caClientSet: map[string]*http.Client{},
 		tkClientSet: map[string]*http.Client{},

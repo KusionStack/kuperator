@@ -25,7 +25,7 @@ import (
 // RuleSetSpec defines the desired state of RuleSet
 type RuleSetSpec struct {
 	// Selector select the targets controlled by ruleset
-	Selector metav1.LabelSelector `json:"selector,omitempty"`
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
 	// Rules is a set of rules that need to be checked in certain situations
 	Rules []RuleSetRule `json:"rules,omitempty"`
@@ -112,6 +112,10 @@ const (
 	Ignore FailurePolicyType = "Ignore"
 	// Fail means that an error calling the webhook causes the admission to fail.
 	Fail FailurePolicyType = "Fail"
+)
+const (
+	DefaultWebhookInterval = int64(5)
+	DefaultWebhookTimeout  = int64(60)
 )
 
 // ResourceParameter is representing the request body of resource parameter

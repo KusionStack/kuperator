@@ -77,7 +77,7 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 	marshalled, err := json.Marshal(pod)
 	if err != nil {
 		klog.Errorf("marshal Pod failed, %v", err)
-		return admission.Errored(http.StatusBadRequest, err)
+		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
 	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
