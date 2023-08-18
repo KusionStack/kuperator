@@ -170,7 +170,7 @@ func (sc *RealSyncControl) Scale(set *appsv1alpha1.CollaSet, podWrappers []*coll
 			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = fmt.Sprintf("%d", availableIDContext.ID)
 
 			klog.V(1).Info("try to create Pod with revision %s from CollaSet %s/%s", revision.Name, set.Namespace, set.Name)
-			if pod, err := sc.podControl.CreatePod(newPod); err == nil {
+			if pod, err = sc.podControl.CreatePod(newPod); err == nil {
 				// add an expectation for this pod creation, before next reconciling
 				if err := collasetutils.ActiveExpectations.ExpectCreate(set, expectations.Pod, pod.Name); err != nil {
 					return err
