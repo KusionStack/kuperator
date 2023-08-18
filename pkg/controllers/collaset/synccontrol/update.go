@@ -350,7 +350,7 @@ func (u *RecreatePodUpdater) AnalyseAndGetUpdatedPod(_ *appsv1alpha1.CollaSet, _
 	return false, false, nil, nil
 }
 
-func (u *RecreatePodUpdater) GetPodUpdateFinishStatus(podUpdateInfo *PodUpdateInfo) (finished bool, msg string, err error) {
+func (u *RecreatePodUpdater) GetPodUpdateFinishStatus(podInfo *PodUpdateInfo) (finished bool, msg string, err error) {
 	// Recreate policy alway treat Pod as update finished
-	return podUpdateInfo.IsUpdatedRevision, "", nil
+	return podInfo.IsUpdatedRevision, "", nil
 }
