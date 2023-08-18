@@ -19,6 +19,7 @@ package ruleset
 import (
 	"context"
 	"fmt"
+	"kusionstack.io/kafed/pkg/controllers/utils"
 	"sort"
 	"sync"
 	"time"
@@ -45,7 +46,6 @@ import (
 	"kusionstack.io/kafed/pkg/controllers/ruleset/processor"
 	"kusionstack.io/kafed/pkg/controllers/ruleset/register"
 	rulesetutils "kusionstack.io/kafed/pkg/controllers/ruleset/utils"
-	"kusionstack.io/kafed/pkg/utils"
 )
 
 const (

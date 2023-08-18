@@ -19,6 +19,7 @@ package collaset
 import (
 	"context"
 	"fmt"
+	"kusionstack.io/kafed/pkg/controllers/collaset/podcontext"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -46,6 +47,8 @@ import (
 
 const (
 	controllerName = "collaset-controller"
+
+	preReclaimFinalizer = "apps.kusionstack.io/pre-reclaim"
 )
 
 // CollaSetReconciler reconciles a CollaSet object
@@ -128,6 +131,21 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	} else if !satisfied {
 		klog.Warningf("CollaSet %s is not satisfied to reconcile.", req)
 		return ctrl.Result{}, nil
+	}
+
+	if instance.DeletionTimestamp != nil {
+		if controllerutils.ContainsFinalizer(instance, preReclaimFinalizer) {
+			// reclaim owner IDs in ResourceContext
+			if err := r.reclaimResourceContext(instance); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+
+		return ctrl.Result{}, nil
+	}
+
+	if updated, err := r.ensurePreReclaimFinalizer(instance); updated || err != nil {
+		return ctrl.Result{}, err
 	}
 
 	currentRevision, updatedRevision, revisions, collisionCount, _, err := r.revisionManager.ConstructRevisions(instance, false)
@@ -247,4 +265,21 @@ func (r *CollaSetReconciler) updateStatus(ctx context.Context, instance *appsv1a
 	}
 
 	return err
+}
+
+func (r *CollaSetReconciler) ensurePreReclaimFinalizer(cls *appsv1alpha1.CollaSet) (bool, error) {
+	if controllerutils.ContainsFinalizer(cls, preReclaimFinalizer) {
+		return false, nil
+	}
+
+	return true, controllerutils.AddFinalizer(context.TODO(), r, cls, preReclaimFinalizer)
+}
+
+func (r *CollaSetReconciler) reclaimResourceContext(cls *appsv1alpha1.CollaSet) error {
+	// clean the owner IDs from this CollaSet
+	if err := podcontext.UpdateToPodContext(r, cls, nil); err != nil {
+		return err
+	}
+
+	return controllerutils.RemoveFinalizer(context.TODO(), r, cls, preReclaimFinalizer)
 }

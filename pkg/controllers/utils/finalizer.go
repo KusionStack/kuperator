@@ -65,3 +65,13 @@ func AddFinalizer(ctx context.Context, c client.Client, obj client.Object, final
 		return updateErr
 	})
 }
+
+func ContainsFinalizer(obj client.Object, finalizer string) bool {
+	for _, f := range obj.GetFinalizers() {
+		if f == finalizer {
+			return true
+		}
+	}
+
+	return false
+}
