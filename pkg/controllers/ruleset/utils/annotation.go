@@ -26,10 +26,6 @@ import (
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
 )
 
-const (
-	AnnotationRuleSets = "kafed.kusionstack.io/rulesets"
-)
-
 func HasSkipRule(po *corev1.Pod, ruleName string) (bool, error) {
 	if po.Annotations == nil || len(po.Annotations[appsv1alpha1.AnnotationPodSkipRuleConditions]) == 0 {
 		return false, nil
@@ -58,13 +54,13 @@ func MoveRulesetAnno(po *corev1.Pod, rulesetName string) bool {
 	if po.Annotations == nil {
 		return false
 	}
-	val, ok := po.Annotations[AnnotationRuleSets]
+	val, ok := po.Annotations[appsv1alpha1.AnnotationRuleSets]
 	if !ok {
 		return false
 	}
 	state := RuleSets{}
 	if err := json.Unmarshal([]byte(val), &state); err != nil {
-		klog.Errorf("fail to unmarshal anno %s=%s, %v", AnnotationRuleSets, val, err)
+		klog.Errorf("fail to unmarshal anno %s=%s, %v", appsv1alpha1.AnnotationRuleSets, val, err)
 		return false
 	}
 	for i, name := range state {
@@ -83,15 +79,15 @@ func AddRuleSetAnno(po *corev1.Pod, rulesetName string) bool {
 	if po.Annotations == nil {
 		po.Annotations = map[string]string{}
 	}
-	val, ok := po.Annotations[AnnotationRuleSets]
+	val, ok := po.Annotations[appsv1alpha1.AnnotationRuleSets]
 	if !ok {
-		po.Annotations[AnnotationRuleSets] = annoVal(rulesetName)
+		po.Annotations[appsv1alpha1.AnnotationRuleSets] = annoVal(rulesetName)
 		return true
 	}
 	rs := &RuleSets{}
 	if err := json.Unmarshal([]byte(val), rs); err != nil {
-		klog.Errorf("fail to unmarshal anno %s=%s, %v", AnnotationRuleSets, val, err)
-		po.Annotations[AnnotationRuleSets] = annoVal(rulesetName)
+		klog.Errorf("fail to unmarshal anno %s=%s, %v", appsv1alpha1.AnnotationRuleSets, val, err)
+		po.Annotations[appsv1alpha1.AnnotationRuleSets] = annoVal(rulesetName)
 		return true
 	}
 	for _, name := range *rs {
@@ -101,7 +97,7 @@ func AddRuleSetAnno(po *corev1.Pod, rulesetName string) bool {
 	}
 	*rs = append(*rs, rulesetName)
 	bt, _ := json.Marshal(rs)
-	po.Annotations[AnnotationRuleSets] = string(bt)
+	po.Annotations[appsv1alpha1.AnnotationRuleSets] = string(bt)
 	return true
 }
 
@@ -110,7 +106,7 @@ func GetRuleSets(item client.Object) (result []string) {
 	if item.GetAnnotations() == nil {
 		return result
 	}
-	val, ok := item.GetAnnotations()[AnnotationRuleSets]
+	val, ok := item.GetAnnotations()[appsv1alpha1.AnnotationRuleSets]
 	if !ok || len(val) == 0 {
 		return result
 	}
@@ -131,5 +127,5 @@ func annoVal(names ...string) string {
 
 func setRulesetAnno(po *corev1.Pod, rs RuleSets) {
 	val, _ := json.Marshal(rs)
-	po.Annotations[AnnotationRuleSets] = string(val)
+	po.Annotations[appsv1alpha1.AnnotationRuleSets] = string(val)
 }

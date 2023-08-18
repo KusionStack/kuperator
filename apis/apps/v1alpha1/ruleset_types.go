@@ -25,7 +25,7 @@ import (
 // RuleSetSpec defines the desired state of RuleSet
 type RuleSetSpec struct {
 	// Selector select the targets controlled by ruleset
-	Selector metav1.LabelSelector `json:"selector,omitempty"`
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
 	// Rules is a set of rules that need to be checked in certain situations
 	Rules []RuleSetRule `json:"rules,omitempty"`

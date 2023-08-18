@@ -21,6 +21,7 @@ import (
 
 	webhookdmission "kusionstack.io/kafed/pkg/webhook/admission"
 	"kusionstack.io/kafed/pkg/webhook/server/generic/pod"
+	"kusionstack.io/kafed/pkg/webhook/server/generic/ruleset"
 )
 
 var (
@@ -37,4 +38,7 @@ var ValidatingTypeHandlerMap = map[string]webhookdmission.DispatchHandler{}
 func init() {
 	MutatingTypeHandlerMap["Pod"] = pod.NewMutatingHandler()
 	ValidatingTypeHandlerMap["Pod"] = pod.NewValidatingHandler()
+
+	MutatingTypeHandlerMap["RuleSet"] = ruleset.NewMutatingHandler()
+	ValidatingTypeHandlerMap["RuleSet"] = ruleset.NewValidatingHandler()
 }

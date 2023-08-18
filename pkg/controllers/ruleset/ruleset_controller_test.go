@@ -58,7 +58,7 @@ func TestRuleset(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: appsv1alpha1.RuleSetSpec{
-			Selector: metav1.LabelSelector{
+			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"test": "gen",
 				},

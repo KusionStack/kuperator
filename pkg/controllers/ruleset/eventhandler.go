@@ -91,7 +91,7 @@ func involvedRuleSets(c client.Client, obj client.Object) ([]*appsv1alpha1.RuleS
 		return ruleSets, err
 	}
 	for i, rs := range ruleSetList.Items {
-		selector, err := metav1.LabelSelectorAsSelector(&rs.Spec.Selector)
+		selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
 			return ruleSets, err
 		}
