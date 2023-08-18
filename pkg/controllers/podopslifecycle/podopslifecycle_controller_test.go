@@ -138,6 +138,7 @@ var _ = Describe("podopslifecycle controller", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: "default",
+				Labels:    map[string]string{v1alpha1.ControlledByPodOpsLifecycle: "true"},
 			},
 			Spec: podSpec,
 		}
@@ -152,7 +153,9 @@ var _ = Describe("podopslifecycle controller", func() {
 			Namespace: "default",
 		}, pod)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(pod.Status.Conditions).To(HaveLen(0))
+		Expect(pod.Status.Conditions).To(HaveLen(1))
+		Expect(string(pod.Status.Conditions[0].Type)).To(Equal(v1alpha1.ReadinessGatePodServiceReady))
+		Expect(pod.Status.Conditions[0].Status).To(Equal(corev1.ConditionTrue))
 
 		podOpsLifecycle.ruleSetManager = &mockRuleSetManager{CheckState: &checker.CheckState{
 			States: []checker.State{
@@ -166,6 +169,7 @@ var _ = Describe("podopslifecycle controller", func() {
 		}}
 
 		pod.ObjectMeta.Labels = map[string]string{
+			v1alpha1.ControlledByPodOpsLifecycle:                           "true",
 			fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):       time,
 			fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, id):      time,
 			fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, id): operationType,
@@ -192,6 +196,7 @@ var _ = Describe("podopslifecycle controller", func() {
 				Name:      "test",
 				Namespace: "default",
 				Labels: map[string]string{
+					v1alpha1.ControlledByPodOpsLifecycle:                       "true",
 					fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, id): time,
 					fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, id):   time,
 				},
@@ -220,6 +225,7 @@ var _ = Describe("podopslifecycle controller", func() {
 				Name:      "test",
 				Namespace: "default",
 				Labels: map[string]string{
+					v1alpha1.ControlledByPodOpsLifecycle:                      "true",
 					fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):  time,
 					fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, id): time,
 				},
@@ -247,6 +253,7 @@ var _ = Describe("podopslifecycle controller", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: "default",
+				Labels:    map[string]string{v1alpha1.ControlledByPodOpsLifecycle: "true"},
 			},
 			Spec: podSpec,
 		}
@@ -261,9 +268,9 @@ var _ = Describe("podopslifecycle controller", func() {
 			Namespace: "default",
 		}, pod)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(pod.Status.Conditions).To(HaveLen(0))
 
 		pod.ObjectMeta.Labels = map[string]string{
+			v1alpha1.ControlledByPodOpsLifecycle:                      "true",
 			fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):  time,
 			fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, id): time,
 		}

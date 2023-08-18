@@ -24,16 +24,14 @@ import (
 
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"kusionstack.io/kafed/pkg/log"
 )
 
 type ResourceVersionExpectation struct {
 	cache.Store
-	logger *log.Logger
 }
 
-func NewResourceVersionExpectation(logger *log.Logger) *ResourceVersionExpectation {
-	return &ResourceVersionExpectation{cache.NewStore(ExpKeyFunc), logger}
+func NewResourceVersionExpectation() *ResourceVersionExpectation {
+	return &ResourceVersionExpectation{cache.NewStore(ExpKeyFunc)}
 }
 
 func (r *ResourceVersionExpectation) GetExpectations(controllerKey string) (*ResourceVersionExpectationItem, bool, error) {
@@ -55,13 +53,13 @@ func (r *ResourceVersionExpectation) DeleteExpectations(controllerKey string) {
 func (r *ResourceVersionExpectation) SatisfiedExpectations(controllerKey string, resourceVersion string) bool {
 	if exp, exists, err := r.GetExpectations(controllerKey); exists {
 		if exp.Fulfilled(resourceVersion) {
-			r.logger.V(4).Infof("Accuracy expectations fulfilled %s", controllerKey)
+			klog.Infof("Accuracy expectations fulfilled %s", controllerKey)
 			return true
 		} else if exp.isExpired() {
-			r.logger.Errorf("Accuracy expectation expired for key %s", controllerKey)
+			klog.Errorf("Accuracy expectation expired for key %s", controllerKey)
 			panic(fmt.Sprintf("expected panic for accuracy expectation timeout for key %s", controllerKey))
 		} else {
-			r.logger.V(4).Infof("Controller still waiting on accuracy expectations %s", controllerKey)
+			klog.V(4).Infof("Controller still waiting on accuracy expectations %s", controllerKey)
 			return false
 		}
 	} else if err != nil {

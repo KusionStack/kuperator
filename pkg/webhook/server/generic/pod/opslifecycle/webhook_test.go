@@ -88,8 +88,7 @@ func TestValidating(t *testing.T) {
 		},
 		{
 			labels: map[string]string{
-				v1alpha1.PodOperatingLabelPrefix:                                  "1402144848",
-				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
+				v1alpha1.PodOperationTypeLabelPrefix: "1402144848",
 			},
 			keyWords: "invalid label",
 		},
@@ -127,6 +126,7 @@ func TestMutating(t *testing.T) {
 
 		satisfyExpectedFinalizers SatisfyExpectedFinalizers
 		readyToUpgrade            ReadyToUpgrade
+		isPodReady                IsPodReady
 	}{
 		{
 			notes: "pre-check",
@@ -275,7 +275,6 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "upgrade"): "1402144848",
 
 				fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, "123"): "1402144848",
-				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "123"): "1402144848",
 			},
 		},
 
@@ -289,18 +288,17 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, "123"):              "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "upgrade"): "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "123"):                 "1402144848",
-				fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, "123"):                 "1402144848",
 			},
 			newPodLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "123"):                "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, "123"):              "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "upgrade"): "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "123"):                 "1402144848",
-				fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, "123"):                 "1402144848",
 			},
 			expectedLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "123"):           "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "123"):         "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "123"): "upgrade",
 			},
 		},
@@ -432,11 +430,7 @@ func TestMutating(t *testing.T) {
 		},
 	}
 
-	opslifecycle := &OpsLifecycle{
-		timeLabelValue: func() string {
-			return "1402144848"
-		},
-	}
+	opslifecycle := &OpsLifecycle{}
 	for _, v := range inputs {
 		if v.oldPodLabels != nil {
 			v.oldPodLabels[v1alpha1.ControlledByPodOpsLifecycle] = "true"
@@ -460,14 +454,15 @@ func TestMutating(t *testing.T) {
 			},
 		}
 
-		opslifecycle.readyToUpgrade = v.readyToUpgrade
-		if opslifecycle.readyToUpgrade == nil {
-			opslifecycle.readyToUpgrade = readyToUpgradeReturnTrue
+		opsLifecycleDefaultFunc(opslifecycle)
+		if v.readyToUpgrade != nil {
+			opslifecycle.readyToUpgrade = v.readyToUpgrade
 		}
-
-		opslifecycle.satisfyExpectedFinalizers = v.satisfyExpectedFinalizers
-		if opslifecycle.satisfyExpectedFinalizers == nil {
-			opslifecycle.satisfyExpectedFinalizers = satifyExpectedFinalizersReturnTrue
+		if v.satisfyExpectedFinalizers != nil {
+			opslifecycle.satisfyExpectedFinalizers = v.satisfyExpectedFinalizers
+		}
+		if v.isPodReady != nil {
+			opslifecycle.isPodReady = v.isPodReady
 		}
 
 		t.Logf("notes: %s", v.notes)
@@ -488,6 +483,16 @@ func TestMutating(t *testing.T) {
 	}
 }
 
+func opsLifecycleDefaultFunc(opslifecycle *OpsLifecycle) {
+	opslifecycle.timeLabelValue = func() string {
+		return "1402144848"
+	}
+
+	opslifecycle.readyToUpgrade = readyToUpgradeReturnTrue
+	opslifecycle.satisfyExpectedFinalizers = satifyExpectedFinalizersReturnTrue
+	opslifecycle.isPodReady = isPodReadyReturnTrue
+}
+
 func readyToUpgradeReturnTrue(pod *corev1.Pod) (bool, []string) {
 	return true, nil
 }
@@ -502,4 +507,12 @@ func satifyExpectedFinalizersReturnTrue(pod *corev1.Pod) (bool, []string, error)
 
 func satifyExpectedFinalizersReturnFalse(pod *corev1.Pod) (bool, []string, error) {
 	return false, nil, nil
+}
+
+func isPodReadyReturnTrue(pod *corev1.Pod) bool {
+	return true
+}
+
+func isPodReadyReturnFalse(pod *corev1.Pod) bool {
+	return true
 }

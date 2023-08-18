@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"kusionstack.io/kafed/apis/apps/v1alpha1"
+	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
 )
 
 const (
@@ -52,10 +53,12 @@ var (
 type ReadyToUpgrade func(pod *corev1.Pod) (bool, []string)
 type SatisfyExpectedFinalizers func(pod *corev1.Pod) (bool, []string, error)
 type TimeLabelValue func() string
+type IsPodReady func(pod *corev1.Pod) bool
 
 type OpsLifecycle struct {
 	readyToUpgrade            ReadyToUpgrade // for testing
 	satisfyExpectedFinalizers SatisfyExpectedFinalizers
+	isPodReady                IsPodReady
 	timeLabelValue            TimeLabelValue
 }
 
@@ -63,6 +66,7 @@ func New() *OpsLifecycle {
 	return &OpsLifecycle{
 		readyToUpgrade:            hasNoBlockingFinalizer,
 		satisfyExpectedFinalizers: satisfyExpectedFinalizers,
+		isPodReady:                controllerutils.IsPodReady,
 		timeLabelValue: func() string {
 			return strconv.FormatInt(time.Now().Unix(), 10)
 		},
@@ -92,12 +96,12 @@ func addReadinessGates(pod *corev1.Pod, conditionType corev1.PodConditionType) {
 }
 
 func satisfyExpectedFinalizers(pod *corev1.Pod) (bool, []string, error) {
-	satisfy := true
+	satisfied := true
 	var expectedFinalizer []string // expected finalizers that are not satisfied
 
 	availableConditions, err := podAvailableConditions(pod)
 	if err != nil {
-		return satisfy, expectedFinalizer, err
+		return satisfied, expectedFinalizer, err
 	}
 
 	if availableConditions != nil && len(availableConditions.ExpectedFinalizers) != 0 {
@@ -108,30 +112,13 @@ func satisfyExpectedFinalizers(pod *corev1.Pod) (bool, []string, error) {
 
 		for _, finalizer := range availableConditions.ExpectedFinalizers {
 			if !existFinalizers.Has(finalizer) {
-				satisfy = false
+				satisfied = false
 				expectedFinalizer = append(expectedFinalizer, finalizer)
 			}
 		}
 	}
 
-	return satisfy, expectedFinalizer, nil
-}
-
-func podAvailableConditions(pod *corev1.Pod) (*v1alpha1.PodAvailableConditions, error) {
-	if pod.Annotations == nil {
-		return nil, nil
-	}
-
-	anno, ok := pod.Annotations[v1alpha1.PodAvailableConditionsAnnotation]
-	if !ok {
-		return nil, nil
-	}
-
-	availableConditions := &v1alpha1.PodAvailableConditions{}
-	if err := json.Unmarshal([]byte(anno), availableConditions); err != nil {
-		return nil, err
-	}
-	return availableConditions, nil
+	return satisfied, expectedFinalizer, nil
 }
 
 func hasNoBlockingFinalizer(pod *corev1.Pod) (bool, []string) {
@@ -169,4 +156,21 @@ func hasNoBlockingFinalizer(pod *corev1.Pod) (bool, []string) {
 	}
 
 	return true, nil
+}
+
+func podAvailableConditions(pod *corev1.Pod) (*v1alpha1.PodAvailableConditions, error) {
+	if pod.Annotations == nil {
+		return nil, nil
+	}
+
+	anno, ok := pod.Annotations[v1alpha1.PodAvailableConditionsAnnotation]
+	if !ok {
+		return nil, nil
+	}
+
+	availableConditions := &v1alpha1.PodAvailableConditions{}
+	if err := json.Unmarshal([]byte(anno), availableConditions); err != nil {
+		return nil, err
+	}
+	return availableConditions, nil
 }
