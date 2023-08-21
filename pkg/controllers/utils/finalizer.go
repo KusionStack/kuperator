@@ -33,9 +33,6 @@ func ObjectKey(obj client.Object) string {
 }
 
 func RemoveFinalizer(ctx context.Context, c client.Client, obj client.Object, finalizer string) error {
-	if !controllerutil.ContainsFinalizer(obj, finalizer) {
-		return nil
-	}
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		controllerutil.RemoveFinalizer(obj, finalizer)
 		var updateErr error
@@ -50,9 +47,6 @@ func RemoveFinalizer(ctx context.Context, c client.Client, obj client.Object, fi
 }
 
 func AddFinalizer(ctx context.Context, c client.Client, obj client.Object, finalizer string) error {
-	if controllerutil.ContainsFinalizer(obj, finalizer) {
-		return nil
-	}
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		controllerutil.AddFinalizer(obj, finalizer)
 		var updateErr error
@@ -64,4 +58,14 @@ func AddFinalizer(ctx context.Context, c client.Client, obj client.Object, final
 		}
 		return updateErr
 	})
+}
+
+func ContainsFinalizer(obj client.Object, finalizer string) bool {
+	for _, f := range obj.GetFinalizers() {
+		if f == finalizer {
+			return true
+		}
+	}
+
+	return false
 }

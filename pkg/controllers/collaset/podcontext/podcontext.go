@@ -107,6 +107,10 @@ func UpdateToPodContext(c client.Client, instance *appsv1alpha1.CollaSet, ownedI
 			return fmt.Errorf("fail to find ResourceContext %s/%s: %s", instance.Namespace, contextName, err)
 		}
 
+		if len(ownedIDs) == 0 {
+			return nil
+		}
+
 		if err := doCreatePodContext(c, instance, ownedIDs); err != nil {
 			return fmt.Errorf("fail to create ResourceContext %s/%s after not found: %s", instance.Namespace, contextName, err)
 		}

@@ -19,7 +19,7 @@ package register
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	"kusionstack.io/kafed/pkg/utils"
+	"kusionstack.io/kafed/pkg/controllers/utils"
 )
 
 var (

@@ -29,11 +29,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
+	"kusionstack.io/kafed/pkg/controllers/collaset/podcontext"
 	"kusionstack.io/kafed/pkg/controllers/collaset/podcontrol"
 	"kusionstack.io/kafed/pkg/controllers/collaset/synccontrol"
 	"kusionstack.io/kafed/pkg/controllers/collaset/utils"
@@ -46,6 +48,8 @@ import (
 
 const (
 	controllerName = "collaset-controller"
+
+	preReclaimFinalizer = "apps.kusionstack.io/pre-reclaim"
 )
 
 // CollaSetReconciler reconciles a CollaSet object
@@ -128,6 +132,21 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	} else if !satisfied {
 		klog.Warningf("CollaSet %s is not satisfied to reconcile.", req)
 		return ctrl.Result{}, nil
+	}
+
+	if instance.DeletionTimestamp != nil {
+		if controllerutil.ContainsFinalizer(instance, preReclaimFinalizer) {
+			// reclaim owner IDs in ResourceContext
+			if err := r.reclaimResourceContext(instance); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+
+		return ctrl.Result{}, nil
+	}
+
+	if !controllerutil.ContainsFinalizer(instance, preReclaimFinalizer) {
+		return ctrl.Result{}, controllerutils.AddFinalizer(context.TODO(), r, instance, preReclaimFinalizer)
 	}
 
 	currentRevision, updatedRevision, revisions, collisionCount, _, err := r.revisionManager.ConstructRevisions(instance, false)
@@ -247,4 +266,13 @@ func (r *CollaSetReconciler) updateStatus(ctx context.Context, instance *appsv1a
 	}
 
 	return err
+}
+
+func (r *CollaSetReconciler) reclaimResourceContext(cls *appsv1alpha1.CollaSet) error {
+	// clean the owner IDs from this CollaSet
+	if err := podcontext.UpdateToPodContext(r, cls, nil); err != nil {
+		return err
+	}
+
+	return controllerutils.RemoveFinalizer(context.TODO(), r, cls, preReclaimFinalizer)
 }
