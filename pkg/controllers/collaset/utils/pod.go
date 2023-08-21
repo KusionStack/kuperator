@@ -18,7 +18,6 @@ package utils
 
 import (
 	"fmt"
-	"kusionstack.io/kafed/pkg/utils"
 	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -27,6 +26,7 @@ import (
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
 	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
+	"kusionstack.io/kafed/pkg/utils"
 )
 
 type PodWrapper struct {
