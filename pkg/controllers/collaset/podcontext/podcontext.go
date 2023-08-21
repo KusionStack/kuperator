@@ -101,18 +101,13 @@ func AllocateID(c client.Client, instance *appsv1alpha1.CollaSet, defaultRevisio
 
 func UpdateToPodContext(c client.Client, instance *appsv1alpha1.CollaSet, ownedIDs map[int]*appsv1alpha1.ContextDetail) error {
 	contextName := getContextName(instance)
-	emptyOwnerIDs := false
-	if len(ownedIDs) == 0 {
-		emptyOwnerIDs = true
-	}
-
 	podContext := &appsv1alpha1.ResourceContext{}
 	if err := c.Get(context.TODO(), types.NamespacedName{Namespace: instance.Namespace, Name: contextName}, podContext); err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("fail to find ResourceContext %s/%s: %s", instance.Namespace, contextName, err)
 		}
 
-		if emptyOwnerIDs {
+		if len(ownedIDs) == 0 {
 			return nil
 		}
 

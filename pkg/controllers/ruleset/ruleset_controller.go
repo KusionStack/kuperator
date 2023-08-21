@@ -19,7 +19,6 @@ package ruleset
 import (
 	"context"
 	"fmt"
-	"kusionstack.io/kafed/pkg/controllers/utils"
 	"sort"
 	"sync"
 	"time"
@@ -37,6 +36,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -46,6 +46,7 @@ import (
 	"kusionstack.io/kafed/pkg/controllers/ruleset/processor"
 	"kusionstack.io/kafed/pkg/controllers/ruleset/register"
 	rulesetutils "kusionstack.io/kafed/pkg/controllers/ruleset/utils"
+	"kusionstack.io/kafed/pkg/controllers/utils"
 )
 
 const (
@@ -136,13 +137,20 @@ func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Req
 			if err := r.cleanUpRuleSetPods(ctx, ruleSet); err != nil {
 				return reconcile.Result{}, err
 			}
+
+			if !controllerutil.ContainsFinalizer(ruleSet, cleanUpFinalizer) {
+				return reconcile.Result{}, nil
+			}
+
 			return reconcile.Result{}, utils.RemoveFinalizer(ctx, r.Client, ruleSet, cleanUpFinalizer)
 		}
 		msg := fmt.Sprintf("can not delete ruleset: there are some pods waiting for process by ruleset %s/%s. Please terminate pods first or label ruleset kafed.kusionstack.io/terminating=true to force delete it", ruleSet.Namespace, ruleSet.Name)
 		result.RequeueAfter = 5 * time.Second
 		r.recorder.Event(ruleSet, corev1.EventTypeWarning, "BlockProtection", msg)
-	} else if err := utils.AddFinalizer(ctx, r.Client, ruleSet, cleanUpFinalizer); err != nil {
-		return result, fmt.Errorf("fail to add finalizer on RuleSet %s: %s", request, err)
+	} else if !controllerutil.ContainsFinalizer(ruleSet, cleanUpFinalizer) {
+		if err := utils.AddFinalizer(ctx, r.Client, ruleSet, cleanUpFinalizer); err != nil {
+			return result, fmt.Errorf("fail to add finalizer on RuleSet %s: %s", request, err)
+		}
 	}
 
 	selectedPodNames := sets.String{}

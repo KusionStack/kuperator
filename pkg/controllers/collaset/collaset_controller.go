@@ -19,7 +19,6 @@ package collaset
 import (
 	"context"
 	"fmt"
-	"kusionstack.io/kafed/pkg/controllers/collaset/podcontext"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -30,11 +29,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
+	"kusionstack.io/kafed/pkg/controllers/collaset/podcontext"
 	"kusionstack.io/kafed/pkg/controllers/collaset/podcontrol"
 	"kusionstack.io/kafed/pkg/controllers/collaset/synccontrol"
 	"kusionstack.io/kafed/pkg/controllers/collaset/utils"
@@ -134,7 +135,7 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	if instance.DeletionTimestamp != nil {
-		if controllerutils.ContainsFinalizer(instance, preReclaimFinalizer) {
+		if controllerutil.ContainsFinalizer(instance, preReclaimFinalizer) {
 			// reclaim owner IDs in ResourceContext
 			if err := r.reclaimResourceContext(instance); err != nil {
 				return ctrl.Result{}, err
@@ -144,8 +145,8 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	if updated, err := r.ensurePreReclaimFinalizer(instance); updated || err != nil {
-		return ctrl.Result{}, err
+	if !controllerutil.ContainsFinalizer(instance, preReclaimFinalizer) {
+		return ctrl.Result{}, controllerutils.AddFinalizer(context.TODO(), r, instance, preReclaimFinalizer)
 	}
 
 	currentRevision, updatedRevision, revisions, collisionCount, _, err := r.revisionManager.ConstructRevisions(instance, false)
@@ -265,14 +266,6 @@ func (r *CollaSetReconciler) updateStatus(ctx context.Context, instance *appsv1a
 	}
 
 	return err
-}
-
-func (r *CollaSetReconciler) ensurePreReclaimFinalizer(cls *appsv1alpha1.CollaSet) (bool, error) {
-	if controllerutils.ContainsFinalizer(cls, preReclaimFinalizer) {
-		return false, nil
-	}
-
-	return true, controllerutils.AddFinalizer(context.TODO(), r, cls, preReclaimFinalizer)
 }
 
 func (r *CollaSetReconciler) reclaimResourceContext(cls *appsv1alpha1.CollaSet) error {
