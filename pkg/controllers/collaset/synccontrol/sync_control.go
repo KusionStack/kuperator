@@ -161,7 +161,7 @@ func (sc *RealSyncControl) Scale(set *appsv1alpha1.CollaSet, podWrappers []*coll
 
 			// scale out new Pods with updatedRevision
 			// TODO use cache
-			pod, err := controllerutils.NewPodFrom(set, metav1.NewControllerRef(set, appsv1alpha1.GroupVersion.WithKind("CollaSet")), revision)
+			pod, err := collasetutils.NewPodFrom(set, metav1.NewControllerRef(set, appsv1alpha1.GroupVersion.WithKind("CollaSet")), revision)
 			if err != nil {
 				return fmt.Errorf("fail to new Pod from revision %s: %s", revision.Name, err)
 			}

@@ -37,3 +37,13 @@ func ControlledByPodOpsLifecycle(obj client.Object) bool {
 	v, ok := obj.GetLabels()[v1alpha1.ControlledByPodOpsLifecycle]
 	return ok && v == "true"
 }
+
+func ControlByPodOpsLifecycle(obj client.Object) {
+	if obj.GetLabels() == nil {
+		obj.SetLabels(map[string]string{})
+	}
+
+	if v, ok := obj.GetLabels()[v1alpha1.ControlledByPodOpsLifecycle]; !ok || v != "true" {
+		obj.GetLabels()[v1alpha1.ControlledByPodOpsLifecycle] = "true"
+	}
+}
