@@ -194,12 +194,12 @@ spec:
                                 certificate. If unspecified, system trust roots on
                                 the apiserver are used. After Base64.'
                               type: string
-                            interval:
+                            intervalSeconds:
                               description: interval give the request time interval,
                                 default 5s
                               format: int64
                               type: integer
-                            traceTimeout:
+                            traceTimeoutSeconds:
                               description: timeout give the request time timeout,
                                 default 60s
                               format: int64

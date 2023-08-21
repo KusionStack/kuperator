@@ -61,13 +61,13 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 func SetDefaultRuleSet(rs *appsv1alpha1.RuleSet) {
 	for i := range rs.Spec.Rules {
 		if rs.Spec.Rules[i].Webhook != nil {
-			if rs.Spec.Rules[i].Webhook.ClientConfig.Interval == nil {
+			if rs.Spec.Rules[i].Webhook.ClientConfig.IntervalSeconds == nil {
 				interval := appsv1alpha1.DefaultWebhookInterval
-				rs.Spec.Rules[i].Webhook.ClientConfig.Interval = &interval
+				rs.Spec.Rules[i].Webhook.ClientConfig.IntervalSeconds = &interval
 			}
-			if rs.Spec.Rules[i].Webhook.ClientConfig.TraceTimeout == nil {
+			if rs.Spec.Rules[i].Webhook.ClientConfig.TraceTimeoutSeconds == nil {
 				timeout := appsv1alpha1.DefaultWebhookTimeout
-				rs.Spec.Rules[i].Webhook.ClientConfig.TraceTimeout = &timeout
+				rs.Spec.Rules[i].Webhook.ClientConfig.TraceTimeoutSeconds = &timeout
 			}
 			if rs.Spec.Rules[i].Webhook.FailurePolicy == nil {
 				failurePolicy := appsv1alpha1.Ignore
