@@ -94,7 +94,7 @@ jobs:
       with:
         go-version: 1.19
 
-    - name: Release the karbour with GoReleaser
+    - name: Release with GoReleaser
       uses: goreleaser/goreleaser-action@v2
       with:
         distribution: goreleaser
