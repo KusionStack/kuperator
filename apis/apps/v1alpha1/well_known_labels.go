@@ -36,8 +36,9 @@ const (
 	PodCompleteLabelPrefix    = "complete.podopslifecycle.kusionstack.io"     // indicate a pod has finished all phases
 
 	PodServiceAvailableLabel      = "podopslifecycle.kusionstack.io/service-available" // indicate a pod is available to serve
-	PodInstanceIDLabelKey         = "podopslifecycle.kusionstack.io/pod-instance-id"
-	PodDeletionIndicationLabelKey = "podopslifecycle.kusionstack.io/to-delete" // Users can use this label to indicate a pod to delete
+	PodDeletionIndicationLabelKey = "podopslifecycle.kusionstack.io/to-delete"         // users can use this label to indicate a pod to delete
+
+	PodInstanceIDLabelKey = "collaset.kusionstack.io/instance-id" // used to attach Pod instance ID on Pod
 )
 
 const (
