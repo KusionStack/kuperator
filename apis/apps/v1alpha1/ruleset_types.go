@@ -172,11 +172,11 @@ type ClientConfig struct {
 
 	// interval give the request time interval, default 5s
 	// +optional
-	Interval *int64 `json:"interval,omitempty"`
+	IntervalSeconds *int64 `json:"intervalSeconds,omitempty"`
 
 	// timeout give the request time timeout, default 60s
 	// +optional
-	TraceTimeout *int64 `json:"traceTimeout,omitempty"`
+	TraceTimeoutSeconds *int64 `json:"traceTimeoutSeconds,omitempty"`
 }
 
 // RuleSetStatus defines the observed state of RuleSet

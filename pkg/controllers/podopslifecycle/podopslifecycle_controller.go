@@ -124,26 +124,24 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 		r.logger.Errorf("failed to get pod %s state: %s", key, err)
 		return reconcile.Result{}, err
 	}
-	if state.Passed {
-		var labels map[string]string
-		if state.InStage(v1alpha1.PodOpsLifecyclePreCheckStage) {
-			labels, err = r.preCheckStage(pod)
-		} else if state.InStage(v1alpha1.PodOpsLifecyclePostCheckStage) {
-			labels, err = r.postCheckStage(pod)
-		}
-		if err != nil {
-			return reconcile.Result{}, err
-		}
+	var labels map[string]string
+	if state.InStageAndPassed(v1alpha1.PodOpsLifecyclePreCheckStage) {
+		labels, err = r.preCheckStage(pod)
+	} else if state.InStageAndPassed(v1alpha1.PodOpsLifecyclePostCheckStage) {
+		labels, err = r.postCheckStage(pod)
+	}
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 
-		if len(labels) > 0 {
-			expectation.ExpectUpdate(key, pod.ResourceVersion)
-			err = r.addLabels(ctx, pod, labels)
-			if err != nil {
-				r.logger.Errorf("failed to update pod %s: %s", key, err)
-				expectation.DeleteExpectations(key)
-			}
-			return reconcile.Result{}, err
+	if len(labels) > 0 {
+		expectation.ExpectUpdate(key, pod.ResourceVersion)
+		err = r.addLabels(ctx, pod, labels)
+		if err != nil {
+			r.logger.Errorf("failed to update pod %s: %s", key, err)
+			expectation.DeleteExpectations(key)
 		}
+		return reconcile.Result{}, err
 	}
 
 	if !r.expectation.SatisfiedExpectations(key, pod.ResourceVersion) {

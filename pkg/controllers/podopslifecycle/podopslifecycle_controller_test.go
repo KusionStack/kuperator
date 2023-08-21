@@ -157,12 +157,12 @@ var _ = Describe("podopslifecycle controller", func() {
 		podOpsLifecycle.ruleSetManager = &mockRuleSetManager{CheckState: &checker.CheckState{
 			States: []checker.State{
 				{
-					Detail: v1alpha1.Detail{
-						Stage: v1alpha1.PodOpsLifecyclePreCheckStage,
+					Detail: &v1alpha1.Detail{
+						Stage:  v1alpha1.PodOpsLifecyclePreCheckStage,
+						Passed: true,
 					},
 				},
 			},
-			Passed: true,
 		}}
 
 		pod.ObjectMeta.Labels = map[string]string{

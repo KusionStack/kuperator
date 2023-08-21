@@ -42,21 +42,11 @@ type checker struct {
 	policy register.Policy
 }
 
+// GetState get item current check state from all related ruleSets
 func (c *checker) GetState(client client.Client, item client.Object) (CheckState, error) {
 
-	result := CheckState{
-		Passed: true,
-	}
-	stage := c.policy.Stage(item)
-	if stage == "" {
-		result.Info = "no stage found"
-		return result, nil
-	}
-
+	result := CheckState{}
 	rulesetNames := utils.GetRuleSets(item)
-	// TODO: list ruleset, check match ruleset
-	// TODO: add ruleset anno by webhook
-
 	for _, name := range rulesetNames {
 		rs := &appsv1alpha1.RuleSet{}
 		if err := client.Get(context.TODO(), types.NamespacedName{Namespace: item.GetNamespace(), Name: name}, rs); err != nil {
@@ -70,22 +60,23 @@ func (c *checker) GetState(client client.Client, item client.Object) (CheckState
 			if detail.Name != item.GetName() {
 				continue
 			}
-			if detail.Stage != stage {
-				break
-			}
 			findStatus = true
 			if !detail.Passed {
-				result.Passed = false
-				result.Info += CollectInfo(name, rs.Status.Details[i])
+				result.Message += CollectInfo(name, rs.Status.Details[i])
 			}
 			result.States = append(result.States, State{
 				RuleSetName: name,
-				Detail:      *rs.Status.Details[i],
+				Detail:      rs.Status.Details[i],
 			})
 		}
 		if !findStatus {
-			result.Passed = false
-			result.Info = fmt.Sprintf("waiting for ruleset %s processing. ", rs.Name)
+			result.States = append(result.States, State{
+				RuleSetName: name,
+				Detail: &appsv1alpha1.Detail{
+					Passed: false,
+				},
+			})
+			result.Message += fmt.Sprintf("[waiting for ruleset %s processing. ]", rs.Name)
 			return result, nil
 		}
 	}
@@ -93,9 +84,8 @@ func (c *checker) GetState(client client.Client, item client.Object) (CheckState
 }
 
 type CheckState struct {
-	States []State
-	Passed bool
-	Info   string
+	States  []State
+	Message string
 }
 
 func (cs *CheckState) InStage(stage string) bool {
@@ -104,12 +94,22 @@ func (cs *CheckState) InStage(stage string) bool {
 			return false
 		}
 	}
-	return true
+	return len(cs.States) > 0
+}
+
+func (cs *CheckState) InStageAndPassed(stage string) bool {
+	for _, state := range cs.States {
+		if state.Detail.Stage != stage || !state.Detail.Passed {
+			return false
+		}
+	}
+	return len(cs.States) > 0
 }
 
 type State struct {
 	RuleSetName string
-	Detail      appsv1alpha1.Detail
+	Message     string
+	Detail      *appsv1alpha1.Detail
 }
 
 func CollectInfo(ruleset string, detail *appsv1alpha1.Detail) string {

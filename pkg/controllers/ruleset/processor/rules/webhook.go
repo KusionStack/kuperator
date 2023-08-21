@@ -361,8 +361,8 @@ func (w *Webhook) timeOut(traceId string) bool {
 	if tm == nil || tm.BeginTime == nil {
 		return false
 	}
-	if w.Webhook.ClientConfig.TraceTimeout != nil {
-		timeOut = time.Duration(*w.Webhook.ClientConfig.TraceTimeout) * time.Second
+	if w.Webhook.ClientConfig.TraceTimeoutSeconds != nil {
+		timeOut = time.Duration(*w.Webhook.ClientConfig.TraceTimeoutSeconds) * time.Second
 	}
 	return timeNow.Sub(tm.BeginTime.Time) > timeOut
 }
@@ -385,8 +385,8 @@ func (w *Webhook) outInterval(traceId string) (bool, time.Duration, time.Duratio
 		return true, 0, 0
 	}
 	interval := defaultInterval
-	if w.Webhook.ClientConfig.Interval != nil {
-		interval = time.Duration(*w.Webhook.ClientConfig.Interval) * time.Second
+	if w.Webhook.ClientConfig.IntervalSeconds != nil {
+		interval = time.Duration(*w.Webhook.ClientConfig.IntervalSeconds) * time.Second
 	}
 	allCost := time.Since(tm.BeginTime.Time)
 	nowInterval := time.Since(tm.LastTime.Time)

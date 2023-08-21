@@ -103,7 +103,7 @@ func TestRuleset(t *testing.T) {
 	for i := range podList.Items {
 		state, err := RuleSetManager().GetState(c, &podList.Items[i])
 		g.Expect(err).NotTo(gomega.HaveOccurred())
-		if state.Passed && state.InStage(PreTrafficOffStage) {
+		if state.InStageAndPassed(PreTrafficOffStage) {
 			passedCount++
 		}
 		printJson(state)
