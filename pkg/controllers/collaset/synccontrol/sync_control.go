@@ -460,11 +460,11 @@ func (sc *RealSyncControl) Update(set *appsv1alpha1.CollaSet, podWrapers []*coll
 	}
 
 	// try to finish all Pods'PodOpsLifecycle if its update is finished.
-	succCount, err = controllerutils.SlowStartBatch(len(podWrapers), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
-		podInfo := podWrapers[i]
+	succCount, err = controllerutils.SlowStartBatch(len(podUpdateInfos), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+		podInfo := podUpdateInfos[i]
 
 		// check Pod update is finished or not
-		finished, msg, err := updater.GetPodUpdateFinishStatus(podInfo.Pod)
+		finished, msg, err := updater.GetPodUpdateFinishStatus(podInfo)
 		if err != nil {
 			return fmt.Errorf("fail to get pod %s/%s update finished: %s", podInfo.Namespace, podInfo.Name, err)
 		}
