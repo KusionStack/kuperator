@@ -18,10 +18,15 @@ package utils
 
 import (
 	"fmt"
-	corev1 "k8s.io/api/core/v1"
+	"kusionstack.io/kafed/pkg/utils"
 	"strconv"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
+	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
 )
 
 type PodWrapper struct {
@@ -56,4 +61,14 @@ func GetPodInstanceID(pod *corev1.Pod) (int, error) {
 	}
 
 	return int(id), nil
+}
+
+func NewPodFrom(owner metav1.Object, ownerRef *metav1.OwnerReference, revision *appsv1.ControllerRevision) (*corev1.Pod, error) {
+	pod, err := controllerutils.NewPodFrom(owner, ownerRef, revision)
+	if err != nil {
+		return nil, err
+	}
+
+	utils.ControlByPodOpsLifecycle(pod)
+	return pod, nil
 }

@@ -92,7 +92,7 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &appsv1alpha1.CollaSet{},
-	})
+	}, &PodPredicate{})
 	if err != nil {
 		return err
 	}

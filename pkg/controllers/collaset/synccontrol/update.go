@@ -171,13 +171,13 @@ func (u *InPlaceIfPossibleUpdater) AnalyseAndGetUpdatedPod(cls *appsv1alpha1.Col
 	// 1. build pod from current and updated revision
 	ownerRef := metav1.NewControllerRef(cls, appsv1alpha1.GroupVersion.WithKind("CollaSet"))
 	// TODO: use cache
-	currentPod, err := controllerutils.NewPodFrom(cls, ownerRef, podUpdateInfo.CurrentRevision)
+	currentPod, err := collasetutils.NewPodFrom(cls, ownerRef, podUpdateInfo.CurrentRevision)
 	if err != nil {
 		return false, false, nil, fmt.Errorf("fail to build Pod from current revision %s: %s", podUpdateInfo.CurrentRevision.Name, err)
 	}
 
 	// TODO: use cache
-	updatedPod, err = controllerutils.NewPodFrom(cls, ownerRef, updatedRevision)
+	updatedPod, err = collasetutils.NewPodFrom(cls, ownerRef, updatedRevision)
 	if err != nil {
 		return false, false, nil, fmt.Errorf("fail to build Pod from updated revision %s: %s", updatedRevision.Name, err)
 	}
