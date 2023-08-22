@@ -30,7 +30,7 @@ func TestValidate(t *testing.T) {
 	invalidCA := "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUMvVENDQWVXZ0F3SUJBZ0lCQURBTkJna3Foa"
 	webhook := &appsv1alpha1.RuleSetRuleWebhook{
 		ClientConfig: appsv1alpha1.ClientConfig{
-			URL:      "https://www.baidu.com",
+			URL:      "https://github.com",
 			CABundle: "Cg==",
 		},
 	}
