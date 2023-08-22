@@ -36,10 +36,13 @@ func (r *RuleSetWebhook) Validating(ctx context.Context, c client.Client, oldPod
 	if !utils.ControlledByPodOpsLifecycle(newPod) || newPod.Annotations == nil {
 		return nil
 	}
-	ruleSetAnno := newPod.Annotations[appsv1alpha1.AnnotationRuleSets]
-	if operation == admissionv1.Update && ruleSetAnno == oldPod.Annotations[appsv1alpha1.AnnotationRuleSets] {
+
+	ruleSetAnno, ok := newPod.Annotations[appsv1alpha1.AnnotationRuleSets]
+	if (operation == admissionv1.Create && !ok) ||
+		(operation == admissionv1.Update && ruleSetAnno == oldPod.Annotations[appsv1alpha1.AnnotationRuleSets]) {
 		return nil
 	}
+
 	rs := &RuleSets{}
 	if err := json.Unmarshal([]byte(ruleSetAnno), rs); err != nil {
 		return fmt.Errorf("fail to unmarshal RuleSet annotation %s: %v", ruleSetAnno, err)
