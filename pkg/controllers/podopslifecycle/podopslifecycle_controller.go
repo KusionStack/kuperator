@@ -38,7 +38,7 @@ import (
 
 	"kusionstack.io/kafed/apis/apps/v1alpha1"
 	"kusionstack.io/kafed/pkg/controllers/ruleset"
-	"kusionstack.io/kafed/pkg/controllers/utils"
+	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
 	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
 	"kusionstack.io/kafed/pkg/utils"
 )
@@ -324,7 +324,7 @@ func (r *ReconcilePodOpsLifecycle) initRuleSetManager() {
 		return labels != nil && labelHasPrefix(labels, v1alpha1.PodPostCheckLabelPrefix)
 	})
 	ruleset.AddUnAvailableFunc(func(po *corev1.Pod) (bool, *int64) {
-		return !utils.IsServiceAvailable(po), nil
+		return !controllerutils.IsServiceAvailable(po), nil
 	})
 }
 

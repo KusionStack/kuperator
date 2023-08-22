@@ -187,8 +187,12 @@ func ensureWebhookSecret(ctx context.Context, clientset *kubernetes.Clientset, d
 		Data: data,
 	}
 
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		_, err := clientset.CoreV1().Secrets(getNamespace()).Create(ctx, secret, metav1.CreateOptions{})
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() (err error) {
+		if dirty {
+			_, err = clientset.CoreV1().Secrets(getNamespace()).Update(ctx, secret, metav1.UpdateOptions{})
+		} else {
+			_, err = clientset.CoreV1().Secrets(getNamespace()).Create(ctx, secret, metav1.CreateOptions{})
+		}
 		return err
 	})
 	if err != nil {
