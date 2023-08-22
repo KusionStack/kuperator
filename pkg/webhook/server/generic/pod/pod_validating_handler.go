@@ -47,21 +47,21 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 	pod := &corev1.Pod{}
 	if err := h.Decode(req, pod); err != nil {
 		s, _ := json.Marshal(req)
-		return admission.Errored(http.StatusBadRequest, fmt.Errorf("fail to decode old object from request %s: %s", s, err))
+		return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to decode old object from request %s: %s", s, err))
 	}
 
 	var oldPod *corev1.Pod
 	if req.Operation == admissionv1.Update || req.Operation == admissionv1.Delete {
 		oldPod = &corev1.Pod{}
 		if err := h.DecodeRaw(req.OldObject, oldPod); err != nil {
-			return admission.Errored(http.StatusBadRequest, fmt.Errorf("fail to unmarshal old object: %s", err))
+			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to unmarshal old object: %s", err))
 		}
 	}
 
 	for _, webhook := range webhooks {
 		if err := webhook.Validating(ctx, h.Client, oldPod, pod, req.Operation); err != nil {
 			klog.Errorf("failed to validate pod, %v", err)
-			return admission.Denied(fmt.Sprintf("fail to validate %s, %v", webhook.Name(), err))
+			return admission.Denied(fmt.Sprintf("failed to validate %s, %v", webhook.Name(), err))
 		}
 	}
 

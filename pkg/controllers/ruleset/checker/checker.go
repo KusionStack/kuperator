@@ -89,6 +89,9 @@ type CheckState struct {
 }
 
 func (cs *CheckState) InStage(stage string) bool {
+	if len(cs.States) == 0 {
+		return false
+	}
 	for _, state := range cs.States {
 		if state.Detail.Stage != stage {
 			return false

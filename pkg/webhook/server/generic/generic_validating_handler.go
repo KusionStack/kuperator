@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -38,6 +39,8 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 	if req.SubResource != "" {
 		key = fmt.Sprintf("%s/%s", req.Kind.Kind, req.SubResource)
 	}
+	klog.V(5).Infof("ValidatingHandler, Kind: %s, Namespace: %s, Name: %s", key, req.Namespace, req.Name)
+
 	if handler, exist := ValidatingTypeHandlerMap[key]; exist {
 		return handler.Handle(ctx, req)
 	}
