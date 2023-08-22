@@ -95,11 +95,11 @@ changelog:
 release:
   github:
     owner: KusionStack
-    name: kafed
+    name: '{{ .ProjectName }}'
   draft: false
   footer: |
     ## Docker Images
-    * `kusionstack/kafed:{{ .Tag }}`
+    * `kusionstack/{{ .ProjectName }}:{{ .Tag }}`
 
 dockers:
 - image_templates:
