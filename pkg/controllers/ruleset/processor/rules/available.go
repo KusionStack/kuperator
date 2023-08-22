@@ -73,7 +73,7 @@ func (r *AvailableRuler) Filter(ruleSet *appsv1alpha1.RuleSet, targets map[strin
 	// TODO: UncreatedReplicas
 	// allowUnavailable -= uncreatedReplicas
 	allAvailableSize := 0
-	var minTimeLeft *int32
+	var minTimeLeft *int64
 	// filter unavailable pods
 	for podName := range effectiveTargets {
 		pod := targets[podName]
@@ -150,9 +150,9 @@ func (r *AvailableRuler) getPodReplicaSetReplication(controllerRef *metav1.Owner
 	return int(*rs.Spec.Replicas), true, nil
 }
 
-func processUnavailableFunc(pod *corev1.Pod) (bool, *int32) {
+func processUnavailableFunc(pod *corev1.Pod) (bool, *int64) {
 	isUnavailable := false
-	var minInterval *int32
+	var minInterval *int64
 	for _, f := range register.UnAvailableFuncList {
 		unavailable, interval := f(pod)
 		if !unavailable {
@@ -168,7 +168,7 @@ func processUnavailableFunc(pod *corev1.Pod) (bool, *int32) {
 	return isUnavailable, minInterval
 }
 
-func min(a, b *int32) *int32 {
+func min(a, b *int64) *int64 {
 	if a == nil {
 		return b
 	}

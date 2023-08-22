@@ -125,7 +125,7 @@ const (
 
 func initRulesetManager() {
 
-	register.UnAvailableFuncList = append(register.UnAvailableFuncList, func(pod *corev1.Pod) (bool, *int32) {
+	register.UnAvailableFuncList = append(register.UnAvailableFuncList, func(pod *corev1.Pod) (bool, *int64) {
 		if pod.GetLabels() == nil {
 			return false, nil
 		}

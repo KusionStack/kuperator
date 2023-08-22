@@ -38,6 +38,7 @@ import (
 
 	"kusionstack.io/kafed/apis/apps/v1alpha1"
 	"kusionstack.io/kafed/pkg/controllers/ruleset"
+	"kusionstack.io/kafed/pkg/controllers/utils"
 	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
 	"kusionstack.io/kafed/pkg/log"
 )
@@ -89,7 +90,7 @@ func NewReconciler(mgr manager.Manager) *ReconcilePodOpsLifecycle {
 		recorder:    mgr.GetEventRecorderFor(controllerName),
 		expectation: expectation,
 	}
-	r.registerStages()
+	r.initRuleSetManager()
 
 	return r
 }
@@ -288,7 +289,7 @@ func (r *ReconcilePodOpsLifecycle) addLabels(ctx context.Context, pod *corev1.Po
 	})
 }
 
-func (r *ReconcilePodOpsLifecycle) registerStages() {
+func (r *ReconcilePodOpsLifecycle) initRuleSetManager() {
 	r.ruleSetManager.RegisterStage(v1alpha1.PodOpsLifecyclePreCheckStage, func(po client.Object) bool {
 		labels := po.GetLabels()
 		return labels != nil && labelHasPrefix(labels, v1alpha1.PodPreCheckLabelPrefix)
@@ -296,6 +297,9 @@ func (r *ReconcilePodOpsLifecycle) registerStages() {
 	r.ruleSetManager.RegisterStage(v1alpha1.PodOpsLifecyclePostCheckStage, func(po client.Object) bool {
 		labels := po.GetLabels()
 		return labels != nil && labelHasPrefix(labels, v1alpha1.PodPostCheckLabelPrefix)
+	})
+	ruleset.AddUnAvailableFunc(func(po *corev1.Pod) (bool, *int64) {
+		return !utils.IsServiceAvailable(po), nil
 	})
 }
 
