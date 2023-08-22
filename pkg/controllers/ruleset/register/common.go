@@ -26,14 +26,10 @@ var (
 	UnAvailableFuncList []UnAvailableFunc
 )
 
-func AddUnAvailableFunc(f func(pod *corev1.Pod) (bool, *int32)) {
-	UnAvailableFuncList = append(UnAvailableFuncList, f)
-}
+type UnAvailableFunc func(pod *corev1.Pod) (bool, *int64)
 
-type UnAvailableFunc func(pod *corev1.Pod) (bool, *int32)
-
-func DefaultInit() {
-	UnAvailableFuncList = append(UnAvailableFuncList, func(pod *corev1.Pod) (bool, *int32) {
+func init() {
+	UnAvailableFuncList = append(UnAvailableFuncList, func(pod *corev1.Pod) (bool, *int64) {
 		return !utils.IsPodReady(pod) || utils.IsPodTerminal(pod), nil
 	})
 }

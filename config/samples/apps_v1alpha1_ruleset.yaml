@@ -9,4 +9,10 @@ metadata:
     app.kubernetes.io/created-by: kusionstack
   name: ruleset-sample
 spec:
-  # TODO(user): Add fields here
+  rules:
+  - availablePolicy:
+      maxUnavailableValue: 50%
+    name: maxUnavailable
+  selector:
+    matchLabels:
+      app: foo

@@ -19,6 +19,7 @@ package ruleset
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
@@ -76,6 +77,10 @@ func RegisterListenChan(ctx context.Context) *source.Channel {
 		}
 	}()
 	return &source.Channel{Source: ch}
+}
+
+func AddUnAvailableFunc(f func(pod *corev1.Pod) (bool, *int64)) {
+	register.UnAvailableFuncList = append(register.UnAvailableFuncList, f)
 }
 
 func newRulesetManager() ManagerInterface {
