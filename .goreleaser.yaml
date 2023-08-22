@@ -95,9 +95,9 @@ changelog:
     - '^style:'
 
 release:
-  github:
-    owner: KusionStack
-    name: '{{ .ProjectName }}'
+  #github:
+  #  owner: KusionStack
+  #  name: "{{ .ProjectName }}"
   draft: false
   footer: |
     ## Docker Images
