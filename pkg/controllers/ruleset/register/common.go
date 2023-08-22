@@ -28,7 +28,7 @@ var (
 
 type UnAvailableFunc func(pod *corev1.Pod) (bool, *int64)
 
-func init() {
+func DefaultInit() {
 	UnAvailableFuncList = append(UnAvailableFuncList, func(pod *corev1.Pod) (bool, *int64) {
 		return !utils.IsPodReady(pod) || utils.IsPodTerminal(pod), nil
 	})
