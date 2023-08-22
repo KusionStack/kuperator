@@ -23,6 +23,8 @@ builds:
   ldflags:
   - -s -w
   main: .
+  id: "manager"
+  binary: manager
 archives:
 - id: release
   name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
