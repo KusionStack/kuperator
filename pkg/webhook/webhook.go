@@ -187,18 +187,16 @@ func ensureWebhookSecret(ctx context.Context, clientset *kubernetes.Clientset, d
 		Data: data,
 	}
 
+	var updatedSecret *corev1.Secret
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() (err error) {
 		if dirty {
-			_, err = clientset.CoreV1().Secrets(getNamespace()).Update(ctx, secret, metav1.UpdateOptions{})
+			updatedSecret, err = clientset.CoreV1().Secrets(getNamespace()).Update(ctx, secret, metav1.UpdateOptions{})
 		} else {
-			_, err = clientset.CoreV1().Secrets(getNamespace()).Create(ctx, secret, metav1.CreateOptions{})
+			updatedSecret, err = clientset.CoreV1().Secrets(getNamespace()).Create(ctx, secret, metav1.CreateOptions{})
 		}
 		return err
 	})
-	if err != nil {
-		return nil, err
-	}
-	return secret, nil
+	return updatedSecret, err
 }
 
 func generateSelfSignedCACert() (caKey *rsa.PrivateKey, caCert *x509.Certificate, err error) {
