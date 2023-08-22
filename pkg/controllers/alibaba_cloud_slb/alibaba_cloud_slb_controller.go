@@ -22,15 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/util/workqueue"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/ratelimiter"
-
 	"kusionstack.io/kafed/pkg/controllers/resourceconsist"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ resourceconsist.ReconcileAdapter = &ReconcileAdapter{}
@@ -39,82 +32,45 @@ type ReconcileAdapter struct {
 	client.Client
 }
 
-func (r *ReconcileAdapter) GetRateLimiter() ratelimiter.RateLimiter {
-	return workqueue.DefaultControllerRateLimiter()
-}
-
-func (r *ReconcileAdapter) GetMaxConcurrentReconciles() int {
-	return 5
-}
-
-func (r *ReconcileAdapter) EmployerResource() client.Object {
-	return &corev1.Service{}
-}
-
-func (r *ReconcileAdapter) EmployeeResource() client.Object {
-	return &corev1.Pod{}
-}
-
-func (r *ReconcileAdapter) EmployerResourceHandler() handler.EventHandler {
-	return &EnqueueServiceWithRateLimit{}
-}
-
-func (r *ReconcileAdapter) EmployeeResourceHandler() handler.EventHandler {
-	return &EnqueueServiceByPod{
-		c: r.Client,
+func NewReconcileAdapter(c client.Client) *ReconcileAdapter {
+	return &ReconcileAdapter{
+		Client: c,
 	}
 }
 
-func (r *ReconcileAdapter) EmployerResourcePredicates() predicate.Funcs {
-	return predicate.Funcs{
-		CreateFunc: func(event event.CreateEvent) bool {
-			return doPredicate(event.Object)
-		},
-		DeleteFunc: func(event event.DeleteEvent) bool {
-			return doPredicate(event.Object)
-		},
-		UpdateFunc: func(event event.UpdateEvent) bool {
-			return doPredicate(event.ObjectNew)
-		},
-		GenericFunc: func(event event.GenericEvent) bool {
-			return doPredicate(event.Object)
-		},
-	}
-}
-
-func (r *ReconcileAdapter) EmployeeResourcePredicates() predicate.Funcs {
-	return predicate.Funcs{}
+func (r *ReconcileAdapter) GetControllerName() string {
+	return "alibaba-cloud-slb-controller"
 }
 
 func (r *ReconcileAdapter) NotFollowPodOpsLifeCycle() bool {
 	return false
 }
 
-func (r *ReconcileAdapter) GetExpectEmployerStatus(ctx context.Context, employer client.Object) ([]resourceconsist.IEmployerStatus, error) {
+func (r *ReconcileAdapter) GetExpectEmployer(ctx context.Context, employer client.Object) ([]resourceconsist.IEmployer, error) {
 	return nil, nil
 }
 
-func (r *ReconcileAdapter) GetCurrentEmployerStatus(ctx context.Context, employer client.Object) ([]resourceconsist.IEmployerStatus, error) {
+func (r *ReconcileAdapter) GetCurrentEmployer(ctx context.Context, employer client.Object) ([]resourceconsist.IEmployer, error) {
 	return nil, nil
 }
 
-func (r *ReconcileAdapter) CreateEmployer(employer client.Object, toCreate []resourceconsist.IEmployerStatus) ([]resourceconsist.IEmployerStatus, []resourceconsist.IEmployerStatus, error) {
+func (r *ReconcileAdapter) CreateEmployer(employer client.Object, toCreate []resourceconsist.IEmployer) ([]resourceconsist.IEmployer, []resourceconsist.IEmployer, error) {
 	return nil, nil, nil
 }
 
-func (r *ReconcileAdapter) UpdateEmployer(employer client.Object, toUpdate []resourceconsist.IEmployerStatus) ([]resourceconsist.IEmployerStatus, []resourceconsist.IEmployerStatus, error) {
+func (r *ReconcileAdapter) UpdateEmployer(employer client.Object, toUpdate []resourceconsist.IEmployer) ([]resourceconsist.IEmployer, []resourceconsist.IEmployer, error) {
 	return nil, nil, nil
 }
 
-func (r *ReconcileAdapter) DeleteEmployer(employer client.Object, toDelete []resourceconsist.IEmployerStatus) ([]resourceconsist.IEmployerStatus, []resourceconsist.IEmployerStatus, error) {
+func (r *ReconcileAdapter) DeleteEmployer(employer client.Object, toDelete []resourceconsist.IEmployer) ([]resourceconsist.IEmployer, []resourceconsist.IEmployer, error) {
 	return nil, nil, nil
 }
 
-func (r *ReconcileAdapter) RecordEmployer(succCreate, succUpdate, succDelete []resourceconsist.IEmployerStatus) error {
+func (r *ReconcileAdapter) RecordEmployer(succCreate, succUpdate, succDelete []resourceconsist.IEmployer) error {
 	return nil
 }
 
-func (r *ReconcileAdapter) GetExpectEmployeeStatus(ctx context.Context, employer client.Object) ([]resourceconsist.IEmployeeStatus, error) {
+func (r *ReconcileAdapter) GetExpectEmployee(ctx context.Context, employer client.Object) ([]resourceconsist.IEmployee, error) {
 	svc, ok := employer.(*corev1.Service)
 	if !ok {
 		return nil, fmt.Errorf("expect employer kind is Service")
@@ -126,7 +82,7 @@ func (r *ReconcileAdapter) GetExpectEmployeeStatus(ctx context.Context, employer
 		return nil, err
 	}
 
-	expected := make([]resourceconsist.IEmployeeStatus, len(podList.Items))
+	expected := make([]resourceconsist.IEmployee, len(podList.Items))
 	expectIdx := 0
 	for _, pod := range podList.Items {
 		status := AlibabaSlbPodStatus{
@@ -155,7 +111,7 @@ func (r *ReconcileAdapter) GetExpectEmployeeStatus(ctx context.Context, employer
 	return expected[:expectIdx], nil
 }
 
-func (r *ReconcileAdapter) GetCurrentEmployeeStatus(ctx context.Context, employer client.Object) ([]resourceconsist.IEmployeeStatus, error) {
+func (r *ReconcileAdapter) GetCurrentEmployee(ctx context.Context, employer client.Object) ([]resourceconsist.IEmployee, error) {
 	svc, ok := employer.(*corev1.Service)
 	if !ok {
 		return nil, fmt.Errorf("expect employer kind is Service")
@@ -172,15 +128,18 @@ func (r *ReconcileAdapter) GetCurrentEmployeeStatus(ctx context.Context, employe
 	if lbID != "" {
 		alibabaCloudSlbClient, err := NewAlibabaCloudSlbClient()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("get alibaba cloud slb client failed, err: %s", err.Error())
 		}
 		backendServers, err := alibabaCloudSlbClient.GetBackendServers(lbID)
+		if err != nil {
+			return nil, fmt.Errorf("get backend servers of slb failed, err: %s", err.Error())
+		}
 		for _, bs := range backendServers {
 			bsExistUnderSlb[bs] = true
 		}
 	}
 
-	current := make([]resourceconsist.IEmployeeStatus, len(podList.Items))
+	current := make([]resourceconsist.IEmployee, len(podList.Items))
 	currentIdx := 0
 	for _, pod := range podList.Items {
 		status := AlibabaSlbPodStatus{
@@ -207,16 +166,16 @@ func (r *ReconcileAdapter) GetCurrentEmployeeStatus(ctx context.Context, employe
 }
 
 // CreateEmployees returns (nil, toCreate, nil) since CCM of ACK will sync bs of slb
-func (r *ReconcileAdapter) CreateEmployees(employer client.Object, toCreate []resourceconsist.IEmployeeStatus) ([]resourceconsist.IEmployeeStatus, []resourceconsist.IEmployeeStatus, error) {
+func (r *ReconcileAdapter) CreateEmployees(employer client.Object, toCreate []resourceconsist.IEmployee) ([]resourceconsist.IEmployee, []resourceconsist.IEmployee, error) {
 	return nil, toCreate, nil
 }
 
 // UpdateEmployees returns (nil, toUpdate, nil) since CCM of ACK will sync bs of slb
-func (r *ReconcileAdapter) UpdateEmployees(employer client.Object, toUpdate []resourceconsist.IEmployeeStatus) ([]resourceconsist.IEmployeeStatus, []resourceconsist.IEmployeeStatus, error) {
+func (r *ReconcileAdapter) UpdateEmployees(employer client.Object, toUpdate []resourceconsist.IEmployee) ([]resourceconsist.IEmployee, []resourceconsist.IEmployee, error) {
 	return nil, toUpdate, nil
 }
 
 // DeleteEmployees returns (nil, toDelete, nil) since CCM of ACK will sync bs of slb
-func (r *ReconcileAdapter) DeleteEmployees(employer client.Object, toDelete []resourceconsist.IEmployeeStatus) ([]resourceconsist.IEmployeeStatus, []resourceconsist.IEmployeeStatus, error) {
+func (r *ReconcileAdapter) DeleteEmployees(employer client.Object, toDelete []resourceconsist.IEmployee) ([]resourceconsist.IEmployee, []resourceconsist.IEmployee, error) {
 	return nil, toDelete, nil
 }

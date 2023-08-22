@@ -14,13 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package resourceconsist
+package controllers
 
-const (
-	defaultMaxConcurrentReconciles = 5
+import (
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	annoControlledByResourceConsist = "resource-consist.kusionstack.io/control"
-
-	cleanFinalizerPrefix     = "kafed.kusionstack.io/clean-"                    // todo, to be replaced by api
-	lifecycleFinalizerPrefix = "prot.lifecycle.kafed.kusionstack.io/lifecycle-" // todo, to be replaced by api
+	"kusionstack.io/kafed/pkg/controllers/alibaba_cloud_slb"
+	"kusionstack.io/kafed/pkg/controllers/resourceconsist"
 )
+
+func init() {
+	AddToManagerFuncs = append(AddToManagerFuncs, Add)
+}
+
+func Add(manager manager.Manager) error {
+	return resourceconsist.Add(manager, alibaba_cloud_slb.NewReconcileAdapter(manager.GetClient()))
+}

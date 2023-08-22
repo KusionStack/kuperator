@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -45,28 +46,56 @@ func AddToMgr(mgr manager.Manager, adapter ReconcileAdapter) error {
 	r := NewReconcile(mgr, adapter)
 
 	// CreateEmployees a new controller
-	c, err := controller.New(controllerName, mgr, controller.Options{
-		MaxConcurrentReconciles: adapter.GetMaxConcurrentReconciles(),
+	maxConcurrentReconciles := defaultMaxConcurrentReconciles
+	rateLimiter := workqueue.DefaultControllerRateLimiter()
+	if reconcileOptions, ok := adapter.(ReconcileOptions); ok {
+		maxConcurrentReconciles = reconcileOptions.GetMaxConcurrentReconciles()
+		rateLimiter = reconcileOptions.GetRateLimiter()
+	}
+	c, err := controller.New(adapter.GetControllerName(), mgr, controller.Options{
+		MaxConcurrentReconciles: maxConcurrentReconciles,
 		Reconciler:              r,
-		RateLimiter:             adapter.GetRateLimiter()})
+		RateLimiter:             rateLimiter})
 	if err != nil {
 		return err
 	}
 
+	if watchOptions, ok := adapter.(ReconcileWatchOptions); ok {
+		// Watch for changes to EmployerResources
+		err = c.Watch(&source.Kind{
+			Type: watchOptions.NewEmployer()},
+			watchOptions.EmployerEventHandler(),
+			watchOptions.EmployerPredicates())
+		if err != nil {
+			return err
+		}
+
+		// Watch for changes to EmployeeResources
+		err = c.Watch(&source.Kind{
+			Type: watchOptions.NewEmployee()},
+			watchOptions.EmployeeEventHandler(),
+			watchOptions.EmployeePredicates())
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
 	// Watch for changes to EmployerResources
 	err = c.Watch(&source.Kind{
-		Type: adapter.EmployerResource()},
-		adapter.EmployerResourceHandler(),
-		adapter.EmployerResourcePredicates())
+		Type: &v1.Service{}},
+		&EnqueueServiceWithRateLimit{},
+		employerPredicates)
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to EmployeeResources
 	err = c.Watch(&source.Kind{
-		Type: adapter.EmployeeResource()},
-		adapter.EmployeeResourceHandler(),
-		adapter.EmployeeResourcePredicates())
+		Type: &v1.Pod{}},
+		&EnqueueServiceByPod{},
+		employeePredicates)
 	if err != nil {
 		return err
 	}
@@ -75,12 +104,12 @@ func AddToMgr(mgr manager.Manager, adapter ReconcileAdapter) error {
 }
 
 func NewReconcile(mgr manager.Manager, reconcileAdapter ReconcileAdapter) *Consist {
-	recorder := mgr.GetEventRecorderFor(controllerName)
+	recorder := mgr.GetEventRecorderFor(reconcileAdapter.GetControllerName())
 	return &Consist{
 		Client:   mgr.GetClient(),
 		scheme:   mgr.GetScheme(),
 		adapter:  reconcileAdapter,
-		logger:   log.New(logf.Log.WithName("resourceconsist-controller")),
+		logger:   log.New(logf.Log.WithName(reconcileAdapter.GetControllerName())),
 		recorder: recorder,
 	}
 }
@@ -94,7 +123,12 @@ type Consist struct {
 }
 
 func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	employer := r.adapter.EmployerResource()
+	var employer client.Object
+	if watchOptions, ok := r.adapter.(ReconcileWatchOptions); ok {
+		employer = watchOptions.NewEmployer()
+	} else {
+		employer = &v1.Service{}
+	}
 	err := r.Get(ctx, types.NamespacedName{
 		Namespace: request.Namespace,
 		Name:      request.Name,
@@ -108,24 +142,30 @@ func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (rec
 	}
 
 	// ensure employer-clean finalizer firstly, employer-clean finalizer should be cleaned at the end
-	err = r.ensureEmployerCleanFlzFirstAdd(ctx, employer)
+	requeue, err := r.ensureEmployerCleanFlz(ctx, employer)
 	if err != nil {
 		r.logger.Errorf("add employer clean finalizer failed: %s", err.Error())
-		r.recorder.Eventf(employer, v1.EventTypeNormal, "ensureEmployerCleanFlzFirstAddFailed",
+		r.recorder.Eventf(employer, v1.EventTypeNormal, "ensureEmployerCleanFlzFailed",
 			"add employer clean finalizer failed: %s", err.Error())
 		return reconcile.Result{}, err
 	}
+	if requeue {
+		r.logger.Errorf("add employer clean finalizer, requeue")
+		r.recorder.Eventf(employer, v1.EventTypeNormal, "ensureEmployerCleanFlzRequeue",
+			"add employer clean finalizer, requeue")
+		return reconcile.Result{Requeue: requeue}, nil
+	}
 
-	expectEmployerStatus, err := r.adapter.GetExpectEmployerStatus(ctx, employer)
+	expectEmployerStatus, err := r.adapter.GetExpectEmployer(ctx, employer)
 	if err != nil {
-		r.logger.Errorf("get expect employer status failed: %s", err.Error())
+		r.logger.Errorf("get expect employer failed: %s", err.Error())
 		r.recorder.Eventf(employer, v1.EventTypeNormal, "GetExpectEmployerStatusFailed",
 			"get expect employer status failed: %s", err.Error())
 		return reconcile.Result{}, err
 	}
-	currentEmployerStatus, err := r.adapter.GetCurrentEmployerStatus(ctx, employer)
+	currentEmployerStatus, err := r.adapter.GetCurrentEmployer(ctx, employer)
 	if err != nil {
-		r.logger.Errorf("get current employer status failed: %s", err.Error())
+		r.logger.Errorf("get current employer failed: %s", err.Error())
 		r.recorder.Eventf(employer, v1.EventTypeNormal, "GetCurrentEmployerStatusFailed",
 			"get current employer status failed: %s", err.Error())
 		return reconcile.Result{}, err
@@ -138,16 +178,16 @@ func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 
-	expectEmployees, err := r.adapter.GetExpectEmployeeStatus(ctx, employer)
+	expectEmployees, err := r.adapter.GetExpectEmployee(ctx, employer)
 	if err != nil {
-		r.logger.Errorf("get expect employees status failed: %s", err.Error())
+		r.logger.Errorf("get expect employees failed: %s", err.Error())
 		r.recorder.Eventf(employer, v1.EventTypeNormal, "GetExpectEmployeeStatusFailed",
 			"get expect employees status failed: %s", err.Error())
 		return reconcile.Result{}, err
 	}
-	currentEmployees, err := r.adapter.GetCurrentEmployeeStatus(ctx, employer)
+	currentEmployees, err := r.adapter.GetCurrentEmployee(ctx, employer)
 	if err != nil {
-		r.logger.Errorf("get current employees status failed: %s", err.Error())
+		r.logger.Errorf("get current employees failed: %s", err.Error())
 		r.recorder.Eventf(employer, v1.EventTypeNormal, "GetCurrentEmployeeStatusFailed",
 			"get current employees status failed: %s", err.Error())
 		return reconcile.Result{}, err

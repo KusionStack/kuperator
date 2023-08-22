@@ -28,7 +28,7 @@ import (
 	"kusionstack.io/kafed/pkg/controllers/utils"
 )
 
-func (r *Consist) syncEmployer(ctx context.Context, employer client.Object, expectEmployerStatus, currentEmployerStatus []IEmployerStatus) (bool, error) {
+func (r *Consist) syncEmployer(ctx context.Context, employer client.Object, expectEmployerStatus, currentEmployerStatus []IEmployer) (bool, error) {
 	toCudEmployer, err := r.diffEmployer(expectEmployerStatus, currentEmployerStatus)
 	if err != nil {
 		return false, fmt.Errorf("diff employer failed, err: %s", err.Error())
@@ -55,9 +55,9 @@ func (r *Consist) syncEmployer(ctx context.Context, employer client.Object, expe
 	return isClean, nil
 }
 
-func (r *Consist) diffEmployer(expectEmployer, currentEmployer []IEmployerStatus) (ToCUDEmployer, error) {
-	expectEmployerMap := make(map[string]IEmployerStatus)
-	currentEmployerMap := make(map[string]IEmployerStatus)
+func (r *Consist) diffEmployer(expectEmployer, currentEmployer []IEmployer) (ToCUDEmployer, error) {
+	expectEmployerMap := make(map[string]IEmployer)
+	currentEmployerMap := make(map[string]IEmployer)
 
 	for _, expect := range expectEmployer {
 		expectEmployerMap[expect.GetEmployerId()] = expect
@@ -66,10 +66,10 @@ func (r *Consist) diffEmployer(expectEmployer, currentEmployer []IEmployerStatus
 		currentEmployerMap[current.GetEmployerId()] = current
 	}
 
-	toCreate := make([]IEmployerStatus, len(expectEmployer))
-	toUpdate := make([]IEmployerStatus, len(currentEmployer))
-	toDelete := make([]IEmployerStatus, len(currentEmployer))
-	unchanged := make([]IEmployerStatus, len(currentEmployer))
+	toCreate := make([]IEmployer, len(expectEmployer))
+	toUpdate := make([]IEmployer, len(currentEmployer))
+	toDelete := make([]IEmployer, len(currentEmployer))
+	unchanged := make([]IEmployer, len(currentEmployer))
 	toCreateIdx, toUpdateIdx, toDeleteIdx, unchangedIdx := 0, 0, 0, 0
 
 	for expectId, expect := range expectEmployerMap {
@@ -112,9 +112,9 @@ func (r *Consist) diffEmployer(expectEmployer, currentEmployer []IEmployerStatus
 	}, nil
 }
 
-func (r *Consist) diffEmployees(expectEmployees, currentEmployees []IEmployeeStatus) (ToCUDEmployees, error) {
-	expectEmployeesMap := make(map[string]IEmployeeStatus)
-	currentEmployeesMap := make(map[string]IEmployeeStatus)
+func (r *Consist) diffEmployees(expectEmployees, currentEmployees []IEmployee) (ToCUDEmployees, error) {
+	expectEmployeesMap := make(map[string]IEmployee)
+	currentEmployeesMap := make(map[string]IEmployee)
 
 	for _, expect := range expectEmployees {
 		expectEmployeesMap[expect.GetEmployeeId()] = expect
@@ -123,10 +123,10 @@ func (r *Consist) diffEmployees(expectEmployees, currentEmployees []IEmployeeSta
 		currentEmployeesMap[current.GetEmployeeId()] = current
 	}
 
-	toCreate := make([]IEmployeeStatus, len(expectEmployees))
-	toUpdate := make([]IEmployeeStatus, len(currentEmployees))
-	toDelete := make([]IEmployeeStatus, len(currentEmployees))
-	unchanged := make([]IEmployeeStatus, len(currentEmployees))
+	toCreate := make([]IEmployee, len(expectEmployees))
+	toUpdate := make([]IEmployee, len(currentEmployees))
+	toDelete := make([]IEmployee, len(currentEmployees))
+	unchanged := make([]IEmployee, len(currentEmployees))
 	toCreateIdx, toUpdateIdx, toDeleteIdx, unchangedIdx := 0, 0, 0, 0
 
 	for expectId, expect := range expectEmployeesMap {
@@ -169,7 +169,7 @@ func (r *Consist) diffEmployees(expectEmployees, currentEmployees []IEmployeeSta
 	}, nil
 }
 
-func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, expectEmployees, currentEmployees []IEmployeeStatus) (bool, error) {
+func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, expectEmployees, currentEmployees []IEmployee) (bool, error) {
 	// get expect/current employees diffEmployees
 	toCudEmployees, err := r.diffEmployees(expectEmployees, currentEmployees)
 	if err != nil {
@@ -208,7 +208,13 @@ func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, exp
 }
 
 func (r *Consist) cleanEmployerCleanFinalizer(ctx context.Context, employer client.Object) error {
-	employerLatest := r.adapter.EmployerResource()
+	var employerLatest client.Object
+	if watchOptions, ok := r.adapter.(ReconcileWatchOptions); ok {
+		employerLatest = watchOptions.NewEmployer()
+	} else {
+		employerLatest = &v1.Service{}
+	}
+
 	err := r.Get(ctx, types.NamespacedName{
 		Namespace: employer.GetNamespace(),
 		Name:      employer.GetName(),
@@ -238,9 +244,16 @@ func (r *Consist) cleanEmployerCleanFinalizer(ctx context.Context, employer clie
 }
 
 func (r *Consist) ensureLifecycleFinalizer(ctx context.Context, ns, lifecycleFlz string, toAdd, toDelete []string) error {
+	watchOptions, watchOptionsImplemented := r.adapter.(ReconcileWatchOptions)
+
 	_, err := utils.SlowStartBatch(len(toAdd), 1, false, func(i int, _ error) error {
 		employeeName := toAdd[i]
-		employee := r.adapter.EmployeeResource()
+		var employee client.Object
+		if watchOptionsImplemented {
+			employee = watchOptions.NewEmployee()
+		} else {
+			employee = &v1.Pod{}
+		}
 		err := r.Get(ctx, types.NamespacedName{
 			Namespace: ns,
 			Name:      employeeName,
@@ -270,7 +283,12 @@ func (r *Consist) ensureLifecycleFinalizer(ctx context.Context, ns, lifecycleFlz
 
 	_, err = utils.SlowStartBatch(len(toDelete), 1, false, func(i int, _ error) error {
 		employeeName := toDelete[i]
-		employee := r.adapter.EmployeeResource()
+		var employee client.Object
+		if watchOptionsImplemented {
+			employee = watchOptions.NewEmployee()
+		} else {
+			employee = &v1.Pod{}
+		}
 		err := r.Get(ctx, types.NamespacedName{
 			Namespace: ns,
 			Name:      employeeName,
@@ -299,12 +317,14 @@ func (r *Consist) ensureLifecycleFinalizer(ctx context.Context, ns, lifecycleFlz
 	return err
 }
 
-func (r *Consist) getToAddDeleteLifecycleFlzEmployees(succCreate, failCreate, succDelete, failDelete, succUpdate, unchanged []IEmployeeStatus) ([]string, []string) {
+func (r *Consist) getToAddDeleteLifecycleFlzEmployees(succCreate, failCreate, succDelete, failDelete, succUpdate, unchanged []IEmployee) ([]string, []string) {
 	toAddLifecycleFlz := make([]string, len(succCreate)+len(succUpdate)+len(unchanged))
 	toDeleteLifecycleFlz := make([]string, len(succDelete)+len(succUpdate)+len(unchanged))
 	toAddIdx, toDeleteIdx := 0, 0
 
-	if !isPod(r.adapter.EmployeeResource()) || r.adapter.NotFollowPodOpsLifeCycle() {
+	watchOptions, watchOptionsImplemented := r.adapter.(ReconcileWatchOptions)
+
+	if (watchOptionsImplemented && !isPod(watchOptions.NewEmployee())) || r.adapter.NotFollowPodOpsLifeCycle() {
 		return toAddLifecycleFlz[:toAddIdx], toDeleteLifecycleFlz[:toDeleteIdx]
 	}
 
@@ -349,9 +369,9 @@ func (r *Consist) getToAddDeleteLifecycleFlzEmployees(succCreate, failCreate, su
 	return toAddLifecycleFlz[:toAddIdx], toDeleteLifecycleFlz[:toDeleteIdx]
 }
 
-func (r *Consist) ensureEmployerCleanFlzFirstAdd(ctx context.Context, employer client.Object) error {
+func (r *Consist) ensureEmployerCleanFlz(ctx context.Context, employer client.Object) (bool, error) {
 	if !employer.GetDeletionTimestamp().IsZero() {
-		return nil
+		return false, nil
 	}
 	alreadyAdd := false
 	for _, flz := range employer.GetFinalizers() {
@@ -361,9 +381,12 @@ func (r *Consist) ensureEmployerCleanFlzFirstAdd(ctx context.Context, employer c
 		}
 	}
 	if alreadyAdd {
-		return nil
+		return false, nil
 	}
 	employer.SetFinalizers(append(employer.GetFinalizers(), cleanFinalizerPrefix+employer.GetName()))
-	r.Update(ctx, employer)
-	return fmt.Errorf("employer clean finalizer first added, requeue")
+	err := r.Update(ctx, employer)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }

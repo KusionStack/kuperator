@@ -25,64 +25,74 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/ratelimiter"
 )
 
-type ReconcileAdapter interface {
+// ReconcileOptions includes max concurrent reconciles and rate limiter,
+// max concurrent reconcile: 5 and DefaultControllerRateLimiter() will be used if ReconcileOptions not implemented.
+type ReconcileOptions interface {
 	GetRateLimiter() ratelimiter.RateLimiter
 	GetMaxConcurrentReconciles() int
-
-	EmployerResource() client.Object
-	EmployeeResource() client.Object
-	EmployerResourceHandler() handler.EventHandler
-	EmployeeResourceHandler() handler.EventHandler
-	EmployerResourcePredicates() predicate.Funcs
-	EmployeeResourcePredicates() predicate.Funcs
-
-	NotFollowPodOpsLifeCycle() bool
-
-	// GetExpectEmployerStatus and GetCurrentEmployerStatus return expect/current status of employer from related backend provider
-	GetExpectEmployerStatus(ctx context.Context, employer client.Object) ([]IEmployerStatus, error)
-	GetCurrentEmployerStatus(ctx context.Context, employer client.Object) ([]IEmployerStatus, error)
-
-	CreateEmployer(employer client.Object, toCreate []IEmployerStatus) ([]IEmployerStatus, []IEmployerStatus, error)
-	UpdateEmployer(employer client.Object, toUpdate []IEmployerStatus) ([]IEmployerStatus, []IEmployerStatus, error)
-	DeleteEmployer(employer client.Object, toDelete []IEmployerStatus) ([]IEmployerStatus, []IEmployerStatus, error)
-
-	RecordEmployer(succCreate, succUpdate, succDelete []IEmployerStatus) error
-
-	// GetExpectEmployeeStatus return expect status of employees
-	GetExpectEmployeeStatus(ctx context.Context, employer client.Object) ([]IEmployeeStatus, error)
-	// GetCurrentEmployeeStatus return current status of employees from related backend provider
-	GetCurrentEmployeeStatus(ctx context.Context, employer client.Object) ([]IEmployeeStatus, error)
-
-	CreateEmployees(employer client.Object, toCreate []IEmployeeStatus) ([]IEmployeeStatus, []IEmployeeStatus, error)
-	UpdateEmployees(employer client.Object, toUpdate []IEmployeeStatus) ([]IEmployeeStatus, []IEmployeeStatus, error)
-	DeleteEmployees(employer client.Object, toDelete []IEmployeeStatus) ([]IEmployeeStatus, []IEmployeeStatus, error)
 }
 
-type IEmployerStatus interface {
+// ReconcileWatchOptions defines what employer and employee is and how controller watch
+// default employer: Service, default employee: Pod
+type ReconcileWatchOptions interface {
+	NewEmployer() client.Object
+	NewEmployee() client.Object
+	EmployerEventHandler() handler.EventHandler
+	EmployeeEventHandler() handler.EventHandler
+	EmployerPredicates() predicate.Funcs
+	EmployeePredicates() predicate.Funcs
+}
+
+// ReconcileAdapter is the interface that customized controllers should implement.
+type ReconcileAdapter interface {
+	GetControllerName() string
+	NotFollowPodOpsLifeCycle() bool
+
+	// GetExpectEmployer and GetCurrentEmployer return expect/current status of employer from related backend provider
+	GetExpectEmployer(ctx context.Context, employer client.Object) ([]IEmployer, error)
+	GetCurrentEmployer(ctx context.Context, employer client.Object) ([]IEmployer, error)
+
+	CreateEmployer(employer client.Object, toCreate []IEmployer) ([]IEmployer, []IEmployer, error)
+	UpdateEmployer(employer client.Object, toUpdate []IEmployer) ([]IEmployer, []IEmployer, error)
+	DeleteEmployer(employer client.Object, toDelete []IEmployer) ([]IEmployer, []IEmployer, error)
+
+	RecordEmployer(succCreate, succUpdate, succDelete []IEmployer) error
+
+	// GetExpectEmployee return expect status of employees
+	GetExpectEmployee(ctx context.Context, employer client.Object) ([]IEmployee, error)
+	// GetCurrentEmployee return current status of employees from related backend provider
+	GetCurrentEmployee(ctx context.Context, employer client.Object) ([]IEmployee, error)
+
+	CreateEmployees(employer client.Object, toCreate []IEmployee) ([]IEmployee, []IEmployee, error)
+	UpdateEmployees(employer client.Object, toUpdate []IEmployee) ([]IEmployee, []IEmployee, error)
+	DeleteEmployees(employer client.Object, toDelete []IEmployee) ([]IEmployee, []IEmployee, error)
+}
+
+type IEmployer interface {
 	GetEmployerId() string
 	GetEmployerStatuses() interface{}
 	EmployerEqual(employerStatuses interface{}) (bool, error)
 }
 
-type IEmployeeStatus interface {
+type IEmployee interface {
 	GetEmployeeId() string
 	GetEmployeeName() string
 	GetEmployeeStatuses() interface{}
-	EmployeeEqual(employeeStatus IEmployeeStatus) (bool, error)
+	EmployeeEqual(employee IEmployee) (bool, error)
 }
 
 type ToCUDEmployer struct {
-	ToCreate  []IEmployerStatus
-	ToUpdate  []IEmployerStatus
-	ToDelete  []IEmployerStatus
-	Unchanged []IEmployerStatus
+	ToCreate  []IEmployer
+	ToUpdate  []IEmployer
+	ToDelete  []IEmployer
+	Unchanged []IEmployer
 }
 
 type ToCUDEmployees struct {
-	ToCreate  []IEmployeeStatus
-	ToUpdate  []IEmployeeStatus
-	ToDelete  []IEmployeeStatus
-	Unchanged []IEmployeeStatus
+	ToCreate  []IEmployee
+	ToUpdate  []IEmployee
+	ToDelete  []IEmployee
+	Unchanged []IEmployee
 }
 
 type PodEmployeeStatuses struct {

@@ -23,8 +23,8 @@ import (
 	"kusionstack.io/kafed/pkg/controllers/resourceconsist"
 )
 
-var _ resourceconsist.IEmployerStatus = DemoServiceStatus{}
-var _ resourceconsist.IEmployeeStatus = DemoPodStatus{}
+var _ resourceconsist.IEmployer = DemoServiceStatus{}
+var _ resourceconsist.IEmployee = DemoPodStatus{}
 
 type DemoServiceStatus struct {
 	EmployerId       string
@@ -61,7 +61,7 @@ func (d DemoPodStatus) GetEmployeeStatuses() interface{} {
 	return d.EmployeeStatuses
 }
 
-func (d DemoPodStatus) EmployeeEqual(employeeStatus resourceconsist.IEmployeeStatus) (bool, error) {
+func (d DemoPodStatus) EmployeeEqual(employeeStatus resourceconsist.IEmployee) (bool, error) {
 	if d.EmployeeName != employeeStatus.GetEmployeeName() {
 		return false, nil
 	}
