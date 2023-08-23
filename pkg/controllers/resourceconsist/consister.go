@@ -268,6 +268,8 @@ func (r *Consist) ensureExpectedFinalizer(ctx context.Context, employer client.O
 			})
 		}
 	}
+
+	_ = r.patchPodExpectedFinalizer(ctx, employer, toAdd, toDelete)
 	var succDeletedNames []string
 	for _, deleteExpectFinalizerOps := range toDelete {
 		if deleteExpectFinalizerOps.Succeed {
