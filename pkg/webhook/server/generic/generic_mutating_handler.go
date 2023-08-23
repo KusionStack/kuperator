@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -41,8 +42,10 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 	if req.SubResource != "" {
 		key = fmt.Sprintf("%s/%s", req.Kind.Kind, req.SubResource)
 	}
+	klog.V(5).Infof("MutatingHandler, Kind: %s, Namespace: %s, Name: %s", key, req.Namespace, req.Name)
+
 	if handler, exist := MutatingTypeHandlerMap[key]; exist {
-		return handler.Handle(ctx, req, h.Client, h.Decoder)
+		return handler.Handle(ctx, req)
 	}
 
 	// do nothing
@@ -54,6 +57,11 @@ var _ inject.Client = &MutatingHandler{}
 // InjectClient injects the client into the MutatingHandler
 func (h *MutatingHandler) InjectClient(c client.Client) error {
 	h.Client = c
+	for i := range MutatingTypeHandlerMap {
+		if _, err := inject.ClientInto(h.Client, MutatingTypeHandlerMap[i]); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -62,5 +70,10 @@ var _ admission.DecoderInjector = &MutatingHandler{}
 // InjectDecoder injects the decoder into the MutatingHandler
 func (h *MutatingHandler) InjectDecoder(d *admission.Decoder) error {
 	h.Decoder = d
+	for i := range MutatingTypeHandlerMap {
+		if _, err := admission.InjectDecoderInto(d, MutatingTypeHandlerMap[i]); err != nil {
+			return err
+		}
+	}
 	return nil
 }

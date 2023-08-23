@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -38,8 +39,10 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 	if req.SubResource != "" {
 		key = fmt.Sprintf("%s/%s", req.Kind.Kind, req.SubResource)
 	}
+	klog.V(5).Infof("ValidatingHandler, Kind: %s, Namespace: %s, Name: %s", key, req.Namespace, req.Name)
+
 	if handler, exist := ValidatingTypeHandlerMap[key]; exist {
-		return handler.Handle(ctx, req, h.Client, h.Decoder)
+		return handler.Handle(ctx, req)
 	}
 
 	return admission.ValidationResponse(true, "")
@@ -50,6 +53,11 @@ var _ inject.Client = &ValidatingHandler{}
 // InjectClient injects the client into the ValidatingHandler
 func (h *ValidatingHandler) InjectClient(c client.Client) error {
 	h.Client = c
+	for i := range ValidatingTypeHandlerMap {
+		if _, err := inject.ClientInto(h.Client, ValidatingTypeHandlerMap[i]); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -58,5 +66,10 @@ var _ admission.DecoderInjector = &ValidatingHandler{}
 // InjectDecoder injects the decoder into the ValidatingHandler
 func (h *ValidatingHandler) InjectDecoder(d *admission.Decoder) error {
 	h.Decoder = d
+	for i := range ValidatingTypeHandlerMap {
+		if _, err := admission.InjectDecoderInto(d, ValidatingTypeHandlerMap[i]); err != nil {
+			return err
+		}
+	}
 	return nil
 }

@@ -6,7 +6,19 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - apps.kafed.io
+  - apps
+  resources:
+  - controllerrevisions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kusionstack.io
   resources:
   - collasets
   verbs:
@@ -18,15 +30,87 @@ rules:
   - update
   - watch
 - apiGroups:
-  - apps.kafed.io
+  - apps.kusionstack.io
   resources:
   - collasets/finalizers
   verbs:
   - update
 - apiGroups:
-  - apps.kafed.io
+  - apps.kusionstack.io
   resources:
   - collasets/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kusionstack.io
+  resources:
+  - resourcecontexts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kusionstack.io
+  resources:
+  - resourcecontexts/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kusionstack.io
+  resources:
+  - resourcecontexts/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kusionstack.io
+  resources:
+  - rulesets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kusionstack.io
+  resources:
+  - rulesets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kusionstack.io
+  resources:
+  - rulesets/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/status
   verbs:
   - get
   - patch

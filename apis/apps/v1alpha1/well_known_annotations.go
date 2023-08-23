@@ -17,7 +17,13 @@ limitations under the License.
 package v1alpha1
 
 const (
-	PodAvailableConditionsAnnotation = "kafed.kusionstack.io/available-conditions" // indicate the available conditions of a pod
+	PodAvailableConditionsAnnotation = "pod.kusionstack.io/available-conditions" // indicate the available conditions of a pod
 
-	LastPodStatusAnnotationKey = "collaset.kafed.kusionstack.io/last-pod-status"
+	LastPodStatusAnnotationKey = "collaset.kusionstack.io/last-pod-status"
+)
+
+// RuleSet Annotation
+const (
+	AnnotationRuleSets              = "ruleset.kusionstack.io/rulesets"
+	AnnotationPodSkipRuleConditions = "ruleset.kusionstack.io/skip-rule-conditions"
 )

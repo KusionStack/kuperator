@@ -1,12 +1,18 @@
-apiVersion: apps.korbito.io/v1alpha1
+apiVersion: apps.kusionstack.io/v1alpha1
 kind: RuleSet
 metadata:
   labels:
     app.kubernetes.io/name: ruleset
     app.kubernetes.io/instance: ruleset-sample
-    app.kubernetes.io/part-of: korbito
+    app.kubernetes.io/part-of: kusionstack
     app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/created-by: korbito
+    app.kubernetes.io/created-by: kusionstack
   name: ruleset-sample
 spec:
-  # TODO(user): Add fields here
+  rules:
+  - availablePolicy:
+      maxUnavailableValue: 50%
+    name: maxUnavailable
+  selector:
+    matchLabels:
+      app: foo

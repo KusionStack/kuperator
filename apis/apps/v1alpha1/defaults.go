@@ -23,16 +23,15 @@ import (
 	"time"
 
 	dockerref "github.com/docker/distribution/reference"
-	"k8s.io/api/core/v1"
-	corev1 "k8s.io/api/core/v1"
-	utilpointer "k8s.io/utils/pointer"
+	v1 "k8s.io/api/core/v1"
+	utilpointer "k8s.io/utils/ptr"
 )
 
 const (
 	DefaultImageTag = "latest"
 )
 
-func SetDefaults_PodSpec(podSpec *corev1.PodSpec) {
+func SetDefaults_PodSpec(podSpec *v1.PodSpec) {
 	SetDefaults_PodSpecConfig(podSpec)
 	for i := range podSpec.Volumes {
 		a := &podSpec.Volumes[i]

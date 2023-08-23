@@ -139,7 +139,7 @@ func (o orderByDefault) Less(i, j int) bool {
 
 type PodUpdater interface {
 	AnalyseAndGetUpdatedPod(cls *appsv1alpha1.CollaSet, revision *appsv1.ControllerRevision, podUpdateInfo *PodUpdateInfo) (inPlaceUpdateSupport bool, onlyMetadataChanged bool, updatedPod *corev1.Pod, err error)
-	GetPodUpdateFinishStatus(pod *corev1.Pod) (bool, string, error)
+	GetPodUpdateFinishStatus(podUpdateInfo *PodUpdateInfo) (bool, string, error)
 }
 
 func newPodUpdater(cls *appsv1alpha1.CollaSet) PodUpdater {
@@ -171,13 +171,13 @@ func (u *InPlaceIfPossibleUpdater) AnalyseAndGetUpdatedPod(cls *appsv1alpha1.Col
 	// 1. build pod from current and updated revision
 	ownerRef := metav1.NewControllerRef(cls, appsv1alpha1.GroupVersion.WithKind("CollaSet"))
 	// TODO: use cache
-	currentPod, err := controllerutils.NewPodFrom(cls, ownerRef, podUpdateInfo.CurrentRevision)
+	currentPod, err := collasetutils.NewPodFrom(cls, ownerRef, podUpdateInfo.CurrentRevision)
 	if err != nil {
 		return false, false, nil, fmt.Errorf("fail to build Pod from current revision %s: %s", podUpdateInfo.CurrentRevision.Name, err)
 	}
 
 	// TODO: use cache
-	updatedPod, err = controllerutils.NewPodFrom(cls, ownerRef, updatedRevision)
+	updatedPod, err = collasetutils.NewPodFrom(cls, ownerRef, updatedRevision)
 	if err != nil {
 		return false, false, nil, fmt.Errorf("fail to build Pod from updated revision %s: %s", updatedRevision.Name, err)
 	}
@@ -263,25 +263,29 @@ func (u *InPlaceIfPossibleUpdater) diffPod(currentPod, updatedPod *corev1.Pod) (
 	return true, false
 }
 
-func (u *InPlaceIfPossibleUpdater) GetPodUpdateFinishStatus(pod *corev1.Pod) (finished bool, msg string, err error) {
-	if pod.Status.ContainerStatuses == nil {
+func (u *InPlaceIfPossibleUpdater) GetPodUpdateFinishStatus(podUpdateInfo *PodUpdateInfo) (finished bool, msg string, err error) {
+	if !podUpdateInfo.IsUpdatedRevision {
+		return false, "not updated revision", nil
+	}
+
+	if podUpdateInfo.Status.ContainerStatuses == nil {
 		return false, "no container status", nil
 	}
 
-	if pod.Spec.Containers == nil {
+	if podUpdateInfo.Spec.Containers == nil {
 		return false, "no container spec", nil
 	}
 
-	if len(pod.Spec.Containers) != len(pod.Status.ContainerStatuses) {
+	if len(podUpdateInfo.Spec.Containers) != len(podUpdateInfo.Status.ContainerStatuses) {
 		return false, "container status number does not match", nil
 	}
 
-	if pod.Annotations == nil {
+	if podUpdateInfo.Annotations == nil {
 		return true, "no annotations for last container status", nil
 	}
 
 	podLastState := &PodStatus{}
-	if lastStateJson, exist := pod.Annotations[appsv1alpha1.LastPodStatusAnnotationKey]; !exist {
+	if lastStateJson, exist := podUpdateInfo.Annotations[appsv1alpha1.LastPodStatusAnnotationKey]; !exist {
 		return true, "no pod last state annotation", nil
 	} else if err := json.Unmarshal([]byte(lastStateJson), podLastState); err != nil {
 		msg := fmt.Sprintf("malformat pod last state annotation [%s]: %s", lastStateJson, err)
@@ -293,12 +297,12 @@ func (u *InPlaceIfPossibleUpdater) GetPodUpdateFinishStatus(pod *corev1.Pod) (fi
 	}
 
 	imageMapping := map[string]string{}
-	for _, containerSpec := range pod.Spec.Containers {
+	for _, containerSpec := range podUpdateInfo.Spec.Containers {
 		imageMapping[containerSpec.Name] = containerSpec.Image
 	}
 
 	imageIdMapping := map[string]string{}
-	for _, containerStatus := range pod.Status.ContainerStatuses {
+	for _, containerStatus := range podUpdateInfo.Status.ContainerStatuses {
 		imageIdMapping[containerStatus.Name] = containerStatus.ImageID
 	}
 
@@ -335,7 +339,7 @@ func (u *InPlaceOnlyPodUpdater) AnalyseAndGetUpdatedPod(_ *appsv1alpha1.CollaSet
 	return
 }
 
-func (u *InPlaceOnlyPodUpdater) GetPodUpdateFinishStatus(_ *corev1.Pod) (finished bool, msg string, err error) {
+func (u *InPlaceOnlyPodUpdater) GetPodUpdateFinishStatus(_ *PodUpdateInfo) (finished bool, msg string, err error) {
 	return
 }
 
@@ -346,7 +350,7 @@ func (u *RecreatePodUpdater) AnalyseAndGetUpdatedPod(_ *appsv1alpha1.CollaSet, _
 	return false, false, nil, nil
 }
 
-func (u *RecreatePodUpdater) GetPodUpdateFinishStatus(_ *corev1.Pod) (finished bool, msg string, err error) {
+func (u *RecreatePodUpdater) GetPodUpdateFinishStatus(podInfo *PodUpdateInfo) (finished bool, msg string, err error) {
 	// Recreate policy alway treat Pod as update finished
-	return true, "", nil
+	return podInfo.IsUpdatedRevision, "", nil
 }

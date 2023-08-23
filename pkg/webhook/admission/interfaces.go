@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -42,5 +41,5 @@ type ValidationFunc func(ctx context.Context, req admission.Request, obj runtime
 type MutationFunc func(ctx context.Context, req admission.Request, obj runtime.Object) error
 
 type DispatchHandler interface {
-	Handle(context.Context, admission.Request, client.Client, *admission.Decoder) admission.Response
+	Handle(context.Context, admission.Request) admission.Response
 }

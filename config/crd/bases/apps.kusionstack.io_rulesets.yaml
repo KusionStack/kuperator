@@ -1,0 +1,409 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.10.0
+  creationTimestamp: null
+  name: rulesets.apps.kusionstack.io
+spec:
+  group: apps.kusionstack.io
+  names:
+    kind: RuleSet
+    listKind: RuleSetList
+    plural: rulesets
+    shortNames:
+    - rs
+    singular: ruleset
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: RuleSet is the Schema for the rulesets API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: RuleSetSpec defines the desired state of RuleSet
+            properties:
+              rules:
+                description: Rules is a set of rules that need to be checked in certain
+                  situations
+                items:
+                  properties:
+                    availablePolicy:
+                      description: AvailablePolicy is the rule to check if the max
+                        unavailable number is reached by current resource updated.
+                      properties:
+                        maxUnavailableValue:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          description: MaxUnavailableValue is the expected max unavailable
+                            replicas which is allowed to be a integer or a percentage
+                            of the whole number of the target resources.
+                          x-kubernetes-int-or-string: true
+                        minAvailableValue:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          description: MinAvailableValue is the expected min available
+                            replicas which is allowed to be a integer or a percentage
+                            of the whole number of the target resources.
+                          x-kubernetes-int-or-string: true
+                      type: object
+                    conditions:
+                      description: Conditions is the condition to control this rule
+                        enable or not.
+                      items:
+                        type: string
+                      type: array
+                    disabled:
+                      description: Disabled is the switch to control this rule enable
+                        or not.
+                      type: boolean
+                    filter:
+                      description: Filter is used to filter the resource which will
+                        be applied with this rule.
+                      properties:
+                        labelSelector:
+                          description: LabelSelector is used to filter resource with
+                            label match expresion.
+                          properties:
+                            matchExpressions:
+                              description: matchExpressions is a list of label selector
+                                requirements. The requirements are ANDed.
+                              items:
+                                description: A label selector requirement is a selector
+                                  that contains values, a key, and an operator that
+                                  relates the key and values.
+                                properties:
+                                  key:
+                                    description: key is the label key that the selector
+                                      applies to.
+                                    type: string
+                                  operator:
+                                    description: operator represents a key's relationship
+                                      to a set of values. Valid operators are In,
+                                      NotIn, Exists and DoesNotExist.
+                                    type: string
+                                  values:
+                                    description: values is an array of string values.
+                                      If the operator is In or NotIn, the values array
+                                      must be non-empty. If the operator is Exists
+                                      or DoesNotExist, the values array must be empty.
+                                      This array is replaced during a strategic merge
+                                      patch.
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - operator
+                                type: object
+                              type: array
+                            matchLabels:
+                              additionalProperties:
+                                type: string
+                              description: matchLabels is a map of {key,value} pairs.
+                                A single {key,value} in the matchLabels map is equivalent
+                                to an element of matchExpressions, whose key field
+                                is "key", the operator is "In", and the values array
+                                contains only "value". The requirements are ANDed.
+                              type: object
+                          type: object
+                          x-kubernetes-map-type: atomic
+                      type: object
+                    labelCheck:
+                      description: LabelCheck is the rule to check labels on pods.
+                      properties:
+                        requires:
+                          description: Requires is the expected labels on pods
+                          properties:
+                            matchExpressions:
+                              description: matchExpressions is a list of label selector
+                                requirements. The requirements are ANDed.
+                              items:
+                                description: A label selector requirement is a selector
+                                  that contains values, a key, and an operator that
+                                  relates the key and values.
+                                properties:
+                                  key:
+                                    description: key is the label key that the selector
+                                      applies to.
+                                    type: string
+                                  operator:
+                                    description: operator represents a key's relationship
+                                      to a set of values. Valid operators are In,
+                                      NotIn, Exists and DoesNotExist.
+                                    type: string
+                                  values:
+                                    description: values is an array of string values.
+                                      If the operator is In or NotIn, the values array
+                                      must be non-empty. If the operator is Exists
+                                      or DoesNotExist, the values array must be empty.
+                                      This array is replaced during a strategic merge
+                                      patch.
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - operator
+                                type: object
+                              type: array
+                            matchLabels:
+                              additionalProperties:
+                                type: string
+                              description: matchLabels is a map of {key,value} pairs.
+                                A single {key,value} in the matchLabels map is equivalent
+                                to an element of matchExpressions, whose key field
+                                is "key", the operator is "In", and the values array
+                                contains only "value". The requirements are ANDed.
+                              type: object
+                          type: object
+                          x-kubernetes-map-type: atomic
+                      required:
+                      - requires
+                      type: object
+                    name:
+                      description: Name is the name of this rule.
+                      type: string
+                    stage:
+                      type: string
+                    webhook:
+                      properties:
+                        clientConfig:
+                          description: ClientConfig is the configuration for accessing
+                            webhook.
+                          properties:
+                            caBundle:
+                              description: '`caBundle` is a PEM encoded CA bundle
+                                which will be used to validate the webhook''s server
+                                certificate. If unspecified, system trust roots on
+                                the apiserver are used. After Base64.'
+                              type: string
+                            intervalSeconds:
+                              description: interval give the request time interval,
+                                default 5s
+                              format: int64
+                              type: integer
+                            traceTimeoutSeconds:
+                              description: timeout give the request time timeout,
+                                default 60s
+                              format: int64
+                              type: integer
+                            url:
+                              description: '`url` gives the location of the webhook,
+                                in standard URL form (`scheme://host:port/path`).
+                                Exactly one of `url` or `service` must be specified.'
+                              type: string
+                          required:
+                          - url
+                          type: object
+                        failurePolicy:
+                          description: FailurePolicy defines how unrecognized errors
+                            from the admission endpoint are handled - allowed values
+                            are Ignore or Fail. Defaults to Ignore.
+                          type: string
+                        parameters:
+                          description: Parameters contains the list of parameters
+                            which will be passed in webhook body.
+                          items:
+                            properties:
+                              key:
+                                description: Key is the parameter key.
+                                type: string
+                              value:
+                                description: Value is the string value of this parameter.
+                                  Defaults to "".
+                                type: string
+                              valueFrom:
+                                description: Source for the parameter's value. Cannot
+                                  be used if value is not empty.
+                                properties:
+                                  fieldRef:
+                                    description: 'Selects a field of the pod: supports
+                                      metadata.name, metadata.namespace, metadata.labels,
+                                      metadata.annotations, spec.nodeName, spec.serviceAccountName,
+                                      status.hostIP, status.podIP.'
+                                    properties:
+                                      apiVersion:
+                                        description: Version of the schema the FieldPath
+                                          is written in terms of, defaults to "v1".
+                                        type: string
+                                      fieldPath:
+                                        description: Path of the field to select in
+                                          the specified API version.
+                                        type: string
+                                    required:
+                                    - fieldPath
+                                    type: object
+                                    x-kubernetes-map-type: atomic
+                                type: object
+                            type: object
+                          type: array
+                      type: object
+                  type: object
+                type: array
+              selector:
+                description: Selector select the targets controlled by ruleset
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: A label selector requirement is a selector that
+                        contains values, a key, and an operator that relates the key
+                        and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: operator represents a key's relationship to
+                            a set of values. Valid operators are In, NotIn, Exists
+                            and DoesNotExist.
+                          type: string
+                        values:
+                          description: values is an array of string values. If the
+                            operator is In or NotIn, the values array must be non-empty.
+                            If the operator is Exists or DoesNotExist, the values
+                            array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: matchLabels is a map of {key,value} pairs. A single
+                      {key,value} in the matchLabels map is equivalent to an element
+                      of matchExpressions, whose key field is "key", the operator
+                      is "In", and the values array contains only "value". The requirements
+                      are ANDed.
+                    type: object
+                type: object
+                x-kubernetes-map-type: atomic
+            type: object
+          status:
+            description: RuleSetStatus defines the observed state of RuleSet
+            properties:
+              details:
+                description: Details contains all pods ruleset details
+                items:
+                  properties:
+                    name:
+                      type: string
+                    passed:
+                      type: boolean
+                    passedRules:
+                      items:
+                        type: string
+                      type: array
+                    rejectInfo:
+                      items:
+                        properties:
+                          reason:
+                            type: string
+                          ruleName:
+                            type: string
+                        type: object
+                      type: array
+                    stage:
+                      type: string
+                  required:
+                  - passed
+                  type: object
+                type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed
+                  for RuleSet
+                format: int64
+                type: integer
+              ruleStates:
+                description: RuleStates contains the RuleState resource info in webhook
+                  processing progress.
+                items:
+                  description: RuleState defines the resource info in webhook processing
+                    progress.
+                  properties:
+                    name:
+                      description: Name is the name representing the rule
+                      type: string
+                    webhookStatus:
+                      description: WebhookStatus is the webhook status representing
+                        processing progress
+                      properties:
+                        itemStatus:
+                          description: RuleSetPodStatus is async request status representing
+                            the info of pods
+                          items:
+                            description: ItemStatus defines async request info of
+                              resources
+                            properties:
+                              name:
+                                description: Name representing the name of pod
+                                type: string
+                              traceId:
+                                description: TraceId representing async request traceId
+                                type: string
+                              webhookChecked:
+                                description: WebhookChecked representing the pod has
+                                  pass check
+                                type: boolean
+                            required:
+                            - webhookChecked
+                            type: object
+                          type: array
+                        traceStates:
+                          description: TraceStates is a list of tracing info
+                          items:
+                            properties:
+                              beginTime:
+                                format: date-time
+                                type: string
+                              lastTime:
+                                format: date-time
+                                type: string
+                              message:
+                                type: string
+                              traceId:
+                                type: string
+                            type: object
+                          type: array
+                      type: object
+                  type: object
+                type: array
+              targets:
+                description: Targets contains the target resource names this RuleSet
+                  is able to select.
+                items:
+                  type: string
+                type: array
+              updateTime:
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

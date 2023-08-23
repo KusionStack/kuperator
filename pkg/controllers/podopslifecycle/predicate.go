@@ -18,12 +18,11 @@ package podopslifecycle
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
-type NeedOpsLifecycle func(oldPod, newPod *v1.Pod) bool
+type NeedOpsLifecycle func(oldPod, newPod *corev1.Pod) bool
 
 type PodPredicate struct {
 	NeedOpsLifecycle // check if pod need use lifecycle
@@ -31,7 +30,7 @@ type PodPredicate struct {
 
 func (pp *PodPredicate) Create(evt event.CreateEvent) bool {
 	if pp.NeedOpsLifecycle == nil {
-		return true
+		return false
 	}
 
 	pod := evt.Object.(*corev1.Pod)
@@ -44,7 +43,7 @@ func (pp *PodPredicate) Delete(evt event.DeleteEvent) bool {
 
 func (pp *PodPredicate) Update(evt event.UpdateEvent) bool {
 	if pp.NeedOpsLifecycle == nil {
-		return true
+		return false
 	}
 
 	oldPod := evt.ObjectOld.(*corev1.Pod)
@@ -56,18 +55,12 @@ func (pp *PodPredicate) Update(evt event.UpdateEvent) bool {
 		return false
 	}
 
-	rv := oldPod.ResourceVersion
-	defer func() {
-		oldPod.ResourceVersion = rv
-	}()
-
-	oldPod.ResourceVersion = newPod.ResourceVersion
-	return !equality.Semantic.DeepEqual(oldPod.ObjectMeta, newPod.ObjectMeta)
+	return !equality.Semantic.DeepEqual(oldPod.ObjectMeta.Annotations, newPod.ObjectMeta.Annotations) || !equality.Semantic.DeepEqual(oldPod.ObjectMeta.Labels, newPod.ObjectMeta.Labels)
 }
 
 func (pp *PodPredicate) Generic(evt event.GenericEvent) bool {
 	if pp.NeedOpsLifecycle == nil {
-		return true
+		return false
 	}
 
 	pod := evt.Object.(*corev1.Pod)

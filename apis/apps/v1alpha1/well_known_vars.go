@@ -14,23 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package server
+package v1alpha1
 
-import (
-	"fmt"
-
-	"k8s.io/klog/v2"
-
-	"kusionstack.io/kafed/pkg/webhook/server/generic"
+// well known readiness gate
+const (
+	ReadinessGatePodServiceReady = "pod.kusionstack.io/service-ready"
 )
 
-func init() {
-	for k, v := range generic.HandlerMap {
-		_, found := HandlerMap[k]
-		if found {
-			klog.V(1).Info(fmt.Sprintf(
-				"conflicting webhook builder names in handler map: %v", k))
-		}
-		HandlerMap[k] = v
-	}
-}
+// well known finalizer
+const (
+	PodOperationProtectionFinalizerPrefix = "prot.podopslifecycle.kusionstack.io"
+)
+
+// well known variables
+const (
+	PodOpsLifecyclePreCheckStage  = "pre-check"
+	PodOpsLifecyclePostCheckStage = "post-check"
+)

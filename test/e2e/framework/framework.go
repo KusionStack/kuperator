@@ -19,6 +19,10 @@ package framework
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"strings"
+	"time"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -27,10 +31,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"math/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
-	"time"
 )
 
 const (
@@ -120,9 +121,9 @@ type TestDataSummary interface {
 // created for the test.
 type DumpAllNamespaceInfoAction func(ctx context.Context, f *Framework, namespace string)
 
-// KorbitoDescribe is a wrapper for ginkgo.Describe.
-func KorbitoDescribe(text string, body func()) bool {
-	return ginkgo.Describe("[korbito] "+text, body)
+// KusionstackDescribe is a wrapper for ginkgo.Describe.
+func KusionstackDescribe(text string, body func()) bool {
+	return ginkgo.Describe("[kusionstack] "+text, body)
 }
 
 // NewDefaultFramework makes a new framework and sets up a BeforeEach/AfterEach for

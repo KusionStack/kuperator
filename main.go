@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 
@@ -26,6 +27,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -59,6 +61,7 @@ func main() {
 		enableLeaderElection bool
 		probeAddr            string
 		certDir              string
+		dnsName              string
 	)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -66,6 +69,10 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&certDir, "cert-dir", "", "The directory that contains the server key and certificate.")
+	flag.StringVar(&dnsName, "dns-name", "", "The DNS name of the webhook server.")
+
+	klog.InitFlags(nil)
+	defer klog.Flush()
 
 	opts := zap.Options{
 		Development: true,
@@ -77,13 +84,14 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	config := ctrl.GetConfigOrDie()
+	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "5d84702b.kafed.io",
+		LeaderElectionID:       "kusionstack-controller-manager",
 		CertDir:                certDir,
 		NewCache:               inject.NewCacheWithFieldIndex,
 
@@ -116,6 +124,13 @@ func main() {
 
 	if err = webhook.AddToManager(mgr); err != nil {
 		setupLog.Error(err, "unable to add webhook")
+		os.Exit(1)
+	}
+
+	// +kubebuilder:scaffold:builder
+	setupLog.Info("initialize webhook")
+	if err := webhook.Initialize(context.Background(), config, dnsName, certDir); err != nil {
+		setupLog.Error(err, "unable to initialize webhook")
 		os.Exit(1)
 	}
 

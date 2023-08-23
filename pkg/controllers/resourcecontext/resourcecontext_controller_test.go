@@ -64,7 +64,7 @@ var (
 var _ = Describe("ResourceContext controller", func() {
 
 	It("resource context reconcile", func() {
-		testcase := "test-reclaim"
+		testcase := "test-rc-reconcile"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
 
 		cs := &appsv1alpha1.CollaSet{
@@ -169,7 +169,66 @@ var _ = Describe("ResourceContext controller", func() {
 
 		Eventually(func() error {
 			return c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, resourceContext)
-		}, 500*time.Second, 1*time.Second).ShouldNot(BeNil())
+		}, 5*time.Second, 1*time.Second).ShouldNot(BeNil())
+	})
+
+	It("resource context reclaim", func() {
+		testcase := "test-rc-reclaim"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+
+		cs := &appsv1alpha1.CollaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.CollaSetSpec{
+				Replicas: int32Pointer(2),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "foo",
+								Image: "nginx:v1",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
+
+		podList := &corev1.PodList{}
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 2
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
+
+		Expect(c.Delete(context.TODO(), cs)).Should(BeNil())
+		for _, pod := range podList.Items {
+			Expect(c.Delete(context.TODO(), &pod)).Should(BeNil())
+		}
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 0
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+
+		resourceContext := &appsv1alpha1.ResourceContext{}
+		Eventually(func() error {
+			return c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, resourceContext)
+		}, 5*time.Second, 1*time.Second).ShouldNot(BeNil())
 	})
 })
 
@@ -324,7 +383,7 @@ var _ = AfterEach(func() {
 	Expect(mgr.GetClient().List(context.Background(), csList)).Should(BeNil())
 
 	for i := range csList.Items {
-		Expect(mgr.GetClient().Delete(context.TODO(), &csList.Items[i])).Should(BeNil())
+		mgr.GetClient().Delete(context.TODO(), &csList.Items[i])
 	}
 
 	nsList := &corev1.NamespaceList{}

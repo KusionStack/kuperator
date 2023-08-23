@@ -161,7 +161,7 @@ func (sc *RealSyncControl) Scale(set *appsv1alpha1.CollaSet, podWrappers []*coll
 
 			// scale out new Pods with updatedRevision
 			// TODO use cache
-			pod, err := controllerutils.NewPodFrom(set, metav1.NewControllerRef(set, appsv1alpha1.GroupVersion.WithKind("CollaSet")), revision)
+			pod, err := collasetutils.NewPodFrom(set, metav1.NewControllerRef(set, appsv1alpha1.GroupVersion.WithKind("CollaSet")), revision)
 			if err != nil {
 				return fmt.Errorf("fail to new Pod from revision %s: %s", revision.Name, err)
 			}
@@ -170,13 +170,12 @@ func (sc *RealSyncControl) Scale(set *appsv1alpha1.CollaSet, podWrappers []*coll
 			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = fmt.Sprintf("%d", availableIDContext.ID)
 
 			klog.V(1).Info("try to create Pod with revision %s from CollaSet %s/%s", revision.Name, set.Namespace, set.Name)
-			if pod, err := sc.podControl.CreatePod(newPod); err == nil {
-				// add an expectation for this pod creation, before next reconciling
-				if err := collasetutils.ActiveExpectations.ExpectCreate(set, expectations.Pod, pod.Name); err != nil {
-					return err
-				}
+			if pod, err = sc.podControl.CreatePod(newPod); err != nil {
+				return err
 			}
-			return err
+
+			// add an expectation for this pod creation, before next reconciling
+			return collasetutils.ActiveExpectations.ExpectCreate(set, expectations.Pod, pod.Name)
 		})
 
 		sc.recorder.Eventf(set, corev1.EventTypeNormal, "ScaleOut", "scale out %d Pod(s)", succCount)
@@ -461,11 +460,15 @@ func (sc *RealSyncControl) Update(set *appsv1alpha1.CollaSet, podWrapers []*coll
 	}
 
 	// try to finish all Pods'PodOpsLifecycle if its update is finished.
-	succCount, err = controllerutils.SlowStartBatch(len(podWrapers), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
-		podInfo := podWrapers[i]
+	succCount, err = controllerutils.SlowStartBatch(len(podUpdateInfos), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+		podInfo := podUpdateInfos[i]
 
-		// check Pod update is finished or not
-		finished, msg, err := updater.GetPodUpdateFinishStatus(podInfo.Pod)
+		if !podInfo.isDuringOps {
+			return nil
+		}
+
+		// check Pod is during updating, and it is finished or not
+		finished, msg, err := updater.GetPodUpdateFinishStatus(podInfo)
 		if err != nil {
 			return fmt.Errorf("fail to get pod %s/%s update finished: %s", podInfo.Namespace, podInfo.Name, err)
 		}

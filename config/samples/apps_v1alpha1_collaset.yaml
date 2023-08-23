@@ -1,12 +1,32 @@
-apiVersion: apps.korbito.io/v1alpha1
+apiVersion: apps.kusionstack.io/v1alpha1
 kind: CollaSet
 metadata:
   labels:
     app.kubernetes.io/name: collaset
     app.kubernetes.io/instance: collaset-sample
-    app.kubernetes.io/part-of: korbito
+    app.kubernetes.io/part-of: kusionstack
     app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/created-by: korbito
+    app.kubernetes.io/created-by: kusionstack
   name: collaset-sample
 spec:
-  # TODO(user): Add fields here
+  replicas: 2
+  selector:
+    matchLabels:
+      app: foo
+  template:
+    metadata:
+      labels:
+        app: foo
+    spec:
+      containers:
+        - image: nginx:1.25.2
+          name: nginx
+          resources:
+            limits:
+              cpu: 1
+              ephemeral-storage: 100Mi
+              memory: 100Mi
+            requests:
+              cpu: 1
+              ephemeral-storage: 100Mi
+              memory: 100Mi

@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"kusionstack.io/kafed/pkg/log"
 )
 
 const (
@@ -57,8 +56,7 @@ type ControllerExpectationsInterface interface {
 // ControllerExpectations is a cache mapping controllers to what they expect to see before being woken up for a sync.
 type ControllerExpectations struct {
 	cache.Store
-	name   string
-	logger *log.Logger
+	name string
 }
 
 // GetExpectations returns the ControlleeExpectations of the given controller.
@@ -85,13 +83,13 @@ func (r *ControllerExpectations) DeleteExpectations(controllerKey string) {
 func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) bool {
 	if exp, exists, err := r.GetExpectations(controllerKey); exists {
 		if exp.Fulfilled() {
-			r.logger.V(4).Infof("Controller expectations fulfilled %s", controllerKey)
+			klog.Infof("Controller expectations fulfilled %s", controllerKey)
 			return true
 		} else if exp.isExpired() {
-			r.logger.Errorf("expectation expired for key %s", controllerKey)
+			klog.Errorf("expectation expired for key %s", controllerKey)
 			panic(fmt.Sprintf("expected panic for expectation [%s] timeout for key %s", r.name, controllerKey))
 		} else {
-			r.logger.V(4).Infof("Controller still waiting on expectations %#v", controllerKey)
+			klog.Infof("Controller still waiting on expectations %#v", controllerKey)
 			return false
 		}
 	} else if err != nil {
@@ -204,8 +202,8 @@ func (e *ControlleeExpectations) GetExpectations() (int64, int64) {
 }
 
 // NewControllerExpectations returns a store for ControllerExpectations.
-func NewControllerExpectations(name string, logger *log.Logger) *ControllerExpectations {
-	return &ControllerExpectations{cache.NewStore(ExpKeyFunc), name, logger}
+func NewControllerExpectations(name string) *ControllerExpectations {
+	return &ControllerExpectations{cache.NewStore(ExpKeyFunc), name}
 }
 
 // Expectations are a way for controllers to tell the controller manager what they expect. eg:
