@@ -75,7 +75,16 @@ func addToMgr(mgr manager.Manager, r reconcile.Reconciler) (controller.Controlle
 	if err != nil {
 		return nil, err
 	}
-
+	err = mgr.GetCache().IndexField(context.TODO(), &appsv1alpha1.RuleSet{}, appsv1alpha1.FieldIndexRuleSet, func(obj client.Object) []string {
+		rs, ok := obj.(*appsv1alpha1.RuleSet)
+		if !ok {
+			return nil
+		}
+		return rs.Status.Targets
+	})
+	if err != nil {
+		return nil, err
+	}
 	// Watch for changes to RuleSet
 	err = c.Watch(&source.Kind{Type: &appsv1alpha1.RuleSet{}}, &RulesetEventHandler{})
 	if err != nil {
@@ -172,16 +181,6 @@ func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Req
 			r.Info(fmt.Sprintf("fail to remove ruleset on pod %s, %v", name, err))
 			return result, err
 		}
-	}
-
-	// own selected pods
-	for name, pod := range targetPods {
-		newPod, err := r.updateRuleSetOnPod(ctx, ruleSet.Name, pod.Name, pod.Namespace, rulesetutils.AddRuleSetAnno)
-		if err != nil {
-			r.Info(fmt.Sprintf("fail to add ruleset on pod %s, %v", name, err))
-			return result, err
-		}
-		targetPods[name] = newPod
 	}
 
 	// process rules
