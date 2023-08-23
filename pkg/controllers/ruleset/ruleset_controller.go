@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -46,7 +45,8 @@ import (
 	"kusionstack.io/kafed/pkg/controllers/ruleset/processor"
 	"kusionstack.io/kafed/pkg/controllers/ruleset/register"
 	rulesetutils "kusionstack.io/kafed/pkg/controllers/ruleset/utils"
-	"kusionstack.io/kafed/pkg/controllers/utils"
+	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
+	"kusionstack.io/kafed/pkg/utils"
 )
 
 const (
@@ -54,10 +54,6 @@ const (
 	resourceName            = "RuleSet"
 	cleanUpFinalizer        = "ruleset.kusionstack.io/need-clean-up"
 	rulesetTerminatingLabel = "ruleset.kusionstack.io/terminating"
-)
-
-var (
-	podEventQueues []workqueue.DelayingInterface
 )
 
 // NewReconciler returns a new reconcile.Reconciler
@@ -118,9 +114,9 @@ func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Req
 		return reconcile.Result{}, err
 	}
 
-	if !rulesetutils.RulesetVersionExpectation.SatisfiedExpectations(utils.ObjectKey(ruleSet), ruleSet.ResourceVersion) {
-		r.Info(fmt.Sprintf("expected ruleset %s update, resource version %s, retry later", utils.ObjectKey(ruleSet), ruleSet.ResourceVersion))
-		fmt.Printf("expected ruleset %s update, resource version %s, retry later", utils.ObjectKey(ruleSet), ruleSet.ResourceVersion)
+	if !rulesetutils.RulesetVersionExpectation.SatisfiedExpectations(controllerutils.ObjectKey(ruleSet), ruleSet.ResourceVersion) {
+		r.Info(fmt.Sprintf("expected ruleset %s update, resource version %s, retry later", controllerutils.ObjectKey(ruleSet), ruleSet.ResourceVersion))
+		fmt.Printf("expected ruleset %s update, resource version %s, retry later", controllerutils.ObjectKey(ruleSet), ruleSet.ResourceVersion)
 		return reconcile.Result{}, nil
 	}
 
@@ -142,21 +138,21 @@ func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Req
 				return reconcile.Result{}, nil
 			}
 
-			return reconcile.Result{}, utils.RemoveFinalizer(ctx, r.Client, ruleSet, cleanUpFinalizer)
+			return reconcile.Result{}, controllerutils.RemoveFinalizer(ctx, r.Client, ruleSet, cleanUpFinalizer)
 		}
 		msg := fmt.Sprintf("can not delete ruleset: there are some pods waiting for process by ruleset %s/%s. Please terminate pods first or label ruleset kafed.kusionstack.io/terminating=true to force delete it", ruleSet.Namespace, ruleSet.Name)
 		result.RequeueAfter = 5 * time.Second
 		r.recorder.Event(ruleSet, corev1.EventTypeWarning, "BlockProtection", msg)
 	} else if !controllerutil.ContainsFinalizer(ruleSet, cleanUpFinalizer) {
-		if err := utils.AddFinalizer(ctx, r.Client, ruleSet, cleanUpFinalizer); err != nil {
+		if err := controllerutils.AddFinalizer(ctx, r.Client, ruleSet, cleanUpFinalizer); err != nil {
 			return result, fmt.Errorf("fail to add finalizer on RuleSet %s: %s", request, err)
 		}
 	}
 
 	selectedPodNames := sets.String{}
 	for _, pod := range selectedPods.Items {
-		if !rulesetutils.PodVersionExpectation.SatisfiedExpectations(utils.ObjectKey(&pod), pod.ResourceVersion) {
-			r.Info(fmt.Sprintf("expected pod %s update, resource version %s, retry later", utils.ObjectKey(&pod), pod.ResourceVersion))
+		if !rulesetutils.PodVersionExpectation.SatisfiedExpectations(controllerutils.ObjectKey(&pod), pod.ResourceVersion) {
+			r.Info(fmt.Sprintf("expected pod %s update, resource version %s, retry later", controllerutils.ObjectKey(&pod), pod.ResourceVersion))
 			return reconcile.Result{}, nil
 		}
 		selectedPodNames.Insert(pod.Name)
@@ -172,7 +168,7 @@ func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Req
 			continue
 		}
 
-		if _, err := r.updateRuleSetOnPod(ctx, ruleSet.Name, name, ruleSet.Namespace, rulesetutils.MoveRulesetAnno); err != nil {
+		if _, err := r.updateRuleSetOnPod(ctx, ruleSet.Name, name, ruleSet.Namespace, rulesetutils.MoveAllRuleSetInfo); err != nil {
 			r.Info(fmt.Sprintf("fail to remove ruleset on pod %s, %v", name, err))
 			return result, err
 		}
@@ -221,22 +217,43 @@ func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Req
 	}
 
 	if !equalStatus(newStatus, &ruleSet.Status) {
-		rulesetutils.RulesetVersionExpectation.ExpectUpdate(utils.ObjectKey(ruleSet), ruleSet.ResourceVersion)
+		rulesetutils.RulesetVersionExpectation.ExpectUpdate(controllerutils.ObjectKey(ruleSet), ruleSet.ResourceVersion)
 		ruleSet.Status = *newStatus
 		if err := r.Status().Update(ctx, ruleSet); err != nil {
-			rulesetutils.RulesetVersionExpectation.DeleteExpectations(utils.ObjectKey(ruleSet))
-			r.Error(err, fmt.Sprintf("fail to update ruleset %s status", utils.ObjectKey(ruleSet)))
+			rulesetutils.RulesetVersionExpectation.DeleteExpectations(controllerutils.ObjectKey(ruleSet))
+			r.Error(err, fmt.Sprintf("fail to update ruleset %s status", controllerutils.ObjectKey(ruleSet)))
 			return reconcile.Result{}, err
 		}
 	}
-
-	oldDetails := map[string]*appsv1alpha1.Detail{}
-
-	for i, de := range ruleSet.Status.Details {
-		oldDetails[de.Name] = ruleSet.Status.Details[i]
+	pods := make([]*corev1.Pod, 0, len(targetPods))
+	for _, pod := range targetPods {
+		pods = append(pods, pod)
 	}
-	addQueues(ruleSet, details, oldDetails)
-	return res, nil
+	return res, r.syncPodsDetail(ctx, ruleSet.Name, pods, details)
+}
+
+func (r *RuleSetReconciler) syncPodsDetail(ctx context.Context, ruleSetName string, pods []*corev1.Pod, details map[string]*appsv1alpha1.Detail) error {
+	_, err := controllerutils.SlowStartBatch(len(pods), 1, false, func(i int, _ error) error {
+		return r.updatePodDetail(ctx, pods[i], ruleSetName, details[pods[i].Name])
+	})
+	return err
+}
+
+func (r *RuleSetReconciler) updatePodDetail(ctx context.Context, pod *corev1.Pod, ruleSetName string, detail *appsv1alpha1.Detail) error {
+	detailAnno := appsv1alpha1.AnnotationRuleSetDetailPrefix + ruleSetName
+	var newDetail string
+	if detail != nil {
+		newDetail = utils.DumpJSON(&appsv1alpha1.Detail{Stage: detail.Stage, Passed: detail.Passed})
+	} else {
+		newDetail = utils.DumpJSON(&appsv1alpha1.Detail{Stage: "Unknown", Passed: true})
+	}
+	if pod.Annotations != nil && pod.Annotations[detailAnno] == newDetail {
+		return nil
+	}
+	patch := client.RawPatch(types.MergePatchType, controllerutils.GetLabelAnnoPatchBytes(nil, nil, nil, map[string]string{detailAnno: newDetail}))
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		return r.Patch(ctx, pod, patch)
+	})
 }
 
 func (r *RuleSetReconciler) process(rs *appsv1alpha1.RuleSet, pods map[string]*corev1.Pod) (shouldRetry bool, interval *time.Duration, details map[string]*appsv1alpha1.Detail, ruleStates []*appsv1alpha1.RuleState) {
@@ -270,45 +287,10 @@ func (r *RuleSetReconciler) process(rs *appsv1alpha1.RuleSet, pods map[string]*c
 	return shouldRetry, interval, details, ruleStates
 }
 
-func addQueues(rs *appsv1alpha1.RuleSet, details map[string]*appsv1alpha1.Detail, oldDetails map[string]*appsv1alpha1.Detail) {
-	if len(podEventQueues) == 0 {
-		return
-	}
-	for name, old := range oldDetails {
-		detail, ok := details[name]
-		if !ok {
-			addToEveryQueue(rs.Namespace, name)
-			continue
-		}
-		if !equality.Semantic.DeepEqual(old, detail) {
-			addToEveryQueue(rs.Namespace, name)
-		}
-	}
-	for name := range details {
-		_, ok := oldDetails[name]
-		if !ok {
-			addToEveryQueue(rs.Namespace, name)
-			continue
-		}
-	}
-}
-
-func addToEveryQueue(namespace, name string) {
-	for _, q := range podEventQueues {
-		if q.ShuttingDown() {
-			continue
-		}
-		q.Add(types.NamespacedName{
-			Name:      name,
-			Namespace: namespace,
-		})
-	}
-}
-
 func (r *RuleSetReconciler) cleanUpRuleSetPods(ctx context.Context, ruleSet *appsv1alpha1.RuleSet) error {
 	for _, name := range ruleSet.Status.Targets {
-		if _, err := r.updateRuleSetOnPod(ctx, ruleSet.Name, name, ruleSet.Namespace, rulesetutils.MoveRulesetAnno); err != nil && !errors.IsNotFound(err) {
-			return fmt.Errorf("fail to remove RuleSet %s on pod %s: %v", utils.ObjectKey(ruleSet), name, err)
+		if _, err := r.updateRuleSetOnPod(ctx, ruleSet.Name, name, ruleSet.Namespace, rulesetutils.MoveAllRuleSetInfo); err != nil && !errors.IsNotFound(err) {
+			return fmt.Errorf("fail to remove RuleSet %s on pod %s: %v", controllerutils.ObjectKey(ruleSet), name, err)
 		}
 	}
 	return nil

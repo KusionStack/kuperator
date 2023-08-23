@@ -17,7 +17,6 @@ limitations under the License.
 package ruleset
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -48,7 +47,7 @@ func TestRuleset(t *testing.T) {
 		genDefaultPod("default", "pod-test-3"),
 		genDefaultPod("default", "pod-test-4"))
 	for _, po := range pods {
-		g.Expect(c.Create(context.TODO(), po)).NotTo(gomega.HaveOccurred())
+		g.Expect(c.Create(ctx, po)).NotTo(gomega.HaveOccurred())
 	}
 	istr := intstr.FromString("50%")
 	stage := PreTrafficOffStage
@@ -76,26 +75,29 @@ func TestRuleset(t *testing.T) {
 			},
 		},
 	}
-	g.Expect(c.Create(context.TODO(), rs)).NotTo(gomega.HaveOccurred())
+	g.Expect(c.Create(ctx, rs)).NotTo(gomega.HaveOccurred())
 	waitProcessFinished(request)
 	defer func() {
 		for _, po := range pods {
-			g.Expect(c.Delete(context.TODO(), po)).NotTo(gomega.HaveOccurred())
+			g.Expect(c.Delete(ctx, po)).NotTo(gomega.HaveOccurred())
 		}
-		g.Expect(c.Delete(context.TODO(), rs)).NotTo(gomega.HaveOccurred())
+		g.Expect(c.Delete(ctx, rs)).NotTo(gomega.HaveOccurred())
 	}()
 	podList := &corev1.PodList{}
-	g.Expect(c.List(context.TODO(), podList, &client.ListOptions{
+	g.Expect(c.List(ctx, podList, &client.ListOptions{
 		LabelSelector: labels.SelectorFromSet(rs.Spec.Selector.MatchLabels),
 	})).NotTo(gomega.HaveOccurred())
 
 	// LifeCycle 1. set all pod on Stage
 	for i := range podList.Items {
 		g.Expect(setPodOnStage(&podList.Items[i], PreTrafficOffStage)).NotTo(gomega.HaveOccurred())
+		if podList.Items[i].Name == "pod-test-1" || podList.Items[i].Name == "pod-test-2" {
+			g.Expect(setPodUnavailable(&podList.Items[i])).NotTo(gomega.HaveOccurred())
+		}
 	}
 	// Ruleset Processing rules
 	waitProcessFinished(request)
-	g.Expect(c.List(context.TODO(), podList, &client.ListOptions{
+	g.Expect(c.List(ctx, podList, &client.ListOptions{
 		LabelSelector: labels.SelectorFromSet(rs.Spec.Selector.MatchLabels),
 	})).NotTo(gomega.HaveOccurred())
 	// LifeCycle 2. 2 pod passed
@@ -105,12 +107,23 @@ func TestRuleset(t *testing.T) {
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 		if state.InStageAndPassed(PreTrafficOffStage) {
 			passedCount++
+			g.Expect(podList.Items[i].Name).NotTo(gomega.Equal("pod-test-3"))
+			g.Expect(podList.Items[i].Name).NotTo(gomega.Equal("pod-test-4"))
 		}
 		printJson(state)
 	}
+	waitProcessFinished(request)
 	// 50% passed
 	g.Expect(passedCount).Should(gomega.BeEquivalentTo(2))
-	<-time.After(5 * time.Second)
+
+	po := &corev1.Pod{}
+	g.Expect(c.Get(ctx, types.NamespacedName{Namespace: "default", Name: "pod-test-3"}, po)).NotTo(gomega.HaveOccurred())
+	g.Expect(setPodUnavailable(po)).NotTo(gomega.HaveOccurred())
+	waitProcessFinished(request)
+	g.Expect(c.Get(ctx, types.NamespacedName{Namespace: "default", Name: "pod-test-3"}, po)).NotTo(gomega.HaveOccurred())
+	state, _ := RuleSetManager().GetState(c, po)
+	g.Expect(state.InStageAndPassed(PreTrafficOffStage)).Should(gomega.BeTrue())
+	printJson(state)
 }
 
 const (
@@ -125,13 +138,13 @@ const (
 
 func initRulesetManager() {
 
-	register.UnAvailableFuncList = append(register.UnAvailableFuncList, func(pod *corev1.Pod) (bool, *int64) {
+	register.UnAvailableFuncList = []register.UnAvailableFunc{func(pod *corev1.Pod) (bool, *int64) {
 		if pod.GetLabels() == nil {
 			return false, nil
 		}
 		_, ok := pod.GetLabels()[UnavailableLabel]
 		return ok, nil
-	})
+	}}
 	RuleSetManager().RegisterStage(PreTrafficOffStage, func(po client.Object) bool {
 		if po.GetLabels() == nil {
 			return false
@@ -166,11 +179,21 @@ func waitProcessFinished(reqChan chan reconcile.Request) {
 
 func setPodOnStage(po *corev1.Pod, stage string) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		if err := c.Get(context.TODO(), types.NamespacedName{Namespace: po.Namespace, Name: po.Name}, po); err != nil {
+		if err := c.Get(ctx, types.NamespacedName{Namespace: po.Namespace, Name: po.Name}, po); err != nil {
 			return err
 		}
 		po.Labels[StageLabel] = stage
-		return c.Update(context.TODO(), po)
+		return c.Update(ctx, po)
+	})
+}
+
+func setPodUnavailable(po *corev1.Pod) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if err := c.Get(ctx, types.NamespacedName{Namespace: po.Namespace, Name: po.Name}, po); err != nil {
+			return err
+		}
+		po.Labels[UnavailableLabel] = "true"
+		return c.Update(ctx, po)
 	})
 }
 

@@ -49,6 +49,11 @@ type PodSkipRuleConditions struct {
 	SkipRules []string `json:"skipRules,omitempty"`
 }
 
+func MoveAllRuleSetInfo(po *corev1.Pod, rulesetName string) bool {
+	return MoveRulesetAnno(po, rulesetName) || MoveDetailAnno(po, rulesetName)
+}
+
+// MoveRulesetAnno move RuleSet name in annotation ruleset.kusionstack.io/rulesets
 func MoveRulesetAnno(po *corev1.Pod, rulesetName string) bool {
 
 	if po.Annotations == nil {
@@ -71,6 +76,18 @@ func MoveRulesetAnno(po *corev1.Pod, rulesetName string) bool {
 		}
 	}
 	return false
+}
+
+// MoveDetailAnno move RuleSet detail annotation ruleset.kusionstack.io/detail-${ruleSetName}
+func MoveDetailAnno(po *corev1.Pod, rulesetName string) bool {
+	if po.Annotations == nil {
+		return false
+	}
+	_, ok := po.Annotations[appsv1alpha1.AnnotationRuleSetDetailPrefix+rulesetName]
+	if ok {
+		delete(po.Annotations, appsv1alpha1.AnnotationRuleSetDetailPrefix+rulesetName)
+	}
+	return ok
 }
 
 type RuleSets []string
