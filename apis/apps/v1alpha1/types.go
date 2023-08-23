@@ -20,3 +20,7 @@ package v1alpha1
 type PodAvailableConditions struct {
 	ExpectedFinalizers []string `json:"expectedFinalizers,omitempty"` // indicate the expected finalizers of a pod
 }
+
+type PodAvailableExpectedFinalizers struct {
+	ExpectedFinalizers map[string]string `json:"expectedFinalizers,omitempty"`
+}

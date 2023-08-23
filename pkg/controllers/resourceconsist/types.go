@@ -48,6 +48,8 @@ type ReconcileAdapter interface {
 	GetControllerName() string
 	NotFollowPodOpsLifeCycle() bool
 
+	GetSelectedEmployeeNames(ctx context.Context, employer client.Object) ([]string, error)
+
 	// GetExpectEmployer and GetCurrentEmployer return expect/current status of employer from related backend provider
 	GetExpectEmployer(ctx context.Context, employer client.Object) ([]IEmployer, error)
 	GetCurrentEmployer(ctx context.Context, employer client.Object) ([]IEmployer, error)
@@ -58,9 +60,8 @@ type ReconcileAdapter interface {
 
 	RecordEmployer(succCreate, succUpdate, succDelete []IEmployer) error
 
-	// GetExpectEmployee return expect status of employees
+	// GetExpectEmployee and GetCurrentEmployee return expect/current status of employees from related backend provider
 	GetExpectEmployee(ctx context.Context, employer client.Object) ([]IEmployee, error)
-	// GetCurrentEmployee return current status of employees from related backend provider
 	GetCurrentEmployee(ctx context.Context, employer client.Object) ([]IEmployee, error)
 
 	CreateEmployees(employer client.Object, toCreate []IEmployee) ([]IEmployee, []IEmployee, error)
@@ -102,4 +103,9 @@ type PodEmployeeStatuses struct {
 	LifecycleReady bool   `json:"lifecycleReady,omitempty"`
 	// extra info related to backend provider
 	ExtraStatus interface{} `json:"extraStatus,omitempty"`
+}
+
+type PodExpectedFinalizerOps struct {
+	Name    string
+	Succeed bool
 }

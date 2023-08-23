@@ -17,6 +17,8 @@ limitations under the License.
 package resourceconsist
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"errors"
 	"net"
 	"strings"
@@ -84,4 +86,9 @@ func GetCommonPodEmployeeStatus(pod *corev1.Pod) (PodEmployeeStatuses, error) {
 		Ipv6:           getPodIpv6Address(pod),
 		LifecycleReady: isPodLifecycleReady(pod),
 	}, nil
+}
+
+func GenerateLifecycleFinalizer(employerName string) string {
+	b := md5.Sum([]byte(employerName))
+	return v1alpha1.PodOperationProtectionFinalizerPrefix + "/" + hex.EncodeToString(b[:])[8:24]
 }

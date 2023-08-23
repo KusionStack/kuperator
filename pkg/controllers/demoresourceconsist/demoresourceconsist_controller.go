@@ -45,6 +45,26 @@ func NewReconcileAdapter(c client.Client) *ReconcileAdapter {
 	}
 }
 
+func (r *ReconcileAdapter) GetSelectedEmployeeNames(ctx context.Context, employer client.Object) ([]string, error) {
+	svc, ok := employer.(*corev1.Service)
+	if !ok {
+		return nil, fmt.Errorf("expect employer kind is Service")
+	}
+	selector := labels.Set(svc.Spec.Selector).AsSelectorPreValidated()
+	var podList corev1.PodList
+	err := r.List(ctx, &podList, &client.ListOptions{Namespace: svc.Namespace, LabelSelector: selector})
+	if err != nil {
+		return nil, err
+	}
+
+	selected := make([]string, len(podList.Items))
+	for idx, pod := range podList.Items {
+		selected[idx] = pod.Name
+	}
+
+	return selected, nil
+}
+
 func (r *ReconcileAdapter) GetControllerName() string {
 	return "demo-controller"
 }

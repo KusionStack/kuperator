@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"kusionstack.io/kafed/pkg/log"
+	"kusionstack.io/kafed/pkg/utils/log"
 )
 
 // Add creates a new Controller of specified reconcileAdapter and adds it to the Manager with default RBAC.
@@ -145,7 +145,7 @@ func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (rec
 	requeue, err := r.ensureEmployerCleanFlz(ctx, employer)
 	if err != nil {
 		r.logger.Errorf("add employer clean finalizer failed: %s", err.Error())
-		r.recorder.Eventf(employer, v1.EventTypeNormal, "ensureEmployerCleanFlzFailed",
+		r.recorder.Eventf(employer, v1.EventTypeWarning, "ensureEmployerCleanFlzFailed",
 			"add employer clean finalizer failed: %s", err.Error())
 		return reconcile.Result{}, err
 	}
@@ -156,24 +156,32 @@ func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (rec
 		return reconcile.Result{Requeue: requeue}, nil
 	}
 
-	expectEmployerStatus, err := r.adapter.GetExpectEmployer(ctx, employer)
+	isExpectedClean, err := r.ensureExpectedFinalizer(ctx, employer)
+	if err != nil {
+		r.logger.Errorf("ensure employees expected finalizer failed: %s", err.Error())
+		r.recorder.Eventf(employer, v1.EventTypeWarning, "ensureExpectedFinalizerFailed",
+			"ensure employees expected finalizer failed: %s", err.Error())
+		return reconcile.Result{}, err
+	}
+
+	expectEmployer, err := r.adapter.GetExpectEmployer(ctx, employer)
 	if err != nil {
 		r.logger.Errorf("get expect employer failed: %s", err.Error())
-		r.recorder.Eventf(employer, v1.EventTypeNormal, "GetExpectEmployerStatusFailed",
+		r.recorder.Eventf(employer, v1.EventTypeWarning, "GetExpectEmployerFailed",
 			"get expect employer status failed: %s", err.Error())
 		return reconcile.Result{}, err
 	}
-	currentEmployerStatus, err := r.adapter.GetCurrentEmployer(ctx, employer)
+	currentEmployer, err := r.adapter.GetCurrentEmployer(ctx, employer)
 	if err != nil {
 		r.logger.Errorf("get current employer failed: %s", err.Error())
-		r.recorder.Eventf(employer, v1.EventTypeNormal, "GetCurrentEmployerStatusFailed",
+		r.recorder.Eventf(employer, v1.EventTypeWarning, "GetCurrentEmployerFailed",
 			"get current employer status failed: %s", err.Error())
 		return reconcile.Result{}, err
 	}
-	isCleanEmployer, err := r.syncEmployer(ctx, employer, expectEmployerStatus, currentEmployerStatus)
+	isCleanEmployer, err := r.syncEmployer(ctx, employer, expectEmployer, currentEmployer)
 	if err != nil {
 		r.logger.Errorf("sync employer status failed: %s", err.Error())
-		r.recorder.Eventf(employer, v1.EventTypeNormal, "syncEmployerFailed",
+		r.recorder.Eventf(employer, v1.EventTypeWarning, "syncEmployerFailed",
 			"sync employer status failed: %s", err.Error())
 		return reconcile.Result{}, err
 	}
@@ -181,30 +189,30 @@ func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (rec
 	expectEmployees, err := r.adapter.GetExpectEmployee(ctx, employer)
 	if err != nil {
 		r.logger.Errorf("get expect employees failed: %s", err.Error())
-		r.recorder.Eventf(employer, v1.EventTypeNormal, "GetExpectEmployeeStatusFailed",
+		r.recorder.Eventf(employer, v1.EventTypeWarning, "GetExpectEmployeeFailed",
 			"get expect employees status failed: %s", err.Error())
 		return reconcile.Result{}, err
 	}
 	currentEmployees, err := r.adapter.GetCurrentEmployee(ctx, employer)
 	if err != nil {
 		r.logger.Errorf("get current employees failed: %s", err.Error())
-		r.recorder.Eventf(employer, v1.EventTypeNormal, "GetCurrentEmployeeStatusFailed",
+		r.recorder.Eventf(employer, v1.EventTypeWarning, "GetCurrentEmployeeFailed",
 			"get current employees status failed: %s", err.Error())
 		return reconcile.Result{}, err
 	}
 	isCleanEmployee, err := r.syncEmployees(ctx, employer, expectEmployees, currentEmployees)
 	if err != nil {
 		r.logger.Errorf("sync employees status failed: %s", err.Error())
-		r.recorder.Eventf(employer, v1.EventTypeNormal, "syncEmployeesFailed",
+		r.recorder.Eventf(employer, v1.EventTypeWarning, "syncEmployeesFailed",
 			"sync employees status failed: %s", err.Error())
 		return reconcile.Result{}, err
 	}
 
-	if isCleanEmployer && isCleanEmployee && !employer.GetDeletionTimestamp().IsZero() {
+	if isCleanEmployer && isCleanEmployee && isExpectedClean && !employer.GetDeletionTimestamp().IsZero() {
 		err = r.cleanEmployerCleanFinalizer(ctx, employer)
 		if err != nil {
 			r.logger.Errorf("clean employer clean-finalizer failed: %s", err.Error())
-			r.recorder.Eventf(employer, v1.EventTypeNormal, "cleanEmployerCleanFinalizerFailed",
+			r.recorder.Eventf(employer, v1.EventTypeWarning, "cleanEmployerCleanFinalizerFailed",
 				"clean employer clean-finalizer failed: %s", err.Error())
 			return reconcile.Result{}, err
 		}

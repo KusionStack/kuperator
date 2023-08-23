@@ -50,6 +50,26 @@ func (r *ReconcileAdapter) GetExpectEmployer(ctx context.Context, employer clien
 	return nil, nil
 }
 
+func (r *ReconcileAdapter) GetSelectedEmployeeNames(ctx context.Context, employer client.Object) ([]string, error) {
+	svc, ok := employer.(*corev1.Service)
+	if !ok {
+		return nil, fmt.Errorf("expect employer kind is Service")
+	}
+	selector := labels.Set(svc.Spec.Selector).AsSelectorPreValidated()
+	var podList corev1.PodList
+	err := r.List(ctx, &podList, &client.ListOptions{Namespace: svc.Namespace, LabelSelector: selector})
+	if err != nil {
+		return nil, err
+	}
+
+	selected := make([]string, len(podList.Items))
+	for idx, pod := range podList.Items {
+		selected[idx] = pod.Name
+	}
+
+	return selected, nil
+}
+
 func (r *ReconcileAdapter) GetCurrentEmployer(ctx context.Context, employer client.Object) ([]resourceconsist.IEmployer, error) {
 	return nil, nil
 }

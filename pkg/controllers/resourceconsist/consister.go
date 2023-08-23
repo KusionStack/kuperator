@@ -18,12 +18,16 @@ package resourceconsist
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	errors2 "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"kusionstack.io/kafed/apis/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strings"
 
 	"kusionstack.io/kafed/pkg/controllers/utils"
 )
@@ -197,7 +201,7 @@ func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, exp
 		succCreate, failCreate, succDelete, failDelete, succUpdate, toCudEmployees.Unchanged)
 
 	ns := employer.GetNamespace()
-	lifecycleFlz := lifecycleFinalizerPrefix + employer.GetName()
+	lifecycleFlz := GenerateLifecycleFinalizer(employer.GetName())
 	err = r.ensureLifecycleFinalizer(ctx, ns, lifecycleFlz, toAddLifecycleFlzEmployees, toDeleteLifecycleFlzEmployees)
 	if err != nil {
 		return false, fmt.Errorf("ensureLifecycleFinalizer failed, err: %s", err.Error())
@@ -205,6 +209,215 @@ func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, exp
 
 	isClean := len(toCudEmployees.ToCreate) == 0 && len(toCudEmployees.ToUpdate) == 0 && len(toCudEmployees.Unchanged) == 0 && len(failDelete) == 0
 	return isClean, nil
+}
+
+// ensureExpectFinalizer add expected finalizer to employee's available condition anno
+func (r *Consist) ensureExpectedFinalizer(ctx context.Context, employer client.Object) (bool, error) {
+	// employee is not pod or not follow PodOpsLifecycle
+	watchOptions, watchOptionsImplemented := r.adapter.(ReconcileWatchOptions)
+	if (watchOptionsImplemented && !isPod(watchOptions.NewEmployee())) || r.adapter.NotFollowPodOpsLifeCycle() {
+		return true, nil
+	}
+
+	selectedEmployeeNames, err := r.adapter.GetSelectedEmployeeNames(ctx, employer)
+	if err != nil {
+		return false, fmt.Errorf("get selected employees' names failed, err: %s", err.Error())
+	}
+
+	addedExpectedFinalizerPodNames := strings.Split(employer.GetAnnotations()[annoExpectedFinalizerAdded], ",")
+
+	var toAdd, toDelete []PodExpectedFinalizerOps
+	if !employer.GetDeletionTimestamp().IsZero() {
+		toDeleteNames := sets.NewString(addedExpectedFinalizerPodNames...).Insert(selectedEmployeeNames...).List()
+		for _, podName := range toDeleteNames {
+			toDelete = append(toDelete, PodExpectedFinalizerOps{
+				Name:    podName,
+				Succeed: false,
+			})
+		}
+		_ = r.patchPodExpectedFinalizer(ctx, employer, toAdd, toDelete)
+		var notDeletedPodNames []string
+		for _, deleteExpectedFinalizerOps := range toDelete {
+			if !deleteExpectedFinalizerOps.Succeed {
+				notDeletedPodNames = append(notDeletedPodNames, deleteExpectedFinalizerOps.Name)
+			}
+		}
+		patch := client.MergeFrom(employer)
+		annos := employer.GetAnnotations()
+		annos[annoExpectedFinalizerAdded] = strings.Join(notDeletedPodNames, ",")
+		employer.SetAnnotations(annos)
+		return len(notDeletedPodNames) == 0, r.Patch(ctx, employer, patch)
+	}
+
+	selectedSet := sets.NewString(selectedEmployeeNames...)
+	for _, podName := range addedExpectedFinalizerPodNames {
+		if !selectedSet.Has(podName) {
+			toDelete = append(toDelete, PodExpectedFinalizerOps{
+				Name:    podName,
+				Succeed: false,
+			})
+		}
+	}
+
+	addedSet := sets.NewString(addedExpectedFinalizerPodNames...)
+	for _, podName := range selectedEmployeeNames {
+		if !addedSet.Has(podName) {
+			toAdd = append(toAdd, PodExpectedFinalizerOps{
+				Name:    podName,
+				Succeed: false,
+			})
+		}
+	}
+	var succDeletedNames []string
+	for _, deleteExpectFinalizerOps := range toDelete {
+		if deleteExpectFinalizerOps.Succeed {
+			succDeletedNames = append(succDeletedNames, deleteExpectFinalizerOps.Name)
+		}
+	}
+	succDeletedNamesSet := sets.NewString(succDeletedNames...)
+	var addedNames []string
+	for _, added := range addedExpectedFinalizerPodNames {
+		if !succDeletedNamesSet.Has(added) {
+			addedNames = append(addedNames, added)
+		}
+	}
+	for _, addExpectedFinalizerOps := range toAdd {
+		if addExpectedFinalizerOps.Succeed {
+			addedNames = append(addedNames, addExpectedFinalizerOps.Name)
+		}
+	}
+
+	patch := client.MergeFrom(employer)
+	annos := employer.GetAnnotations()
+	annos[annoExpectedFinalizerAdded] = strings.Join(addedNames, ",")
+	employer.SetAnnotations(annos)
+	return len(addedNames) == 0, r.Patch(ctx, employer, patch)
+}
+
+func (r *Consist) patchPodExpectedFinalizer(ctx context.Context, employer client.Object, toAdd, toDelete []PodExpectedFinalizerOps) error {
+	expectedFlzKey := fmt.Sprintf("%s/%s/%s", employer.GetObjectKind().GroupVersionKind().Kind,
+		employer.GetNamespace(), employer.GetName())
+	expectedFlz := GenerateLifecycleFinalizer(employer.GetName())
+
+	errAdd := r.patchAddPodExpectedFinalizer(ctx, employer, toAdd, expectedFlzKey, expectedFlz)
+	errDelete := r.patchDeletePodExpectedFinalizer(ctx, employer, toDelete, expectedFlzKey)
+
+	return errors2.NewAggregate([]error{errAdd, errDelete})
+}
+
+func (r *Consist) patchAddPodExpectedFinalizer(ctx context.Context, employer client.Object, toAdd []PodExpectedFinalizerOps,
+	expectedFlzKey, expectedFlz string) error {
+	_, err := utils.SlowStartBatch(len(toAdd), 1, false, func(i int, _ error) error {
+		podExpectedFinalizerOps := &toAdd[i]
+		var pod v1.Pod
+		err := r.Get(ctx, types.NamespacedName{
+			Namespace: employer.GetNamespace(),
+			Name:      podExpectedFinalizerOps.Name,
+		}, &pod)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+
+		if !pod.GetDeletionTimestamp().IsZero() {
+			return nil
+		}
+
+		patch := client.MergeFrom(pod.DeepCopy())
+
+		var availableExpectedFlzs v1alpha1.PodAvailableExpectedFinalizers
+		if pod.Annotations == nil {
+			pod.Annotations = make(map[string]string)
+		}
+		if pod.Annotations[v1alpha1.PodAvailableConditionsAnnotation] == "" {
+			availableExpectedFlzs.ExpectedFinalizers = map[string]string{expectedFlzKey: expectedFlz}
+			annoAvailableExpectedFlzs, errMarshal := json.Marshal(availableExpectedFlzs)
+			if errMarshal != nil {
+				return errMarshal
+			}
+			pod.Annotations[v1alpha1.PodAvailableConditionsAnnotation] = string(annoAvailableExpectedFlzs)
+			errPatch := r.Patch(ctx, &pod, patch)
+			if errPatch != nil {
+				return errPatch
+			}
+		} else {
+			errUnmarshal := json.Unmarshal([]byte(pod.Annotations[v1alpha1.PodAvailableConditionsAnnotation]), &availableExpectedFlzs)
+			if errUnmarshal != nil {
+				return errUnmarshal
+			}
+			if availableExpectedFlzs.ExpectedFinalizers[expectedFlzKey] != expectedFlz {
+				availableExpectedFlzs.ExpectedFinalizers[expectedFlzKey] = expectedFlz
+				annoAvailableExpectedFlzs, errMarshal := json.Marshal(availableExpectedFlzs)
+				if errMarshal != nil {
+					return errMarshal
+				}
+				pod.Annotations[v1alpha1.PodAvailableConditionsAnnotation] = string(annoAvailableExpectedFlzs)
+				errPatch := r.Patch(ctx, &pod, patch)
+				if errPatch != nil {
+					return errPatch
+				}
+			}
+		}
+		podExpectedFinalizerOps.Succeed = true
+		return nil
+	})
+
+	return err
+}
+
+func (r *Consist) patchDeletePodExpectedFinalizer(ctx context.Context, employer client.Object, toDelete []PodExpectedFinalizerOps,
+	expectedFlzKey string) error {
+	_, err := utils.SlowStartBatch(len(toDelete), 1, false, func(i int, _ error) error {
+		podExpectedFinalizerOps := &toDelete[i]
+		var pod v1.Pod
+		err := r.Get(ctx, types.NamespacedName{
+			Namespace: employer.GetNamespace(),
+			Name:      podExpectedFinalizerOps.Name,
+		}, &pod)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+
+		if !pod.GetDeletionTimestamp().IsZero() {
+			// no need to update, since no longer used
+			podExpectedFinalizerOps.Succeed = true
+			return nil
+		}
+
+		patch := client.MergeFrom(pod.DeepCopy())
+
+		var availableExpectedFlzs v1alpha1.PodAvailableExpectedFinalizers
+		if pod.Annotations == nil || pod.Annotations[v1alpha1.PodAvailableConditionsAnnotation] == "" {
+			podExpectedFinalizerOps.Succeed = true
+			return nil
+		}
+
+		errUnmarshal := json.Unmarshal([]byte(pod.Annotations[v1alpha1.PodAvailableConditionsAnnotation]), &availableExpectedFlzs)
+		if errUnmarshal != nil {
+			return errUnmarshal
+		}
+		if _, exist := availableExpectedFlzs.ExpectedFinalizers[expectedFlzKey]; exist {
+			delete(availableExpectedFlzs.ExpectedFinalizers, expectedFlzKey)
+			annoAvailableExpectedFlzs, errMarshal := json.Marshal(availableExpectedFlzs)
+			if errMarshal != nil {
+				return errMarshal
+			}
+			pod.Annotations[v1alpha1.PodAvailableConditionsAnnotation] = string(annoAvailableExpectedFlzs)
+			errPatch := r.Patch(ctx, &pod, patch)
+			if errPatch != nil {
+				return errPatch
+			}
+		}
+		podExpectedFinalizerOps.Succeed = true
+		return nil
+	})
+
+	return err
 }
 
 func (r *Consist) cleanEmployerCleanFinalizer(ctx context.Context, employer client.Object) error {

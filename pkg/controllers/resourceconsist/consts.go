@@ -20,7 +20,7 @@ const (
 	defaultMaxConcurrentReconciles = 5
 
 	annoControlledByResourceConsist = "resource-consist.kusionstack.io/control"
+	annoExpectedFinalizerAdded      = "resource-consist.kusionstack.io/employees-expected-finalizer-added"
 
-	cleanFinalizerPrefix     = "kafed.kusionstack.io/clean-"                    // todo, to be replaced by api
-	lifecycleFinalizerPrefix = "prot.lifecycle.kafed.kusionstack.io/lifecycle-" // todo, to be replaced by api
+	cleanFinalizerPrefix = "resource-consist.kusionstack.io/clean-"
 )
