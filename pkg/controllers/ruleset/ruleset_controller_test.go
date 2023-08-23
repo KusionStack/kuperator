@@ -90,10 +90,12 @@ func TestRuleset(t *testing.T) {
 
 	// LifeCycle 1. set all pod on Stage
 	for i := range podList.Items {
-		g.Expect(setPodOnStage(&podList.Items[i], PreTrafficOffStage)).NotTo(gomega.HaveOccurred())
 		if podList.Items[i].Name == "pod-test-1" || podList.Items[i].Name == "pod-test-2" {
 			g.Expect(setPodUnavailable(&podList.Items[i])).NotTo(gomega.HaveOccurred())
 		}
+	}
+	for i := range podList.Items {
+		g.Expect(setPodOnStage(&podList.Items[i], PreTrafficOffStage)).NotTo(gomega.HaveOccurred())
 	}
 	// Ruleset Processing rules
 	waitProcessFinished(request)
@@ -105,12 +107,13 @@ func TestRuleset(t *testing.T) {
 	for i := range podList.Items {
 		state, err := RuleSetManager().GetState(c, &podList.Items[i])
 		g.Expect(err).NotTo(gomega.HaveOccurred())
+		printJson(state)
+		printJson(podList.Items[i])
 		if state.InStageAndPassed(PreTrafficOffStage) {
 			passedCount++
 			g.Expect(podList.Items[i].Name).NotTo(gomega.Equal("pod-test-3"))
 			g.Expect(podList.Items[i].Name).NotTo(gomega.Equal("pod-test-4"))
 		}
-		printJson(state)
 	}
 	waitProcessFinished(request)
 	// 50% passed
