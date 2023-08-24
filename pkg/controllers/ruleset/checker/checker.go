@@ -44,7 +44,9 @@ type checker struct {
 // GetState get item current check state from all related ruleSets
 func (c *checker) GetState(cl client.Client, item client.Object) (CheckState, error) {
 
-	result := CheckState{}
+	result := CheckState{
+		Stage: c.policy.Stage(item),
+	}
 	ruleSetList := &appsv1alpha1.RuleSetList{}
 	if err := cl.List(context.TODO(), ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(rulesetutils.FieldIndexRuleSet, item.GetName())}); err != nil {
 		return result, err
@@ -83,22 +85,23 @@ func (c *checker) GetState(cl client.Client, item client.Object) (CheckState, er
 }
 
 type CheckState struct {
+	Stage   string
 	States  []State
 	Message string
 }
 
-func (cs *CheckState) InStage(stage string) bool {
+func (cs *CheckState) InStage() bool {
 	for _, state := range cs.States {
-		if state.Detail.Stage != stage {
+		if state.Detail.Stage != cs.Stage {
 			return false
 		}
 	}
 	return true
 }
 
-func (cs *CheckState) InStageAndPassed(stage string) bool {
+func (cs *CheckState) InStageAndPassed() bool {
 	for _, state := range cs.States {
-		if state.Detail.Stage != stage || !state.Detail.Passed {
+		if state.Detail.Stage != cs.Stage || !state.Detail.Passed {
 			return false
 		}
 	}
