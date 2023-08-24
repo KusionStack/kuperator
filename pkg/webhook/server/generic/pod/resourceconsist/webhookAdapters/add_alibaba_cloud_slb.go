@@ -17,6 +17,10 @@ limitations under the License.
 package webhookAdapters
 
 import (
+	"context"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -29,7 +33,24 @@ var _ WebhookAdapter = &SlbWebhookAdapter{}
 type SlbWebhookAdapter struct {
 }
 
-func (r *SlbWebhookAdapter) GetEmployersByEmployee(employee client.Object, client client.Client) ([]client.Object, error) {
-	//TODO implement me
-	panic("implement me")
+func (r *SlbWebhookAdapter) GetEmployersByEmployee(ctx context.Context, employee client.Object, c client.Client) ([]client.Object, error) {
+	var employers []client.Object
+	var err error
+
+	serviceList := &corev1.ServiceList{}
+	err = c.List(ctx, serviceList, client.InNamespace(employee.GetNamespace()))
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return employers, nil
+		}
+		return employers, err
+	}
+
+	for _, service := range serviceList.Items {
+		if labels.SelectorFromSet(service.Spec.Selector).Matches(labels.Set(employee.GetLabels())) {
+			employers = append(employers, service.DeepCopy())
+		}
+	}
+
+	return employers, nil
 }

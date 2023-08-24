@@ -16,11 +16,15 @@ limitations under the License.
 
 package webhookAdapters
 
-import "sigs.k8s.io/controller-runtime/pkg/client"
+import (
+	"context"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
 
 var WebhookAdapters []WebhookAdapter
 
 // WebhookAdapter should be implemented by adapters which follow PodOpsLifecycle
 type WebhookAdapter interface {
-	GetEmployersByEmployee(employee client.Object, client client.Client) ([]client.Object, error)
+	GetEmployersByEmployee(ctx context.Context, employee client.Object, client client.Client) ([]client.Object, error)
 }

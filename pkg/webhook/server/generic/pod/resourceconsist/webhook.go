@@ -54,13 +54,9 @@ func (r *PodResourceConsistWebhook) Mutating(ctx context.Context, c client.Clien
 		return nil
 	}
 
-	employers, err := r.WebhookAdapter.GetEmployersByEmployee(newPod, c)
+	employers, err := r.WebhookAdapter.GetEmployersByEmployee(ctx, newPod, c)
 	if err != nil {
 		return err
-	}
-
-	if employers == nil || len(employers) == 0 {
-		return nil
 	}
 
 	availableExpectedFlzs := v1alpha1.PodAvailableConditions{
