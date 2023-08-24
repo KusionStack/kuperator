@@ -24,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 
 	"kusionstack.io/kafed/apis/apps/v1alpha1"
 	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
@@ -82,6 +83,25 @@ func (lc *OpsLifecycle) addLabelWithTime(pod *corev1.Pod, key string) {
 		pod.Labels = make(map[string]string)
 	}
 	pod.Labels[key] = lc.timeLabelValue()
+}
+
+func (lc *OpsLifecycle) podServiceAvailableLabel(pod *corev1.Pod) error {
+	if _, ok := pod.Labels[v1alpha1.PodServiceAvailableLabel]; ok {
+		return nil
+	}
+
+	satisfied, expectedFinalizer, err := lc.satisfyExpectedFinalizers(pod) // whether all expected finalizers are satisfied
+	if err != nil || !satisfied {
+		klog.Infof("pod: %s/%s, expected finalizers: %v, err: %v", pod.Namespace, pod.Name, expectedFinalizer, err)
+		return err
+	}
+
+	if !lc.isPodReady(pod) {
+		return nil
+	}
+
+	lc.addLabelWithTime(pod, v1alpha1.PodServiceAvailableLabel)
+	return nil
 }
 
 func addReadinessGates(pod *corev1.Pod, conditionType corev1.PodConditionType) {
