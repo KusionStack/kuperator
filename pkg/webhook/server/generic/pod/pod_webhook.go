@@ -25,7 +25,6 @@ import (
 
 	"kusionstack.io/kafed/pkg/webhook/server/generic/pod/opslifecycle"
 	"kusionstack.io/kafed/pkg/webhook/server/generic/pod/resourceconsist"
-	"kusionstack.io/kafed/pkg/webhook/server/generic/pod/ruleset"
 )
 
 var (
@@ -40,7 +39,6 @@ type AdmissionWebhook interface {
 
 func init() {
 	webhooks = append(webhooks, opslifecycle.New())
-	webhooks = append(webhooks, ruleset.New())
 	for _, podResourceConsistWebhook := range resourceconsist.PodResourceConsistWebhooks {
 		webhooks = append(webhooks, podResourceConsistWebhook)
 	}

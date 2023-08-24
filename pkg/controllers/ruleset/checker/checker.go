@@ -20,13 +20,12 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/fields"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
 	"kusionstack.io/kafed/pkg/controllers/ruleset/register"
-	"kusionstack.io/kafed/pkg/controllers/ruleset/utils"
+	rulesetutils "kusionstack.io/kafed/pkg/controllers/ruleset/utils"
 )
 
 type Check interface {
@@ -43,18 +42,15 @@ type checker struct {
 }
 
 // GetState get item current check state from all related ruleSets
-func (c *checker) GetState(client client.Client, item client.Object) (CheckState, error) {
+func (c *checker) GetState(cl client.Client, item client.Object) (CheckState, error) {
 
 	result := CheckState{}
-	rulesetNames := utils.GetRuleSets(item)
-	for _, name := range rulesetNames {
-		rs := &appsv1alpha1.RuleSet{}
-		if err := client.Get(context.TODO(), types.NamespacedName{Namespace: item.GetNamespace(), Name: name}, rs); err != nil {
-			if errors.IsNotFound(err) {
-				continue
-			}
-			return result, err
-		}
+	ruleSetList := &appsv1alpha1.RuleSetList{}
+	if err := cl.List(context.TODO(), ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(rulesetutils.FieldIndexRuleSet, item.GetName())}); err != nil {
+		return result, err
+	}
+	for i := range ruleSetList.Items {
+		rs := &ruleSetList.Items[i]
 		findStatus := false
 		for i, detail := range rs.Status.Details {
 			if detail.Name != item.GetName() {
@@ -62,16 +58,16 @@ func (c *checker) GetState(client client.Client, item client.Object) (CheckState
 			}
 			findStatus = true
 			if !detail.Passed {
-				result.Message += CollectInfo(name, rs.Status.Details[i])
+				result.Message += CollectInfo(rs.Name, rs.Status.Details[i])
 			}
 			result.States = append(result.States, State{
-				RuleSetName: name,
+				RuleSetName: rs.Name,
 				Detail:      rs.Status.Details[i],
 			})
 		}
 		if !findStatus {
 			result.States = append(result.States, State{
-				RuleSetName: name,
+				RuleSetName: rs.Name,
 				Detail: &appsv1alpha1.Detail{
 					Passed: false,
 				},

@@ -72,13 +72,6 @@ func AddToMgr(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
-
-	sourceChannel := ruleset.RegisterListenChan(context.Background())
-	err = c.Watch(sourceChannel, &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 

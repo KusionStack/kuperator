@@ -61,6 +61,7 @@ func TestMain(m *testing.M) {
 		Host: "127.0.0.1:10001",
 	}
 	initRulesetManager()
+
 	config, err := env.Start()
 	if err != nil {
 		panic(err)

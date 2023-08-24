@@ -17,17 +17,10 @@ limitations under the License.
 package ruleset
 
 import (
-	"context"
-
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"kusionstack.io/kafed/pkg/controllers/ruleset/checker"
 	"kusionstack.io/kafed/pkg/controllers/ruleset/register"
@@ -52,33 +45,6 @@ func RuleSetManager() ManagerInterface {
 	return defaultManager
 }
 
-func RegisterListenChan(ctx context.Context) *source.Channel {
-	ch := make(chan event.GenericEvent, 32)
-	go func() {
-		q := loadPodEventQueue()
-		for {
-			select {
-			case <-ctx.Done():
-				q.ShutDown()
-				break
-			default:
-				item, shutdown := q.Get()
-				if shutdown {
-					break
-				}
-				tp, ok := item.(types.NamespacedName)
-				if !ok {
-					q.Done(item)
-					continue
-				}
-				ch <- event.GenericEvent{Object: &metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Namespace: tp.Namespace, Name: tp.Name}}}
-				q.Done(item)
-			}
-		}
-	}()
-	return &source.Channel{Source: ch}
-}
-
 func AddUnAvailableFunc(f func(pod *corev1.Pod) (bool, *int64)) {
 	register.UnAvailableFuncList = append(register.UnAvailableFuncList, f)
 }
@@ -88,12 +54,6 @@ func newRulesetManager() ManagerInterface {
 		register: register.DefaultRegister(),
 		checker:  checker.NewCheck(),
 	}
-}
-
-func loadPodEventQueue() workqueue.DelayingInterface {
-	podEventQueue := workqueue.NewDelayingQueue()
-	podEventQueues = append(podEventQueues, podEventQueue)
-	return podEventQueue
 }
 
 type rsManager struct {
