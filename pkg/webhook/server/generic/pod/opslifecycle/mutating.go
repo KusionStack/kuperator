@@ -46,6 +46,10 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 	}
 	numOfIDs := len(newIDToLabelsMap)
 
+	if numOfIDs == 0 {
+		return lc.podServiceAvailableLabel(newPod)
+	}
+
 	var operatingCount, operateCount, operatedCount, completeCount int
 	var undoTypeToNumsMap = map[string]int{}
 	for id, labels := range newIDToLabelsMap {
@@ -122,13 +126,9 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 	}
 
 	if completeCount == numOfIDs { // all operations are completed
-		satisfied, expectedFinalizer, err := lc.satisfyExpectedFinalizers(newPod) // whether all expected finalizers are satisfied
-		if err != nil || !satisfied {
-			klog.Infof("pod: %s/%s, expected finalizers: %v, err: %v", newPod.Namespace, newPod.Name, expectedFinalizer, err)
+		err := lc.podServiceAvailableLabel(newPod)
+		if err != nil {
 			return err
-		}
-		if !lc.isPodReady(newPod) {
-			return nil
 		}
 
 		// all operations are done and all expected finalizers are satisfied, then remove all unuseful labels, and add service available label
@@ -143,8 +143,6 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 				delete(newPod.Labels, fmt.Sprintf("%s/%s", v, id))
 			}
 		}
-		lc.addLabelWithTime(newPod, v1alpha1.PodServiceAvailableLabel)
-
 		return nil
 	}
 
