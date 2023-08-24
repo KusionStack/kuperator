@@ -251,10 +251,6 @@ type RejectInfo struct {
 	Reason   string `json:"reason,omitempty"`
 }
 
-const (
-	FieldIndexRuleSet = "rulesetIndex"
-)
-
 // +genclient
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true

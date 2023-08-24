@@ -75,7 +75,7 @@ func addToMgr(mgr manager.Manager, r reconcile.Reconciler) (controller.Controlle
 	if err != nil {
 		return nil, err
 	}
-	err = mgr.GetCache().IndexField(context.TODO(), &appsv1alpha1.RuleSet{}, appsv1alpha1.FieldIndexRuleSet, func(obj client.Object) []string {
+	err = mgr.GetCache().IndexField(context.TODO(), &appsv1alpha1.RuleSet{}, rulesetutils.FieldIndexRuleSet, func(obj client.Object) []string {
 		rs, ok := obj.(*appsv1alpha1.RuleSet)
 		if !ok {
 			return nil

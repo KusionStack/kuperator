@@ -35,6 +35,7 @@ import (
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
 	"kusionstack.io/kafed/pkg/controllers/ruleset/register"
+	rulesetutils "kusionstack.io/kafed/pkg/controllers/ruleset/utils"
 )
 
 func TestRuleSet(t *testing.T) {
@@ -132,20 +133,20 @@ func TestRuleSet(t *testing.T) {
 	printJson(state)
 
 	ruleSetList := &appsv1alpha1.RuleSetList{}
-	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(appsv1alpha1.FieldIndexRuleSet, "pod-test-1")})).NotTo(gomega.HaveOccurred())
+	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(rulesetutils.FieldIndexRuleSet, "pod-test-1")})).NotTo(gomega.HaveOccurred())
 	g.Expect(len(ruleSetList.Items)).Should(gomega.BeEquivalentTo(1))
-	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(appsv1alpha1.FieldIndexRuleSet, "pod-test-2")})).NotTo(gomega.HaveOccurred())
+	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(rulesetutils.FieldIndexRuleSet, "pod-test-2")})).NotTo(gomega.HaveOccurred())
 	g.Expect(len(ruleSetList.Items)).Should(gomega.BeEquivalentTo(1))
-	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(appsv1alpha1.FieldIndexRuleSet, "pod-test-3")})).NotTo(gomega.HaveOccurred())
+	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(rulesetutils.FieldIndexRuleSet, "pod-test-3")})).NotTo(gomega.HaveOccurred())
 	g.Expect(len(ruleSetList.Items)).Should(gomega.BeEquivalentTo(1))
-	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(appsv1alpha1.FieldIndexRuleSet, "pod-test-4")})).NotTo(gomega.HaveOccurred())
+	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(rulesetutils.FieldIndexRuleSet, "pod-test-4")})).NotTo(gomega.HaveOccurred())
 	g.Expect(len(ruleSetList.Items)).Should(gomega.BeEquivalentTo(1))
 	g.Expect(c.Get(ctx, types.NamespacedName{Namespace: "default", Name: "pod-test-1"}, po)).NotTo(gomega.HaveOccurred())
 	g.Expect(c.Delete(ctx, po)).NotTo(gomega.HaveOccurred())
 	waitProcessFinished(request)
 	g.Expect(c.Get(ctx, types.NamespacedName{Namespace: "default", Name: "ruleset-default"}, rs)).NotTo(gomega.HaveOccurred())
 	printJson(rs)
-	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(appsv1alpha1.FieldIndexRuleSet, "pod-test-1")})).NotTo(gomega.HaveOccurred())
+	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(rulesetutils.FieldIndexRuleSet, "pod-test-1")})).NotTo(gomega.HaveOccurred())
 	g.Expect(len(ruleSetList.Items)).Should(gomega.BeEquivalentTo(0))
 }
 
