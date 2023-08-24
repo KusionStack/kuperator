@@ -20,6 +20,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 
@@ -86,6 +87,11 @@ func GetCommonPodEmployeeStatus(pod *corev1.Pod) (PodEmployeeStatuses, error) {
 		Ipv6:           getPodIpv6Address(pod),
 		LifecycleReady: isPodLifecycleReady(pod),
 	}, nil
+}
+
+func GenerateLifecycleFinalizerKey(employer client.Object) string {
+	return fmt.Sprintf("%s/%s/%s", employer.GetObjectKind().GroupVersionKind().Kind,
+		employer.GetNamespace(), employer.GetName())
 }
 
 func GenerateLifecycleFinalizer(employerName string) string {

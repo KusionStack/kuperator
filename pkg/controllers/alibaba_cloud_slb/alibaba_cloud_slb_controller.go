@@ -19,11 +19,12 @@ package alibaba_cloud_slb
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/labels"
 
 	corev1 "k8s.io/api/core/v1"
-	"kusionstack.io/kafed/pkg/controllers/resourceconsist"
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"kusionstack.io/kafed/pkg/controllers/resourceconsist"
 )
 
 var _ resourceconsist.ReconcileAdapter = &ReconcileAdapter{}

@@ -297,8 +297,7 @@ func (r *Consist) ensureExpectedFinalizer(ctx context.Context, employer client.O
 }
 
 func (r *Consist) patchPodExpectedFinalizer(ctx context.Context, employer client.Object, toAdd, toDelete []PodExpectedFinalizerOps) error {
-	expectedFlzKey := fmt.Sprintf("%s/%s/%s", employer.GetObjectKind().GroupVersionKind().Kind,
-		employer.GetNamespace(), employer.GetName())
+	expectedFlzKey := GenerateLifecycleFinalizerKey(employer)
 	expectedFlz := GenerateLifecycleFinalizer(employer.GetName())
 
 	errAdd := r.patchAddPodExpectedFinalizer(ctx, employer, toAdd, expectedFlzKey, expectedFlz)
@@ -329,7 +328,7 @@ func (r *Consist) patchAddPodExpectedFinalizer(ctx context.Context, employer cli
 
 		patch := client.MergeFrom(pod.DeepCopy())
 
-		var availableExpectedFlzs v1alpha1.PodAvailableExpectedFinalizers
+		var availableExpectedFlzs v1alpha1.PodAvailableConditions
 		if pod.Annotations == nil {
 			pod.Annotations = make(map[string]string)
 		}
@@ -393,7 +392,7 @@ func (r *Consist) patchDeletePodExpectedFinalizer(ctx context.Context, employer 
 
 		patch := client.MergeFrom(pod.DeepCopy())
 
-		var availableExpectedFlzs v1alpha1.PodAvailableExpectedFinalizers
+		var availableExpectedFlzs v1alpha1.PodAvailableConditions
 		if pod.Annotations == nil || pod.Annotations[v1alpha1.PodAvailableConditionsAnnotation] == "" {
 			podExpectedFinalizerOps.Succeed = true
 			return nil

@@ -14,9 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package webhookAdapters
 
-// +kubebuilder:object:generate=false
-type PodAvailableConditions struct {
-	ExpectedFinalizers map[string]string `json:"expectedFinalizers,omitempty"` // indicate the expected finalizers of a pod
+import (
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+func init() {
+	WebhookAdapters = append(WebhookAdapters, &SlbWebhookAdapter{})
+}
+
+var _ WebhookAdapter = &SlbWebhookAdapter{}
+
+type SlbWebhookAdapter struct {
+}
+
+func (r *SlbWebhookAdapter) GetEmployersByEmployee(employee client.Object, client client.Client) ([]client.Object, error) {
+	//TODO implement me
+	panic("implement me")
 }
