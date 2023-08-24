@@ -34,9 +34,6 @@ type ManagerInterface interface {
 	// Checker is used to check rule state after starting controller
 	checker.Checker
 
-	// Policy is stages and conditions policy registered by Register
-	register.Policy
-
 	// SetupRuleSetController add a new RuleSetController to manager
 	SetupRuleSetController(manager.Manager) error
 }
@@ -54,14 +51,12 @@ func AddUnAvailableFunc(f func(pod *corev1.Pod) (bool, *int64)) {
 func newRulesetManager() ManagerInterface {
 	return &rsManager{
 		Register: register.DefaultRegister(),
-		Policy:   register.DefaultPolicy(),
 		Checker:  checker.NewCheck(),
 	}
 }
 
 type rsManager struct {
 	register.Register
-	register.Policy
 	checker.Checker
 	controller controller.Controller
 }

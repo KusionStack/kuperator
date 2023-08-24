@@ -123,17 +123,17 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 	}
 
 	var labels map[string]string
-	stage := r.ruleSetManager.Stage(pod)
-	if state.InStageAndPassed(stage) {
-		switch stage {
-		case v1alpha1.PodOpsLifecyclePreCheckStage:
-			labels, err = r.preCheckStage(pod)
-		case v1alpha1.PodOpsLifecyclePostCheckStage:
-			labels, err = r.postCheckStage(pod)
+
+	if state.InStageAndPassed() {
+		switch state.Stage {
+		case v1alpha1.PodOpsLifecyclePreTrafficOffStage:
+			labels, err = r.preTrafficOffStage(pod)
+		case v1alpha1.PodOpsLifecyclePreTrafficOnStage:
+			labels, err = r.preTrafficOnStage(pod)
 		}
 	}
 
-	klog.Infof("pod %s in stage %q, labels: %v, error: %v", key, stage, labels, err)
+	klog.Infof("pod %s in stage %q, labels: %v, error: %v", key, state.Stage, labels, err)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -248,7 +248,7 @@ func (r *ReconcilePodOpsLifecycle) setServiceReadiness(pod *corev1.Pod, isReady 
 	return true, fmt.Sprintf("update service readiness gate to: %s", string(status))
 }
 
-func (r *ReconcilePodOpsLifecycle) preCheckStage(pod *corev1.Pod) (labels map[string]string, err error) {
+func (r *ReconcilePodOpsLifecycle) preTrafficOffStage(pod *corev1.Pod) (labels map[string]string, err error) {
 	idToLabelsMap, _, err := PodIDAndTypesMap(pod)
 	if err != nil {
 		return nil, err
@@ -276,7 +276,7 @@ func (r *ReconcilePodOpsLifecycle) preCheckStage(pod *corev1.Pod) (labels map[st
 	return
 }
 
-func (r *ReconcilePodOpsLifecycle) postCheckStage(pod *corev1.Pod) (labels map[string]string, err error) {
+func (r *ReconcilePodOpsLifecycle) preTrafficOnStage(pod *corev1.Pod) (labels map[string]string, err error) {
 	idToLabelsMap, _, err := PodIDAndTypesMap(pod)
 	if err != nil {
 		return nil, err
@@ -308,11 +308,11 @@ func (r *ReconcilePodOpsLifecycle) addLabels(ctx context.Context, pod *corev1.Po
 }
 
 func (r *ReconcilePodOpsLifecycle) initRuleSetManager() {
-	r.ruleSetManager.RegisterStage(v1alpha1.PodOpsLifecyclePreCheckStage, func(po client.Object) bool {
+	r.ruleSetManager.RegisterStage(v1alpha1.PodOpsLifecyclePreTrafficOffStage, func(po client.Object) bool {
 		labels := po.GetLabels()
 		return labels != nil && labelHasPrefix(labels, v1alpha1.PodPreCheckLabelPrefix)
 	})
-	r.ruleSetManager.RegisterStage(v1alpha1.PodOpsLifecyclePostCheckStage, func(po client.Object) bool {
+	r.ruleSetManager.RegisterStage(v1alpha1.PodOpsLifecyclePreTrafficOnStage, func(po client.Object) bool {
 		labels := po.GetLabels()
 		return labels != nil && labelHasPrefix(labels, v1alpha1.PodPostCheckLabelPrefix)
 	})
