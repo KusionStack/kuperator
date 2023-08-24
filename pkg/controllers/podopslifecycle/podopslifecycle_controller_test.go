@@ -162,13 +162,13 @@ var _ = Describe("podopslifecycle controller", func() {
 				States: []checker.State{
 					{
 						Detail: &v1alpha1.Detail{
-							Stage:  v1alpha1.PodOpsLifecyclePreCheckStage,
+							Stage:  v1alpha1.PodOpsLifecyclePreTrafficOffStage,
 							Passed: true,
 						},
 					},
 				},
 			},
-			stage:   v1alpha1.PodOpsLifecyclePreCheckStage,
+			stage:   v1alpha1.PodOpsLifecyclePreTrafficOffStage,
 			inStage: true,
 		}
 
