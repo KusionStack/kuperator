@@ -91,7 +91,7 @@ func addToMgr(mgr manager.Manager, r reconcile.Reconciler) (controller.Controlle
 		return c, err
 	}
 
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &EventHandler{Client: mgr.GetClient()})
+	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &EventHandler{client: mgr.GetClient()})
 	if err != nil {
 		return c, err
 	}
