@@ -25,5 +25,5 @@ const (
 // RuleSet Annotation
 const (
 	AnnotationPodSkipRuleConditions = "ruleset.kusionstack.io/skip-rule-conditions"
-	AnnotationRuleSetDetailPrefix   = "detail.ruleset.kusionstack.io/"
+	AnnotationRuleSetDetailPrefix   = "detail.ruleset.kusionstack.io"
 )

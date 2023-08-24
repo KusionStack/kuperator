@@ -25,6 +25,7 @@ import (
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -36,7 +37,7 @@ import (
 	"kusionstack.io/kafed/pkg/controllers/ruleset/register"
 )
 
-func TestRuleset(t *testing.T) {
+func TestRuleSet(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 	defer Stop()
 	<-time.After(1 * time.Second)
@@ -77,13 +78,15 @@ func TestRuleset(t *testing.T) {
 	}
 	g.Expect(c.Create(ctx, rs)).NotTo(gomega.HaveOccurred())
 	waitProcessFinished(request)
+	podList := &corev1.PodList{}
 	defer func() {
-		for _, po := range pods {
-			g.Expect(c.Delete(ctx, po)).NotTo(gomega.HaveOccurred())
+		c.List(ctx, podList, client.InNamespace("default"))
+		for _, po := range podList.Items {
+			g.Expect(c.Delete(ctx, &po)).NotTo(gomega.HaveOccurred())
 		}
 		g.Expect(c.Delete(ctx, rs)).NotTo(gomega.HaveOccurred())
 	}()
-	podList := &corev1.PodList{}
+
 	g.Expect(c.List(ctx, podList, &client.ListOptions{
 		LabelSelector: labels.SelectorFromSet(rs.Spec.Selector.MatchLabels),
 	})).NotTo(gomega.HaveOccurred())
@@ -127,6 +130,23 @@ func TestRuleset(t *testing.T) {
 	state, _ := RuleSetManager().GetState(c, po)
 	g.Expect(state.InStageAndPassed(PreTrafficOffStage)).Should(gomega.BeTrue())
 	printJson(state)
+
+	ruleSetList := &appsv1alpha1.RuleSetList{}
+	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(appsv1alpha1.FieldIndexRuleSet, "pod-test-1")})).NotTo(gomega.HaveOccurred())
+	g.Expect(len(ruleSetList.Items)).Should(gomega.BeEquivalentTo(1))
+	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(appsv1alpha1.FieldIndexRuleSet, "pod-test-2")})).NotTo(gomega.HaveOccurred())
+	g.Expect(len(ruleSetList.Items)).Should(gomega.BeEquivalentTo(1))
+	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(appsv1alpha1.FieldIndexRuleSet, "pod-test-3")})).NotTo(gomega.HaveOccurred())
+	g.Expect(len(ruleSetList.Items)).Should(gomega.BeEquivalentTo(1))
+	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(appsv1alpha1.FieldIndexRuleSet, "pod-test-4")})).NotTo(gomega.HaveOccurred())
+	g.Expect(len(ruleSetList.Items)).Should(gomega.BeEquivalentTo(1))
+	g.Expect(c.Get(ctx, types.NamespacedName{Namespace: "default", Name: "pod-test-1"}, po)).NotTo(gomega.HaveOccurred())
+	g.Expect(c.Delete(ctx, po)).NotTo(gomega.HaveOccurred())
+	waitProcessFinished(request)
+	g.Expect(c.Get(ctx, types.NamespacedName{Namespace: "default", Name: "ruleset-default"}, rs)).NotTo(gomega.HaveOccurred())
+	printJson(rs)
+	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(appsv1alpha1.FieldIndexRuleSet, "pod-test-1")})).NotTo(gomega.HaveOccurred())
+	g.Expect(len(ruleSetList.Items)).Should(gomega.BeEquivalentTo(0))
 }
 
 const (

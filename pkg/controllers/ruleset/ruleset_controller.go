@@ -91,7 +91,7 @@ func addToMgr(mgr manager.Manager, r reconcile.Reconciler) (controller.Controlle
 		return c, err
 	}
 
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &EventHandler{client: mgr.GetClient()})
+	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &EventHandler{Client: mgr.GetClient()})
 	if err != nil {
 		return c, err
 	}
@@ -125,7 +125,6 @@ func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Req
 
 	if !rulesetutils.RulesetVersionExpectation.SatisfiedExpectations(controllerutils.ObjectKey(ruleSet), ruleSet.ResourceVersion) {
 		r.Info(fmt.Sprintf("expected ruleset %s update, resource version %s, retry later", controllerutils.ObjectKey(ruleSet), ruleSet.ResourceVersion))
-		fmt.Printf("expected ruleset %s update, resource version %s, retry later", controllerutils.ObjectKey(ruleSet), ruleSet.ResourceVersion)
 		return reconcile.Result{}, nil
 	}
 
@@ -239,7 +238,7 @@ func (r *RuleSetReconciler) syncPodsDetail(ctx context.Context, ruleSetName stri
 }
 
 func (r *RuleSetReconciler) updatePodDetail(ctx context.Context, pod *corev1.Pod, ruleSetName string, detail *appsv1alpha1.Detail) error {
-	detailAnno := appsv1alpha1.AnnotationRuleSetDetailPrefix + ruleSetName
+	detailAnno := appsv1alpha1.AnnotationRuleSetDetailPrefix + "/" + ruleSetName
 	var newDetail string
 	if detail != nil {
 		newDetail = utils.DumpJSON(&appsv1alpha1.Detail{Stage: detail.Stage, Passed: detail.Passed})
@@ -299,6 +298,9 @@ func (r *RuleSetReconciler) updateRuleSetOnPod(ctx context.Context, ruleSet, nam
 	pod := &corev1.Pod{}
 	return pod, retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, pod); err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
 			return err
 		}
 		if fn(pod, ruleSet) {

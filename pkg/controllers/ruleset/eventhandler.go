@@ -20,8 +20,7 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/api/equality"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -33,17 +32,17 @@ import (
 )
 
 type EventHandler struct {
-	client client.Client
+	client.Client
 }
 
 func (p *EventHandler) Create(e event.CreateEvent, q workqueue.RateLimitingInterface) {
 	obj := e.Object
-	ruleSets, err := involvedRuleSets(p.client, obj)
-	if err != nil {
-		klog.Errorf("fail to get %s/%s involved rulesets %v", obj.GetNamespace(), obj.GetName(), err)
+	ruleSetList := &appsv1alpha1.RuleSetList{}
+	if err := p.List(context.TODO(), ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(appsv1alpha1.FieldIndexRuleSet, obj.GetName())}); err != nil {
+		klog.Errorf("fail to list rulesets by pod %s/%s, %v", obj.GetNamespace(), obj.GetName(), err)
 		return
 	}
-	for _, rs := range ruleSets {
+	for _, rs := range ruleSetList.Items {
 		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
 			Name:      rs.Name,
 			Namespace: rs.Namespace,
@@ -53,12 +52,12 @@ func (p *EventHandler) Create(e event.CreateEvent, q workqueue.RateLimitingInter
 
 func (p *EventHandler) Update(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	obj := e.ObjectNew
-	ruleSets, err := involvedRuleSets(p.client, obj)
-	if err != nil {
-		klog.Errorf("fail to get %s/%s involved rulesets %v", obj.GetNamespace(), obj.GetName(), err)
+	ruleSetList := &appsv1alpha1.RuleSetList{}
+	if err := p.List(context.TODO(), ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(appsv1alpha1.FieldIndexRuleSet, obj.GetName())}); err != nil {
+		klog.Errorf("fail to list rulesets by pod %s/%s, %v", obj.GetNamespace(), obj.GetName(), err)
 		return
 	}
-	for _, rs := range ruleSets {
+	for _, rs := range ruleSetList.Items {
 		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
 			Name:      rs.Name,
 			Namespace: rs.Namespace,
@@ -68,12 +67,12 @@ func (p *EventHandler) Update(e event.UpdateEvent, q workqueue.RateLimitingInter
 
 func (p *EventHandler) Delete(e event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	obj := e.Object
-	ruleSets, err := involvedRuleSets(p.client, obj)
-	if err != nil {
-		klog.Errorf("fail to get pod %s/%s involved rulesets %v", obj.GetNamespace(), obj.GetName(), err)
+	ruleSetList := &appsv1alpha1.RuleSetList{}
+	if err := p.List(context.TODO(), ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(appsv1alpha1.FieldIndexRuleSet, obj.GetName())}); err != nil {
+		klog.Errorf("fail to list rulesets by pod %s/%s, %v", obj.GetNamespace(), obj.GetName(), err)
 		return
 	}
-	for _, rs := range ruleSets {
+	for _, rs := range ruleSetList.Items {
 		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
 			Name:      rs.Name,
 			Namespace: rs.Namespace,
@@ -82,30 +81,6 @@ func (p *EventHandler) Delete(e event.DeleteEvent, q workqueue.RateLimitingInter
 }
 
 func (p *EventHandler) Generic(e event.GenericEvent, q workqueue.RateLimitingInterface) {
-}
-
-func involvedRuleSets(c client.Client, obj client.Object) ([]*appsv1alpha1.RuleSet, error) {
-	ruleSetList := &appsv1alpha1.RuleSetList{}
-	var ruleSets []*appsv1alpha1.RuleSet
-	if err := c.List(context.TODO(), ruleSetList, client.InNamespace(obj.GetNamespace())); err != nil {
-		return ruleSets, err
-	}
-	for i, rs := range ruleSetList.Items {
-		selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
-		if err != nil {
-			return ruleSets, err
-		}
-		if selector.Matches(labels.Set(obj.GetLabels())) {
-			ruleSets = append(ruleSets, &ruleSetList.Items[i])
-			continue
-		}
-		for _, item := range rs.Status.Targets {
-			if item == obj.GetName() {
-				ruleSets = append(ruleSets, &ruleSetList.Items[i])
-			}
-		}
-	}
-	return ruleSets, nil
 }
 
 type RulesetEventHandler struct {

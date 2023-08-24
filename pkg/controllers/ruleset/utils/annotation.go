@@ -56,9 +56,9 @@ func MoveDetailAnno(po *corev1.Pod, rulesetName string) bool {
 	if po.Annotations == nil {
 		return false
 	}
-	_, ok := po.Annotations[appsv1alpha1.AnnotationRuleSetDetailPrefix+rulesetName]
+	_, ok := po.Annotations[appsv1alpha1.AnnotationRuleSetDetailPrefix+"/"+rulesetName]
 	if ok {
-		delete(po.Annotations, appsv1alpha1.AnnotationRuleSetDetailPrefix+rulesetName)
+		delete(po.Annotations, appsv1alpha1.AnnotationRuleSetDetailPrefix+"/"+rulesetName)
 	}
 	return ok
 }
