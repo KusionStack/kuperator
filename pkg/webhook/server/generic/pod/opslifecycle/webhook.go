@@ -86,6 +86,9 @@ func (lc *OpsLifecycle) addLabelWithTime(pod *corev1.Pod, key string) {
 }
 
 func (lc *OpsLifecycle) podServiceAvailableLabel(pod *corev1.Pod) error {
+	if pod.Labels == nil {
+		return nil
+	}
 	if _, ok := pod.Labels[v1alpha1.PodServiceAvailableLabel]; ok {
 		return nil
 	}
