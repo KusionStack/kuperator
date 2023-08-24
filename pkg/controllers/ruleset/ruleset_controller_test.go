@@ -17,7 +17,6 @@ limitations under the License.
 package ruleset
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -26,6 +25,7 @@ import (
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -35,9 +35,10 @@ import (
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
 	"kusionstack.io/kafed/pkg/controllers/ruleset/register"
+	rulesetutils "kusionstack.io/kafed/pkg/controllers/ruleset/utils"
 )
 
-func TestRuleset(t *testing.T) {
+func TestRuleSet(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 	defer Stop()
 	<-time.After(1 * time.Second)
@@ -48,7 +49,7 @@ func TestRuleset(t *testing.T) {
 		genDefaultPod("default", "pod-test-3"),
 		genDefaultPod("default", "pod-test-4"))
 	for _, po := range pods {
-		g.Expect(c.Create(context.TODO(), po)).NotTo(gomega.HaveOccurred())
+		g.Expect(c.Create(ctx, po)).NotTo(gomega.HaveOccurred())
 	}
 	istr := intstr.FromString("50%")
 	stage := PreTrafficOffStage
@@ -76,26 +77,33 @@ func TestRuleset(t *testing.T) {
 			},
 		},
 	}
-	g.Expect(c.Create(context.TODO(), rs)).NotTo(gomega.HaveOccurred())
+	g.Expect(c.Create(ctx, rs)).NotTo(gomega.HaveOccurred())
 	waitProcessFinished(request)
-	defer func() {
-		for _, po := range pods {
-			g.Expect(c.Delete(context.TODO(), po)).NotTo(gomega.HaveOccurred())
-		}
-		g.Expect(c.Delete(context.TODO(), rs)).NotTo(gomega.HaveOccurred())
-	}()
 	podList := &corev1.PodList{}
-	g.Expect(c.List(context.TODO(), podList, &client.ListOptions{
+	defer func() {
+		c.List(ctx, podList, client.InNamespace("default"))
+		for _, po := range podList.Items {
+			g.Expect(c.Delete(ctx, &po)).NotTo(gomega.HaveOccurred())
+		}
+		g.Expect(c.Delete(ctx, rs)).NotTo(gomega.HaveOccurred())
+	}()
+
+	g.Expect(c.List(ctx, podList, &client.ListOptions{
 		LabelSelector: labels.SelectorFromSet(rs.Spec.Selector.MatchLabels),
 	})).NotTo(gomega.HaveOccurred())
 
 	// LifeCycle 1. set all pod on Stage
 	for i := range podList.Items {
+		if podList.Items[i].Name == "pod-test-1" || podList.Items[i].Name == "pod-test-2" {
+			g.Expect(setPodUnavailable(&podList.Items[i])).NotTo(gomega.HaveOccurred())
+		}
+	}
+	for i := range podList.Items {
 		g.Expect(setPodOnStage(&podList.Items[i], PreTrafficOffStage)).NotTo(gomega.HaveOccurred())
 	}
 	// Ruleset Processing rules
 	waitProcessFinished(request)
-	g.Expect(c.List(context.TODO(), podList, &client.ListOptions{
+	g.Expect(c.List(ctx, podList, &client.ListOptions{
 		LabelSelector: labels.SelectorFromSet(rs.Spec.Selector.MatchLabels),
 	})).NotTo(gomega.HaveOccurred())
 	// LifeCycle 2. 2 pod passed
@@ -103,14 +111,43 @@ func TestRuleset(t *testing.T) {
 	for i := range podList.Items {
 		state, err := RuleSetManager().GetState(c, &podList.Items[i])
 		g.Expect(err).NotTo(gomega.HaveOccurred())
+		printJson(state)
+		printJson(podList.Items[i])
 		if state.InStageAndPassed(PreTrafficOffStage) {
 			passedCount++
+			g.Expect(podList.Items[i].Name).NotTo(gomega.Equal("pod-test-3"))
+			g.Expect(podList.Items[i].Name).NotTo(gomega.Equal("pod-test-4"))
 		}
-		printJson(state)
 	}
+	waitProcessFinished(request)
 	// 50% passed
 	g.Expect(passedCount).Should(gomega.BeEquivalentTo(2))
-	<-time.After(5 * time.Second)
+
+	po := &corev1.Pod{}
+	g.Expect(c.Get(ctx, types.NamespacedName{Namespace: "default", Name: "pod-test-3"}, po)).NotTo(gomega.HaveOccurred())
+	g.Expect(setPodUnavailable(po)).NotTo(gomega.HaveOccurred())
+	waitProcessFinished(request)
+	g.Expect(c.Get(ctx, types.NamespacedName{Namespace: "default", Name: "pod-test-3"}, po)).NotTo(gomega.HaveOccurred())
+	state, _ := RuleSetManager().GetState(c, po)
+	g.Expect(state.InStageAndPassed(PreTrafficOffStage)).Should(gomega.BeTrue())
+	printJson(state)
+
+	ruleSetList := &appsv1alpha1.RuleSetList{}
+	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(rulesetutils.FieldIndexRuleSet, "pod-test-1")})).NotTo(gomega.HaveOccurred())
+	g.Expect(len(ruleSetList.Items)).Should(gomega.BeEquivalentTo(1))
+	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(rulesetutils.FieldIndexRuleSet, "pod-test-2")})).NotTo(gomega.HaveOccurred())
+	g.Expect(len(ruleSetList.Items)).Should(gomega.BeEquivalentTo(1))
+	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(rulesetutils.FieldIndexRuleSet, "pod-test-3")})).NotTo(gomega.HaveOccurred())
+	g.Expect(len(ruleSetList.Items)).Should(gomega.BeEquivalentTo(1))
+	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(rulesetutils.FieldIndexRuleSet, "pod-test-4")})).NotTo(gomega.HaveOccurred())
+	g.Expect(len(ruleSetList.Items)).Should(gomega.BeEquivalentTo(1))
+	g.Expect(c.Get(ctx, types.NamespacedName{Namespace: "default", Name: "pod-test-1"}, po)).NotTo(gomega.HaveOccurred())
+	g.Expect(c.Delete(ctx, po)).NotTo(gomega.HaveOccurred())
+	waitProcessFinished(request)
+	g.Expect(c.Get(ctx, types.NamespacedName{Namespace: "default", Name: "ruleset-default"}, rs)).NotTo(gomega.HaveOccurred())
+	printJson(rs)
+	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(rulesetutils.FieldIndexRuleSet, "pod-test-1")})).NotTo(gomega.HaveOccurred())
+	g.Expect(len(ruleSetList.Items)).Should(gomega.BeEquivalentTo(0))
 }
 
 const (
@@ -125,13 +162,13 @@ const (
 
 func initRulesetManager() {
 
-	register.UnAvailableFuncList = append(register.UnAvailableFuncList, func(pod *corev1.Pod) (bool, *int64) {
+	register.UnAvailableFuncList = []register.UnAvailableFunc{func(pod *corev1.Pod) (bool, *int64) {
 		if pod.GetLabels() == nil {
 			return false, nil
 		}
 		_, ok := pod.GetLabels()[UnavailableLabel]
 		return ok, nil
-	})
+	}}
 	RuleSetManager().RegisterStage(PreTrafficOffStage, func(po client.Object) bool {
 		if po.GetLabels() == nil {
 			return false
@@ -166,11 +203,21 @@ func waitProcessFinished(reqChan chan reconcile.Request) {
 
 func setPodOnStage(po *corev1.Pod, stage string) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		if err := c.Get(context.TODO(), types.NamespacedName{Namespace: po.Namespace, Name: po.Name}, po); err != nil {
+		if err := c.Get(ctx, types.NamespacedName{Namespace: po.Namespace, Name: po.Name}, po); err != nil {
 			return err
 		}
 		po.Labels[StageLabel] = stage
-		return c.Update(context.TODO(), po)
+		return c.Update(ctx, po)
+	})
+}
+
+func setPodUnavailable(po *corev1.Pod) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if err := c.Get(ctx, types.NamespacedName{Namespace: po.Namespace, Name: po.Name}, po); err != nil {
+			return err
+		}
+		po.Labels[UnavailableLabel] = "true"
+		return c.Update(ctx, po)
 	})
 }
 

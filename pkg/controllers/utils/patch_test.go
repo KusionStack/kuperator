@@ -14,15 +14,14 @@
  limitations under the License.
 */
 
-package ruleset
+package utils
 
-func New() *RuleSetWebhook {
-	return &RuleSetWebhook{}
-}
+import (
+	"fmt"
+	"testing"
+)
 
-type RuleSetWebhook struct {
-}
-
-func (r *RuleSetWebhook) Name() string {
-	return "PodRuleSetWebhook"
+func TestPatch(t *testing.T) {
+	val := GetLabelAnnoPatchBytes(nil, nil, nil, map[string]string{"detailAnno": "newDetail"})
+	fmt.Println(string(val))
 }

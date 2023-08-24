@@ -14,16 +14,8 @@
  limitations under the License.
 */
 
-package ruleset
+package utils
 
-import (
-	"context"
-
-	admissionv1 "k8s.io/api/admission/v1"
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+const (
+	FieldIndexRuleSet = "rulesetIndex"
 )
-
-func (r *RuleSetWebhook) Mutating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) error {
-	return nil
-}
