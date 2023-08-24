@@ -122,17 +122,17 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 		return reconcile.Result{}, err
 	}
 
-	var (
-		stage  string
-		labels map[string]string
-	)
-	if state.InStageAndPassed(v1alpha1.PodOpsLifecyclePreCheckStage) {
-		stage = v1alpha1.PodOpsLifecyclePreCheckStage
-		labels, err = r.preCheckStage(pod)
-	} else if state.InStageAndPassed(v1alpha1.PodOpsLifecyclePostCheckStage) {
-		stage = v1alpha1.PodOpsLifecyclePostCheckStage
-		labels, err = r.postCheckStage(pod)
+	var labels map[string]string
+	stage := r.ruleSetManager.Stage(pod)
+	if state.InStageAndPassed(stage) {
+		switch stage {
+		case v1alpha1.PodOpsLifecyclePreCheckStage:
+			labels, err = r.preCheckStage(pod)
+		case v1alpha1.PodOpsLifecyclePostCheckStage:
+			labels, err = r.postCheckStage(pod)
+		}
 	}
+
 	klog.Infof("pod %s in stage %q, labels: %v, error: %v", key, stage, labels, err)
 	if err != nil {
 		return reconcile.Result{}, err

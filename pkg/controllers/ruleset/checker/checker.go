@@ -28,12 +28,12 @@ import (
 	rulesetutils "kusionstack.io/kafed/pkg/controllers/ruleset/utils"
 )
 
-type Check interface {
-	// GetState get current check state
+type Checker interface {
+	// GetState collects current states from all associated RuleSets, and every state stage is not guaranteed to be consistent
 	GetState(client.Client, client.Object) (CheckState, error)
 }
 
-func NewCheck() Check {
+func NewCheck() Checker {
 	return &checker{policy: register.DefaultPolicy()}
 }
 
@@ -52,29 +52,32 @@ func (c *checker) GetState(cl client.Client, item client.Object) (CheckState, er
 	for i := range ruleSetList.Items {
 		rs := &ruleSetList.Items[i]
 		findStatus := false
-		for i, detail := range rs.Status.Details {
+		for j, detail := range rs.Status.Details {
 			if detail.Name != item.GetName() {
 				continue
 			}
 			findStatus = true
 			if !detail.Passed {
-				result.Message += CollectInfo(rs.Name, rs.Status.Details[i])
+				result.Message += CollectInfo(rs.Name, rs.Status.Details[j])
 			}
 			result.States = append(result.States, State{
 				RuleSetName: rs.Name,
-				Detail:      rs.Status.Details[i],
+				Detail:      rs.Status.Details[j],
 			})
+			break
 		}
 		if !findStatus {
 			result.States = append(result.States, State{
 				RuleSetName: rs.Name,
 				Detail: &appsv1alpha1.Detail{
-					Passed: false,
+					Passed: true,
 				},
 			})
 			result.Message += fmt.Sprintf("[waiting for ruleset %s processing. ]", rs.Name)
-			return result, nil
 		}
+	}
+	if len(ruleSetList.Items) == 0 {
+		result.Message = "No ruleSets found"
 	}
 	return result, nil
 }
@@ -85,15 +88,12 @@ type CheckState struct {
 }
 
 func (cs *CheckState) InStage(stage string) bool {
-	if len(cs.States) == 0 {
-		return false
-	}
 	for _, state := range cs.States {
 		if state.Detail.Stage != stage {
 			return false
 		}
 	}
-	return len(cs.States) > 0
+	return true
 }
 
 func (cs *CheckState) InStageAndPassed(stage string) bool {
@@ -102,7 +102,7 @@ func (cs *CheckState) InStageAndPassed(stage string) bool {
 			return false
 		}
 	}
-	return len(cs.States) > 0
+	return true
 }
 
 type State struct {
