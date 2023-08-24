@@ -157,16 +157,20 @@ var _ = Describe("podopslifecycle controller", func() {
 		Expect(string(pod.Status.Conditions[0].Type)).To(Equal(v1alpha1.ReadinessGatePodServiceReady))
 		Expect(pod.Status.Conditions[0].Status).To(Equal(corev1.ConditionTrue))
 
-		podOpsLifecycle.ruleSetManager = &mockRuleSetManager{CheckState: &checker.CheckState{
-			States: []checker.State{
-				{
-					Detail: &v1alpha1.Detail{
-						Stage:  v1alpha1.PodOpsLifecyclePreCheckStage,
-						Passed: true,
+		podOpsLifecycle.ruleSetManager = &mockRuleSetManager{
+			CheckState: &checker.CheckState{
+				States: []checker.State{
+					{
+						Detail: &v1alpha1.Detail{
+							Stage:  v1alpha1.PodOpsLifecyclePreCheckStage,
+							Passed: true,
+						},
 					},
 				},
 			},
-		}}
+			stage:   v1alpha1.PodOpsLifecyclePreCheckStage,
+			inStage: true,
+		}
 
 		pod.ObjectMeta.Labels = map[string]string{
 			v1alpha1.ControlledByPodOpsLifecycle:                           "true",
@@ -307,6 +311,28 @@ var _ ruleset.ManagerInterface = &mockRuleSetManager{}
 
 type mockRuleSetManager struct {
 	*checker.CheckState
+	stage   string
+	inStage bool
+}
+
+func (rsm *mockRuleSetManager) Stage(obj client.Object) string {
+	return rsm.stage
+}
+
+func (rsm *mockRuleSetManager) InStage(obj client.Object, key string) bool {
+	return rsm.inStage
+}
+
+func (rsm *mockRuleSetManager) GetStages() []string {
+	return nil
+}
+
+func (rsm *mockRuleSetManager) Conditions(obj client.Object) []string {
+	return nil
+}
+
+func (rsm *mockRuleSetManager) MatchConditions(obj client.Object, conditions ...string) []string {
+	return nil
 }
 
 func (rsm *mockRuleSetManager) RegisterStage(key string, inStage func(obj client.Object) bool) {
