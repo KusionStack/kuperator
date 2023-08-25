@@ -79,15 +79,18 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 			operatingCount++
 
 			if _, ok := labels[v1alpha1.PodPreCheckedLabelPrefix]; ok { // pre-checked
-				if _, ok := labels[v1alpha1.PodPrepareLabelPrefix]; !ok {
+				_, hasPrepare := labels[v1alpha1.PodPrepareLabelPrefix]
+				_, hasOperate := labels[v1alpha1.PodOperateLabelPrefix]
+
+				if !hasPrepare && !hasOperate {
 					delete(newPod.Labels, v1alpha1.PodServiceAvailableLabel)
 
 					lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, id)) // prepare
-				} else if _, ok := labels[v1alpha1.PodOperateLabelPrefix]; !ok {
+				} else if !hasOperate {
 					if ready, _ := lc.readyToUpgrade(newPod); ready {
 						delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, id))
 
-						lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id)) // operate, controllers can begin to operate
+						lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id)) // operate
 					}
 				}
 			} else {
