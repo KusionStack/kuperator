@@ -23,6 +23,7 @@ webhooks:
           - DELETE
         resources:
           - pods
+          - pods/status
         scope: '*'
     objectSelector:
       matchExpressions:
@@ -56,6 +57,7 @@ webhooks:
           - UPDATE
         resources:
           - pods
+          - pods/status
         scope: '*'
     objectSelector:
       matchExpressions:

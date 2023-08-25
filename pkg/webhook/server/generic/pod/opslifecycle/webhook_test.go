@@ -424,9 +424,7 @@ func TestMutating(t *testing.T) {
 
 				fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, "456"): "1402144848",
 			},
-			expectedLabels: map[string]string{
-				v1alpha1.PodServiceAvailableLabel: "1402144848",
-			},
+			expectedLabels: map[string]string{},
 		},
 	}
 

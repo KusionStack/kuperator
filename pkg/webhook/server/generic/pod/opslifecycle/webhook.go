@@ -94,6 +94,7 @@ func (lc *OpsLifecycle) podServiceAvailableLabel(pod *corev1.Pod) error {
 	}
 
 	satisfied, expectedFinalizer, err := lc.satisfyExpectedFinalizers(pod) // whether all expected finalizers are satisfied
+	klog.Infof("pod: %s/%s, satisfied: %v, expectedFinalizer: %v, err: %v", pod.Namespace, pod.Name, satisfied, expectedFinalizer, err)
 	if err != nil || !satisfied {
 		klog.Infof("pod: %s/%s, expected finalizers: %v, err: %v", pod.Namespace, pod.Name, expectedFinalizer, err)
 		return err
