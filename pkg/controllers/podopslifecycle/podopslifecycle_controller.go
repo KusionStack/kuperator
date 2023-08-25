@@ -116,6 +116,16 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 		return reconcile.Result{}, err
 	}
 
+	if !r.expectation.SatisfiedExpectations(key, pod.ResourceVersion) {
+		klog.Errorf("skip pod %s with no satisfied", key)
+		return reconcile.Result{}, nil
+	}
+
+	idToLabelsMap, _, err := PodIDAndTypesMap(pod)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	state, err := r.ruleSetManager.GetState(r.Client, pod)
 	if err != nil {
 		klog.Errorf("failed to get pod %s state: %s", key, err)
@@ -123,13 +133,12 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 	}
 
 	var labels map[string]string
-
 	if state.InStageAndPassed() {
 		switch state.Stage {
 		case v1alpha1.PodOpsLifecyclePreTrafficOffStage:
-			labels, err = r.preTrafficOffStage(pod)
+			labels, err = r.preTrafficOffStage(pod, idToLabelsMap)
 		case v1alpha1.PodOpsLifecyclePreTrafficOnStage:
-			labels, err = r.preTrafficOnStage(pod)
+			labels, err = r.preTrafficOnStage(pod, idToLabelsMap)
 		}
 	}
 
@@ -144,16 +153,6 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 		if err != nil {
 			expectation.DeleteExpectations(key)
 		}
-		return reconcile.Result{}, err
-	}
-
-	if !r.expectation.SatisfiedExpectations(key, pod.ResourceVersion) {
-		klog.Errorf("skip pod %s with no satisfied", key)
-		return reconcile.Result{}, nil
-	}
-
-	idToLabelsMap, _, err := PodIDAndTypesMap(pod)
-	if err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -248,12 +247,7 @@ func (r *ReconcilePodOpsLifecycle) setServiceReadiness(pod *corev1.Pod, isReady 
 	return true, fmt.Sprintf("update service readiness gate to: %s", string(status))
 }
 
-func (r *ReconcilePodOpsLifecycle) preTrafficOffStage(pod *corev1.Pod) (labels map[string]string, err error) {
-	idToLabelsMap, _, err := PodIDAndTypesMap(pod)
-	if err != nil {
-		return nil, err
-	}
-
+func (r *ReconcilePodOpsLifecycle) preTrafficOffStage(pod *corev1.Pod, idToLabelsMap map[string]map[string]string) (labels map[string]string, err error) {
 	labels = map[string]string{}
 	currentTime := strconv.FormatInt(time.Now().Unix(), 10)
 	for k, v := range idToLabelsMap {
@@ -276,12 +270,7 @@ func (r *ReconcilePodOpsLifecycle) preTrafficOffStage(pod *corev1.Pod) (labels m
 	return
 }
 
-func (r *ReconcilePodOpsLifecycle) preTrafficOnStage(pod *corev1.Pod) (labels map[string]string, err error) {
-	idToLabelsMap, _, err := PodIDAndTypesMap(pod)
-	if err != nil {
-		return nil, err
-	}
-
+func (r *ReconcilePodOpsLifecycle) preTrafficOnStage(pod *corev1.Pod, idToLabelsMap map[string]map[string]string) (labels map[string]string, err error) {
 	labels = map[string]string{}
 	currentTime := strconv.FormatInt(time.Now().Unix(), 10)
 	for k := range idToLabelsMap {

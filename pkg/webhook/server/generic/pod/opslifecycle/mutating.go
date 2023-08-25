@@ -46,6 +46,7 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 	}
 	numOfIDs := len(newIDToLabelsMap)
 
+	klog.Infof("pod: %s/%s, numOfIDs: %d, ResourceVersion: %v", newPod.Namespace, newPod.Name, numOfIDs, newPod.ResourceVersion)
 	if numOfIDs == 0 {
 		return lc.podServiceAvailableLabel(newPod)
 	}
