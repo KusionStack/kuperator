@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
@@ -213,8 +214,18 @@ func (r *ReconcilePodOpsLifecycle) updateServiceReadiness(ctx context.Context, p
 
 	key := controllerKey(pod)
 	r.expectation.ExpectUpdate(key, pod.ResourceVersion)
-	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		return r.Client.Status().Update(ctx, pod)
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		newPod := &corev1.Pod{}
+		err := r.Client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, newPod)
+		if err != nil {
+			return err
+		}
+		needUpdate, _ := r.setServiceReadiness(newPod, isReady)
+		if !needUpdate {
+			return nil
+		}
+
+		return r.Client.Status().Update(ctx, newPod)
 	}); err != nil {
 		klog.Errorf("failed to update pod status %s: %s", key, err)
 		r.expectation.DeleteExpectations(key)
@@ -311,17 +322,22 @@ func (r *ReconcilePodOpsLifecycle) addLabels(ctx context.Context, pod *corev1.Po
 	if len(labels) == 0 {
 		return nil
 	}
-	if pod.Labels == nil {
-		pod.Labels = map[string]string{}
-	}
-	for k, v := range labels {
-		pod.Labels[k] = v
-	}
 
 	key := controllerKey(pod)
 	expectation.ExpectUpdate(key, pod.ResourceVersion)
-	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		return r.Client.Update(ctx, pod)
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		newPod := &corev1.Pod{}
+		err := r.Client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, newPod)
+		if err != nil {
+			return err
+		}
+		if newPod.Labels == nil {
+			newPod.Labels = map[string]string{}
+		}
+		for k, v := range labels {
+			newPod.Labels[k] = v
+		}
+		return r.Client.Update(ctx, newPod)
 	})
 	if err != nil {
 		klog.Errorf("failed to update pod %s with labels: %v: %s", key, labels, err)

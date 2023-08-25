@@ -214,7 +214,7 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 		return nil, err
 	}
 
-	err = retry.OnError(retry.DefaultBackoff, apierrors.IsNotFound, func() error {
+	err = retry.OnError(retry.DefaultRetry, apierrors.IsNotFound, func() error {
 		time.Sleep(1 * time.Second)
 		Logf("waiting get namespace for: %s", got.Name)
 		getNs, err := c.CoreV1().Namespaces().Get(context.TODO(), got.Name, metav1.GetOptions{})

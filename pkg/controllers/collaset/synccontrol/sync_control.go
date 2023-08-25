@@ -18,6 +18,7 @@ package synccontrol
 
 import (
 	"fmt"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,7 +71,7 @@ func (sc *RealSyncControl) SyncPods(instance *appsv1alpha1.CollaSet, updatedRevi
 
 	// get owned IDs
 	var ownedIDs map[int]*appsv1alpha1.ContextDetail
-	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		ownedIDs, err = podcontext.AllocateID(sc.client, instance, updatedRevision.Name, int(replicasRealValue(instance.Spec.Replicas)))
 		return err
 	}); err != nil {
@@ -126,7 +127,7 @@ func (sc *RealSyncControl) SyncPods(instance *appsv1alpha1.CollaSet, updatedRevi
 
 	if needUpdateContext {
 		klog.V(1).Infof("try to update ResourceContext for CollaSet %s/%s when sync", instance.Namespace, instance.Name)
-		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			return podcontext.UpdateToPodContext(sc.client, instance, ownedIDs)
 		}); err != nil {
 			return false, nil, ownedIDs, fmt.Errorf("fail to update ResourceContext when reclaiming IDs: %s", err)
@@ -248,7 +249,7 @@ func (sc *RealSyncControl) Scale(set *appsv1alpha1.CollaSet, podWrappers []*coll
 		// mark these Pods to scalingIn
 		if needUpdateContext {
 			klog.V(1).Infof("try to update ResourceContext for CollaSet %s/%s when scaling in Pod", set.Namespace, set.Name)
-			err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 				return podcontext.UpdateToPodContext(sc.client, set, ownedIDs)
 			})
 
@@ -303,7 +304,7 @@ func (sc *RealSyncControl) Scale(set *appsv1alpha1.CollaSet, podWrappers []*coll
 
 	if needUpdatePodContext {
 		klog.V(1).Infof("try to update ResourceContext for CollaSet %s/%s after scaling", set.Namespace, set.Name)
-		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			return podcontext.UpdateToPodContext(sc.client, set, ownedIDs)
 		}); err != nil {
 			return scaling, fmt.Errorf("fail to reset ResourceContext: %s", err)
@@ -401,7 +402,7 @@ func (sc *RealSyncControl) Update(set *appsv1alpha1.CollaSet, podWrapers []*coll
 	// 5. mark Pod to use updated revision before updating it.
 	if needUpdateContext {
 		klog.V(1).Infof("try to update ResourceContext for CollaSet %s/%s", set.Namespace, set.Name)
-		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			return podcontext.UpdateToPodContext(sc.client, set, ownedIDs)
 		})
 
