@@ -126,13 +126,13 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 		return reconcile.Result{}, err
 	}
 	if len(idToLabelsMap) == 0 {
-		needUpdate, err := r.addServiceAvailable(pod)
-		if needUpdate {
+		updated, err := r.addServiceAvailable(pod)
+		if updated {
 			return reconcile.Result{}, err
 		}
 
-		needUpdate, err = r.updateServiceReadiness(ctx, pod, true)
-		if needUpdate {
+		updated, err = r.updateServiceReadiness(ctx, pod, true)
+		if updated {
 			return reconcile.Result{}, err
 		}
 	}
@@ -156,10 +156,8 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-
 	if len(labels) > 0 {
-		err = r.addLabels(ctx, pod, labels)
-		return reconcile.Result{}, err
+		return reconcile.Result{}, r.addLabels(ctx, pod, labels)
 	}
 
 	expected := map[string]bool{
@@ -204,9 +202,7 @@ func (r *ReconcilePodOpsLifecycle) addServiceAvailable(pod *corev1.Pod) (bool, e
 	labels := map[string]string{
 		v1alpha1.PodServiceAvailableLabel: strconv.FormatInt(time.Now().Unix(), 10),
 	}
-	err = r.addLabels(context.Background(), pod, labels)
-
-	return true, err
+	return true, r.addLabels(context.Background(), pod, labels)
 }
 
 func (r *ReconcilePodOpsLifecycle) updateServiceReadiness(ctx context.Context, pod *corev1.Pod, isReady bool) (bool, error) {
@@ -312,6 +308,9 @@ func (r *ReconcilePodOpsLifecycle) preTrafficOnStage(pod *corev1.Pod, idToLabels
 }
 
 func (r *ReconcilePodOpsLifecycle) addLabels(ctx context.Context, pod *corev1.Pod, labels map[string]string) error {
+	if len(labels) == 0 {
+		return nil
+	}
 	if pod.Labels == nil {
 		pod.Labels = map[string]string{}
 	}
