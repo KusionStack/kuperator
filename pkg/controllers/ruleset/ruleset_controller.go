@@ -249,7 +249,7 @@ func (r *RuleSetReconciler) updatePodDetail(ctx context.Context, pod *corev1.Pod
 		return nil
 	}
 	patch := client.RawPatch(types.MergePatchType, controllerutils.GetLabelAnnoPatchBytes(nil, nil, nil, map[string]string{detailAnno: newDetail}))
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		return r.Patch(ctx, pod, patch)
 	})
 }

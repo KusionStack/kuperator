@@ -274,7 +274,7 @@ func expectedStatusReplicas(c client.Client, cls *appsv1alpha1.CollaSet, schedul
 }
 
 func updateCollaSetWithRetry(c client.Client, namespace, name string, updateFn func(cls *appsv1alpha1.CollaSet) bool) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		cls := &appsv1alpha1.CollaSet{}
 		if err := c.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: name}, cls); err != nil {
 			return err
@@ -289,7 +289,7 @@ func updateCollaSetWithRetry(c client.Client, namespace, name string, updateFn f
 }
 
 func updatePodWithRetry(c client.Client, namespace, name string, updateFn func(pod *corev1.Pod) bool) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		pod := &corev1.Pod{}
 		if err := c.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: name}, pod); err != nil {
 			return err

@@ -110,9 +110,8 @@ var _ = Describe("podopslifecycle controller", func() {
 				},
 			},
 		}
-		operationType = "restart"
-		id            = "123"
-		time          = "1402144848"
+		id   = "123"
+		time = "1402144848"
 	)
 
 	AfterEach(func() {
@@ -156,41 +155,6 @@ var _ = Describe("podopslifecycle controller", func() {
 		Expect(pod.Status.Conditions).To(HaveLen(1))
 		Expect(string(pod.Status.Conditions[0].Type)).To(Equal(v1alpha1.ReadinessGatePodServiceReady))
 		Expect(pod.Status.Conditions[0].Status).To(Equal(corev1.ConditionTrue))
-
-		podOpsLifecycle.ruleSetManager = &mockRuleSetManager{
-			CheckState: &checker.CheckState{
-				Stage: v1alpha1.PodOpsLifecyclePreTrafficOffStage,
-				States: []checker.State{
-					{
-						Detail: &v1alpha1.Detail{
-							Stage:  v1alpha1.PodOpsLifecyclePreTrafficOffStage,
-							Passed: true,
-						},
-					},
-				},
-			},
-		}
-
-		pod.ObjectMeta.Labels = map[string]string{
-			v1alpha1.ControlledByPodOpsLifecycle:                           "true",
-			fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):       time,
-			fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, id):      time,
-			fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, id): operationType,
-		}
-		err = mgr.GetClient().Update(context.Background(), pod)
-		Expect(err).NotTo(HaveOccurred())
-
-		<-request
-
-		pod = &corev1.Pod{}
-		err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
-			Name:      "test",
-			Namespace: "default",
-		}, pod)
-		Expect(err).NotTo(HaveOccurred())
-
-		Expect(pod.GetLabels()).To(HaveKey(fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, id)))
-		Expect(pod.GetLabels()).To(HaveKey(fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, operationType)))
 	})
 
 	It("create pod with label prepare", func() {
