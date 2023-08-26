@@ -120,9 +120,6 @@ func (r *ReconcileAdapter) GetExpectEmployee(ctx context.Context, employer clien
 		} else {
 			extraStatus.TrafficOn = false
 		}
-		if !pod.DeletionTimestamp.IsZero() {
-			extraStatus.TrafficOn = false
-		}
 		employeeStatuses.ExtraStatus = extraStatus
 		status.EmployeeStatuses = employeeStatuses
 		expected[expectIdx] = status

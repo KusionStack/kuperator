@@ -199,7 +199,7 @@ func doPredicate(obj client.Object) bool {
 		return false
 	}
 	if obj.GetAnnotations() != nil {
-		value, exist := obj.GetAnnotations()[annoControlledByResourceConsist]
+		value, exist := obj.GetAnnotations()[controlledByResourceConsistAnnoKey]
 		if exist && value == "true" {
 			return true
 		}

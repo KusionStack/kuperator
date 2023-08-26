@@ -19,8 +19,8 @@ package resourceconsist
 const (
 	defaultMaxConcurrentReconciles = 5
 
-	annoControlledByResourceConsist = "resource-consist.kusionstack.io/control"
-	annoExpectedFinalizerAdded      = "resource-consist.kusionstack.io/employees-expected-finalizer-added"
+	controlledByResourceConsistAnnoKey = "resource-consist.kusionstack.io/control" // todo, replace to an unified label, like: kusionstack.io/control: "true"
+	expectedFinalizerAddedAnnoKey      = "resource-consist.kusionstack.io/employees-expected-finalizer-added"
 
 	cleanFinalizerPrefix = "resource-consist.kusionstack.io/clean-"
 )

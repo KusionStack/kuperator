@@ -215,7 +215,7 @@ func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, exp
 func (r *Consist) ensureExpectedFinalizer(ctx context.Context, employer client.Object) (bool, error) {
 	// employee is not pod or not follow PodOpsLifecycle
 	watchOptions, watchOptionsImplemented := r.adapter.(ReconcileWatchOptions)
-	if (watchOptionsImplemented && !isPod(watchOptions.NewEmployee())) || r.adapter.NotFollowPodOpsLifeCycle() {
+	if r.adapter.NotFollowPodOpsLifeCycle() || (watchOptionsImplemented && !isPod(watchOptions.NewEmployee())) {
 		return true, nil
 	}
 
@@ -224,7 +224,7 @@ func (r *Consist) ensureExpectedFinalizer(ctx context.Context, employer client.O
 		return false, fmt.Errorf("get selected employees' names failed, err: %s", err.Error())
 	}
 
-	addedExpectedFinalizerPodNames := strings.Split(employer.GetAnnotations()[annoExpectedFinalizerAdded], ",")
+	addedExpectedFinalizerPodNames := strings.Split(employer.GetAnnotations()[expectedFinalizerAddedAnnoKey], ",")
 
 	var toAdd, toDelete []PodExpectedFinalizerOps
 	if !employer.GetDeletionTimestamp().IsZero() {
@@ -244,7 +244,7 @@ func (r *Consist) ensureExpectedFinalizer(ctx context.Context, employer client.O
 		}
 		patch := client.MergeFrom(employer)
 		annos := employer.GetAnnotations()
-		annos[annoExpectedFinalizerAdded] = strings.Join(notDeletedPodNames, ",")
+		annos[expectedFinalizerAddedAnnoKey] = strings.Join(notDeletedPodNames, ",")
 		employer.SetAnnotations(annos)
 		return len(notDeletedPodNames) == 0, r.Patch(ctx, employer, patch)
 	}
@@ -291,7 +291,7 @@ func (r *Consist) ensureExpectedFinalizer(ctx context.Context, employer client.O
 
 	patch := client.MergeFrom(employer)
 	annos := employer.GetAnnotations()
-	annos[annoExpectedFinalizerAdded] = strings.Join(addedNames, ",")
+	annos[expectedFinalizerAddedAnnoKey] = strings.Join(addedNames, ",")
 	employer.SetAnnotations(annos)
 	return len(addedNames) == 0, r.Patch(ctx, employer, patch)
 }
@@ -538,7 +538,7 @@ func (r *Consist) getToAddDeleteLifecycleFlzEmployees(succCreate, failCreate, su
 
 	watchOptions, watchOptionsImplemented := r.adapter.(ReconcileWatchOptions)
 
-	if (watchOptionsImplemented && !isPod(watchOptions.NewEmployee())) || r.adapter.NotFollowPodOpsLifeCycle() {
+	if r.adapter.NotFollowPodOpsLifeCycle() || (watchOptionsImplemented && !isPod(watchOptions.NewEmployee())) {
 		return toAddLifecycleFlz[:toAddIdx], toDeleteLifecycleFlz[:toDeleteIdx]
 	}
 
@@ -587,20 +587,11 @@ func (r *Consist) ensureEmployerCleanFlz(ctx context.Context, employer client.Ob
 	if !employer.GetDeletionTimestamp().IsZero() {
 		return false, nil
 	}
-	alreadyAdd := false
 	for _, flz := range employer.GetFinalizers() {
 		if flz == cleanFinalizerPrefix+employer.GetName() {
-			alreadyAdd = true
-			break
+			return false, nil
 		}
 	}
-	if alreadyAdd {
-		return false, nil
-	}
 	employer.SetFinalizers(append(employer.GetFinalizers(), cleanFinalizerPrefix+employer.GetName()))
-	err := r.Update(ctx, employer)
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+	return true, r.Update(ctx, employer)
 }

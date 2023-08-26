@@ -38,6 +38,10 @@ func isPod(obj client.Object) bool {
 // isPodLifecycleReady check both ReadinessGatePodServiceReady and PodReady to avoid effects that PodReady not set to false
 // even ReadinessGatePodServiceReady is false caused by evict machine
 func isPodLifecycleReady(pod *corev1.Pod) bool {
+	if !pod.DeletionTimestamp.IsZero() {
+		return false
+	}
+
 	podReady := false
 	readinessGateReady := true
 	var podReadyChecked, readinessGateReadyChecked bool

@@ -142,18 +142,18 @@ func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (rec
 	}
 
 	// ensure employer-clean finalizer firstly, employer-clean finalizer should be cleaned at the end
-	requeue, err := r.ensureEmployerCleanFlz(ctx, employer)
+	updated, err := r.ensureEmployerCleanFlz(ctx, employer)
 	if err != nil {
 		r.logger.Errorf("add employer clean finalizer failed: %s", err.Error())
 		r.recorder.Eventf(employer, v1.EventTypeWarning, "ensureEmployerCleanFlzFailed",
 			"add employer clean finalizer failed: %s", err.Error())
 		return reconcile.Result{}, err
 	}
-	if requeue {
-		r.logger.Errorf("add employer clean finalizer, requeue")
-		r.recorder.Eventf(employer, v1.EventTypeNormal, "ensureEmployerCleanFlzRequeue",
-			"add employer clean finalizer, requeue")
-		return reconcile.Result{Requeue: requeue}, nil
+	if updated {
+		r.logger.Errorf("add employer clean finalizer")
+		r.recorder.Eventf(employer, v1.EventTypeNormal, "ensureEmployerCleanFlzSucceed",
+			"add employer clean finalizer")
+		return reconcile.Result{}, nil
 	}
 
 	isExpectedClean, err := r.ensureExpectedFinalizer(ctx, employer)
