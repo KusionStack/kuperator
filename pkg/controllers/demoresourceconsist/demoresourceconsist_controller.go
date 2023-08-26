@@ -138,6 +138,10 @@ func (r *ReconcileAdapter) RecordEmployer(succCreate, succUpdate, succDelete []r
 
 // GetExpectEmployeeStatus return expect employee status
 func (r *ReconcileAdapter) GetExpectEmployee(ctx context.Context, employer client.Object) ([]resourceconsist.IEmployee, error) {
+	if !employer.GetDeletionTimestamp().IsZero() {
+		return []resourceconsist.IEmployee{}, nil
+	}
+
 	svc, ok := employer.(*corev1.Service)
 	if !ok {
 		return nil, fmt.Errorf("expect employer kind is Service")

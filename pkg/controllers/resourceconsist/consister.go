@@ -105,7 +105,7 @@ func (r *Consist) diffEmployer(expectEmployer, currentEmployer []IEmployer) (ToC
 	}
 
 	// todo, log level
-	r.logger.Infof("toCreate: %v, toUpdate: %v, toDelete: %v, unchanged: %v",
+	r.logger.Infof("employer, toCreate: %v, toUpdate: %v, toDelete: %v, unchanged: %v",
 		toCreate[:toCreateIdx], toUpdate[:toUpdateIdx], toDelete[:toDeleteIdx], unchanged[:unchangedIdx])
 
 	return ToCUDEmployer{
@@ -162,8 +162,8 @@ func (r *Consist) diffEmployees(expectEmployees, currentEmployees []IEmployee) (
 	}
 
 	// todo, log level
-	r.logger.Infof("toCreate: %v, toUpdate: %v, toDelete: %v, unchanged: %v",
-		toCreate[:toCreateIdx], toUpdate[:toUpdateIdx], toDelete[toDeleteIdx], unchanged[:unchangedIdx])
+	r.logger.Infof("employee, toCreate: %v, toUpdate: %v, toDelete: %v, unchanged: %v",
+		toCreate[:toCreateIdx], toUpdate[:toUpdateIdx], toDelete[:toDeleteIdx], unchanged[:unchangedIdx])
 
 	return ToCUDEmployees{
 		ToCreate:  toCreate[:toCreateIdx],
@@ -242,7 +242,7 @@ func (r *Consist) ensureExpectedFinalizer(ctx context.Context, employer client.O
 				notDeletedPodNames = append(notDeletedPodNames, deleteExpectedFinalizerOps.Name)
 			}
 		}
-		patch := client.MergeFrom(employer)
+		patch := client.MergeFrom(employer.DeepCopyObject().(client.Object))
 		annos := employer.GetAnnotations()
 		annos[expectedFinalizerAddedAnnoKey] = strings.Join(notDeletedPodNames, ",")
 		employer.SetAnnotations(annos)
@@ -289,7 +289,7 @@ func (r *Consist) ensureExpectedFinalizer(ctx context.Context, employer client.O
 		}
 	}
 
-	patch := client.MergeFrom(employer)
+	patch := client.MergeFrom(employer.DeepCopyObject().(client.Object))
 	annos := employer.GetAnnotations()
 	annos[expectedFinalizerAddedAnnoKey] = strings.Join(addedNames, ",")
 	employer.SetAnnotations(annos)
@@ -348,6 +348,9 @@ func (r *Consist) patchAddPodExpectedFinalizer(ctx context.Context, employer cli
 			if errUnmarshal != nil {
 				return errUnmarshal
 			}
+			if availableExpectedFlzs.ExpectedFinalizers == nil {
+				availableExpectedFlzs.ExpectedFinalizers = make(map[string]string)
+			}
 			if availableExpectedFlzs.ExpectedFinalizers[expectedFlzKey] != expectedFlz {
 				availableExpectedFlzs.ExpectedFinalizers[expectedFlzKey] = expectedFlz
 				annoAvailableExpectedFlzs, errMarshal := json.Marshal(availableExpectedFlzs)
@@ -379,6 +382,7 @@ func (r *Consist) patchDeletePodExpectedFinalizer(ctx context.Context, employer 
 		}, &pod)
 		if err != nil {
 			if errors.IsNotFound(err) {
+				podExpectedFinalizerOps.Succeed = true
 				return nil
 			}
 			return err
