@@ -18,7 +18,6 @@ package ruleset
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -32,11 +31,11 @@ type ManagerInterface interface {
 	// Register used to register ruleSet stages and conditions before starting controller
 	register.Register
 
+	// Checker is used to check rule state after starting controller
+	checker.Checker
+
 	// SetupRuleSetController add a new RuleSetController to manager
 	SetupRuleSetController(manager.Manager) error
-
-	// Check is used to check rule state after starting controller
-	checker.Check
 }
 
 var defaultManager = newRulesetManager()
@@ -51,27 +50,15 @@ func AddUnAvailableFunc(f func(pod *corev1.Pod) (bool, *int64)) {
 
 func newRulesetManager() ManagerInterface {
 	return &rsManager{
-		register: register.DefaultRegister(),
-		checker:  checker.NewCheck(),
+		Register: register.DefaultRegister(),
+		Checker:  checker.NewCheck(),
 	}
 }
 
 type rsManager struct {
-	register   register.Register
-	checker    checker.Check
+	register.Register
+	checker.Checker
 	controller controller.Controller
-}
-
-func (m *rsManager) RegisterStage(key string, needCheck func(obj client.Object) bool) {
-	m.register.RegisterStage(key, needCheck)
-}
-
-func (m *rsManager) RegisterCondition(opsCondition string, inCondition func(obj client.Object) bool) {
-	m.register.RegisterCondition(opsCondition, inCondition)
-}
-
-func (m *rsManager) GetState(c client.Client, item client.Object) (checker.CheckState, error) {
-	return m.checker.GetState(c, item)
 }
 
 func (m *rsManager) SetupRuleSetController(mgr manager.Manager) (err error) {

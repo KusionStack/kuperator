@@ -23,7 +23,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 
 	"kusionstack.io/kafed/apis/apps/v1alpha1"
 	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
@@ -51,22 +50,19 @@ var (
 )
 
 type ReadyToUpgrade func(pod *corev1.Pod) (bool, []string)
-type SatisfyExpectedFinalizers func(pod *corev1.Pod) (bool, []string, error)
 type TimeLabelValue func() string
 type IsPodReady func(pod *corev1.Pod) bool
 
 type OpsLifecycle struct {
-	readyToUpgrade            ReadyToUpgrade // for testing
-	satisfyExpectedFinalizers SatisfyExpectedFinalizers
-	isPodReady                IsPodReady
-	timeLabelValue            TimeLabelValue
+	readyToUpgrade ReadyToUpgrade // for testing
+	isPodReady     IsPodReady
+	timeLabelValue TimeLabelValue
 }
 
 func New() *OpsLifecycle {
 	return &OpsLifecycle{
-		readyToUpgrade:            hasNoBlockingFinalizer,
-		satisfyExpectedFinalizers: satisfyExpectedFinalizers,
-		isPodReady:                controllerutils.IsPodReady,
+		readyToUpgrade: hasNoBlockingFinalizer,
+		isPodReady:     controllerutils.IsPodReady,
 		timeLabelValue: func() string {
 			return strconv.FormatInt(time.Now().Unix(), 10)
 		},
@@ -93,32 +89,6 @@ func addReadinessGates(pod *corev1.Pod, conditionType corev1.PodConditionType) {
 	pod.Spec.ReadinessGates = append(pod.Spec.ReadinessGates, corev1.PodReadinessGate{
 		ConditionType: conditionType,
 	})
-}
-
-func satisfyExpectedFinalizers(pod *corev1.Pod) (bool, []string, error) {
-	satisfied := true
-	var expectedFinalizer []string // expected finalizers that are not satisfied
-
-	availableConditions, err := podAvailableConditions(pod)
-	if err != nil {
-		return satisfied, expectedFinalizer, err
-	}
-
-	if availableConditions != nil && len(availableConditions.ExpectedFinalizers) != 0 {
-		existFinalizers := sets.String{}
-		for _, finalizer := range pod.Finalizers {
-			existFinalizers.Insert(finalizer)
-		}
-
-		for _, finalizer := range availableConditions.ExpectedFinalizers {
-			if !existFinalizers.Has(finalizer) {
-				satisfied = false
-				expectedFinalizer = append(expectedFinalizer, finalizer)
-			}
-		}
-	}
-
-	return satisfied, expectedFinalizer, nil
 }
 
 func hasNoBlockingFinalizer(pod *corev1.Pod) (bool, []string) {

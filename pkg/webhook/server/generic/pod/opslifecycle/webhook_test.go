@@ -124,9 +124,8 @@ func TestMutating(t *testing.T) {
 		newPodLabels   map[string]string
 		expectedLabels map[string]string
 
-		satisfyExpectedFinalizers SatisfyExpectedFinalizers
-		readyToUpgrade            ReadyToUpgrade
-		isPodReady                IsPodReady
+		readyToUpgrade ReadyToUpgrade
+		isPodReady     IsPodReady
 	}{
 		{
 			notes: "pre-check",
@@ -402,7 +401,6 @@ func TestMutating(t *testing.T) {
 
 				fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, "123"): "1402144848",
 			},
-			satisfyExpectedFinalizers: satifyExpectedFinalizersReturnFalse,
 		},
 
 		{
@@ -424,9 +422,7 @@ func TestMutating(t *testing.T) {
 
 				fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, "456"): "1402144848",
 			},
-			expectedLabels: map[string]string{
-				v1alpha1.PodServiceAvailableLabel: "1402144848",
-			},
+			expectedLabels: map[string]string{},
 		},
 	}
 
@@ -458,9 +454,6 @@ func TestMutating(t *testing.T) {
 		if v.readyToUpgrade != nil {
 			opslifecycle.readyToUpgrade = v.readyToUpgrade
 		}
-		if v.satisfyExpectedFinalizers != nil {
-			opslifecycle.satisfyExpectedFinalizers = v.satisfyExpectedFinalizers
-		}
 		if v.isPodReady != nil {
 			opslifecycle.isPodReady = v.isPodReady
 		}
@@ -489,7 +482,6 @@ func opsLifecycleDefaultFunc(opslifecycle *OpsLifecycle) {
 	}
 
 	opslifecycle.readyToUpgrade = readyToUpgradeReturnTrue
-	opslifecycle.satisfyExpectedFinalizers = satifyExpectedFinalizersReturnTrue
 	opslifecycle.isPodReady = isPodReadyReturnTrue
 }
 
@@ -499,14 +491,6 @@ func readyToUpgradeReturnTrue(pod *corev1.Pod) (bool, []string) {
 
 func readyToUpgradeReturnFalse(pod *corev1.Pod) (bool, []string) {
 	return false, nil
-}
-
-func satifyExpectedFinalizersReturnTrue(pod *corev1.Pod) (bool, []string, error) {
-	return true, nil, nil
-}
-
-func satifyExpectedFinalizersReturnFalse(pod *corev1.Pod) (bool, []string, error) {
-	return false, nil, nil
 }
 
 func isPodReadyReturnTrue(pod *corev1.Pod) bool {

@@ -27,6 +27,7 @@ import (
 
 	"kusionstack.io/kafed/apis/apps/v1alpha1"
 	"kusionstack.io/kafed/pkg/controllers/podopslifecycle"
+	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
 	"kusionstack.io/kafed/pkg/utils"
 )
 
@@ -75,15 +76,18 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 			operatingCount++
 
 			if _, ok := labels[v1alpha1.PodPreCheckedLabelPrefix]; ok { // pre-checked
-				if _, ok := labels[v1alpha1.PodPrepareLabelPrefix]; !ok {
+				_, hasPrepare := labels[v1alpha1.PodPrepareLabelPrefix]
+				_, hasOperate := labels[v1alpha1.PodOperateLabelPrefix]
+
+				if !hasPrepare && !hasOperate {
 					delete(newPod.Labels, v1alpha1.PodServiceAvailableLabel)
 
 					lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, id)) // prepare
-				} else if _, ok := labels[v1alpha1.PodOperateLabelPrefix]; !ok {
+				} else if !hasOperate {
 					if ready, _ := lc.readyToUpgrade(newPod); ready {
 						delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, id))
 
-						lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id)) // operate, controllers can begin to operate
+						lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id)) // operate
 					}
 				}
 			} else {
@@ -95,7 +99,7 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 
 		if _, ok := labels[v1alpha1.PodPostCheckedLabelPrefix]; ok { // post-checked
 			if _, ok := labels[v1alpha1.PodCompleteLabelPrefix]; !ok {
-				lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, id)) // complete, wait fo podopslifecycle controller adds readiness gate
+				lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, id)) // complete
 			}
 		}
 
@@ -122,16 +126,12 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 	}
 
 	if completeCount == numOfIDs { // all operations are completed
-		satisfied, expectedFinalizer, err := lc.satisfyExpectedFinalizers(newPod) // whether all expected finalizers are satisfied
+		satisfied, expectedFinalizers, err := controllerutils.SatisfyExpectedFinalizers(newPod) // whether all expected finalizers are satisfied
 		if err != nil || !satisfied {
-			klog.Infof("pod: %s/%s, expected finalizers: %v, err: %v", newPod.Namespace, newPod.Name, expectedFinalizer, err)
+			klog.Infof("pod: %s/%s, satisfied: %v, expectedFinalizer: %v, err: %v", newPod.Namespace, newPod.Name, satisfied, expectedFinalizers, err)
 			return err
 		}
-		if !lc.isPodReady(newPod) {
-			return nil
-		}
 
-		// all operations are done and all expected finalizers are satisfied, then remove all unuseful labels, and add service available label
 		for id := range newIDToLabelsMap {
 			for _, v := range []string{v1alpha1.PodOperateLabelPrefix,
 				v1alpha1.PodOperatedLabelPrefix,
@@ -143,8 +143,6 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 				delete(newPod.Labels, fmt.Sprintf("%s/%s", v, id))
 			}
 		}
-		lc.addLabelWithTime(newPod, v1alpha1.PodServiceAvailableLabel)
-
 		return nil
 	}
 

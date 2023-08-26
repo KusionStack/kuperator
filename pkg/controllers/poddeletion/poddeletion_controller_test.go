@@ -110,7 +110,7 @@ var _ = Describe("Pod Deletion controller", func() {
 })
 
 func updatePodWithRetry(c client.Client, namespace, name string, updateFn func(pod *corev1.Pod) bool) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		pod := &corev1.Pod{}
 		if err := c.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: name}, pod); err != nil {
 			return err
@@ -125,7 +125,7 @@ func updatePodWithRetry(c client.Client, namespace, name string, updateFn func(p
 }
 
 func updatePodStatusWithRetry(c client.Client, namespace, name string, updateFn func(pod *corev1.Pod) bool) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		pod := &corev1.Pod{}
 		if err := c.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: name}, pod); err != nil {
 			return err

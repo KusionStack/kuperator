@@ -18,7 +18,6 @@ package podopslifecycle
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
@@ -51,11 +50,7 @@ func (pp *PodPredicate) Update(evt event.UpdateEvent) bool {
 	if oldPod == nil && newPod == nil {
 		return false
 	}
-	if !pp.NeedOpsLifecycle(oldPod, newPod) {
-		return false
-	}
-
-	return !equality.Semantic.DeepEqual(oldPod.ObjectMeta.Annotations, newPod.ObjectMeta.Annotations) || !equality.Semantic.DeepEqual(oldPod.ObjectMeta.Labels, newPod.ObjectMeta.Labels)
+	return pp.NeedOpsLifecycle(oldPod, newPod)
 }
 
 func (pp *PodPredicate) Generic(evt event.GenericEvent) bool {

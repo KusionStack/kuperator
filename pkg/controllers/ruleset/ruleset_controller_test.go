@@ -113,7 +113,7 @@ func TestRuleSet(t *testing.T) {
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 		printJson(state)
 		printJson(podList.Items[i])
-		if state.InStageAndPassed(PreTrafficOffStage) {
+		if state.InStageAndPassed() {
 			passedCount++
 			g.Expect(podList.Items[i].Name).NotTo(gomega.Equal("pod-test-3"))
 			g.Expect(podList.Items[i].Name).NotTo(gomega.Equal("pod-test-4"))
@@ -129,7 +129,7 @@ func TestRuleSet(t *testing.T) {
 	waitProcessFinished(request)
 	g.Expect(c.Get(ctx, types.NamespacedName{Namespace: "default", Name: "pod-test-3"}, po)).NotTo(gomega.HaveOccurred())
 	state, _ := RuleSetManager().GetState(c, po)
-	g.Expect(state.InStageAndPassed(PreTrafficOffStage)).Should(gomega.BeTrue())
+	g.Expect(state.InStageAndPassed()).Should(gomega.BeTrue())
 	printJson(state)
 
 	ruleSetList := &appsv1alpha1.RuleSetList{}

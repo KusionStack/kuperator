@@ -26,8 +26,10 @@ import (
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
+	"kusionstack.io/kafed/apis/apps/v1alpha1"
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
 	revisionutils "kusionstack.io/kafed/pkg/controllers/utils/revision"
 )
@@ -274,4 +276,47 @@ func IsPodUpdatedRevision(pod *corev1.Pod, revision string) bool {
 	}
 
 	return pod.Labels[appsv1.ControllerRevisionHashLabelKey] == revision
+}
+
+func SatisfyExpectedFinalizers(pod *corev1.Pod) (bool, []string, error) {
+	satisfied := true
+	var expectedFinalizers []string // expected finalizers that are not satisfied
+
+	availableConditions, err := PodAvailableConditions(pod)
+	if err != nil {
+		return satisfied, expectedFinalizers, err
+	}
+
+	if availableConditions != nil && len(availableConditions.ExpectedFinalizers) != 0 {
+		existFinalizers := sets.String{}
+		for _, finalizer := range pod.Finalizers {
+			existFinalizers.Insert(finalizer)
+		}
+
+		for _, finalizer := range availableConditions.ExpectedFinalizers {
+			if !existFinalizers.Has(finalizer) {
+				satisfied = false
+				expectedFinalizers = append(expectedFinalizers, finalizer)
+			}
+		}
+	}
+
+	return satisfied, expectedFinalizers, nil
+}
+
+func PodAvailableConditions(pod *corev1.Pod) (*v1alpha1.PodAvailableConditions, error) {
+	if pod.Annotations == nil {
+		return nil, nil
+	}
+
+	anno, ok := pod.Annotations[v1alpha1.PodAvailableConditionsAnnotation]
+	if !ok {
+		return nil, nil
+	}
+
+	availableConditions := &v1alpha1.PodAvailableConditions{}
+	if err := json.Unmarshal([]byte(anno), availableConditions); err != nil {
+		return nil, err
+	}
+	return availableConditions, nil
 }
