@@ -47,7 +47,6 @@ import (
 	rulesetutils "kusionstack.io/kafed/pkg/controllers/ruleset/utils"
 	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
 	"kusionstack.io/kafed/pkg/utils"
-	"kusionstack.io/kafed/pkg/utils/inject"
 )
 
 const (
@@ -71,16 +70,6 @@ func addToMgr(mgr manager.Manager, r reconcile.Reconciler) (controller.Controlle
 	c, err := controller.New(controllerName, mgr, controller.Options{
 		MaxConcurrentReconciles: 5,
 		Reconciler:              r,
-	})
-	if err != nil {
-		return nil, err
-	}
-	err = mgr.GetCache().IndexField(context.TODO(), &appsv1alpha1.RuleSet{}, inject.FieldIndexRuleSet, func(obj client.Object) []string {
-		rs, ok := obj.(*appsv1alpha1.RuleSet)
-		if !ok {
-			return nil
-		}
-		return rs.Status.Targets
 	})
 	if err != nil {
 		return nil, err
