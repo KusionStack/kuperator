@@ -25,10 +25,13 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
 )
 
 const (
 	FieldIndexOwnerRefUID = "ownerRefUID"
+	FieldIndexRuleSet     = "rulesetIndex"
 )
 
 func NewCacheWithFieldIndex(config *rest.Config, opts cache.Options) (cache.Cache, error) {
@@ -53,6 +56,14 @@ func NewCacheWithFieldIndex(config *rest.Config, opts cache.Options) (cache.Cach
 		}
 
 		return []string{string(ownerRef.UID)}
+	})
+
+	c.IndexField(context.TODO(), &appsv1alpha1.RuleSet{}, FieldIndexRuleSet, func(obj client.Object) []string {
+		rs, ok := obj.(*appsv1alpha1.RuleSet)
+		if !ok {
+			return nil
+		}
+		return rs.Status.Targets
 	})
 	return c, err
 }
