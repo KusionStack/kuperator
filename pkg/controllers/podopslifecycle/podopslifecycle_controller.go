@@ -48,10 +48,6 @@ const (
 	controllerName = "podopslifecycle-controller"
 )
 
-var (
-	expectation *expectations.ResourceVersionExpectation
-)
-
 func Add(mgr manager.Manager) error {
 	return AddToMgr(mgr, NewReconciler(mgr))
 }
@@ -79,7 +75,7 @@ func AddToMgr(mgr manager.Manager, r reconcile.Reconciler) error {
 var _ reconcile.Reconciler = &ReconcilePodOpsLifecycle{}
 
 func NewReconciler(mgr manager.Manager) *ReconcilePodOpsLifecycle {
-	expectation = expectations.NewResourceVersionExpectation()
+	expectation := expectations.NewResourceVersionExpectation()
 
 	r := &ReconcilePodOpsLifecycle{
 		Client:         mgr.GetClient(),
@@ -131,11 +127,13 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 	if len(idToLabelsMap) == 0 {
 		updated, err := r.addServiceAvailable(pod)
 		if updated {
+			r.recorder.Eventf(pod, corev1.EventTypeNormal, "ServiceAvailable", "Label pod as service available, error: %v", err)
 			return reconcile.Result{}, err
 		}
 
 		updated, err = r.updateServiceReadiness(ctx, pod, true)
 		if updated {
+			r.recorder.Eventf(pod, corev1.EventTypeNormal, "ReadinessGate", "Set service ready readiness gate to true, error: %v", err)
 			return reconcile.Result{}, err
 		}
 	}
@@ -178,6 +176,7 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 				return reconcile.Result{}, err // only need set once
 			}
 			if updated {
+				r.recorder.Eventf(pod, corev1.EventTypeNormal, "ReadinessGate", "Set service ready readiness gate to %v", v)
 				return reconcile.Result{}, nil
 			}
 		}
@@ -326,7 +325,7 @@ func (r *ReconcilePodOpsLifecycle) addLabels(ctx context.Context, pod *corev1.Po
 	}
 
 	key := controllerKey(pod)
-	expectation.ExpectUpdate(key, pod.ResourceVersion)
+	r.expectation.ExpectUpdate(key, pod.ResourceVersion)
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		newPod := &corev1.Pod{}
 		err := r.Client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, newPod)
@@ -343,8 +342,10 @@ func (r *ReconcilePodOpsLifecycle) addLabels(ctx context.Context, pod *corev1.Po
 	})
 	if err != nil {
 		klog.Errorf("failed to update pod %s with labels: %v: %s", key, labels, err)
-		expectation.DeleteExpectations(key)
+		r.expectation.DeleteExpectations(key)
 	}
+	r.recorder.Eventf(pod, corev1.EventTypeNormal, "UpdatePod", "Succeed to update labels: %v", labels)
+
 	return err
 }
 
