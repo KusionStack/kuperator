@@ -14,9 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package alibaba_cloud_slb
 
-// +kubebuilder:object:generate=false
-type PodAvailableConditions struct {
-	ExpectedFinalizers map[string]string `json:"expectedFinalizers,omitempty"` // indicate the expected finalizers of a pod
-}
+const alibabaCloudSlbLbIdLabelKey = "service.k8s.alibaba/loadbalancer-id"

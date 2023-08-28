@@ -14,9 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package controllers
 
-// +kubebuilder:object:generate=false
-type PodAvailableConditions struct {
-	ExpectedFinalizers map[string]string `json:"expectedFinalizers,omitempty"` // indicate the expected finalizers of a pod
+import (
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	"kusionstack.io/kafed/pkg/controllers/alibaba_cloud_slb"
+	"kusionstack.io/kafed/pkg/controllers/resourceconsist"
+)
+
+func init() {
+	AddToManagerFuncs = append(AddToManagerFuncs, Add)
+}
+
+func Add(manager manager.Manager) error {
+	return resourceconsist.Add(manager, alibaba_cloud_slb.NewReconcileAdapter(manager.GetClient()))
 }

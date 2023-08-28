@@ -14,9 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package webhookAdapters
 
-// +kubebuilder:object:generate=false
-type PodAvailableConditions struct {
-	ExpectedFinalizers map[string]string `json:"expectedFinalizers,omitempty"` // indicate the expected finalizers of a pod
+import (
+	"context"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+var WebhookAdapters []WebhookAdapter
+
+// WebhookAdapter should be implemented by adapters which follow PodOpsLifecycle
+type WebhookAdapter interface {
+	GetEmployersByEmployee(ctx context.Context, employee client.Object, client client.Client) ([]client.Object, error)
 }

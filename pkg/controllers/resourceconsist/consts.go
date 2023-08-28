@@ -14,9 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package resourceconsist
 
-// +kubebuilder:object:generate=false
-type PodAvailableConditions struct {
-	ExpectedFinalizers map[string]string `json:"expectedFinalizers,omitempty"` // indicate the expected finalizers of a pod
-}
+const (
+	defaultMaxConcurrentReconciles = 5
+
+	controlledByResourceConsistAnnoKey = "resource-consist.kusionstack.io/control" // todo, replace to an unified label, like: kusionstack.io/control: "true"
+	expectedFinalizerAddedAnnoKey      = "resource-consist.kusionstack.io/employees-expected-finalizer-added"
+
+	cleanFinalizerPrefix = "resource-consist.kusionstack.io/clean-"
+)

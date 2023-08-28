@@ -18,6 +18,8 @@ package v1alpha1
 
 // pod ops lifecyle labels
 const (
+	ControlledByKusionStackLabelKey = "kusionstack.io/control"
+
 	ControlledByPodOpsLifecycle = "podopslifecycle.kusionstack.io/control" // indicate a pod is controlled by podopslifecycle
 
 	PodOperatingLabelPrefix           = "operating.podopslifecycle.kusionstack.io"            // indicate a pod is operating
