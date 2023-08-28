@@ -56,7 +56,10 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 		klog.Errorf("decode RuleSet validating request failed, %v", err)
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-
+	if err := h.validate(rs); err != nil {
+		klog.Errorf("illegal RuleSet: %v", err)
+		return admission.Denied(err.Error())
+	}
 	return admission.Allowed("")
 }
 

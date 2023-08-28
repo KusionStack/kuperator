@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
@@ -40,4 +42,116 @@ func TestValidate(t *testing.T) {
 	assert.Nil(t, CheckCaBundle(testCA))
 	assert.Nil(t, CheckCaBundle("Cg=="))
 	assert.Error(t, CheckCaBundle(invalidCA))
+
+	rs := &appsv1alpha1.RuleSet{
+		Spec: appsv1alpha1.RuleSetSpec{},
+	}
+	assert.Error(t, NewValidatingHandler().validate(rs))
+	rs.Spec = appsv1alpha1.RuleSetSpec{
+		Selector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{"test": "test"},
+		},
+		Rules: []appsv1alpha1.RuleSetRule{
+			{
+				Name:                  "",
+				RuleSetRuleDefinition: appsv1alpha1.RuleSetRuleDefinition{},
+			},
+		},
+	}
+	assert.Error(t, NewValidatingHandler().validate(rs))
+	rs.Spec = appsv1alpha1.RuleSetSpec{
+		Selector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{"test": "test"},
+		},
+		Rules: []appsv1alpha1.RuleSetRule{
+			{
+				Name: "webhook",
+				RuleSetRuleDefinition: appsv1alpha1.RuleSetRuleDefinition{
+					Webhook: &appsv1alpha1.RuleSetRuleWebhook{},
+				},
+			},
+		},
+	}
+	assert.Error(t, NewValidatingHandler().validate(rs))
+	rs.Spec = appsv1alpha1.RuleSetSpec{
+		Selector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{"test": "test"},
+		},
+		Rules: []appsv1alpha1.RuleSetRule{
+			{
+				Name: "webhook",
+				RuleSetRuleDefinition: appsv1alpha1.RuleSetRuleDefinition{
+					Webhook: &appsv1alpha1.RuleSetRuleWebhook{
+						ClientConfig: appsv1alpha1.ClientConfig{
+							URL: "https://github.com",
+						},
+					},
+				},
+			},
+		},
+	}
+	assert.Nil(t, NewValidatingHandler().validate(rs))
+	rs.Spec = appsv1alpha1.RuleSetSpec{
+		Selector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{"test": "test"},
+		},
+		Rules: []appsv1alpha1.RuleSetRule{
+			{
+				Name: "available",
+				RuleSetRuleDefinition: appsv1alpha1.RuleSetRuleDefinition{
+					AvailablePolicy: &appsv1alpha1.AvailableRule{},
+				},
+			},
+		},
+	}
+	assert.Error(t, NewValidatingHandler().validate(rs))
+	istr := intstr.FromString("50%")
+	rs.Spec = appsv1alpha1.RuleSetSpec{
+		Selector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{"test": "test"},
+		},
+		Rules: []appsv1alpha1.RuleSetRule{
+			{
+				Name: "available",
+				RuleSetRuleDefinition: appsv1alpha1.RuleSetRuleDefinition{
+					AvailablePolicy: &appsv1alpha1.AvailableRule{
+						MaxUnavailableValue: &istr,
+					},
+				},
+			},
+		},
+	}
+	assert.Nil(t, NewValidatingHandler().validate(rs))
+	rs.Spec = appsv1alpha1.RuleSetSpec{
+		Selector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{"test": "test"},
+		},
+		Rules: []appsv1alpha1.RuleSetRule{
+			{
+				Name: "label",
+				RuleSetRuleDefinition: appsv1alpha1.RuleSetRuleDefinition{
+					LabelCheck: &appsv1alpha1.LabelCheckRule{},
+				},
+			},
+		},
+	}
+	assert.Error(t, NewValidatingHandler().validate(rs))
+	rs.Spec = appsv1alpha1.RuleSetSpec{
+		Selector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{"test": "test"},
+		},
+		Rules: []appsv1alpha1.RuleSetRule{
+			{
+				Name: "label",
+				RuleSetRuleDefinition: appsv1alpha1.RuleSetRuleDefinition{
+					LabelCheck: &appsv1alpha1.LabelCheckRule{
+						Requires: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"test": "test"},
+						},
+					},
+				},
+			},
+		},
+	}
+	assert.Nil(t, NewValidatingHandler().validate(rs))
 }
