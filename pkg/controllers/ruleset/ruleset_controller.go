@@ -50,10 +50,9 @@ import (
 )
 
 const (
-	controllerName          = "ruleset-controller"
-	resourceName            = "RuleSet"
-	cleanUpFinalizer        = "ruleset.kusionstack.io/need-clean-up"
-	rulesetTerminatingLabel = "ruleset.kusionstack.io/terminating"
+	controllerName   = "ruleset-controller"
+	resourceName     = "RuleSet"
+	cleanUpFinalizer = "ruleset.kusionstack.io/need-clean-up"
 )
 
 // NewReconciler returns a new reconcile.Reconciler
@@ -137,20 +136,13 @@ func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Req
 
 	// Delete
 	if ruleSet.DeletionTimestamp != nil {
-		if _, find := ruleSet.Labels[rulesetTerminatingLabel]; find || !r.hasRunningPod(selectedPods) {
-			if err := r.cleanUpRuleSetPods(ctx, ruleSet); err != nil {
-				return reconcile.Result{}, err
-			}
-
-			if !controllerutil.ContainsFinalizer(ruleSet, cleanUpFinalizer) {
-				return reconcile.Result{}, nil
-			}
-
-			return reconcile.Result{}, controllerutils.RemoveFinalizer(ctx, r.Client, ruleSet, cleanUpFinalizer)
+		if err := r.cleanUpRuleSetPods(ctx, ruleSet); err != nil {
+			return reconcile.Result{}, err
 		}
-		msg := fmt.Sprintf("can not delete ruleset: there are some pods waiting for process by ruleset %s/%s. Please terminate pods first or label ruleset kafed.kusionstack.io/terminating=true to force delete it", ruleSet.Namespace, ruleSet.Name)
-		result.RequeueAfter = 5 * time.Second
-		r.recorder.Event(ruleSet, corev1.EventTypeWarning, "BlockProtection", msg)
+		if !controllerutil.ContainsFinalizer(ruleSet, cleanUpFinalizer) {
+			return reconcile.Result{}, nil
+		}
+		return reconcile.Result{}, controllerutils.RemoveFinalizer(ctx, r.Client, ruleSet, cleanUpFinalizer)
 	} else if !controllerutil.ContainsFinalizer(ruleSet, cleanUpFinalizer) {
 		if err := controllerutils.AddFinalizer(ctx, r.Client, ruleSet, cleanUpFinalizer); err != nil {
 			return result, fmt.Errorf("fail to add finalizer on RuleSet %s: %s", request, err)
