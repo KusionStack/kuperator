@@ -93,7 +93,9 @@ func AddToMgr(mgr manager.Manager, adapter ReconcileAdapter) error {
 	// Watch for changes to EmployeeResources
 	err = c.Watch(&source.Kind{
 		Type: &v1.Pod{}},
-		&EnqueueServiceByPod{},
+		&EnqueueServiceByPod{
+			c: mgr.GetClient(),
+		},
 		employeePredicates)
 	if err != nil {
 		return err
