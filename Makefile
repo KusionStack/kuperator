@@ -1,12 +1,13 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= my.docker.registry/controller:test
+IMG ?= kusionstack/kafed:test
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.22.1
 # kind cluster name for e2e
 CLUSTER_NAME ?= cluster1
 # kind version for e2e
 KIND_VERSION ?= v1.22.2
+KIND_KUBECONFIG ?= /tmp/kind/kubeconfig.yaml
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -126,16 +127,22 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 .PHONY: deploy-kind
 deploy-kind:
-	sed -i'' -e 's@name: .*@name: '"${CLUSTER_NAME}"'@' ./test/e2e/scripts/kind-conf.yaml
-	kind create cluster --image kindest/node:${KIND_VERSION} --config ./test/e2e/scripts/kind-conf.yaml
+	@if [ $(shell kind get clusters | grep ${CLUSTER_NAME}) = ${CLUSTER_NAME} ]; then echo "kind ${CLUSTER_NAME} already exists"; else \
+	sed -i'' -e 's@name: .*@name: '"${CLUSTER_NAME}"'@' ./test/e2e/scripts/kind-conf.yaml; \
+	mkdir -p /tmp/kind; \
+	kind create cluster --image kindest/node:${KIND_VERSION} --config ./test/e2e/scripts/kind-conf.yaml; fi
 
 .PHONY: kind-kube-config
 kind-kube-config:
-	kind get kubeconfig --name kindcluster > /tmp/kind-kubeconfig.yaml
+	kind get kubeconfig --name ${CLUSTER_NAME} > ${KIND_KUBECONFIG}
+	export KUBECONFIG=${KIND_KUBECONFIG}
 
 .PHONY: sync-kind-image
 sync-kind-image:
 	kind load docker-image ${IMG} --name ${CLUSTER_NAME}
+
+.PHONY: deploy-in-kind
+deploy-in-kind: deploy-kind kind-kube-config docker-build sync-kind-image deploy
 
 .PHONY: clean-kind
 clean-kind:
