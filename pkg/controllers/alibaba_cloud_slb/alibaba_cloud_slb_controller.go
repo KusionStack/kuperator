@@ -104,8 +104,7 @@ func (r *ReconcileAdapter) GetExpectEmployee(ctx context.Context, employer clien
 	}
 
 	expected := make([]resourceconsist.IEmployee, len(podList.Items))
-	expectIdx := 0
-	for _, pod := range podList.Items {
+	for idx, pod := range podList.Items {
 		status := AlibabaSlbPodStatus{
 			EmployeeID:   pod.Status.PodIP,
 			EmployeeName: pod.Name,
@@ -122,11 +121,10 @@ func (r *ReconcileAdapter) GetExpectEmployee(ctx context.Context, employer clien
 		}
 		employeeStatuses.ExtraStatus = extraStatus
 		status.EmployeeStatuses = employeeStatuses
-		expected[expectIdx] = status
-		expectIdx++
+		expected[idx] = status
 	}
 
-	return expected[:expectIdx], nil
+	return expected, nil
 }
 
 func (r *ReconcileAdapter) GetCurrentEmployee(ctx context.Context, employer client.Object) ([]resourceconsist.IEmployee, error) {
@@ -141,13 +139,9 @@ func (r *ReconcileAdapter) GetCurrentEmployee(ctx context.Context, employer clie
 		return nil, err
 	}
 
-	lbID := svc.GetLabels()["service.k8s.alibaba/loadbalancer-id"]
+	lbID := svc.GetLabels()[alibabaCloudSlbLbIdLabelKey]
 	bsExistUnderSlb := make(map[string]bool)
 	if lbID != "" {
-		alibabaCloudSlbClient, err := NewAlibabaCloudSlbClient()
-		if err != nil {
-			return nil, fmt.Errorf("get alibaba cloud slb client failed, err: %s", err.Error())
-		}
 		backendServers, err := alibabaCloudSlbClient.GetBackendServers(lbID)
 		if err != nil {
 			return nil, fmt.Errorf("get backend servers of slb failed, err: %s", err.Error())
@@ -158,8 +152,7 @@ func (r *ReconcileAdapter) GetCurrentEmployee(ctx context.Context, employer clie
 	}
 
 	current := make([]resourceconsist.IEmployee, len(podList.Items))
-	currentIdx := 0
-	for _, pod := range podList.Items {
+	for idx, pod := range podList.Items {
 		status := AlibabaSlbPodStatus{
 			EmployeeID:   pod.Status.PodIP,
 			EmployeeName: pod.Name,
@@ -176,11 +169,10 @@ func (r *ReconcileAdapter) GetCurrentEmployee(ctx context.Context, employer clie
 		}
 		employeeStatuses.ExtraStatus = extraStatus
 		status.EmployeeStatuses = employeeStatuses
-		current[currentIdx] = status
-		currentIdx++
+		current[idx] = status
 	}
 
-	return current[:currentIdx], nil
+	return current, nil
 }
 
 // CreateEmployees returns (nil, toCreate, nil) since CCM of ACK will sync bs of slb

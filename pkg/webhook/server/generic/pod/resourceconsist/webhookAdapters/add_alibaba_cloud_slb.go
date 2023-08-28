@@ -23,6 +23,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"kusionstack.io/kafed/apis/apps/v1alpha1"
 )
 
 func init() {
@@ -48,7 +50,7 @@ func (r *SlbWebhookAdapter) GetEmployersByEmployee(ctx context.Context, employee
 	}
 
 	for _, service := range serviceList.Items {
-		if service.GetAnnotations()[annoControlledByResourceConsist] != "true" {
+		if service.GetLabels()[v1alpha1.ControlledByKusionStackLabelKey] != "true" {
 			continue
 		}
 		if labels.SelectorFromSet(service.Spec.Selector).Matches(labels.Set(employee.GetLabels())) {

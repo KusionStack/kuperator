@@ -28,6 +28,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"kusionstack.io/kafed/apis/apps/v1alpha1"
 )
 
 var _ handler.EventHandler = &EnqueueServiceWithRateLimit{}
@@ -198,8 +200,8 @@ func doPredicate(obj client.Object) bool {
 	if obj == nil {
 		return false
 	}
-	if obj.GetAnnotations() != nil {
-		value, exist := obj.GetAnnotations()[controlledByResourceConsistAnnoKey]
+	if obj.GetLabels() != nil {
+		value, exist := obj.GetLabels()[v1alpha1.ControlledByKusionStackLabelKey]
 		if exist && value == "true" {
 			return true
 		}

@@ -22,8 +22,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const annoControlledByResourceConsist = "resource-consist.kusionstack.io/control"
-
 var WebhookAdapters []WebhookAdapter
 
 // WebhookAdapter should be implemented by adapters which follow PodOpsLifecycle
