@@ -102,6 +102,8 @@ type ReconcilePodOpsLifecycle struct {
 
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch
+
 func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	key := fmt.Sprintf("%s/%s", request.Namespace, request.Name)
 	klog.Infof("Reconcile Pod %s", key)

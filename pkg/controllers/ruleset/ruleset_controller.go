@@ -108,9 +108,11 @@ type RuleSetReconciler struct {
 	logr.Logger
 }
 
-//+kubebuilder:rbac:groups=apps.kusionstack.io,resources=rulesets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=apps.kusionstack.io,resources=rulesets/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=apps.kusionstack.io,resources=rulesets/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps.kusionstack.io,resources=rulesets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.kusionstack.io,resources=rulesets/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kusionstack.io,resources=rulesets/finalizers,verbs=update
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch
 
 func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, reconcileErr error) {
 
