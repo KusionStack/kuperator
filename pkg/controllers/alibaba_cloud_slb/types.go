@@ -18,8 +18,9 @@ package alibaba_cloud_slb
 
 import (
 	"fmt"
-	"kusionstack.io/kafed/pkg/controllers/resourceconsist"
 	"reflect"
+
+	"kusionstack.io/kafed/pkg/controllers/resourceconsist"
 )
 
 var _ resourceconsist.IEmployee = AlibabaSlbPodStatus{}

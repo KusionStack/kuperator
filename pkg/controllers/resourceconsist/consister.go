@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -27,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"kusionstack.io/kafed/apis/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 
 	"kusionstack.io/kafed/pkg/controllers/utils"
 )
