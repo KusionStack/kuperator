@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
+	"kusionstack.io/kafed/pkg/utils/inject"
 )
 
 var (
@@ -70,6 +71,7 @@ func TestMain(m *testing.M) {
 	go func() {
 		mgr, err = manager.New(config, manager.Options{
 			MetricsBindAddress: "0",
+			NewCache:           inject.NewCacheWithFieldIndex,
 		})
 		var r reconcile.Reconciler
 		r, request = testReconcile(newReconciler(mgr))
