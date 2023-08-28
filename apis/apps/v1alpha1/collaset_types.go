@@ -240,8 +240,8 @@ type CollaSetCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 
 // CollaSet is the Schema for the collasets API
 // +k8s:openapi-gen=true

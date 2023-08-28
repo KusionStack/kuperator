@@ -266,7 +266,7 @@ type RuleSet struct {
 	Status RuleSetStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // RuleSetList contains a list of RuleSet
 type RuleSetList struct {

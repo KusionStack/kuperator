@@ -43,7 +43,7 @@ type ResourceContext struct {
 	Spec ResourceContextSpec `json:"spec,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ResourceContextList contains a list of ResourceContext
 type ResourceContextList struct {
