@@ -388,12 +388,6 @@ func (r *Consist) patchDeletePodExpectedFinalizer(ctx context.Context, employer 
 			return err
 		}
 
-		if !pod.GetDeletionTimestamp().IsZero() {
-			// no need to update, since no longer used
-			podExpectedFinalizerOps.Succeed = true
-			return nil
-		}
-
 		patch := client.MergeFrom(pod.DeepCopy())
 
 		var availableExpectedFlzs v1alpha1.PodAvailableConditions
