@@ -25,7 +25,7 @@ import (
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
 	"kusionstack.io/kafed/pkg/controllers/ruleset/register"
-	rulesetutils "kusionstack.io/kafed/pkg/controllers/ruleset/utils"
+	"kusionstack.io/kafed/pkg/utils/inject"
 )
 
 type Checker interface {
@@ -48,7 +48,7 @@ func (c *checker) GetState(cl client.Client, item client.Object) (CheckState, er
 		Stage: c.policy.Stage(item),
 	}
 	ruleSetList := &appsv1alpha1.RuleSetList{}
-	if err := cl.List(context.TODO(), ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(rulesetutils.FieldIndexRuleSet, item.GetName())}); err != nil {
+	if err := cl.List(context.TODO(), ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(inject.FieldIndexRuleSet, item.GetName())}); err != nil {
 		return result, err
 	}
 	for i := range ruleSetList.Items {
