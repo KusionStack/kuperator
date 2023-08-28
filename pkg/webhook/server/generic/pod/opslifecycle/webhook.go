@@ -64,7 +64,7 @@ func New() *OpsLifecycle {
 		readyToUpgrade: hasNoBlockingFinalizer,
 		isPodReady:     controllerutils.IsPodReady,
 		timeLabelValue: func() string {
-			return strconv.FormatInt(time.Now().Unix(), 10)
+			return strconv.FormatInt(time.Now().UnixNano(), 10)
 		},
 	}
 }
