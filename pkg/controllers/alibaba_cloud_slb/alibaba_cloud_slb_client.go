@@ -30,8 +30,6 @@ var (
 	slbAccessKeyID     string
 	slbAccessKeySecret string
 	slbEndpoint        string
-
-	alibabaCloudSlbClient *AlibabaCloudSlbClient
 )
 
 type AlibabaCloudSlbClient struct {
@@ -89,6 +87,4 @@ func init() {
 	if os.Getenv("ALIYUN_SLB_ENDPOINT") != "" {
 		slbEndpoint = os.Getenv("ALIYUN_SLB_ENDPOINT")
 	}
-
-	alibabaCloudSlbClient, _ = NewAlibabaCloudSlbClient()
 }

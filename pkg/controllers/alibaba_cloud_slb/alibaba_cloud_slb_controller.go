@@ -31,12 +31,22 @@ var _ resourceconsist.ReconcileAdapter = &ReconcileAdapter{}
 
 type ReconcileAdapter struct {
 	client.Client
+	slbClient *AlibabaCloudSlbClient
 }
 
-func NewReconcileAdapter(c client.Client) *ReconcileAdapter {
-	return &ReconcileAdapter{
-		Client: c,
+func NewReconcileAdapter(c client.Client) (*ReconcileAdapter, error) {
+	slbClient, err := NewAlibabaCloudSlbClient()
+	if err != nil {
+		return nil, err
 	}
+	if slbClient == nil {
+		return nil, fmt.Errorf("alibaba cloud slb client is nil")
+	}
+
+	return &ReconcileAdapter{
+		Client:    c,
+		slbClient: slbClient,
+	}, nil
 }
 
 func (r *ReconcileAdapter) GetControllerName() string {
@@ -142,7 +152,7 @@ func (r *ReconcileAdapter) GetCurrentEmployee(ctx context.Context, employer clie
 	lbID := svc.GetLabels()[alibabaCloudSlbLbIdLabelKey]
 	bsExistUnderSlb := make(map[string]bool)
 	if lbID != "" {
-		backendServers, err := alibabaCloudSlbClient.GetBackendServers(lbID)
+		backendServers, err := r.slbClient.GetBackendServers(lbID)
 		if err != nil {
 			return nil, fmt.Errorf("get backend servers of slb failed, err: %s", err.Error())
 		}
