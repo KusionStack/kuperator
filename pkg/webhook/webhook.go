@@ -34,8 +34,9 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
-	"kusionstack.io/kafed/pkg/utils"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	"kusionstack.io/kafed/pkg/utils"
 )
 
 const (
@@ -230,7 +231,7 @@ func generateSelfSignedCert(caCert *x509.Certificate, caKey crypto.Signer, dnsNa
 
 func ensureWebhookCert(certDir string, tlsKey, tlsCert []byte) error {
 	if _, err := os.Stat(certDir); os.IsNotExist(err) {
-		err := os.Mkdir(certDir, 0644)
+		err := os.MkdirAll(certDir, 0755)
 		if err != nil {
 			return err
 		}

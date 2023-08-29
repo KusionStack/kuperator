@@ -25,13 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func ObjectKey(obj client.Object) string {
-	if obj.GetNamespace() == "" {
-		return obj.GetName()
-	}
-	return obj.GetNamespace() + "/" + obj.GetName()
-}
-
 func RemoveFinalizer(ctx context.Context, c client.Client, obj client.Object, finalizer string) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		controllerutil.RemoveFinalizer(obj, finalizer)

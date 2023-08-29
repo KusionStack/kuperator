@@ -19,11 +19,11 @@ package revision
 
 import (
 	"hash"
-	"k8s.io/klog/v2"
 
 	"github.com/davecgh/go-spew/spew"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog/v2"
 )
 
 var PodCodec = scheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion)

@@ -24,10 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -44,6 +41,7 @@ import (
 	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
 	"kusionstack.io/kafed/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/kafed/pkg/controllers/utils/revision"
+	"kusionstack.io/kafed/pkg/utils/mixin"
 )
 
 const (
@@ -54,9 +52,8 @@ const (
 
 // CollaSetReconciler reconciles a CollaSet object
 type CollaSetReconciler struct {
-	client.Client
+	*mixin.ReconcilerMixin
 
-	recorder        record.EventRecorder
 	revisionManager *revision.RevisionManager
 	syncControl     synccontrol.Interface
 }
@@ -67,14 +64,13 @@ func Add(mgr ctrl.Manager) error {
 
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr ctrl.Manager) reconcile.Reconciler {
-	collasetutils.InitExpectations(mgr.GetClient())
+	mixin := mixin.NewReconcilerMixin(controllerName, mgr)
+	collasetutils.InitExpectations(mixin.Client)
 
-	recorder := mgr.GetEventRecorderFor(controllerName)
 	return &CollaSetReconciler{
-		Client:          mgr.GetClient(),
-		recorder:        recorder,
-		revisionManager: revision.NewRevisionManager(mgr.GetClient(), mgr.GetScheme(), &revisionOwnerAdapter{}),
-		syncControl:     synccontrol.NewRealSyncControl(mgr.GetClient(), podcontrol.NewRealPodControl(mgr.GetClient(), mgr.GetScheme()), recorder),
+		ReconcilerMixin: mixin,
+		revisionManager: revision.NewRevisionManager(mixin.Client, mixin.Scheme, &revisionOwnerAdapter{}),
+		syncControl:     synccontrol.NewRealSyncControl(mixin.Client, mixin.Logger, podcontrol.NewRealPodControl(mixin.Client, mixin.Scheme), mixin.Recorder),
 	}
 }
 
@@ -117,14 +113,15 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := r.Logger.WithValues("collaset", req.String())
 	instance := &appsv1alpha1.CollaSet{}
-	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
+	if err := r.Client.Get(ctx, req.NamespacedName, instance); err != nil {
 		if !errors.IsNotFound(err) {
-			klog.Error("fail to find CollaSet %s: %s", req, err)
+			logger.Error(err, "failed to find CollaSet")
 			return reconcile.Result{}, err
 		}
 
-		klog.Infof("CollaSet %s is deleted", req)
+		logger.Info("collaSet is deleted")
 		return ctrl.Result{}, collasetutils.ActiveExpectations.Delete(req.Namespace, req.Name)
 	}
 
@@ -132,7 +129,7 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if satisfied, err := collasetutils.ActiveExpectations.IsSatisfied(instance); err != nil {
 		return ctrl.Result{}, err
 	} else if !satisfied {
-		klog.Warningf("CollaSet %s is not satisfied to reconcile.", req)
+		logger.Info("CollaSet is not satisfied to reconcile")
 		return ctrl.Result{}, nil
 	}
 
@@ -148,7 +145,7 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	if !controllerutil.ContainsFinalizer(instance, preReclaimFinalizer) {
-		return ctrl.Result{}, controllerutils.AddFinalizer(context.TODO(), r, instance, preReclaimFinalizer)
+		return ctrl.Result{}, controllerutils.AddFinalizer(context.TODO(), r.Client, instance, preReclaimFinalizer)
 	}
 
 	currentRevision, updatedRevision, revisions, collisionCount, _, err := r.revisionManager.ConstructRevisions(instance, false)
@@ -260,7 +257,7 @@ func (r *CollaSetReconciler) updateStatus(ctx context.Context, instance *appsv1a
 
 	instance.Status = *newStatus
 
-	err := r.Status().Update(ctx, instance)
+	err := r.Client.Status().Update(ctx, instance)
 	if err == nil {
 		if err := collasetutils.ActiveExpectations.ExpectUpdate(instance, expectations.CollaSet, instance.Name, instance.ResourceVersion); err != nil {
 			return err
@@ -272,9 +269,9 @@ func (r *CollaSetReconciler) updateStatus(ctx context.Context, instance *appsv1a
 
 func (r *CollaSetReconciler) reclaimResourceContext(cls *appsv1alpha1.CollaSet) error {
 	// clean the owner IDs from this CollaSet
-	if err := podcontext.UpdateToPodContext(r, cls, nil); err != nil {
+	if err := podcontext.UpdateToPodContext(r.Client, cls, nil); err != nil {
 		return err
 	}
 
-	return controllerutils.RemoveFinalizer(context.TODO(), r, cls, preReclaimFinalizer)
+	return controllerutils.RemoveFinalizer(context.TODO(), r.Client, cls, preReclaimFinalizer)
 }

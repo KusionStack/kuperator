@@ -20,10 +20,7 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -31,6 +28,7 @@ import (
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
 	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
+	"kusionstack.io/kafed/pkg/utils/mixin"
 )
 
 const (
@@ -39,9 +37,7 @@ const (
 
 // ResourceContextReconciler reconciles and reclaims a ResourceContext object
 type ResourceContextReconciler struct {
-	client.Client
-
-	recorder record.EventRecorder
+	*mixin.ReconcilerMixin
 }
 
 func Add(mgr ctrl.Manager) error {
@@ -50,13 +46,12 @@ func Add(mgr ctrl.Manager) error {
 
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr ctrl.Manager) reconcile.Reconciler {
-	recorder := mgr.GetEventRecorderFor(controllerName)
+	mixin := mixin.NewReconcilerMixin(controllerName, mgr)
 
-	InitExpectations(mgr.GetClient())
+	InitExpectations(mixin.Client)
 
 	return &ResourceContextReconciler{
-		Client:   mgr.GetClient(),
-		recorder: recorder,
+		ReconcilerMixin: mixin,
 	}
 }
 
@@ -90,14 +85,15 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 
 // Reconcile aims to reclaim ResourceContext which is not in used which means the ResourceContext contains no Context.
 func (r *ResourceContextReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := r.Logger.WithValues("resourceContext", req.String())
 	instance := &appsv1alpha1.ResourceContext{}
-	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
+	if err := r.Client.Get(ctx, req.NamespacedName, instance); err != nil {
 		if !errors.IsNotFound(err) {
-			klog.Error("fail to find ResourceContext %s: %s", req, err)
+			logger.Error(err, "failed to find ResourceContext")
 			return reconcile.Result{}, err
 		}
 
-		klog.Infof("ResourceContext %s is deleted", req)
+		logger.Info("resourceContext is deleted")
 		return ctrl.Result{}, activeExpectations.Delete(req.Namespace, req.Name)
 	}
 
@@ -105,19 +101,19 @@ func (r *ResourceContextReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if satisfied, err := activeExpectations.IsSatisfied(instance); err != nil {
 		return ctrl.Result{}, err
 	} else if !satisfied {
-		klog.Warningf("ResourceContext %s is not satisfied to reconcile.", req)
+		logger.Info("resourceContext is not satisfied to reconcile")
 		return ctrl.Result{}, nil
 	}
 
 	// if ResourceContext is empty, delete it
 	if len(instance.Spec.Contexts) == 0 {
-		klog.Infof("try to delete ResourceContext %s as empty", req)
-		if err := r.Delete(context.TODO(), instance); err != nil {
-			klog.Error("fail to delete ResourceContext %s: %s", req, err)
+		logger.Info("try to delete empty ResourceContext")
+		if err := r.Client.Delete(context.TODO(), instance); err != nil {
+			logger.Error(err, "failed to delete resourceContext")
 			return ctrl.Result{}, err
 		}
 		if err := activeExpectations.ExpectDelete(instance, expectations.ResourceContext, instance.Name); err != nil {
-			klog.Error("fail to expect deletion after deleting ResourceContext %s: %s", req, err)
+			logger.Error(err, "failed to expect deletion after ResourceContext is deleted")
 			return ctrl.Result{}, err
 		}
 	}

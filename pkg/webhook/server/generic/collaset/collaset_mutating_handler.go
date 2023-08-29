@@ -22,37 +22,45 @@ import (
 	"net/http"
 
 	admissionv1 "k8s.io/api/admission/v1"
-	"k8s.io/klog/v2"
 	k8scorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
+	commonutils "kusionstack.io/kafed/pkg/utils"
+	"kusionstack.io/kafed/pkg/utils/mixin"
 )
 
 type MutatingHandler struct {
-	client.Client
-	*admission.Decoder
+	*mixin.WebhookHandlerMixin
 }
 
 func NewMutatingHandler() *MutatingHandler {
-	return &MutatingHandler{}
+	return &MutatingHandler{
+		WebhookHandlerMixin: mixin.NewWebhookHandlerMixin(),
+	}
 }
 
 func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
 	if req.Operation != admissionv1.Update && req.Operation != admissionv1.Create {
 		return admission.Allowed("")
 	}
+
+	logger := h.Logger.WithValues(
+		"op", req.Operation,
+		"collaset", commonutils.AdmissionRequestObjectKeyString(req),
+	)
+
 	cls := &appsv1alpha1.CollaSet{}
-	if err := h.Decode(req, cls); err != nil {
-		klog.Errorf("decode CollaSet validating request failed, %v", err)
+	if err := h.Decoder.Decode(req, cls); err != nil {
+		logger.Error(err, "failed to decode collaset")
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	h.setDetaultCollaSet(cls)
 	marshalled, err := json.Marshal(cls)
 	if err != nil {
-		klog.Errorf("marshal RuleSet failed, %v", err)
+		logger.Error(err, "failed to marshal collaset to json")
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 

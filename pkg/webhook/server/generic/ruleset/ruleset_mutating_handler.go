@@ -22,36 +22,46 @@ import (
 	"net/http"
 
 	admissionv1 "k8s.io/api/admission/v1"
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
+	commonutils "kusionstack.io/kafed/pkg/utils"
+	"kusionstack.io/kafed/pkg/utils/mixin"
 )
 
+var _ inject.Client = &MutatingHandler{}
+var _ admission.DecoderInjector = &MutatingHandler{}
+
 type MutatingHandler struct {
-	client.Client
-	*admission.Decoder
+	*mixin.WebhookHandlerMixin
 }
 
 func NewMutatingHandler() *MutatingHandler {
-	return &MutatingHandler{}
+	return &MutatingHandler{
+		WebhookHandlerMixin: mixin.NewWebhookHandlerMixin(),
+	}
 }
 
 func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
 	if req.Operation != admissionv1.Update && req.Operation != admissionv1.Create {
 		return admission.Allowed("")
 	}
+
+	logger := h.Logger.WithValues(
+		"op", req.Operation,
+		"ruleset", commonutils.AdmissionRequestObjectKeyString(req),
+	)
+
 	rs := &appsv1alpha1.RuleSet{}
-	if err := h.Decode(req, rs); err != nil {
-		klog.Errorf("decode RuleSet validating request failed, %v", err)
+	if err := h.Decoder.Decode(req, rs); err != nil {
+		logger.Error(err, "failed to decode ruleset")
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	SetDefaultRuleSet(rs)
 	marshalled, err := json.Marshal(rs)
 	if err != nil {
-		klog.Errorf("marshal RuleSet failed, %v", err)
+		logger.Error(err, "failed to marshal ruleset json")
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
@@ -75,18 +85,4 @@ func SetDefaultRuleSet(rs *appsv1alpha1.RuleSet) {
 			}
 		}
 	}
-}
-
-var _ inject.Client = &MutatingHandler{}
-
-func (h *MutatingHandler) InjectClient(c client.Client) error {
-	h.Client = c
-	return nil
-}
-
-var _ admission.DecoderInjector = &MutatingHandler{}
-
-func (h *MutatingHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	return nil
 }

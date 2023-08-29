@@ -23,20 +23,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -47,6 +43,8 @@ import (
 	rulesetutils "kusionstack.io/kafed/pkg/controllers/ruleset/utils"
 	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
 	"kusionstack.io/kafed/pkg/utils"
+	commonutils "kusionstack.io/kafed/pkg/utils"
+	"kusionstack.io/kafed/pkg/utils/mixin"
 )
 
 const (
@@ -57,11 +55,10 @@ const (
 
 // NewReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+	mixin := mixin.NewReconcilerMixin(controllerName, mgr)
 	return &RuleSetReconciler{
-		Client:   mgr.GetClient(),
-		Policy:   register.DefaultPolicy(),
-		Logger:   logf.Log.WithName(controllerName).WithValues("kind", resourceName),
-		recorder: mgr.GetEventRecorderFor(controllerName),
+		ReconcilerMixin: mixin,
+		Policy:          register.DefaultPolicy(),
 	}
 }
 
@@ -80,7 +77,7 @@ func addToMgr(mgr manager.Manager, r reconcile.Reconciler) (controller.Controlle
 		return c, err
 	}
 
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &EventHandler{client: mgr.GetClient()})
+	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &EventHandler{})
 	if err != nil {
 		return c, err
 	}
@@ -90,11 +87,8 @@ func addToMgr(mgr manager.Manager, r reconcile.Reconciler) (controller.Controlle
 
 // RuleSetReconciler reconciles a RuleSet object
 type RuleSetReconciler struct {
-	client.Client
+	*mixin.ReconcilerMixin
 	register.Policy
-	scheme   *runtime.Scheme
-	recorder record.EventRecorder
-	logr.Logger
 }
 
 // +kubebuilder:rbac:groups=apps.kusionstack.io,resources=rulesets,verbs=get;list;watch;create;update;patch;delete
@@ -104,25 +98,25 @@ type RuleSetReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch
 
 func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, reconcileErr error) {
-
+	logger := r.Logger.WithValues("ruleSet", request.String())
 	result = reconcile.Result{}
 	ruleSet := &appsv1alpha1.RuleSet{}
-	if err := r.Get(context.TODO(), request.NamespacedName, ruleSet); err != nil {
+	if err := r.Client.Get(context.TODO(), request.NamespacedName, ruleSet); err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
 		return reconcile.Result{}, err
 	}
 
-	if !rulesetutils.RulesetVersionExpectation.SatisfiedExpectations(controllerutils.ObjectKey(ruleSet), ruleSet.ResourceVersion) {
-		r.Info(fmt.Sprintf("expected ruleset %s update, resource version %s, retry later", controllerutils.ObjectKey(ruleSet), ruleSet.ResourceVersion))
+	if !rulesetutils.RulesetVersionExpectation.SatisfiedExpectations(commonutils.ObjectKeyString(ruleSet), ruleSet.ResourceVersion) {
+		logger.Info("ruleSet's resourceVerison is too old, retry later", "resourceVerison.now", ruleSet.ResourceVersion)
 		return reconcile.Result{}, nil
 	}
 
 	selector, _ := metav1.LabelSelectorAsSelector(ruleSet.Spec.Selector)
 	selectedPods := &corev1.PodList{}
-	if err := r.List(context.TODO(), selectedPods, &client.ListOptions{Namespace: ruleSet.Namespace, LabelSelector: selector}); err != nil {
-		r.Error(err, fmt.Sprintf("fail to list pods by ruleset %s", request.NamespacedName.String()))
+	if err := r.Client.List(context.TODO(), selectedPods, &client.ListOptions{Namespace: ruleSet.Namespace, LabelSelector: selector}); err != nil {
+		logger.Error(err, "failed to list pod by ruleset")
 		return reconcile.Result{}, err
 	}
 
@@ -143,8 +137,8 @@ func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Req
 
 	selectedPodNames := sets.String{}
 	for _, pod := range selectedPods.Items {
-		if !rulesetutils.PodVersionExpectation.SatisfiedExpectations(controllerutils.ObjectKey(&pod), pod.ResourceVersion) {
-			r.Info(fmt.Sprintf("expected pod %s update, resource version %s, retry later", controllerutils.ObjectKey(&pod), pod.ResourceVersion))
+		if !rulesetutils.PodVersionExpectation.SatisfiedExpectations(commonutils.ObjectKeyString(&pod), pod.ResourceVersion) {
+			logger.Info("pod's resourceVersion is too old, retry later", "pod", commonutils.ObjectKeyString(&pod), "pod.resourceVersion", pod.ResourceVersion)
 			return reconcile.Result{}, nil
 		}
 		selectedPodNames.Insert(pod.Name)
@@ -161,7 +155,7 @@ func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Req
 		}
 
 		if _, err := r.updateRuleSetOnPod(ctx, ruleSet.Name, name, ruleSet.Namespace, rulesetutils.MoveAllRuleSetInfo); err != nil {
-			r.Info(fmt.Sprintf("fail to remove ruleset on pod %s, %v", name, err))
+			logger.Error(err, "failed to remote ruleset on pod", "pod", name)
 			return result, err
 		}
 	}
@@ -199,11 +193,11 @@ func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Req
 	}
 
 	if !equalStatus(newStatus, &ruleSet.Status) {
-		rulesetutils.RulesetVersionExpectation.ExpectUpdate(controllerutils.ObjectKey(ruleSet), ruleSet.ResourceVersion)
+		rulesetutils.RulesetVersionExpectation.ExpectUpdate(commonutils.ObjectKeyString(ruleSet), ruleSet.ResourceVersion)
 		ruleSet.Status = *newStatus
-		if err := r.Status().Update(ctx, ruleSet); err != nil {
-			rulesetutils.RulesetVersionExpectation.DeleteExpectations(controllerutils.ObjectKey(ruleSet))
-			r.Error(err, fmt.Sprintf("fail to update ruleset %s status", controllerutils.ObjectKey(ruleSet)))
+		if err := r.Client.Status().Update(ctx, ruleSet); err != nil {
+			rulesetutils.RulesetVersionExpectation.DeleteExpectations(commonutils.ObjectKeyString(ruleSet))
+			logger.Error(err, "failed to update ruleset status")
 			return reconcile.Result{}, err
 		}
 	}
@@ -234,7 +228,7 @@ func (r *RuleSetReconciler) updatePodDetail(ctx context.Context, pod *corev1.Pod
 	}
 	patch := client.RawPatch(types.MergePatchType, controllerutils.GetLabelAnnoPatchBytes(nil, nil, nil, map[string]string{detailAnno: newDetail}))
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return r.Patch(ctx, pod, patch)
+		return r.Client.Patch(ctx, pod, patch)
 	})
 }
 
@@ -272,7 +266,7 @@ func (r *RuleSetReconciler) process(rs *appsv1alpha1.RuleSet, pods map[string]*c
 func (r *RuleSetReconciler) cleanUpRuleSetPods(ctx context.Context, ruleSet *appsv1alpha1.RuleSet) error {
 	for _, name := range ruleSet.Status.Targets {
 		if _, err := r.updateRuleSetOnPod(ctx, ruleSet.Name, name, ruleSet.Namespace, rulesetutils.MoveAllRuleSetInfo); err != nil && !errors.IsNotFound(err) {
-			return fmt.Errorf("fail to remove RuleSet %s on pod %s: %v", controllerutils.ObjectKey(ruleSet), name, err)
+			return fmt.Errorf("fail to remove RuleSet %s on pod %s: %v", commonutils.ObjectKeyString(ruleSet), name, err)
 		}
 	}
 	return nil
@@ -281,14 +275,14 @@ func (r *RuleSetReconciler) cleanUpRuleSetPods(ctx context.Context, ruleSet *app
 func (r *RuleSetReconciler) updateRuleSetOnPod(ctx context.Context, ruleSet, name, namespace string, fn func(pod *corev1.Pod, name string) bool) (*corev1.Pod, error) {
 	pod := &corev1.Pod{}
 	return pod, retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, pod); err != nil {
+		if err := r.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, pod); err != nil {
 			if errors.IsNotFound(err) {
 				return nil
 			}
 			return err
 		}
 		if fn(pod, ruleSet) {
-			return r.Update(ctx, pod)
+			return r.Client.Update(ctx, pod)
 		}
 		return nil
 	})

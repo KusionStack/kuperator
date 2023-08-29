@@ -30,34 +30,45 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
+	commonutils "kusionstack.io/kafed/pkg/utils"
+	"kusionstack.io/kafed/pkg/utils/mixin"
 )
 
+var _ inject.Client = &ValidatingHandler{}
+var _ admission.DecoderInjector = &ValidatingHandler{}
+
 type ValidatingHandler struct {
-	client.Client
-	*admission.Decoder
+	*mixin.WebhookHandlerMixin
 }
 
 func NewValidatingHandler() *ValidatingHandler {
-	return &ValidatingHandler{}
+	return &ValidatingHandler{
+		WebhookHandlerMixin: mixin.NewWebhookHandlerMixin(),
+	}
 }
 
 func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
 	if req.Kind.Kind != "RuleSet" || req.Operation == admissionv1.Delete {
 		return admission.Allowed("")
 	}
+
+	logger := h.Logger.WithValues(
+		"op", req.Operation,
+		"ruleset", commonutils.AdmissionRequestObjectKeyString(req),
+	)
+
 	rs := &appsv1alpha1.RuleSet{}
-	if err := h.Decode(req, rs); err != nil {
-		klog.Errorf("decode RuleSet validating request failed, %v", err)
+
+	if err := h.Decoder.Decode(req, rs); err != nil {
+		logger.Error(err, "failed to decode ruleset")
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	if err := h.validate(rs); err != nil {
-		klog.Errorf("illegal RuleSet: %v", err)
+		logger.Error(err, "illegal RuleSet")
 		return admission.Denied(err.Error())
 	}
 	return admission.Allowed("")
@@ -140,19 +151,5 @@ func CheckCaBundle(ca string) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse CABundle certificate, %v", err)
 	}
-	return nil
-}
-
-var _ inject.Client = &ValidatingHandler{}
-
-func (h *ValidatingHandler) InjectClient(c client.Client) error {
-	h.Client = c
-	return nil
-}
-
-var _ admission.DecoderInjector = &ValidatingHandler{}
-
-func (h *ValidatingHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
 	return nil
 }

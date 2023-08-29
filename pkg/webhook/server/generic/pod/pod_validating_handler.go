@@ -24,19 +24,25 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	commonutils "kusionstack.io/kafed/pkg/utils"
+	"kusionstack.io/kafed/pkg/utils/mixin"
 )
 
+var _ inject.Client = &ValidatingHandler{}
+var _ inject.Logger = &ValidatingHandler{}
+var _ admission.DecoderInjector = &ValidatingHandler{}
+
 type ValidatingHandler struct {
-	client.Client
-	*admission.Decoder
+	*mixin.WebhookHandlerMixin
 }
 
 func NewValidatingHandler() *ValidatingHandler {
-	return &ValidatingHandler{}
+	return &ValidatingHandler{
+		WebhookHandlerMixin: mixin.NewWebhookHandlerMixin(),
+	}
 }
 
 func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
@@ -44,8 +50,13 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 		return admission.Allowed("pod is allowed by opslifecycle")
 	}
 
+	logger := h.Logger.WithValues(
+		"op", req.Operation,
+		"pod", commonutils.AdmissionRequestObjectKeyString(req),
+	)
+
 	pod := &corev1.Pod{}
-	if err := h.Decode(req, pod); err != nil {
+	if err := h.Decoder.Decode(req, pod); err != nil {
 		s, _ := json.Marshal(req)
 		return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to decode old object from request %s: %s", s, err))
 	}
@@ -53,31 +64,17 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 	var oldPod *corev1.Pod
 	if req.Operation == admissionv1.Update || req.Operation == admissionv1.Delete {
 		oldPod = &corev1.Pod{}
-		if err := h.DecodeRaw(req.OldObject, oldPod); err != nil {
+		if err := h.Decoder.DecodeRaw(req.OldObject, oldPod); err != nil {
 			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to unmarshal old object: %s", err))
 		}
 	}
 
 	for _, webhook := range webhooks {
 		if err := webhook.Validating(ctx, h.Client, oldPod, pod, req.Operation); err != nil {
-			klog.Errorf("failed to validate pod, %v", err)
+			logger.Error(err, "failed to validate pod")
 			return admission.Denied(fmt.Sprintf("failed to validate %s, %v", webhook.Name(), err))
 		}
 	}
 
 	return admission.Allowed("")
-}
-
-var _ inject.Client = &ValidatingHandler{}
-
-func (h *ValidatingHandler) InjectClient(c client.Client) error {
-	h.Client = c
-	return nil
-}
-
-var _ admission.DecoderInjector = &ValidatingHandler{}
-
-func (h *ValidatingHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	return nil
 }

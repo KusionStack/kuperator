@@ -26,7 +26,6 @@ import (
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/core"
 	k8scorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
@@ -35,25 +34,34 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
+	commonutils "kusionstack.io/kafed/pkg/utils"
+	"kusionstack.io/kafed/pkg/utils/mixin"
 	"kusionstack.io/kafed/pkg/webhook/server/generic/utils"
 )
 
 type ValidatingHandler struct {
-	client.Client
-	*admission.Decoder
+	*mixin.WebhookHandlerMixin
 }
 
 func NewValidatingHandler() *ValidatingHandler {
-	return &ValidatingHandler{}
+	return &ValidatingHandler{
+		WebhookHandlerMixin: mixin.NewWebhookHandlerMixin(),
+	}
 }
 
 func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
 	if req.Operation == admissionv1.Delete {
 		return admission.Allowed("")
 	}
+
+	logger := h.Logger.WithValues(
+		"op", req.Operation,
+		"collaset", commonutils.AdmissionRequestObjectKeyString(req),
+	)
+
 	cls := &appsv1alpha1.CollaSet{}
-	if err := h.Decode(req, cls); err != nil {
-		klog.Errorf("decode CollaSet validating request failed, %v", err)
+	if err := h.Decoder.Decode(req, cls); err != nil {
+		logger.Error(err, "failed to decode collaset")
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
