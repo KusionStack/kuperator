@@ -17,6 +17,7 @@ limitations under the License.
 package generic
 
 import (
+	"kusionstack.io/kafed/pkg/webhook/server/generic/collaset"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	webhookdmission "kusionstack.io/kafed/pkg/webhook/admission"
@@ -39,9 +40,11 @@ func init() {
 	podMutatingHandler := pod.NewMutatingHandler()
 	MutatingTypeHandlerMap["Pod"] = podMutatingHandler
 	MutatingTypeHandlerMap["Pod/status"] = podMutatingHandler
-
 	ValidatingTypeHandlerMap["Pod"] = pod.NewValidatingHandler()
 
 	MutatingTypeHandlerMap["RuleSet"] = ruleset.NewMutatingHandler()
 	ValidatingTypeHandlerMap["RuleSet"] = ruleset.NewValidatingHandler()
+
+	MutatingTypeHandlerMap["CollaSet"] = collaset.NewMutatingHandler()
+	ValidatingTypeHandlerMap["CollaSet"] = collaset.NewValidatingHandler()
 }

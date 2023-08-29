@@ -3,7 +3,7 @@ kind: MutatingWebhookConfiguration
 metadata:
   name: controller-manager-mutating
 webhooks:
-  - name: mutating-generic.apps.kusionstack.io
+  - name: mutating-pod.apps.kusionstack.io
     sideEffects: NoneOnDryRun
     admissionReviewVersions: ["v1", "v1beta1"]
     clientConfig:
@@ -27,10 +27,31 @@ webhooks:
         scope: '*'
     objectSelector:
       matchExpressions:
-      - key: podopslifecycle.kusionstack.io/control
-        operator: In
-        values:
-        - 'true'
+        - key: podopslifecycle.kusionstack.io/control
+          operator: In
+          values:
+            - 'true'
+  - name: mutating-generic.apps.kusionstack.io
+    sideEffects: NoneOnDryRun
+    admissionReviewVersions: ["v1", "v1beta1"]
+    clientConfig:
+      service:
+        namespace: kusionstack-system
+        name: controller-manager
+        path: /mutating-generic
+    failurePolicy: Fail
+    rules:
+      - apiGroups:
+          - "apps.kusionstack.io"
+        apiVersions:
+          - "*"
+        operations:
+          - CREATE
+          - UPDATE
+          - DELETE
+        resources:
+          - "*/*"
+        scope: '*'
 ---
 
 apiVersion: admissionregistration.k8s.io/v1
@@ -38,7 +59,7 @@ kind: ValidatingWebhookConfiguration
 metadata:
   name: controller-manager-validating
 webhooks:
-  - name: validating-generic.apps.kusionstack.io
+  - name: validating-pod.apps.kusionstack.io
     sideEffects: NoneOnDryRun
     admissionReviewVersions: ["v1", "v1beta1"]
     clientConfig:
@@ -60,7 +81,28 @@ webhooks:
         scope: '*'
     objectSelector:
       matchExpressions:
-      - key: podopslifecycle.kusionstack.io/control
-        operator: In
-        values:
-        - 'true'
+        - key: podopslifecycle.kusionstack.io/control
+          operator: In
+          values:
+            - 'true'
+  - name: validating-generic.apps.kusionstack.io
+    sideEffects: NoneOnDryRun
+    admissionReviewVersions: ["v1", "v1beta1"]
+    clientConfig:
+      service:
+        namespace: kusionstack-system
+        name: controller-manager
+        path: /validating-generic
+    failurePolicy: Fail
+    rules:
+      - apiGroups:
+          - "apps.kusionstack.io"
+        apiVersions:
+          - "*"
+        operations:
+          - CREATE
+          - UPDATE
+          - DELETE
+        resources:
+          - "*/*"
+        scope: '*'
