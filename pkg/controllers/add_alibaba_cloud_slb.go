@@ -28,5 +28,9 @@ func init() {
 }
 
 func Add(manager manager.Manager) error {
-	return resourceconsist.Add(manager, alibaba_cloud_slb.NewReconcileAdapter(manager.GetClient()))
+	reconcileAdapter, err := alibaba_cloud_slb.NewReconcileAdapter(manager.GetClient())
+	if err != nil {
+		return err
+	}
+	return resourceconsist.Add(manager, reconcileAdapter)
 }

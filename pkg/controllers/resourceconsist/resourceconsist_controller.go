@@ -182,7 +182,7 @@ func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (rec
 			"get current employer status failed: %s", err.Error())
 		return reconcile.Result{}, err
 	}
-	isCleanEmployer, isSyncEmployerFailedExist, err := r.syncEmployer(ctx, employer, expectEmployer, currentEmployer)
+	isCleanEmployer, syncEmployerFailedExist, err := r.syncEmployer(ctx, employer, expectEmployer, currentEmployer)
 	if err != nil {
 		r.logger.Errorf("sync employer status failed: %s", err.Error())
 		r.recorder.Eventf(employer, v1.EventTypeWarning, "syncEmployerFailed",
@@ -204,7 +204,7 @@ func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (rec
 			"get current employees status failed: %s", err.Error())
 		return reconcile.Result{}, err
 	}
-	isCleanEmployee, isSyncEmployeeFailedExist, err := r.syncEmployees(ctx, employer, expectEmployees, currentEmployees)
+	isCleanEmployee, syncEmployeeFailedExist, err := r.syncEmployees(ctx, employer, expectEmployees, currentEmployees)
 	if err != nil {
 		r.logger.Errorf("sync employees status failed: %s", err.Error())
 		r.recorder.Eventf(employer, v1.EventTypeWarning, "syncEmployeesFailed",
@@ -222,7 +222,7 @@ func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (rec
 		}
 	}
 
-	if isSyncEmployerFailedExist || isSyncEmployeeFailedExist {
+	if syncEmployerFailedExist || syncEmployeeFailedExist {
 		r.recorder.Eventf(employer, v1.EventTypeNormal, "ReconcileFailed", "employer or employees synced failed exist")
 		return reconcile.Result{}, fmt.Errorf("employer or employees synced failed exist")
 	}

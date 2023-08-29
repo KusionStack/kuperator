@@ -57,8 +57,8 @@ func (r *Consist) syncEmployer(ctx context.Context, employer client.Object, expe
 	}
 
 	isClean := len(toCudEmployer.Unchanged) == 0 && len(toCudEmployer.ToCreate) == 0 && len(toCudEmployer.ToUpdate) == 0 && len(toCudEmployer.ToDelete) == 0
-	isCudFailedExist := len(failCreate) > 0 || len(failUpdate) > 0 || len(failDelete) > 0
-	return isClean, isCudFailedExist, nil
+	cudFailedExist := len(failCreate) > 0 || len(failUpdate) > 0 || len(failDelete) > 0
+	return isClean, cudFailedExist, nil
 }
 
 func (r *Consist) diffEmployer(expectEmployer, currentEmployer []IEmployer) (ToCUDEmployer, error) {
@@ -210,8 +210,8 @@ func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, exp
 	}
 
 	isClean := len(toCudEmployees.ToCreate) == 0 && len(toCudEmployees.ToUpdate) == 0 && len(toCudEmployees.Unchanged) == 0 && len(failDelete) == 0
-	isCudFailedExist := len(failCreate) > 0 || len(failUpdate) > 0 || len(failDelete) > 0
-	return isClean, isCudFailedExist, nil
+	cudFailedExist := len(failCreate) > 0 || len(failUpdate) > 0 || len(failDelete) > 0
+	return isClean, cudFailedExist, nil
 }
 
 // ensureExpectFinalizer add expected finalizer to employee's available condition anno
