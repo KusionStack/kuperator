@@ -80,9 +80,11 @@ func (h *ValidatingHandler) validate(cls *appsv1alpha1.CollaSet) error {
 
 func (h *ValidatingHandler) validateUpdateStrategy(cls *appsv1alpha1.CollaSet, fSpec *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	if cls.Spec.UpdateStrategy.PodUpdatePolicy != appsv1alpha1.CollaSetRecreatePodUpdateStrategyType &&
-		cls.Spec.UpdateStrategy.PodUpdatePolicy != appsv1alpha1.CollaSetInPlaceOnlyPodUpdateStrategyType &&
-		cls.Spec.UpdateStrategy.PodUpdatePolicy != appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType {
+	switch cls.Spec.UpdateStrategy.PodUpdatePolicy {
+	case appsv1alpha1.CollaSetRecreatePodUpdateStrategyType,
+		appsv1alpha1.CollaSetInPlaceOnlyPodUpdateStrategyType,
+		appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType:
+	default:
 		allErrs = append(allErrs, field.Invalid(fSpec.Child("updateStrategy", "podUpdatePolicy"),
 			cls.Spec.UpdateStrategy.PodUpdatePolicy, fmt.Sprintf("podUpdatePolicy should be one of %v",
 				[]appsv1alpha1.PodUpdateStrategyType{appsv1alpha1.CollaSetRecreatePodUpdateStrategyType,
