@@ -123,6 +123,8 @@ type Consist struct {
 	recorder record.EventRecorder
 }
 
+// +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
+
 func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	var employer client.Object
 	if watchOptions, ok := r.adapter.(ReconcileWatchOptions); ok {
