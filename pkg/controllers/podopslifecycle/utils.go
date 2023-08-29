@@ -20,14 +20,14 @@ import (
 	"fmt"
 	"strings"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"kusionstack.io/kafed/apis/apps/v1alpha1"
 )
 
 // PodIDAndTypesMap returns a map of pod id to labels map and a map of operation type to number of pods.
-func PodIDAndTypesMap(pod *v1.Pod) (map[string]map[string]string, map[string]int, error) {
+func PodIDAndTypesMap(pod *corev1.Pod) (map[string]map[string]string, map[string]int, error) {
 	idToLabelsMap := map[string]map[string]string{}
 	typeToNumsMap := map[string]int{}
 

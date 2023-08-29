@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	errors2 "k8s.io/apimachinery/pkg/util/errors"
@@ -191,7 +191,7 @@ func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, exp
 	}
 
 	// todo, to be removed, for demo
-	r.Recorder.Eventf(employer, v1.EventTypeNormal, "diffEmployees", "toCreate: %v, toUpdate: %v, toDelete: %v, unchanged: %v",
+	r.Recorder.Eventf(employer, corev1.EventTypeNormal, "diffEmployees", "toCreate: %v, toUpdate: %v, toDelete: %v, unchanged: %v",
 		toCudEmployees.ToCreate, toCudEmployees.ToUpdate, toCudEmployees.ToDelete, toCudEmployees.Unchanged)
 
 	succCreate, failCreate, err := r.adapter.CreateEmployees(employer, toCudEmployees.ToCreate)
@@ -321,7 +321,7 @@ func (r *Consist) patchAddPodExpectedFinalizer(ctx context.Context, employer cli
 	expectedFlzKey, expectedFlz string) error {
 	_, err := utils.SlowStartBatch(len(toAdd), 1, false, func(i int, _ error) error {
 		podExpectedFinalizerOps := &toAdd[i]
-		var pod v1.Pod
+		var pod corev1.Pod
 		err := r.Client.Get(ctx, types.NamespacedName{
 			Namespace: employer.GetNamespace(),
 			Name:      podExpectedFinalizerOps.Name,
@@ -386,7 +386,7 @@ func (r *Consist) patchDeletePodExpectedFinalizer(ctx context.Context, employer 
 	expectedFlzKey string) error {
 	_, err := utils.SlowStartBatch(len(toDelete), 1, false, func(i int, _ error) error {
 		podExpectedFinalizerOps := &toDelete[i]
-		var pod v1.Pod
+		var pod corev1.Pod
 		err := r.Client.Get(ctx, types.NamespacedName{
 			Namespace: employer.GetNamespace(),
 			Name:      podExpectedFinalizerOps.Name,
@@ -435,7 +435,7 @@ func (r *Consist) cleanEmployerCleanFinalizer(ctx context.Context, employer clie
 	if watchOptions, ok := r.adapter.(ReconcileWatchOptions); ok {
 		employerLatest = watchOptions.NewEmployer()
 	} else {
-		employerLatest = &v1.Service{}
+		employerLatest = &corev1.Service{}
 	}
 
 	err := r.Client.Get(ctx, types.NamespacedName{
@@ -475,7 +475,7 @@ func (r *Consist) ensureLifecycleFinalizer(ctx context.Context, ns, lifecycleFlz
 		if watchOptionsImplemented {
 			employee = watchOptions.NewEmployee()
 		} else {
-			employee = &v1.Pod{}
+			employee = &corev1.Pod{}
 		}
 		err := r.Client.Get(ctx, types.NamespacedName{
 			Namespace: ns,
@@ -510,7 +510,7 @@ func (r *Consist) ensureLifecycleFinalizer(ctx context.Context, ns, lifecycleFlz
 		if watchOptionsImplemented {
 			employee = watchOptions.NewEmployee()
 		} else {
-			employee = &v1.Pod{}
+			employee = &corev1.Pod{}
 		}
 		err := r.Client.Get(ctx, types.NamespacedName{
 			Namespace: ns,

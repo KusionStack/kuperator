@@ -34,7 +34,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -163,14 +163,14 @@ const (
 
 var (
 	// UnreachableTaintTemplate is the taint for when a node becomes unreachable.
-	UnreachableTaintTemplate = &v1.Taint{
-		Key:    v1.TaintNodeUnreachable,
-		Effect: v1.TaintEffectNoExecute,
+	UnreachableTaintTemplate = &corev1.Taint{
+		Key:    corev1.TaintNodeUnreachable,
+		Effect: corev1.TaintEffectNoExecute,
 	}
 	// NotReadyTaintTemplate is the taint for when a node doesn't ready.
-	NotReadyTaintTemplate = &v1.Taint{
-		Key:    v1.TaintNodeNotReady,
-		Effect: v1.TaintEffectNoExecute,
+	NotReadyTaintTemplate = &corev1.Taint{
+		Key:    corev1.TaintNodeNotReady,
+		Effect: corev1.TaintEffectNoExecute,
 	}
 )
 
@@ -178,11 +178,11 @@ var (
 var RunID = uuid.NewUUID()
 
 // CreateTestingNSFn defines a function to create test
-type CreateTestingNSFn func(baseName string, c clientset.Interface, labels map[string]string) (*v1.Namespace, error)
+type CreateTestingNSFn func(baseName string, c clientset.Interface, labels map[string]string) (*corev1.Namespace, error)
 
 // CreateTestingNS should be used by every test, note that we append a common prefix to the provided test name.
 // Please see NewFramework instead of using this directly.
-func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]string) (*v1.Namespace, error) {
+func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]string) (*corev1.Namespace, error) {
 	if labels == nil {
 		labels = map[string]string{}
 	}
@@ -192,16 +192,16 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 	if err != nil {
 		return nil, err
 	}
-	namespaceObj := &v1.Namespace{
+	namespaceObj := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      namespaceName,
 			Namespace: "",
 			Labels:    labels,
 		},
-		Status: v1.NamespaceStatus{},
+		Status: corev1.NamespaceStatus{},
 	}
 	// Be robust about making the namespace creation call.
-	var got *v1.Namespace
+	var got *corev1.Namespace
 	if err := wait.PollImmediate(Poll, 30*time.Second, func() (bool, error) {
 		var err error
 		got, err = c.CoreV1().Namespaces().Create(context.TODO(), namespaceObj, metav1.CreateOptions{})
@@ -261,7 +261,7 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 	}
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
 	defer cancel()
-	_, err := watchtools.UntilWithSync(ctx, lw, &v1.ServiceAccount{}, nil, func(event watch.Event) (bool, error) {
+	_, err := watchtools.UntilWithSync(ctx, lw, &corev1.ServiceAccount{}, nil, func(event watch.Event) (bool, error) {
 		switch event.Type {
 		case watch.Deleted:
 			return false, apierrors.NewNotFound(schema.GroupResource{Resource: "serviceaccounts"}, serviceAccountName)
@@ -373,7 +373,7 @@ func logNamespaces(c clientset.Interface, namespace string) {
 	numActive := 0
 	numTerminating := 0
 	for _, namespace := range namespaceList.Items {
-		if namespace.Status.Phase == v1.NamespaceActive {
+		if namespace.Status.Phase == corev1.NamespaceActive {
 			numActive++
 		} else {
 			numTerminating++
@@ -504,7 +504,7 @@ func isDynamicDiscoveryError(err error) bool {
 
 // DumpAllNamespaceInfo is used to dump all namespace info
 func DumpAllNamespaceInfo(c clientset.Interface, namespace string) {
-	DumpEventsInNamespace(func(opts metav1.ListOptions, ns string) (*v1.EventList, error) {
+	DumpEventsInNamespace(func(opts metav1.ListOptions, ns string) (*corev1.EventList, error) {
 		return c.CoreV1().Events(ns).List(context.TODO(), opts)
 	}, namespace)
 
@@ -548,7 +548,7 @@ func dumpAllNodeInfo(c clientset.Interface) {
 }
 
 // EventsLister defines a event listener
-type EventsLister func(opts metav1.ListOptions, ns string) (*v1.EventList, error)
+type EventsLister func(opts metav1.ListOptions, ns string) (*corev1.EventList, error)
 
 // DumpEventsInNamespace dump events in namespace
 func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
@@ -571,7 +571,7 @@ func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 }
 
 // byFirstTimestamp sorts a slice of events by first timestamp, using their involvedObject's name as a tie breaker.
-type byFirstTimestamp []v1.Event
+type byFirstTimestamp []corev1.Event
 
 func (o byFirstTimestamp) Len() int      { return len(o) }
 func (o byFirstTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
@@ -590,7 +590,7 @@ func (o byFirstTimestamp) Less(i, j int) bool {
 func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 	Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, TestContext.AllowedNotReadyNodes)
 
-	var notReady []*v1.Node
+	var notReady []*corev1.Node
 	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		notReady = nil
 		// It should be OK to list unschedulable Nodes here.
@@ -603,7 +603,7 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 		}
 		for i := range nodes.Items {
 			node := &nodes.Items[i]
-			if !IsNodeConditionSetAsExpected(node, v1.NodeReady, true) {
+			if !IsNodeConditionSetAsExpected(node, corev1.NodeReady, true) {
 				notReady = append(notReady, node)
 			}
 		}
@@ -725,7 +725,7 @@ func ExpectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interf
 }
 
 // logPodStates logs basic info of provided pods for debugging.
-func logPodStates(pods []v1.Pod) {
+func logPodStates(pods []corev1.Pod) {
 	// Find maximum widths for pod, node, and phase strings for column printing.
 	maxPodW, maxNodeW, maxPhaseW, maxGraceW := len("POD"), len("NODE"), len("PHASE"), len("GRACE")
 	for i := range pods {
@@ -798,8 +798,8 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 
 // WaitForPodRunningInNamespace waits default amount of time (PodStartTimeout) for the specified pod to become running.
 // Returns an error if timeout occurs first, or pod goes in to failed state.
-func WaitForPodRunningInNamespace(c clientset.Interface, pod *v1.Pod) error {
-	if pod.Status.Phase == v1.PodRunning {
+func WaitForPodRunningInNamespace(c clientset.Interface, pod *corev1.Pod) error {
+	if pod.Status.Phase == corev1.PodRunning {
 		return nil
 	}
 	return WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, PodStartTimeout)
@@ -830,9 +830,9 @@ func podRunning(c clientset.Interface, podName, namespace string) wait.Condition
 			return false, err
 		}
 		switch pod.Status.Phase {
-		case v1.PodRunning:
+		case corev1.PodRunning:
 			return true, nil
-		case v1.PodFailed, v1.PodSucceeded:
+		case corev1.PodFailed, corev1.PodSucceeded:
 			return false, ErrPodCompleted
 		}
 		return false, nil
@@ -988,8 +988,8 @@ func KubectlCmd(args ...string) *exec.Cmd {
 // FilterNodes filters nodes in NodeList in place, removing nodes that do not
 // satisfy the given condition
 // TODO: consider merging with pkg/client/cache.NodeLister
-func FilterNodes(nodeList *v1.NodeList, fn func(node v1.Node) bool) {
-	var l []v1.Node
+func FilterNodes(nodeList *corev1.NodeList, fn func(node corev1.Node) bool) {
+	var l []corev1.Node
 
 	for _, node := range nodeList.Items {
 		if fn(node) {
@@ -1003,30 +1003,30 @@ func FilterNodes(nodeList *v1.NodeList, fn func(node v1.Node) bool) {
 // 1) doesn't have "unschedulable" field set
 // 2) it's Ready condition is set to true
 // 3) doesn't have NetworkUnavailable condition set to true
-func isNodeSchedulable(node *v1.Node) bool {
-	nodeReady := IsNodeConditionSetAsExpected(node, v1.NodeReady, true)
-	networkReady := IsNodeConditionUnset(node, v1.NodeNetworkUnavailable) ||
-		IsNodeConditionSetAsExpectedSilent(node, v1.NodeNetworkUnavailable, false)
+func isNodeSchedulable(node *corev1.Node) bool {
+	nodeReady := IsNodeConditionSetAsExpected(node, corev1.NodeReady, true)
+	networkReady := IsNodeConditionUnset(node, corev1.NodeNetworkUnavailable) ||
+		IsNodeConditionSetAsExpectedSilent(node, corev1.NodeNetworkUnavailable, false)
 	return !node.Spec.Unschedulable && nodeReady && networkReady
 }
 
 // IsNodeConditionSetAsExpected indicate if node is ready
-func IsNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
+func IsNodeConditionSetAsExpected(node *corev1.Node, conditionType corev1.NodeConditionType, wantTrue bool) bool {
 	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, false)
 }
 
 // IsNodeConditionSetAsExpectedSilent indicate if node is ready with silent
-func IsNodeConditionSetAsExpectedSilent(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
+func IsNodeConditionSetAsExpectedSilent(node *corev1.Node, conditionType corev1.NodeConditionType, wantTrue bool) bool {
 	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, true)
 }
 
-func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue, silent bool) bool {
+func isNodeConditionSetAsExpected(node *corev1.Node, conditionType corev1.NodeConditionType, wantTrue, silent bool) bool {
 	// Check the node readiness condition (logging all).
 	for _, cond := range node.Status.Conditions {
 		// Ensure that the condition type and the status matches as desired.
 		if cond.Type == conditionType {
 			// For NodeReady condition we need to check Taints as well
-			if cond.Type == v1.NodeReady {
+			if cond.Type == corev1.NodeReady {
 				hasNodeControllerTaints := false
 				// For NodeReady we need to check if Taints are gone as well
 				taints := node.Spec.Taints
@@ -1037,16 +1037,16 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 					}
 				}
 				if wantTrue {
-					if (cond.Status == v1.ConditionTrue) && !hasNodeControllerTaints {
+					if (cond.Status == corev1.ConditionTrue) && !hasNodeControllerTaints {
 						return true
 					}
 					msg := ""
 					if !hasNodeControllerTaints {
 						msg = fmt.Sprintf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-							conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+							conditionType, node.Name, cond.Status == corev1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
 					} else {
 						msg = fmt.Sprintf("Condition %s of node %s is %v, but Node is tainted by NodeController with %v. Failure",
-							conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
+							conditionType, node.Name, cond.Status == corev1.ConditionTrue, taints)
 					}
 					if !silent {
 						Logf(msg)
@@ -1054,21 +1054,21 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 					return false
 				}
 				// TODO: check if the Node is tainted once we enable NC notReady/unreachable taints by default
-				if cond.Status != v1.ConditionTrue {
+				if cond.Status != corev1.ConditionTrue {
 					return true
 				}
 				if !silent {
 					Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-						conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+						conditionType, node.Name, cond.Status == corev1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
 				}
 				return false
 			}
-			if (wantTrue && (cond.Status == v1.ConditionTrue)) || (!wantTrue && (cond.Status != v1.ConditionTrue)) {
+			if (wantTrue && (cond.Status == corev1.ConditionTrue)) || (!wantTrue && (cond.Status != corev1.ConditionTrue)) {
 				return true
 			}
 			if !silent {
 				Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-					conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+					conditionType, node.Name, cond.Status == corev1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
 			}
 			return false
 		}
@@ -1081,7 +1081,7 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 }
 
 // IsNodeConditionUnset indicate if set condition
-func IsNodeConditionUnset(node *v1.Node, conditionType v1.NodeConditionType) bool {
+func IsNodeConditionUnset(node *corev1.Node, conditionType corev1.NodeConditionType) bool {
 	for _, cond := range node.Status.Conditions {
 		if cond.Type == conditionType {
 			return false
@@ -1091,8 +1091,8 @@ func IsNodeConditionUnset(node *v1.Node, conditionType v1.NodeConditionType) boo
 }
 
 // Test whether a fake pod can be scheduled on "node", given its current taints.
-func isNodeUntainted(node *v1.Node) bool {
-	fakePod := &v1.Pod{
+func isNodeUntainted(node *corev1.Node) bool {
+	fakePod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
@@ -1101,8 +1101,8 @@ func isNodeUntainted(node *v1.Node) bool {
 			Name:      "fake-not-scheduled",
 			Namespace: "fake-not-scheduled",
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
 				{
 					Name:  "fake-not-scheduled",
 					Image: "fake-not-scheduled",
@@ -1110,9 +1110,9 @@ func isNodeUntainted(node *v1.Node) bool {
 			},
 		},
 	}
-	filterPredicate := func(t *v1.Taint) bool {
+	filterPredicate := func(t *corev1.Taint) bool {
 		// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
-		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
+		return t.Effect == corev1.TaintEffectNoSchedule || t.Effect == corev1.TaintEffectNoExecute
 	}
 	_, isUntolerated := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, fakePod.Spec.Tolerations, filterPredicate)
 	return !isUntolerated
@@ -1122,18 +1122,18 @@ func isNodeUntainted(node *v1.Node) bool {
 // 1) Needs to be schedulable.
 // 2) Needs to be ready.
 // If EITHER 1 or 2 is not true, most tests will want to ignore the node entirely.
-func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *v1.NodeList) {
+func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *corev1.NodeList) {
 	nodes = waitListSchedulableNodesOrDie(c)
 	// previous tests may have cause failures of some nodes. Let's skip
 	// 'Not Ready' nodes, just in case (there is no need to fail the test).
-	FilterNodes(nodes, func(node v1.Node) bool {
+	FilterNodes(nodes, func(node corev1.Node) bool {
 		return isNodeSchedulable(&node) && isNodeUntainted(&node)
 	})
 	return nodes
 }
 
 // waitListSchedulableNodesOrDie is a wrapper around listing nodes supporting retries.
-func waitListSchedulableNodesOrDie(c clientset.Interface) *v1.NodeList {
+func waitListSchedulableNodesOrDie(c clientset.Interface) *corev1.NodeList {
 	nodes, err := waitListSchedulableNodes(c)
 	if err != nil {
 		ExpectNoError(err, "Non-retryable failure or timed out while listing nodes for e2e cluster.")
@@ -1142,8 +1142,8 @@ func waitListSchedulableNodesOrDie(c clientset.Interface) *v1.NodeList {
 }
 
 // waitListSchedulableNodes is a wrapper around listing nodes supporting retries.
-func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
-	var nodes *v1.NodeList
+func waitListSchedulableNodes(c clientset.Interface) (*corev1.NodeList, error) {
+	var nodes *corev1.NodeList
 	var err error
 	if wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
 		nodes, err = c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{FieldSelector: fields.Set{
@@ -1162,7 +1162,7 @@ func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
 	return nodes, nil
 }
 
-type podCondition func(pod *v1.Pod) (bool, error)
+type podCondition func(pod *corev1.Pod) (bool, error)
 
 // WaitForPodCondition waits until pod satisfied condition
 func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeout time.Duration, condition podCondition) error {
