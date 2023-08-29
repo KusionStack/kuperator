@@ -33,31 +33,32 @@ import (
 	"kusionstack.io/kafed/pkg/controllers/utils"
 )
 
-func (r *Consist) syncEmployer(ctx context.Context, employer client.Object, expectEmployerStatus, currentEmployerStatus []IEmployer) (bool, error) {
+func (r *Consist) syncEmployer(ctx context.Context, employer client.Object, expectEmployerStatus, currentEmployerStatus []IEmployer) (bool, bool, error) {
 	toCudEmployer, err := r.diffEmployer(expectEmployerStatus, currentEmployerStatus)
 	if err != nil {
-		return false, fmt.Errorf("diff employer failed, err: %s", err.Error())
+		return false, false, fmt.Errorf("diff employer failed, err: %s", err.Error())
 	}
-	succCreate, _, err := r.adapter.CreateEmployer(employer, toCudEmployer.ToCreate)
+	succCreate, failCreate, err := r.adapter.CreateEmployer(employer, toCudEmployer.ToCreate)
 	if err != nil {
-		return false, fmt.Errorf("syncCreate failed, err: %s", err.Error())
+		return false, false, fmt.Errorf("syncCreate failed, err: %s", err.Error())
 	}
-	succUpdate, _, err := r.adapter.UpdateEmployer(employer, toCudEmployer.ToUpdate)
+	succUpdate, failUpdate, err := r.adapter.UpdateEmployer(employer, toCudEmployer.ToUpdate)
 	if err != nil {
-		return false, fmt.Errorf("syncUpdate failed, err: %s", err.Error())
+		return false, false, fmt.Errorf("syncUpdate failed, err: %s", err.Error())
 	}
-	succDelete, _, err := r.adapter.DeleteEmployer(employer, toCudEmployer.ToDelete)
+	succDelete, failDelete, err := r.adapter.DeleteEmployer(employer, toCudEmployer.ToDelete)
 	if err != nil {
-		return false, fmt.Errorf("syncDelete failed, err: %s", err.Error())
+		return false, false, fmt.Errorf("syncDelete failed, err: %s", err.Error())
 	}
 
 	err = r.adapter.RecordEmployer(succCreate, succUpdate, succDelete)
 	if err != nil {
-		return false, fmt.Errorf("record employer failed, err: %s", err.Error())
+		return false, false, fmt.Errorf("record employer failed, err: %s", err.Error())
 	}
 
 	isClean := len(toCudEmployer.Unchanged) == 0 && len(toCudEmployer.ToCreate) == 0 && len(toCudEmployer.ToUpdate) == 0 && len(toCudEmployer.ToDelete) == 0
-	return isClean, nil
+	isCudFailedExist := len(failCreate) > 0 || len(failUpdate) > 0 || len(failDelete) > 0
+	return isClean, isCudFailedExist, nil
 }
 
 func (r *Consist) diffEmployer(expectEmployer, currentEmployer []IEmployer) (ToCUDEmployer, error) {
@@ -174,11 +175,11 @@ func (r *Consist) diffEmployees(expectEmployees, currentEmployees []IEmployee) (
 	}, nil
 }
 
-func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, expectEmployees, currentEmployees []IEmployee) (bool, error) {
+func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, expectEmployees, currentEmployees []IEmployee) (bool, bool, error) {
 	// get expect/current employees diffEmployees
 	toCudEmployees, err := r.diffEmployees(expectEmployees, currentEmployees)
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 
 	// todo, to be removed, for demo
@@ -187,29 +188,30 @@ func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, exp
 
 	succCreate, failCreate, err := r.adapter.CreateEmployees(employer, toCudEmployees.ToCreate)
 	if err != nil {
-		return false, fmt.Errorf("syncCreate failed, err: %s", err.Error())
+		return false, false, fmt.Errorf("syncCreate failed, err: %s", err.Error())
 	}
-	succUpdate, _, err := r.adapter.UpdateEmployees(employer, toCudEmployees.ToUpdate)
+	succUpdate, failUpdate, err := r.adapter.UpdateEmployees(employer, toCudEmployees.ToUpdate)
 	if err != nil {
-		return false, fmt.Errorf("syncUpdate failed, err: %s", err.Error())
+		return false, false, fmt.Errorf("syncUpdate failed, err: %s", err.Error())
 	}
 	succDelete, failDelete, err := r.adapter.DeleteEmployees(employer, toCudEmployees.ToDelete)
 	if err != nil {
-		return false, fmt.Errorf("syncDelete failed, err: %s", err.Error())
+		return false, false, fmt.Errorf("syncDelete failed, err: %s", err.Error())
 	}
 
 	toAddLifecycleFlzEmployees, toDeleteLifecycleFlzEmployees := r.getToAddDeleteLifecycleFlzEmployees(
-		succCreate, failCreate, succDelete, failDelete, succUpdate, toCudEmployees.Unchanged)
+		succCreate, succDelete, succUpdate, toCudEmployees.Unchanged)
 
 	ns := employer.GetNamespace()
 	lifecycleFlz := GenerateLifecycleFinalizer(employer.GetName())
 	err = r.ensureLifecycleFinalizer(ctx, ns, lifecycleFlz, toAddLifecycleFlzEmployees, toDeleteLifecycleFlzEmployees)
 	if err != nil {
-		return false, fmt.Errorf("ensureLifecycleFinalizer failed, err: %s", err.Error())
+		return false, false, fmt.Errorf("ensureLifecycleFinalizer failed, err: %s", err.Error())
 	}
 
 	isClean := len(toCudEmployees.ToCreate) == 0 && len(toCudEmployees.ToUpdate) == 0 && len(toCudEmployees.Unchanged) == 0 && len(failDelete) == 0
-	return isClean, nil
+	isCudFailedExist := len(failCreate) > 0 || len(failUpdate) > 0 || len(failDelete) > 0
+	return isClean, isCudFailedExist, nil
 }
 
 // ensureExpectFinalizer add expected finalizer to employee's available condition anno
@@ -530,7 +532,7 @@ func (r *Consist) ensureLifecycleFinalizer(ctx context.Context, ns, lifecycleFlz
 	return err
 }
 
-func (r *Consist) getToAddDeleteLifecycleFlzEmployees(succCreate, failCreate, succDelete, failDelete, succUpdate, unchanged []IEmployee) ([]string, []string) {
+func (r *Consist) getToAddDeleteLifecycleFlzEmployees(succCreate, succDelete, succUpdate, unchanged []IEmployee) ([]string, []string) {
 	toAddLifecycleFlz := make([]string, len(succCreate)+len(succUpdate)+len(unchanged))
 	toDeleteLifecycleFlz := make([]string, len(succDelete)+len(succUpdate)+len(unchanged))
 	toAddIdx, toDeleteIdx := 0, 0

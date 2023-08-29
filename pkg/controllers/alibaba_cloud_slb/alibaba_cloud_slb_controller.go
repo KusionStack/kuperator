@@ -142,6 +142,9 @@ func (r *ReconcileAdapter) GetCurrentEmployee(ctx context.Context, employer clie
 	lbID := svc.GetLabels()[alibabaCloudSlbLbIdLabelKey]
 	bsExistUnderSlb := make(map[string]bool)
 	if lbID != "" {
+		if alibabaCloudSlbClient == nil {
+			return nil, fmt.Errorf("alibaba cloud slb client is nil")
+		}
 		backendServers, err := alibabaCloudSlbClient.GetBackendServers(lbID)
 		if err != nil {
 			return nil, fmt.Errorf("get backend servers of slb failed, err: %s", err.Error())
