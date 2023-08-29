@@ -63,7 +63,7 @@ func AddToMgr(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForObject{}, &PodPredicate{
 		NeedOpsLifecycle: func(oldPod, newPod *corev1.Pod) bool {
-			return utils.ControlledByPodOpsLifecycle(newPod)
+			return utils.ControlledByKusionStack(newPod)
 		},
 	})
 	if err != nil {
