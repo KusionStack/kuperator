@@ -20,17 +20,31 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	commonutils "kusionstack.io/kafed/pkg/utils"
+	"kusionstack.io/kafed/pkg/utils/mixin"
 )
+
+var _ inject.Injector = &MutatingHandler{}
+var _ inject.Client = &MutatingHandler{}
+var _ inject.Logger = &MutatingHandler{}
+var _ admission.DecoderInjector = &MutatingHandler{}
 
 // MutatingHandler handles all resources mutating operation
 type MutatingHandler struct {
-	Client client.Client
-	// Decoder decodes objects
-	Decoder *admission.Decoder
+	*mixin.WebhookHandlerMixin
+
+	// setFields allows injecting dependencies from an external source
+	setFields inject.Func
+}
+
+func NewGenericMutatingHandler() *MutatingHandler {
+	return &MutatingHandler{
+		WebhookHandlerMixin: mixin.NewWebhookHandlerMixin(),
+	}
 }
 
 func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
@@ -42,7 +56,12 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 	if req.SubResource != "" {
 		key = fmt.Sprintf("%s/%s", req.Kind.Kind, req.SubResource)
 	}
-	klog.V(5).Infof("MutatingHandler, Kind: %s, Namespace: %s, Name: %s", key, req.Namespace, req.Name)
+
+	h.Logger.V(5).Info("mutating handler",
+		"kind", req.Kind.Kind,
+		"key", commonutils.AdmissionRequestObjectKeyString(req),
+		"op", req.Operation,
+	)
 
 	if handler, exist := MutatingTypeHandlerMap[key]; exist {
 		return handler.Handle(ctx, req)
@@ -52,26 +71,23 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 	return admission.Patched("NoMutating")
 }
 
-var _ inject.Client = &MutatingHandler{}
+func (h *MutatingHandler) InjectFunc(f inject.Func) error {
+	h.setFields = f
 
-// InjectClient injects the client into the MutatingHandler
-func (h *MutatingHandler) InjectClient(c client.Client) error {
-	h.Client = c
 	for i := range MutatingTypeHandlerMap {
-		if _, err := inject.ClientInto(h.Client, MutatingTypeHandlerMap[i]); err != nil {
+		if err := h.setFields(MutatingTypeHandlerMap[i]); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-var _ admission.DecoderInjector = &MutatingHandler{}
+func (h *MutatingHandler) InjectLogger(l logr.Logger) error {
+	h.WebhookHandlerMixin.InjectLogger(l)
 
-// InjectDecoder injects the decoder into the MutatingHandler
-func (h *MutatingHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	for i := range MutatingTypeHandlerMap {
-		if _, err := admission.InjectDecoderInto(d, MutatingTypeHandlerMap[i]); err != nil {
+	// inject logger into subHandlers
+	for kind, handler := range MutatingTypeHandlerMap {
+		if _, err := inject.LoggerInto(l.WithValues("kind", kind), handler); err != nil {
 			return err
 		}
 	}

@@ -22,10 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -33,6 +30,7 @@ import (
 
 	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
 	"kusionstack.io/kafed/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/kafed/pkg/utils/mixin"
 )
 
 const (
@@ -41,9 +39,7 @@ const (
 
 // PodDeletionReconciler reconciles and reclaims a Pod object
 type PodDeletionReconciler struct {
-	client.Client
-
-	recorder record.EventRecorder
+	*mixin.ReconcilerMixin
 }
 
 func Add(mgr ctrl.Manager) error {
@@ -52,13 +48,12 @@ func Add(mgr ctrl.Manager) error {
 
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr ctrl.Manager) reconcile.Reconciler {
-	recorder := mgr.GetEventRecorderFor(controllerName)
+	mixin := mixin.NewReconcilerMixin(controllerName, mgr)
 
-	InitExpectations(mgr.GetClient())
+	InitExpectations(mixin.Client)
 
 	return &PodDeletionReconciler{
-		Client:   mgr.GetClient(),
-		recorder: recorder,
+		ReconcilerMixin: mixin,
 	}
 }
 
@@ -88,14 +83,15 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 // If a Pod is labeled, controller will first trigger a deletion PodOpsLifecycle. If all conditions are satisfied,
 // it will then delete Pod.
 func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := r.Logger.WithValues("pod", req.String())
 	instance := &corev1.Pod{}
-	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
+	if err := r.Client.Get(ctx, req.NamespacedName, instance); err != nil {
 		if !errors.IsNotFound(err) {
-			klog.Error("fail to find Pod %s: %s", req, err)
+			logger.Error(err, "failed to find pod")
 			return reconcile.Result{}, err
 		}
 
-		klog.Infof("Pod %s is deleted", req)
+		logger.V(2).Info("pod is deleted")
 		return ctrl.Result{}, activeExpectations.Delete(req.Namespace, req.Name)
 	}
 
@@ -103,7 +99,7 @@ func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if satisfied, err := activeExpectations.IsSatisfied(instance); err != nil {
 		return ctrl.Result{}, err
 	} else if !satisfied {
-		klog.Warningf("Pod %s is not satisfied to reconcile.", req)
+		logger.Info("pod is not satisfied to reconcile")
 		return ctrl.Result{}, nil
 	}
 
@@ -113,7 +109,7 @@ func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// if Pod is not begin a deletion PodOpsLifecycle, trigger it
 	if !podopslifecycle.IsDuringOps(OpsLifecycleAdapter, instance) {
-		if updated, err := podopslifecycle.Begin(r, OpsLifecycleAdapter, instance); err != nil {
+		if updated, err := podopslifecycle.Begin(r.Client, OpsLifecycleAdapter, instance); err != nil {
 			return ctrl.Result{}, fmt.Errorf("fail to begin PodOpsLifecycle to delete Pod %s: %s", req, err)
 		} else if updated {
 			if err := activeExpectations.ExpectUpdate(instance, expectations.Pod, instance.Name, instance.ResourceVersion); err != nil {
@@ -124,8 +120,8 @@ func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// if Pod is allow to operate, delete it
 	if podopslifecycle.AllowOps(OpsLifecycleAdapter, instance) {
-		klog.Infof("try to delete Pod %s with deletion indication", req)
-		if err := r.Delete(context.TODO(), instance); err != nil {
+		logger.Info("try to delete Pod with deletion indication")
+		if err := r.Client.Delete(context.TODO(), instance); err != nil {
 			return ctrl.Result{}, fmt.Errorf("fail to delete Pod %s with deletion indication: %s", req, err)
 		} else {
 			if err := activeExpectations.ExpectDelete(instance, expectations.Pod, instance.Name); err != nil {

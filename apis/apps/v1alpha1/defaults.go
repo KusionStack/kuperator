@@ -23,7 +23,7 @@ import (
 	"time"
 
 	dockerref "github.com/docker/distribution/reference"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	utilpointer "k8s.io/utils/ptr"
 )
 
@@ -31,7 +31,7 @@ const (
 	DefaultImageTag = "latest"
 )
 
-func SetDefaults_PodSpec(podSpec *v1.PodSpec) {
+func SetDefaults_PodSpec(podSpec *corev1.PodSpec) {
 	SetDefaults_PodSpecConfig(podSpec)
 	for i := range podSpec.Volumes {
 		a := &podSpec.Volumes[i]
@@ -170,31 +170,31 @@ func SetDefaults_PodSpec(podSpec *v1.PodSpec) {
 	}
 }
 
-func SetDefaults_PodSpecConfig(obj *v1.PodSpec) {
+func SetDefaults_PodSpecConfig(obj *corev1.PodSpec) {
 	if obj.DNSPolicy == "" {
-		obj.DNSPolicy = v1.DNSClusterFirst
+		obj.DNSPolicy = corev1.DNSClusterFirst
 	}
 	if obj.RestartPolicy == "" {
-		obj.RestartPolicy = v1.RestartPolicyAlways
+		obj.RestartPolicy = corev1.RestartPolicyAlways
 	}
 	if obj.HostNetwork {
 		defaultHostNetworkPorts(&obj.Containers)
 		defaultHostNetworkPorts(&obj.InitContainers)
 	}
 	if obj.SecurityContext == nil {
-		obj.SecurityContext = &v1.PodSecurityContext{}
+		obj.SecurityContext = &corev1.PodSecurityContext{}
 	}
 	if obj.TerminationGracePeriodSeconds == nil {
-		period := int64(v1.DefaultTerminationGracePeriodSeconds)
+		period := int64(corev1.DefaultTerminationGracePeriodSeconds)
 		obj.TerminationGracePeriodSeconds = &period
 	}
 	if obj.SchedulerName == "" {
-		obj.SchedulerName = v1.DefaultSchedulerName
+		obj.SchedulerName = corev1.DefaultSchedulerName
 	}
 }
 
 // With host networking default all container ports to host ports.
-func defaultHostNetworkPorts(containers *[]v1.Container) {
+func defaultHostNetworkPorts(containers *[]corev1.Container) {
 	for i := range *containers {
 		for j := range (*containers)[i].Ports {
 			if (*containers)[i].Ports[j].HostPort == 0 {
@@ -204,14 +204,14 @@ func defaultHostNetworkPorts(containers *[]v1.Container) {
 	}
 }
 
-func SetDefaults_Volume(obj *v1.Volume) {
+func SetDefaults_Volume(obj *corev1.Volume) {
 	if utilpointer.AllPtrFieldsNil(&obj.VolumeSource) {
-		obj.VolumeSource = v1.VolumeSource{
-			EmptyDir: &v1.EmptyDirVolumeSource{},
+		obj.VolumeSource = corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
 		}
 	}
 }
-func SetDefaults_Probe(obj *v1.Probe) {
+func SetDefaults_Probe(obj *corev1.Probe) {
 	if obj.TimeoutSeconds == 0 {
 		obj.TimeoutSeconds = 1
 	}
@@ -225,59 +225,59 @@ func SetDefaults_Probe(obj *v1.Probe) {
 		obj.FailureThreshold = 3
 	}
 }
-func SetDefaults_SecretVolumeSource(obj *v1.SecretVolumeSource) {
+func SetDefaults_SecretVolumeSource(obj *corev1.SecretVolumeSource) {
 	if obj.DefaultMode == nil {
-		perm := int32(v1.SecretVolumeSourceDefaultMode)
+		perm := int32(corev1.SecretVolumeSourceDefaultMode)
 		obj.DefaultMode = &perm
 	}
 }
-func SetDefaults_ConfigMapVolumeSource(obj *v1.ConfigMapVolumeSource) {
+func SetDefaults_ConfigMapVolumeSource(obj *corev1.ConfigMapVolumeSource) {
 	if obj.DefaultMode == nil {
-		perm := int32(v1.ConfigMapVolumeSourceDefaultMode)
+		perm := int32(corev1.ConfigMapVolumeSourceDefaultMode)
 		obj.DefaultMode = &perm
 	}
 }
-func SetDefaults_DownwardAPIVolumeSource(obj *v1.DownwardAPIVolumeSource) {
+func SetDefaults_DownwardAPIVolumeSource(obj *corev1.DownwardAPIVolumeSource) {
 	if obj.DefaultMode == nil {
-		perm := int32(v1.DownwardAPIVolumeSourceDefaultMode)
+		perm := int32(corev1.DownwardAPIVolumeSourceDefaultMode)
 		obj.DefaultMode = &perm
 	}
 }
-func SetDefaults_Secret(obj *v1.Secret) {
+func SetDefaults_Secret(obj *corev1.Secret) {
 	if obj.Type == "" {
-		obj.Type = v1.SecretTypeOpaque
+		obj.Type = corev1.SecretTypeOpaque
 	}
 }
-func SetDefaults_ProjectedVolumeSource(obj *v1.ProjectedVolumeSource) {
+func SetDefaults_ProjectedVolumeSource(obj *corev1.ProjectedVolumeSource) {
 	if obj.DefaultMode == nil {
-		perm := int32(v1.ProjectedVolumeSourceDefaultMode)
+		perm := int32(corev1.ProjectedVolumeSourceDefaultMode)
 		obj.DefaultMode = &perm
 	}
 }
-func SetDefaults_ServiceAccountTokenProjection(obj *v1.ServiceAccountTokenProjection) {
+func SetDefaults_ServiceAccountTokenProjection(obj *corev1.ServiceAccountTokenProjection) {
 	hour := int64(time.Hour.Seconds())
 	if obj.ExpirationSeconds == nil {
 		obj.ExpirationSeconds = &hour
 	}
 }
-func SetDefaults_ISCSIVolumeSource(obj *v1.ISCSIVolumeSource) {
+func SetDefaults_ISCSIVolumeSource(obj *corev1.ISCSIVolumeSource) {
 	if obj.ISCSIInterface == "" {
 		obj.ISCSIInterface = "default"
 	}
 }
-func SetDefaults_ISCSIPersistentVolumeSource(obj *v1.ISCSIPersistentVolumeSource) {
+func SetDefaults_ISCSIPersistentVolumeSource(obj *corev1.ISCSIPersistentVolumeSource) {
 	if obj.ISCSIInterface == "" {
 		obj.ISCSIInterface = "default"
 	}
 }
-func SetDefaults_AzureDiskVolumeSource(obj *v1.AzureDiskVolumeSource) {
+func SetDefaults_AzureDiskVolumeSource(obj *corev1.AzureDiskVolumeSource) {
 	if obj.CachingMode == nil {
-		obj.CachingMode = new(v1.AzureDataDiskCachingMode)
-		*obj.CachingMode = v1.AzureDataDiskCachingReadWrite
+		obj.CachingMode = new(corev1.AzureDataDiskCachingMode)
+		*obj.CachingMode = corev1.AzureDataDiskCachingReadWrite
 	}
 	if obj.Kind == nil {
-		obj.Kind = new(v1.AzureDataDiskKind)
-		*obj.Kind = v1.AzureSharedBlobDisk
+		obj.Kind = new(corev1.AzureDataDiskKind)
+		*obj.Kind = corev1.AzureSharedBlobDisk
 	}
 	if obj.FSType == nil {
 		obj.FSType = new(string)
@@ -288,44 +288,44 @@ func SetDefaults_AzureDiskVolumeSource(obj *v1.AzureDiskVolumeSource) {
 		*obj.ReadOnly = false
 	}
 }
-func SetDefaults_Endpoints(obj *v1.Endpoints) {
+func SetDefaults_Endpoints(obj *corev1.Endpoints) {
 	for i := range obj.Subsets {
 		ss := &obj.Subsets[i]
 		for i := range ss.Ports {
 			ep := &ss.Ports[i]
 			if ep.Protocol == "" {
-				ep.Protocol = v1.ProtocolTCP
+				ep.Protocol = corev1.ProtocolTCP
 			}
 		}
 	}
 }
-func SetDefaults_HTTPGetAction(obj *v1.HTTPGetAction) {
+func SetDefaults_HTTPGetAction(obj *corev1.HTTPGetAction) {
 	if obj.Path == "" {
 		obj.Path = "/"
 	}
 	if obj.Scheme == "" {
-		obj.Scheme = v1.URISchemeHTTP
+		obj.Scheme = corev1.URISchemeHTTP
 	}
 }
-func SetDefaults_NamespaceStatus(obj *v1.NamespaceStatus) {
+func SetDefaults_NamespaceStatus(obj *corev1.NamespaceStatus) {
 	if obj.Phase == "" {
-		obj.Phase = v1.NamespaceActive
+		obj.Phase = corev1.NamespaceActive
 	}
 }
-func SetDefaults_ObjectFieldSelector(obj *v1.ObjectFieldSelector) {
+func SetDefaults_ObjectFieldSelector(obj *corev1.ObjectFieldSelector) {
 	if obj.APIVersion == "" {
 		obj.APIVersion = "v1"
 	}
 }
-func SetDefaults_LimitRangeItem(obj *v1.LimitRangeItem) {
+func SetDefaults_LimitRangeItem(obj *corev1.LimitRangeItem) {
 	// for container limits, we apply default values
-	if obj.Type == v1.LimitTypeContainer {
+	if obj.Type == corev1.LimitTypeContainer {
 
 		if obj.Default == nil {
-			obj.Default = make(v1.ResourceList)
+			obj.Default = make(corev1.ResourceList)
 		}
 		if obj.DefaultRequest == nil {
-			obj.DefaultRequest = make(v1.ResourceList)
+			obj.DefaultRequest = make(corev1.ResourceList)
 		}
 
 		// If a default limit is unspecified, but the max is specified, default the limit to the max
@@ -348,13 +348,13 @@ func SetDefaults_LimitRangeItem(obj *v1.LimitRangeItem) {
 		}
 	}
 }
-func SetDefaults_ConfigMap(obj *v1.ConfigMap) {
+func SetDefaults_ConfigMap(obj *corev1.ConfigMap) {
 	if obj.Data == nil {
 		obj.Data = make(map[string]string)
 	}
 }
 
-func SetDefaults_RBDVolumeSource(obj *v1.RBDVolumeSource) {
+func SetDefaults_RBDVolumeSource(obj *corev1.RBDVolumeSource) {
 	if obj.RBDPool == "" {
 		obj.RBDPool = "rbd"
 	}
@@ -366,7 +366,7 @@ func SetDefaults_RBDVolumeSource(obj *v1.RBDVolumeSource) {
 	}
 }
 
-func SetDefaults_RBDPersistentVolumeSource(obj *v1.RBDPersistentVolumeSource) {
+func SetDefaults_RBDPersistentVolumeSource(obj *corev1.RBDPersistentVolumeSource) {
 	if obj.RBDPool == "" {
 		obj.RBDPool = "rbd"
 	}
@@ -378,7 +378,7 @@ func SetDefaults_RBDPersistentVolumeSource(obj *v1.RBDPersistentVolumeSource) {
 	}
 }
 
-func SetDefaults_ScaleIOVolumeSource(obj *v1.ScaleIOVolumeSource) {
+func SetDefaults_ScaleIOVolumeSource(obj *corev1.ScaleIOVolumeSource) {
 	if obj.StorageMode == "" {
 		obj.StorageMode = "ThinProvisioned"
 	}
@@ -387,7 +387,7 @@ func SetDefaults_ScaleIOVolumeSource(obj *v1.ScaleIOVolumeSource) {
 	}
 }
 
-func SetDefaults_ScaleIOPersistentVolumeSource(obj *v1.ScaleIOPersistentVolumeSource) {
+func SetDefaults_ScaleIOPersistentVolumeSource(obj *corev1.ScaleIOPersistentVolumeSource) {
 	if obj.StorageMode == "" {
 		obj.StorageMode = "ThinProvisioned"
 	}
@@ -396,47 +396,47 @@ func SetDefaults_ScaleIOPersistentVolumeSource(obj *v1.ScaleIOPersistentVolumeSo
 	}
 }
 
-func SetDefaults_HostPathVolumeSource(obj *v1.HostPathVolumeSource) {
-	typeVol := v1.HostPathUnset
+func SetDefaults_HostPathVolumeSource(obj *corev1.HostPathVolumeSource) {
+	typeVol := corev1.HostPathUnset
 	if obj.Type == nil {
 		obj.Type = &typeVol
 	}
 }
 
-func SetDefaults_Container(obj *v1.Container) {
+func SetDefaults_Container(obj *corev1.Container) {
 	if obj.ImagePullPolicy == "" {
 		// Ignore error and assume it has been validated elsewhere
 		_, tag, _, _ := ParseImageName(obj.Image)
 
 		// Check image tag
 		if tag == "latest" {
-			obj.ImagePullPolicy = v1.PullAlways
+			obj.ImagePullPolicy = corev1.PullAlways
 		} else {
-			obj.ImagePullPolicy = v1.PullIfNotPresent
+			obj.ImagePullPolicy = corev1.PullIfNotPresent
 		}
 	}
 	if obj.TerminationMessagePath == "" {
-		obj.TerminationMessagePath = v1.TerminationMessagePathDefault
+		obj.TerminationMessagePath = corev1.TerminationMessagePathDefault
 	}
 	if obj.TerminationMessagePolicy == "" {
-		obj.TerminationMessagePolicy = v1.TerminationMessageReadFile
+		obj.TerminationMessagePolicy = corev1.TerminationMessageReadFile
 	}
 }
 
-func SetDefaults_ContainerPort(obj *v1.ContainerPort) {
+func SetDefaults_ContainerPort(obj *corev1.ContainerPort) {
 	if obj.Protocol == "" {
-		obj.Protocol = v1.ProtocolTCP
+		obj.Protocol = corev1.ProtocolTCP
 	}
 }
 
-func SetDefaults_ResourceList(obj *v1.ResourceList) {
+func SetDefaults_ResourceList(obj *corev1.ResourceList) {
 	for key, val := range *obj {
 		// TODO(#18538): We round up resource values to milli scale to maintain API compatibility.
 		// In the future, we should instead reject values that need rounding.
 		const milliScale = -3
 		val.RoundUp(milliScale)
 
-		(*obj)[v1.ResourceName(key)] = val
+		(*obj)[corev1.ResourceName(key)] = val
 	}
 }
 

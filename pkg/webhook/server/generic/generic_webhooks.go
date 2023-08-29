@@ -28,8 +28,8 @@ import (
 var (
 	// HandlerMap contains admission webhook handlers
 	HandlerMap = map[string]admission.Handler{
-		"mutating-generic":   &MutatingHandler{},
-		"validating-generic": &ValidatingHandler{},
+		"mutating-generic":   NewGenericMutatingHandler(),
+		"validating-generic": NewGenericValidatingHandler(),
 	}
 )
 

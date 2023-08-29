@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	errors2 "k8s.io/apimachinery/pkg/util/errors"
@@ -107,8 +107,12 @@ func (r *Consist) diffEmployer(expectEmployer, currentEmployer []IEmployer) (ToC
 	}
 
 	// todo, log level
-	r.logger.Infof("employer, toCreate: %v, toUpdate: %v, toDelete: %v, unchanged: %v",
-		toCreate[:toCreateIdx], toUpdate[:toUpdateIdx], toDelete[:toDeleteIdx], unchanged[:unchangedIdx])
+	r.Logger.Info("employer info",
+		"toCreate", toCreate[:toCreateIdx],
+		"toUpdate", toUpdate[:toUpdateIdx],
+		"toDelete", toDelete[:toDeleteIdx],
+		"unchanged", unchanged[:unchangedIdx],
+	)
 
 	return ToCUDEmployer{
 		ToCreate:  toCreate[:toCreateIdx],
@@ -164,8 +168,12 @@ func (r *Consist) diffEmployees(expectEmployees, currentEmployees []IEmployee) (
 	}
 
 	// todo, log level
-	r.logger.Infof("employee, toCreate: %v, toUpdate: %v, toDelete: %v, unchanged: %v",
-		toCreate[:toCreateIdx], toUpdate[:toUpdateIdx], toDelete[:toDeleteIdx], unchanged[:unchangedIdx])
+	r.Logger.Info("employee info",
+		"toCreate", toCreate[:toCreateIdx],
+		"toUpdate", toUpdate[:toUpdateIdx],
+		"toDelete", toDelete[:toDeleteIdx],
+		"unchanged", unchanged[:unchangedIdx],
+	)
 
 	return ToCUDEmployees{
 		ToCreate:  toCreate[:toCreateIdx],
@@ -183,7 +191,7 @@ func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, exp
 	}
 
 	// todo, to be removed, for demo
-	r.recorder.Eventf(employer, v1.EventTypeNormal, "diffEmployees", "toCreate: %v, toUpdate: %v, toDelete: %v, unchanged: %v",
+	r.Recorder.Eventf(employer, corev1.EventTypeNormal, "diffEmployees", "toCreate: %v, toUpdate: %v, toDelete: %v, unchanged: %v",
 		toCudEmployees.ToCreate, toCudEmployees.ToUpdate, toCudEmployees.ToDelete, toCudEmployees.Unchanged)
 
 	succCreate, failCreate, err := r.adapter.CreateEmployees(employer, toCudEmployees.ToCreate)
@@ -249,7 +257,7 @@ func (r *Consist) ensureExpectedFinalizer(ctx context.Context, employer client.O
 		annos := employer.GetAnnotations()
 		annos[expectedFinalizerAddedAnnoKey] = strings.Join(notDeletedPodNames, ",")
 		employer.SetAnnotations(annos)
-		return len(notDeletedPodNames) == 0, r.Patch(ctx, employer, patch)
+		return len(notDeletedPodNames) == 0, r.Client.Patch(ctx, employer, patch)
 	}
 
 	selectedSet := sets.NewString(selectedEmployeeNames...)
@@ -296,7 +304,7 @@ func (r *Consist) ensureExpectedFinalizer(ctx context.Context, employer client.O
 	annos := employer.GetAnnotations()
 	annos[expectedFinalizerAddedAnnoKey] = strings.Join(addedNames, ",")
 	employer.SetAnnotations(annos)
-	return len(addedNames) == 0, r.Patch(ctx, employer, patch)
+	return len(addedNames) == 0, r.Client.Patch(ctx, employer, patch)
 }
 
 func (r *Consist) patchPodExpectedFinalizer(ctx context.Context, employer client.Object, toAdd, toDelete []PodExpectedFinalizerOps) error {
@@ -313,8 +321,8 @@ func (r *Consist) patchAddPodExpectedFinalizer(ctx context.Context, employer cli
 	expectedFlzKey, expectedFlz string) error {
 	_, err := utils.SlowStartBatch(len(toAdd), 1, false, func(i int, _ error) error {
 		podExpectedFinalizerOps := &toAdd[i]
-		var pod v1.Pod
-		err := r.Get(ctx, types.NamespacedName{
+		var pod corev1.Pod
+		err := r.Client.Get(ctx, types.NamespacedName{
 			Namespace: employer.GetNamespace(),
 			Name:      podExpectedFinalizerOps.Name,
 		}, &pod)
@@ -342,7 +350,7 @@ func (r *Consist) patchAddPodExpectedFinalizer(ctx context.Context, employer cli
 				return errMarshal
 			}
 			pod.Annotations[v1alpha1.PodAvailableConditionsAnnotation] = string(annoAvailableExpectedFlzs)
-			errPatch := r.Patch(ctx, &pod, patch)
+			errPatch := r.Client.Patch(ctx, &pod, patch)
 			if errPatch != nil {
 				return errPatch
 			}
@@ -361,7 +369,7 @@ func (r *Consist) patchAddPodExpectedFinalizer(ctx context.Context, employer cli
 					return errMarshal
 				}
 				pod.Annotations[v1alpha1.PodAvailableConditionsAnnotation] = string(annoAvailableExpectedFlzs)
-				errPatch := r.Patch(ctx, &pod, patch)
+				errPatch := r.Client.Patch(ctx, &pod, patch)
 				if errPatch != nil {
 					return errPatch
 				}
@@ -378,8 +386,8 @@ func (r *Consist) patchDeletePodExpectedFinalizer(ctx context.Context, employer 
 	expectedFlzKey string) error {
 	_, err := utils.SlowStartBatch(len(toDelete), 1, false, func(i int, _ error) error {
 		podExpectedFinalizerOps := &toDelete[i]
-		var pod v1.Pod
-		err := r.Get(ctx, types.NamespacedName{
+		var pod corev1.Pod
+		err := r.Client.Get(ctx, types.NamespacedName{
 			Namespace: employer.GetNamespace(),
 			Name:      podExpectedFinalizerOps.Name,
 		}, &pod)
@@ -410,7 +418,7 @@ func (r *Consist) patchDeletePodExpectedFinalizer(ctx context.Context, employer 
 				return errMarshal
 			}
 			pod.Annotations[v1alpha1.PodAvailableConditionsAnnotation] = string(annoAvailableExpectedFlzs)
-			errPatch := r.Patch(ctx, &pod, patch)
+			errPatch := r.Client.Patch(ctx, &pod, patch)
 			if errPatch != nil {
 				return errPatch
 			}
@@ -427,10 +435,10 @@ func (r *Consist) cleanEmployerCleanFinalizer(ctx context.Context, employer clie
 	if watchOptions, ok := r.adapter.(ReconcileWatchOptions); ok {
 		employerLatest = watchOptions.NewEmployer()
 	} else {
-		employerLatest = &v1.Service{}
+		employerLatest = &corev1.Service{}
 	}
 
-	err := r.Get(ctx, types.NamespacedName{
+	err := r.Client.Get(ctx, types.NamespacedName{
 		Namespace: employer.GetNamespace(),
 		Name:      employer.GetName(),
 	}, employerLatest)
@@ -455,7 +463,7 @@ func (r *Consist) cleanEmployerCleanFinalizer(ctx context.Context, employer clie
 		return nil
 	}
 	employerLatest.SetFinalizers(finalizers)
-	return r.Update(ctx, employerLatest)
+	return r.Client.Update(ctx, employerLatest)
 }
 
 func (r *Consist) ensureLifecycleFinalizer(ctx context.Context, ns, lifecycleFlz string, toAdd, toDelete []string) error {
@@ -467,9 +475,9 @@ func (r *Consist) ensureLifecycleFinalizer(ctx context.Context, ns, lifecycleFlz
 		if watchOptionsImplemented {
 			employee = watchOptions.NewEmployee()
 		} else {
-			employee = &v1.Pod{}
+			employee = &corev1.Pod{}
 		}
-		err := r.Get(ctx, types.NamespacedName{
+		err := r.Client.Get(ctx, types.NamespacedName{
 			Namespace: ns,
 			Name:      employeeName,
 		}, employee)
@@ -490,7 +498,7 @@ func (r *Consist) ensureLifecycleFinalizer(ctx context.Context, ns, lifecycleFlz
 			return nil
 		}
 		employee.SetFinalizers(append(employee.GetFinalizers(), lifecycleFlz))
-		return r.Update(ctx, employee)
+		return r.Client.Update(ctx, employee)
 	})
 	if err != nil {
 		return err
@@ -502,9 +510,9 @@ func (r *Consist) ensureLifecycleFinalizer(ctx context.Context, ns, lifecycleFlz
 		if watchOptionsImplemented {
 			employee = watchOptions.NewEmployee()
 		} else {
-			employee = &v1.Pod{}
+			employee = &corev1.Pod{}
 		}
-		err := r.Get(ctx, types.NamespacedName{
+		err := r.Client.Get(ctx, types.NamespacedName{
 			Namespace: ns,
 			Name:      employeeName,
 		}, employee)
@@ -527,7 +535,7 @@ func (r *Consist) ensureLifecycleFinalizer(ctx context.Context, ns, lifecycleFlz
 			return nil
 		}
 		employee.SetFinalizers(finalizers)
-		return r.Update(ctx, employee)
+		return r.Client.Update(ctx, employee)
 	})
 	return err
 }
@@ -594,5 +602,5 @@ func (r *Consist) ensureEmployerCleanFlz(ctx context.Context, employer client.Ob
 		}
 	}
 	employer.SetFinalizers(append(employer.GetFinalizers(), cleanFinalizerPrefix+employer.GetName()))
-	return true, r.Update(ctx, employer)
+	return true, r.Client.Update(ctx, employer)
 }

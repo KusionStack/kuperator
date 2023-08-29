@@ -18,7 +18,6 @@ package ruleset
 
 import (
 	"context"
-	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
@@ -58,9 +57,7 @@ func TestMain(m *testing.M) {
 		Scheme:            scheme.Scheme,
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 	}
-	env.ControlPlane.GetAPIServer().URL = &url.URL{
-		Host: "127.0.0.1:10001",
-	}
+
 	initRulesetManager()
 
 	config, err := env.Start()

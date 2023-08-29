@@ -4,7 +4,7 @@ IMG ?= kusionstack/kafed:test
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.22.1
 # kind cluster name for e2e
-CLUSTER_NAME ?= cluster1
+CLUSTER_NAME ?= e2e-test
 # kind version for e2e
 KIND_VERSION ?= v1.22.2
 KIND_KUBECONFIG ?= /tmp/kind/kubeconfig.yaml

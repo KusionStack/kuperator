@@ -19,28 +19,45 @@ package ruleset
 import (
 	"context"
 
+	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
+	commonutils "kusionstack.io/kafed/pkg/utils"
 )
 
+var _ inject.Client = &EventHandler{}
+var _ inject.Logger = &EventHandler{}
+
 type EventHandler struct {
+	// client and logger will be injected
 	client client.Client
+	logger logr.Logger
+}
+
+func (p *EventHandler) InjectClient(c client.Client) error {
+	p.client = c
+	return nil
+}
+
+func (p *EventHandler) InjectLogger(l logr.Logger) error {
+	p.logger = l.WithName("ruleset").WithName("eventHandler")
+	return nil
 }
 
 func (p *EventHandler) Create(e event.CreateEvent, q workqueue.RateLimitingInterface) {
 	obj := e.Object
 	ruleSets, err := involvedRuleSets(p.client, obj)
 	if err != nil {
-		klog.Errorf("fail to get %s/%s involved rulesets %v", obj.GetNamespace(), obj.GetName(), err)
+		p.logger.Error(err, "failed to get involved rulesets for objects", "obj", commonutils.ObjectKeyString(obj))
 		return
 	}
 	for _, rs := range ruleSets {
@@ -55,7 +72,7 @@ func (p *EventHandler) Update(e event.UpdateEvent, q workqueue.RateLimitingInter
 	obj := e.ObjectNew
 	ruleSets, err := involvedRuleSets(p.client, obj)
 	if err != nil {
-		klog.Errorf("fail to get %s/%s involved rulesets %v", obj.GetNamespace(), obj.GetName(), err)
+		p.logger.Error(err, "failed to get involved rulesets for objects", "obj", commonutils.ObjectKeyString(obj))
 		return
 	}
 	for _, rs := range ruleSets {
@@ -70,7 +87,7 @@ func (p *EventHandler) Delete(e event.DeleteEvent, q workqueue.RateLimitingInter
 	obj := e.Object
 	ruleSets, err := involvedRuleSets(p.client, obj)
 	if err != nil {
-		klog.Errorf("fail to get pod %s/%s involved rulesets %v", obj.GetNamespace(), obj.GetName(), err)
+		p.logger.Error(err, "failed to get involved rulesets for objects", "obj", commonutils.ObjectKeyString(obj))
 		return
 	}
 	for _, rs := range ruleSets {

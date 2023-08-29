@@ -19,7 +19,6 @@ package server
 import (
 	"strings"
 
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -29,11 +28,12 @@ import (
 // Add adds itself to the manager
 func Add(mgr manager.Manager) error {
 	server := mgr.GetWebhookServer()
+	logger := mgr.GetLogger().WithName("webhook")
 
 	// register admission handlers
 	for name, handler := range generic.HandlerMap {
 		if len(name) == 0 {
-			klog.Warningf("Skip registering handlers without a name")
+			logger.Info("Skip registering handlers without a name")
 			continue
 		}
 
@@ -42,7 +42,7 @@ func Add(mgr manager.Manager) error {
 			path = "/" + path
 		}
 		server.Register(path, &webhook.Admission{Handler: handler})
-		klog.V(3).Infof("Registered webhook handler %s", path)
+		logger.V(3).Info("Registered webhook handler", "path", path)
 	}
 
 	return nil

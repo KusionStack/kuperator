@@ -20,17 +20,30 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"github.com/go-logr/logr"
+	commonutils "kusionstack.io/kafed/pkg/utils"
+	"kusionstack.io/kafed/pkg/utils/mixin"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
+var _ inject.Injector = &ValidatingHandler{}
+var _ inject.Client = &ValidatingHandler{}
+var _ inject.Logger = &ValidatingHandler{}
+var _ admission.DecoderInjector = &ValidatingHandler{}
+
 // ValidatingHandler validates all resources requests
 type ValidatingHandler struct {
-	Client client.Client
-	// Decoder decodes objects
-	Decoder *admission.Decoder
+	*mixin.WebhookHandlerMixin
+
+	// setFields allows injecting dependencies from an external source
+	setFields inject.Func
+}
+
+func NewGenericValidatingHandler() *ValidatingHandler {
+	return &ValidatingHandler{
+		WebhookHandlerMixin: mixin.NewWebhookHandlerMixin(),
+	}
 }
 
 // Handle handles admission requests.
@@ -39,7 +52,12 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 	if req.SubResource != "" {
 		key = fmt.Sprintf("%s/%s", req.Kind.Kind, req.SubResource)
 	}
-	klog.V(5).Infof("ValidatingHandler, Kind: %s, Namespace: %s, Name: %s", key, req.Namespace, req.Name)
+
+	h.Logger.V(5).Info("validating handler",
+		"kind", req.Kind.Kind,
+		"key", commonutils.AdmissionRequestObjectKeyString(req),
+		"op", req.Operation,
+	)
 
 	if handler, exist := ValidatingTypeHandlerMap[key]; exist {
 		return handler.Handle(ctx, req)
@@ -48,26 +66,23 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 	return admission.ValidationResponse(true, "")
 }
 
-var _ inject.Client = &ValidatingHandler{}
+func (h *ValidatingHandler) InjectFunc(f inject.Func) error {
+	h.setFields = f
 
-// InjectClient injects the client into the ValidatingHandler
-func (h *ValidatingHandler) InjectClient(c client.Client) error {
-	h.Client = c
-	for i := range ValidatingTypeHandlerMap {
-		if _, err := inject.ClientInto(h.Client, ValidatingTypeHandlerMap[i]); err != nil {
+	for _, handler := range ValidatingTypeHandlerMap {
+		if err := h.setFields(handler); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-var _ admission.DecoderInjector = &ValidatingHandler{}
+func (h *ValidatingHandler) InjectLogger(l logr.Logger) error {
+	h.WebhookHandlerMixin.InjectLogger(l)
 
-// InjectDecoder injects the decoder into the ValidatingHandler
-func (h *ValidatingHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	for i := range ValidatingTypeHandlerMap {
-		if _, err := admission.InjectDecoderInto(d, ValidatingTypeHandlerMap[i]); err != nil {
+	// inject logger into subHandlers
+	for kind, handler := range ValidatingTypeHandlerMap {
+		if _, err := inject.LoggerInto(l.WithValues("kind", kind), handler); err != nil {
 			return err
 		}
 	}

@@ -27,9 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -42,6 +40,7 @@ import (
 	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
 	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
 	"kusionstack.io/kafed/pkg/utils"
+	"kusionstack.io/kafed/pkg/utils/mixin"
 )
 
 const (
@@ -75,14 +74,14 @@ func AddToMgr(mgr manager.Manager, r reconcile.Reconciler) error {
 var _ reconcile.Reconciler = &ReconcilePodOpsLifecycle{}
 
 func NewReconciler(mgr manager.Manager) *ReconcilePodOpsLifecycle {
+	mixin := mixin.NewReconcilerMixin(controllerName, mgr)
 	expectation := expectations.NewResourceVersionExpectation()
 
 	r := &ReconcilePodOpsLifecycle{
-		Client:         mgr.GetClient(),
-		ruleSetManager: ruleset.RuleSetManager(),
+		ReconcilerMixin: mixin,
 
-		recorder:    mgr.GetEventRecorderFor(controllerName),
-		expectation: expectation,
+		ruleSetManager: ruleset.RuleSetManager(),
+		expectation:    expectation,
 	}
 	r.initRuleSetManager()
 
@@ -90,9 +89,9 @@ func NewReconciler(mgr manager.Manager) *ReconcilePodOpsLifecycle {
 }
 
 type ReconcilePodOpsLifecycle struct {
-	client.Client
+	*mixin.ReconcilerMixin
+
 	ruleSetManager ruleset.ManagerInterface
-	recorder       record.EventRecorder
 	expectation    *expectations.ResourceVersionExpectation
 }
 
@@ -102,12 +101,13 @@ type ReconcilePodOpsLifecycle struct {
 
 func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	key := fmt.Sprintf("%s/%s", request.Namespace, request.Name)
-	klog.Infof("Reconcile Pod %s", key)
+	logger := r.Logger.WithValues("pod", key)
+	logger.Info("reconciling pod lifecycle")
 
 	pod := &corev1.Pod{}
 	err := r.Client.Get(ctx, request.NamespacedName, pod)
 	if err != nil {
-		klog.Warningf("failed to get pod %s: %s", key, err)
+		logger.Error(err, "failed to get pod")
 		if errors.IsNotFound(err) {
 			r.expectation.DeleteExpectations(key)
 			return reconcile.Result{}, nil
@@ -116,7 +116,7 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 	}
 
 	if !r.expectation.SatisfiedExpectations(key, pod.ResourceVersion) {
-		klog.Errorf("skip pod %s with no satisfied", key)
+		logger.Info("skip pod with no satisfied")
 		return reconcile.Result{}, nil
 	}
 
@@ -127,20 +127,20 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 	if len(idToLabelsMap) == 0 {
 		updated, err := r.addServiceAvailable(pod)
 		if updated {
-			r.recorder.Eventf(pod, corev1.EventTypeNormal, "ServiceAvailable", "Label pod as service available, error: %v", err)
+			r.Recorder.Eventf(pod, corev1.EventTypeNormal, "ServiceAvailable", "Label pod as service available, error: %v", err)
 			return reconcile.Result{}, err
 		}
 
 		updated, err = r.updateServiceReadiness(ctx, pod, true)
 		if updated {
-			r.recorder.Eventf(pod, corev1.EventTypeNormal, "ReadinessGate", "Set service ready readiness gate to true, error: %v", err)
+			r.Recorder.Eventf(pod, corev1.EventTypeNormal, "ReadinessGate", "Set service ready readiness gate to true, error: %v", err)
 			return reconcile.Result{}, err
 		}
 	}
 
 	state, err := r.ruleSetManager.GetState(r.Client, pod)
 	if err != nil {
-		klog.Errorf("failed to get pod %s state: %s", key, err)
+		logger.Error(err, "failed to get pod state")
 		return reconcile.Result{}, err
 	}
 
@@ -153,10 +153,11 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 			labels, err = r.preTrafficOnStage(pod, idToLabelsMap)
 		}
 	}
-	klog.Infof("pod %s in stage %q, labels: %v, error: %v", key, state.Stage, labels, err)
 	if err != nil {
+		logger.Error(err, "pod in stage informations", "stage", state.Stage, "labels", labels)
 		return reconcile.Result{}, err
 	}
+	logger.Info("pod in stage informations", "stage", state.Stage, "labels", labels)
 	if len(labels) > 0 {
 		return reconcile.Result{}, r.addLabels(ctx, pod, labels)
 	}
@@ -176,7 +177,7 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 				return reconcile.Result{}, err // only need set once
 			}
 			if updated {
-				r.recorder.Eventf(pod, corev1.EventTypeNormal, "ReadinessGate", "Set service ready readiness gate to %v", v)
+				r.Recorder.Eventf(pod, corev1.EventTypeNormal, "ReadinessGate", "Set service ready readiness gate to %v", v)
 				return reconcile.Result{}, nil
 			}
 		}
@@ -214,6 +215,8 @@ func (r *ReconcilePodOpsLifecycle) updateServiceReadiness(ctx context.Context, p
 	}
 
 	key := controllerKey(pod)
+	logger := r.Logger.WithValues("pod", key)
+
 	r.expectation.ExpectUpdate(key, pod.ResourceVersion)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		newPod := &corev1.Pod{}
@@ -228,7 +231,7 @@ func (r *ReconcilePodOpsLifecycle) updateServiceReadiness(ctx context.Context, p
 
 		return r.Client.Status().Update(ctx, newPod)
 	}); err != nil {
-		klog.Errorf("failed to update pod status %s: %s", key, err)
+		logger.Error(err, "failed to update pod status")
 		r.expectation.DeleteExpectations(key)
 
 		return false, err
@@ -341,10 +344,10 @@ func (r *ReconcilePodOpsLifecycle) addLabels(ctx context.Context, pod *corev1.Po
 		return r.Client.Update(ctx, newPod)
 	})
 	if err != nil {
-		klog.Errorf("failed to update pod %s with labels: %v: %s", key, labels, err)
+		r.Logger.Error(err, "failed to update pod with labels", "pod", utils.ObjectKeyString(pod), "labels", labels)
 		r.expectation.DeleteExpectations(key)
 	}
-	r.recorder.Eventf(pod, corev1.EventTypeNormal, "UpdatePod", "Succeed to update labels: %v", labels)
+	r.Recorder.Eventf(pod, corev1.EventTypeNormal, "UpdatePod", "Succeed to update labels: %v", labels)
 
 	return err
 }

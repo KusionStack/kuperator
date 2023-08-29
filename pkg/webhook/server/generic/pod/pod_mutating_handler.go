@@ -24,23 +24,29 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	commonutils "kusionstack.io/kafed/pkg/utils"
+	"kusionstack.io/kafed/pkg/utils/mixin"
 )
 
 const (
 	mutatingName = "pod-mutating-webhook"
 )
 
+var _ inject.Client = &MutatingHandler{}
+var _ inject.Logger = &MutatingHandler{}
+var _ admission.DecoderInjector = &MutatingHandler{}
+
 type MutatingHandler struct {
-	client.Client
-	*admission.Decoder
+	*mixin.WebhookHandlerMixin
 }
 
 func NewMutatingHandler() *MutatingHandler {
-	return &MutatingHandler{}
+	return &MutatingHandler{
+		WebhookHandlerMixin: mixin.NewWebhookHandlerMixin(),
+	}
 }
 
 func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
@@ -52,16 +58,21 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 		return admission.Patched("Not Create or Update, but " + string(req.Operation))
 	}
 
+	logger := h.Logger.WithValues(
+		"op", req.Operation,
+		"pod", commonutils.AdmissionRequestObjectKeyString(req),
+	)
+
 	pod := &corev1.Pod{}
-	err := h.Decode(req, pod)
+	err := h.Decoder.Decode(req, pod)
 	if err != nil {
-		klog.Errorf("decode request failed, %v", err)
+		logger.Error(err, "failed to decode admission request")
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	var oldPod *corev1.Pod
 	if req.Operation == admissionv1.Update || req.Operation == admissionv1.Delete {
 		oldPod = &corev1.Pod{}
-		if err = h.DecodeRaw(req.OldObject, oldPod); err != nil {
+		if err = h.Decoder.DecodeRaw(req.OldObject, oldPod); err != nil {
 			return admission.Errored(http.StatusBadRequest, fmt.Errorf("fail to unmarshal old object: %s", err))
 		}
 	}
@@ -69,30 +80,16 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 	for _, webhook := range webhooks {
 		// mutating on new pod
 		if err = webhook.Mutating(ctx, h.Client, oldPod, pod, req.Operation); err != nil {
-			klog.Errorf("failed to mutate pod, %v", err)
+			logger.Error(err, "failed to mutate pod")
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
 	}
 
 	marshalled, err := json.Marshal(pod)
 	if err != nil {
-		klog.Errorf("marshal Pod failed, %v", err)
+		logger.Error(err, "failed to marshal pod json")
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
 	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
-}
-
-var _ inject.Client = &MutatingHandler{}
-
-func (h *MutatingHandler) InjectClient(c client.Client) error {
-	h.Client = c
-	return nil
-}
-
-var _ admission.DecoderInjector = &MutatingHandler{}
-
-func (h *MutatingHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	return nil
 }

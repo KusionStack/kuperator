@@ -23,8 +23,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
@@ -90,14 +89,14 @@ type ProviderInterface interface {
 
 	CreatePD(zone string) (string, error)
 	DeletePD(pdName string) error
-	CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSource, error)
-	DeletePVSource(pvSource *v1.PersistentVolumeSource) error
+	CreatePVSource(zone, diskName string) (*corev1.PersistentVolumeSource, error)
+	DeletePVSource(pvSource *corev1.PersistentVolumeSource) error
 
 	CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zone string)
 
 	EnsureLoadBalancerResourcesDeleted(ip, portRange string) error
 	LoadBalancerSrcRanges() []string
-	EnableAndDisableInternalLB() (enable, disable func(svc *v1.Service))
+	EnableAndDisableInternalLB() (enable, disable func(svc *corev1.Service))
 }
 
 // NullProvider is the default implementation of the ProviderInterface
@@ -136,12 +135,12 @@ func (n NullProvider) DeletePD(pdName string) error {
 }
 
 // CreatePVSource no usages
-func (n NullProvider) CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSource, error) {
+func (n NullProvider) CreatePVSource(zone, diskName string) (*corev1.PersistentVolumeSource, error) {
 	return nil, fmt.Errorf("Provider not supported")
 }
 
 // DeletePVSource no usages
-func (n NullProvider) DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
+func (n NullProvider) DeletePVSource(pvSource *corev1.PersistentVolumeSource) error {
 	return fmt.Errorf("Provider not supported")
 }
 
@@ -160,8 +159,8 @@ func (n NullProvider) LoadBalancerSrcRanges() []string {
 }
 
 // EnableAndDisableInternalLB no usages
-func (n NullProvider) EnableAndDisableInternalLB() (enable, disable func(svc *v1.Service)) {
-	nop := func(svc *v1.Service) {}
+func (n NullProvider) EnableAndDisableInternalLB() (enable, disable func(svc *corev1.Service)) {
+	nop := func(svc *corev1.Service) {}
 	return nop, nop
 }
 

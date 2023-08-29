@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/pflag"
 
@@ -28,9 +29,9 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/klogr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"kusionstack.io/kafed/apis"
 	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
@@ -68,21 +69,17 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&certDir, "cert-dir", "", "The directory that contains the server key and certificate.")
-	flag.StringVar(&dnsName, "dns-name", "", "The DNS name of the webhook server.")
+	flag.StringVar(&certDir, "cert-dir", webhookTempCertDir(), "The directory that contains the server key and certificate. If not set, webhook server would look up the server key and certificate in {TempDir}/k8s-webhook-server/serving-certs")
+	flag.StringVar(&dnsName, "dns-name", "kusionstack-controller-manager.kusionstack-system.svc", "The DNS name of the webhook server.")
 
 	klog.InitFlags(nil)
 	defer klog.Flush()
 
-	opts := zap.Options{
-		Development: true,
-	}
-	opts.BindFlags(flag.CommandLine)
 	feature.DefaultMutableFeatureGate.AddFlag(pflag.CommandLine)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	ctrl.SetLogger(klogr.New())
 
 	config := ctrl.GetConfigOrDie()
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
@@ -94,6 +91,7 @@ func main() {
 		LeaderElectionID:       "kusionstack-controller-manager",
 		CertDir:                certDir,
 		NewCache:               inject.NewCacheWithFieldIndex,
+		Logger:                 ctrl.Log,
 
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
@@ -148,4 +146,8 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func webhookTempCertDir() string {
+	return filepath.Join(os.TempDir(), "k8s-webhook-server", "serving-certs")
 }
