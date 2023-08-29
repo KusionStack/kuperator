@@ -19,6 +19,7 @@ package features
 import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/component-base/featuregate"
+
 	"kusionstack.io/kafed/pkg/utils/feature"
 )
 
