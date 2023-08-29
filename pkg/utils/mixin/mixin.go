@@ -72,7 +72,7 @@ func NewReconcilerMixin(controllerName string, mgr manager.Manager) *ReconcilerM
 	// - Logger
 	mgr.SetFields(m)
 
-	// aditional inject fields
+	// additional inject fields
 	m.InjectRecorder(mgr)
 	return m
 }
