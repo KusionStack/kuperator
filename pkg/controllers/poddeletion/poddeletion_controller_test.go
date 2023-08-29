@@ -19,7 +19,6 @@ package poddeletion
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -165,9 +164,7 @@ var _ = BeforeSuite(func() {
 	env = &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 	}
-	env.ControlPlane.GetAPIServer().URL = &url.URL{
-		Host: "127.0.0.1:10001",
-	}
+
 	config, err := env.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(config).NotTo(BeNil())
