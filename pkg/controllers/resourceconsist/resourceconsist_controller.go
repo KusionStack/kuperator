@@ -18,6 +18,7 @@ package resourceconsist
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -222,8 +223,8 @@ func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (rec
 	}
 
 	if isSyncEmployerFailedExist || isSyncEmployeeFailedExist {
-		r.recorder.Eventf(employer, v1.EventTypeNormal, "ReconcileRequeue", "employer or employees synced failed exist")
-		return reconcile.Result{Requeue: true}, nil
+		r.recorder.Eventf(employer, v1.EventTypeNormal, "ReconcileFailed", "employer or employees synced failed exist")
+		return reconcile.Result{}, fmt.Errorf("employer or employees synced failed exist")
 	}
 
 	r.recorder.Eventf(employer, v1.EventTypeNormal, "ReconcileSucceed", "")
