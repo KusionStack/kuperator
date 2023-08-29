@@ -69,6 +69,6 @@ func NewPodFrom(owner metav1.Object, ownerRef *metav1.OwnerReference, revision *
 		return nil, err
 	}
 
-	utils.ControlByPodOpsLifecycle(pod)
+	utils.ControllByKusionStack(pod)
 	return pod, nil
 }

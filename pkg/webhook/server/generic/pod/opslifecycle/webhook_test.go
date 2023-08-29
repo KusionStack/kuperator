@@ -97,7 +97,7 @@ func TestValidating(t *testing.T) {
 	lifecycle := &OpsLifecycle{}
 	for _, v := range inputs {
 		if v.labels != nil {
-			v.labels[v1alpha1.ControlledByPodOpsLifecycle] = "true"
+			v.labels[v1alpha1.ControlledByKusionStackLabelKey] = "true"
 		}
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -429,7 +429,7 @@ func TestMutating(t *testing.T) {
 	opslifecycle := &OpsLifecycle{}
 	for _, v := range inputs {
 		if v.oldPodLabels != nil {
-			v.oldPodLabels[v1alpha1.ControlledByPodOpsLifecycle] = "true"
+			v.oldPodLabels[v1alpha1.ControlledByKusionStackLabelKey] = "true"
 		}
 		oldPod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -440,7 +440,7 @@ func TestMutating(t *testing.T) {
 		}
 
 		if v.newPodLabels != nil {
-			v.newPodLabels[v1alpha1.ControlledByPodOpsLifecycle] = "true"
+			v.newPodLabels[v1alpha1.ControlledByKusionStackLabelKey] = "true"
 		}
 		newPod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -470,7 +470,7 @@ func TestMutating(t *testing.T) {
 		}
 
 		if v.expectedLabels != nil {
-			v.expectedLabels[v1alpha1.ControlledByPodOpsLifecycle] = "true"
+			v.expectedLabels[v1alpha1.ControlledByKusionStackLabelKey] = "true"
 		}
 		assert.Equal(t, v.expectedLabels, newPod.Labels)
 	}

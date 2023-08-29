@@ -30,20 +30,20 @@ func DumpJSON(o interface{}) string {
 	return string(j)
 }
 
-func ControlledByPodOpsLifecycle(obj client.Object) bool {
+func ControlledByKusionStack(obj client.Object) bool {
 	if obj == nil || obj.GetLabels() == nil {
 		return false
 	}
-	v, ok := obj.GetLabels()[v1alpha1.ControlledByPodOpsLifecycle]
+	v, ok := obj.GetLabels()[v1alpha1.ControlledByKusionStackLabelKey]
 	return ok && v == "true"
 }
 
-func ControlByPodOpsLifecycle(obj client.Object) {
+func ControllByKusionStack(obj client.Object) {
 	if obj.GetLabels() == nil {
 		obj.SetLabels(map[string]string{})
 	}
 
-	if v, ok := obj.GetLabels()[v1alpha1.ControlledByPodOpsLifecycle]; !ok || v != "true" {
-		obj.GetLabels()[v1alpha1.ControlledByPodOpsLifecycle] = "true"
+	if v, ok := obj.GetLabels()[v1alpha1.ControlledByKusionStackLabelKey]; !ok || v != "true" {
+		obj.GetLabels()[v1alpha1.ControlledByKusionStackLabelKey] = "true"
 	}
 }

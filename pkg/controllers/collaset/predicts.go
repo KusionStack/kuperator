@@ -27,20 +27,20 @@ type PodPredicate struct {
 
 // Create returns true if the Create event should be processed
 func (p *PodPredicate) Create(e event.CreateEvent) bool {
-	return utils.ControlledByPodOpsLifecycle(e.Object)
+	return utils.ControlledByKusionStack(e.Object)
 }
 
 // Delete returns true if the Delete event should be processed
 func (p *PodPredicate) Delete(e event.DeleteEvent) bool {
-	return utils.ControlledByPodOpsLifecycle(e.Object)
+	return utils.ControlledByKusionStack(e.Object)
 }
 
 // Update returns true if the Update event should be processed
 func (p *PodPredicate) Update(e event.UpdateEvent) bool {
-	return utils.ControlledByPodOpsLifecycle(e.ObjectNew) || utils.ControlledByPodOpsLifecycle(e.ObjectOld)
+	return utils.ControlledByKusionStack(e.ObjectNew) || utils.ControlledByKusionStack(e.ObjectOld)
 }
 
 // Generic returns true if the Generic event should be processed
 func (p *PodPredicate) Generic(e event.GenericEvent) bool {
-	return utils.ControlledByPodOpsLifecycle(e.Object)
+	return utils.ControlledByKusionStack(e.Object)
 }

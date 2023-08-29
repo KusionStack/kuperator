@@ -137,7 +137,7 @@ var _ = Describe("podopslifecycle controller", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: "default",
-				Labels:    map[string]string{v1alpha1.ControlledByPodOpsLifecycle: "true"},
+				Labels:    map[string]string{v1alpha1.ControlledByKusionStackLabelKey: "true"},
 			},
 			Spec: podSpec,
 		}
@@ -163,7 +163,7 @@ var _ = Describe("podopslifecycle controller", func() {
 				Name:      "test",
 				Namespace: "default",
 				Labels: map[string]string{
-					v1alpha1.ControlledByPodOpsLifecycle:                       "true",
+					v1alpha1.ControlledByKusionStackLabelKey:                   "true",
 					fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, id): time,
 					fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, id):   time,
 				},
@@ -192,7 +192,7 @@ var _ = Describe("podopslifecycle controller", func() {
 				Name:      "test",
 				Namespace: "default",
 				Labels: map[string]string{
-					v1alpha1.ControlledByPodOpsLifecycle:                      "true",
+					v1alpha1.ControlledByKusionStackLabelKey:                  "true",
 					fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):  time,
 					fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, id): time,
 				},
@@ -220,7 +220,7 @@ var _ = Describe("podopslifecycle controller", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: "default",
-				Labels:    map[string]string{v1alpha1.ControlledByPodOpsLifecycle: "true"},
+				Labels:    map[string]string{v1alpha1.ControlledByKusionStackLabelKey: "true"},
 			},
 			Spec: podSpec,
 		}
@@ -237,7 +237,7 @@ var _ = Describe("podopslifecycle controller", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		pod.ObjectMeta.Labels = map[string]string{
-			v1alpha1.ControlledByPodOpsLifecycle:                      "true",
+			v1alpha1.ControlledByKusionStackLabelKey:                  "true",
 			fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):  time,
 			fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, id): time,
 		}
