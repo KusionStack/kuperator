@@ -24,8 +24,8 @@ import (
 	appsalphav1 "kusionstack.io/kafed/apis/apps/v1alpha1"
 )
 
-func getCollaSetPatch(ds *appsalphav1.CollaSet) ([]byte, error) {
-	dsBytes, err := json.Marshal(ds)
+func getCollaSetPatch(cls *appsalphav1.CollaSet) ([]byte, error) {
+	dsBytes, err := json.Marshal(cls)
 	if err != nil {
 		return nil, err
 	}

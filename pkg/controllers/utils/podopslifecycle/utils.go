@@ -19,6 +19,7 @@ package podopslifecycle
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -85,13 +86,29 @@ func Begin(c client.Client, adapter LifecycleAdapter, obj client.Object) (update
 }
 
 // AllowOps is used to check whether the PodOpsLifecycle phase is in UPGRADE to do following operations.
-func AllowOps(adapter LifecycleAdapter, obj client.Object) (allow bool) {
+func AllowOps(adapter LifecycleAdapter, operationDelaySeconds int32, obj client.Object) (requeueAfter time.Duration, allow bool) {
 	if !IsDuringOps(adapter, obj) {
-		return false
+		return 0, false
 	}
 
-	_, started := checkOperate(adapter, obj)
-	return started
+	startedTimestampStr, started := checkOperate(adapter, obj)
+	if !started || operationDelaySeconds <= 0 {
+		return 0, started
+	}
+
+	startedTimestamp, err := strconv.ParseInt(startedTimestampStr, 10, 64)
+	if err != nil {
+		return 0, started
+	}
+
+	startedTime := time.Unix(0, startedTimestamp)
+	duration := time.Now().Sub(startedTime)
+	delay := time.Duration(operationDelaySeconds) * time.Second
+	if duration < delay {
+		return delay - duration, started
+	}
+
+	return 0, started
 }
 
 // Finish is used for an CRD Operator to finish a lifecycle

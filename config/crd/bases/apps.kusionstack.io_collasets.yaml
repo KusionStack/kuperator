@@ -95,6 +95,11 @@ spec:
                       It is not allowed to change. Context defaults to be CollaSet's
                       name.
                     type: string
+                  operationDelaySeconds:
+                    description: OperationDelaySeconds indicates how many seconds
+                      it should delay before operating scale.
+                    format: int32
+                    type: integer
                   persistentVolumeClaimRetentionPolicy:
                     description: PersistentVolumeClaimRetentionPolicy describes the
                       lifecycle of PersistentVolumeClaim created from volumeClaimTemplates.
@@ -190,6 +195,11 @@ spec:
                   will be employed to update Pods in the CollaSet when a revision
                   is made to Template.
                 properties:
+                  operationDelaySeconds:
+                    description: OperationDelaySeconds indicates how many seconds
+                      it should delay before operating update.
+                    format: int32
+                    type: integer
                   podUpgradePolicy:
                     description: PodUpdatePolicy indicates the policy by to update
                       pods.

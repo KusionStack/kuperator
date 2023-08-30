@@ -24,9 +24,8 @@ import (
 type CollaSetConditionType string
 
 const (
-	CollaSetSyncPod CollaSetConditionType = "SyncPod"
-	CollaSetScale   CollaSetConditionType = "Scale"
-	CollaSetUpdate  CollaSetConditionType = "Update"
+	CollaSetScale  CollaSetConditionType = "Scale"
+	CollaSetUpdate CollaSetConditionType = "Update"
 )
 
 // PersistentVolumeClaimRetentionPolicyType is a string enumeration of the policies that will determine
@@ -98,9 +97,11 @@ type CollaSetSpec struct {
 	// UpdateStrategy indicates the CollaSetUpdateStrategy that will be
 	// employed to update Pods in the CollaSet when a revision is made to
 	// Template.
+	// +optional
 	UpdateStrategy UpdateStrategy `json:"updateStrategy,omitempty"`
 
 	// ScaleStrategy indicates the strategy detail that will be used during pod scaling.
+	// +optional
 	ScaleStrategy ScaleStrategy `json:"scaleStrategy,omitempty"`
 
 	// Indicate the number of histories to be conserved
@@ -113,11 +114,15 @@ type ScaleStrategy struct {
 	// Context indicates the pool from which to allocate Pod instance ID. CollaSets are allowed to share the
 	// same Context. It is not allowed to change.
 	// Context defaults to be CollaSet's name.
+	// +optional
 	Context string `json:"context,omitempty"`
+
 	// PodToExclude indicates the pods which will be orphaned by CollaSet.
+	// +optional
 	PodToExclude []string `json:"podToExclude,omitempty"`
 
 	// PodToInclude indicates the pods which will be adapted by CollaSet.
+	// +optional
 	PodToInclude []string `json:"podToInclude,omitempty"`
 
 	// PersistentVolumeClaimRetentionPolicy describes the lifecycle of PersistentVolumeClaim
@@ -126,6 +131,10 @@ type ScaleStrategy struct {
 	// by deleting persistent volume claims when their CollaSet is deleted, or when their pod is scaled down.
 	// +optional
 	PersistentVolumeClaimRetentionPolicy *PersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy,omitempty"`
+
+	// OperationDelaySeconds indicates how many seconds it should delay before operating scale.
+	// +optional
+	OperationDelaySeconds *int32 `json:"operationDelaySeconds,omitempty"`
 }
 
 type PersistentVolumeClaimRetentionPolicy struct {
@@ -133,18 +142,22 @@ type PersistentVolumeClaimRetentionPolicy struct {
 	// VolumeClaimTemplates when the CollaSet is deleted. The default policy
 	// of `Delete` policy causes those PVCs to be deleted.
 	//`Retain` causes PVCs to not be affected by StatefulSet deletion. The
+	// +optional
 	WhenDeleted PersistentVolumeClaimRetentionPolicyType `json:"whenDeleted,omitempty"`
+
 	// WhenScaled specifies what happens to PVCs created from StatefulSet
 	// VolumeClaimTemplates when the StatefulSet is scaled down. The default
 	// policy of `Retain` causes PVCs to not be affected by a scaledown. The
 	// `Delete` policy causes the associated PVCs for any excess pods above
 	// the replica count to be deleted.
+	// +optional
 	WhenScaled PersistentVolumeClaimRetentionPolicyType `json:"whenScaled,omitempty"`
 }
 
 type ByPartition struct {
 	// Partition controls the update progress by indicating how many pods should be updated.
 	// Defaults to nil (all pods will be updated)
+	// +optional
 	Partition *int32 `json:"partition,omitempty"`
 }
 
@@ -154,19 +167,26 @@ type ByLabel struct {
 // RollingUpdateCollaSetStrategy is used to communicate parameter for rolling update.
 type RollingUpdateCollaSetStrategy struct {
 	// ByPartition indicates the update progress is controlled by partition value.
+	// +optional
 	ByPartition *ByPartition `json:"byPartition,omitempty"`
 
 	// ByLabel indicates the update progress is controlled by attaching pod label.
+	// +optional
 	ByLabel *ByLabel `json:"byLabel,omitempty"`
 }
 
 type UpdateStrategy struct {
 	// RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.
+	// +optional
 	RollingUpdate *RollingUpdateCollaSetStrategy `json:"rollingUpdate,omitempty"`
 
 	// PodUpdatePolicy indicates the policy by to update pods.
 	// +optional
 	PodUpdatePolicy PodUpdateStrategyType `json:"podUpgradePolicy,omitempty"`
+
+	// OperationDelaySeconds indicates how many seconds it should delay before operating update.
+	// +optional
+	OperationDelaySeconds *int32 `json:"operationDelaySeconds,omitempty"`
 }
 
 // CollaSetStatus defines the observed state of CollaSet
@@ -177,9 +197,11 @@ type CollaSetStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// CurrentRevision, if not empty, indicates the version of the CollaSet.
+	// +optional
 	CurrentRevision string `json:"currentRevision,omitempty"`
 
 	// UpdatedRevision, if not empty, indicates the version of the CollaSet currently updated.
+	// +optional
 	UpdatedRevision string `json:"updatedRevision,omitempty"`
 
 	// Count of hash collisions for the DaemonSet. The DaemonSet controller
@@ -201,12 +223,15 @@ type CollaSetStatus struct {
 	AvailableReplicas int32 `json:"availableReplicas,omitempty"`
 
 	// Replicas is the most recently observed number of replicas.
+	// +optional
 	Replicas int32 `json:"replicas,omitempty"`
 
 	// The number of pods in updated version.
+	// +optional
 	UpdatedReplicas int32 `json:"updatedReplicas,omitempty"`
 
 	// OperatingReplicas indicates the number of pods during pod ops lifecycle and not finish update-phase.
+	// +optional
 	OperatingReplicas int32 `json:"operatingReplicas,omitempty"`
 
 	// UpdatedReadyReplicas indicates the number of the pod with updated revision and ready condition
