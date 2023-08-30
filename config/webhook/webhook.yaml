@@ -27,7 +27,7 @@ webhooks:
         scope: '*'
     objectSelector:
       matchExpressions:
-        - key: podopslifecycle.kusionstack.io/control
+        - key: kusionstack.io/control
           operator: In
           values:
             - 'true'
@@ -81,7 +81,7 @@ webhooks:
         scope: '*'
     objectSelector:
       matchExpressions:
-        - key: podopslifecycle.kusionstack.io/control
+        - key: kusionstack.io/control
           operator: In
           values:
             - 'true'
