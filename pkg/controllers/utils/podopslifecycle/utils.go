@@ -102,7 +102,7 @@ func AllowOps(adapter LifecycleAdapter, operationDelaySeconds int32, obj client.
 	}
 
 	startedTime := time.Unix(0, startedTimestamp)
-	duration := time.Now().Sub(startedTime)
+	duration := time.Since(startedTime)
 	delay := time.Duration(operationDelaySeconds) * time.Second
 	if duration < delay {
 		return delay - duration, started
