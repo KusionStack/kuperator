@@ -17,6 +17,8 @@ limitations under the License.
 package controllers
 
 import (
+	"os"
+
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"kusionstack.io/kafed/pkg/controllers/alibaba_cloud_slb"
@@ -28,6 +30,10 @@ func init() {
 }
 
 func Add(manager manager.Manager) error {
+	if os.Getenv("ENABLE_ALIBABA_CLOUD_SLB") != "true" {
+		return nil
+	}
+
 	reconcileAdapter, err := alibaba_cloud_slb.NewReconcileAdapter(manager.GetClient())
 	if err != nil {
 		return err
