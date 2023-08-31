@@ -168,12 +168,15 @@ var _ = Describe("collaset controller", func() {
 			})).Should(BeNil())
 		}
 
-		Eventually(func() bool {
+		Eventually(func() error {
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-			return len(podList.Items) == 0
-		}, 5*time.Second, 1*time.Second).Should(BeTrue())
-		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
-		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 0, 0, 0, 0, 0)).Should(BeNil())
+			if len(podList.Items) != 0 {
+				return fmt.Errorf("expected 0 pods, got %d", len(podList.Items))
+			}
+
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 0, 0, 0, 0, 0)
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
 	})
 
 	It("update reconcile", func() {
