@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -110,8 +111,8 @@ var _ = Describe("podopslifecycle controller", func() {
 				},
 			},
 		}
-		id   = "123"
-		time = "1402144848"
+		id        = "123"
+		timestamp = "1402144848"
 	)
 
 	AfterEach(func() {
@@ -164,8 +165,8 @@ var _ = Describe("podopslifecycle controller", func() {
 				Namespace: "default",
 				Labels: map[string]string{
 					v1alpha1.ControlledByKusionStackLabelKey:                   "true",
-					fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, id): time,
-					fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, id):   time,
+					fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, id): timestamp,
+					fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, id):   timestamp,
 				},
 			},
 			Spec: podSpec,
@@ -173,17 +174,29 @@ var _ = Describe("podopslifecycle controller", func() {
 		err := mgr.GetClient().Create(context.Background(), pod)
 		Expect(err).NotTo(HaveOccurred())
 
-		<-request
-
 		pod = &corev1.Pod{}
-		err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
-			Name:      "test",
-			Namespace: "default",
-		}, pod)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(pod.Status.Conditions).To(HaveLen(1))
-		Expect(string(pod.Status.Conditions[0].Type)).To(Equal(v1alpha1.ReadinessGatePodServiceReady))
-		Expect(pod.Status.Conditions[0].Status).To(Equal(corev1.ConditionFalse))
+		Eventually(func() error {
+			if err := mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
+				Name:      "test",
+				Namespace: "default",
+			}, pod); err != nil {
+				return fmt.Errorf("fail to get pod: %s", err)
+			}
+
+			if len(pod.Status.Conditions) != 1 {
+				return fmt.Errorf("expected 1 condition, got %d", len(pod.Status.Conditions))
+			}
+
+			if string(pod.Status.Conditions[0].Type) != v1alpha1.ReadinessGatePodServiceReady {
+				return fmt.Errorf("expected type %s, got %s", v1alpha1.ReadinessGatePodServiceReady, pod.Status.Conditions[0].Type)
+			}
+
+			if pod.Status.Conditions[0].Status != corev1.ConditionFalse {
+				return fmt.Errorf("expected status %s, got %s", corev1.ConditionFalse, pod.Status.Conditions[0].Status)
+			}
+
+			return nil
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
 	})
 
 	It("create pod with label complete", func() {
@@ -193,8 +206,8 @@ var _ = Describe("podopslifecycle controller", func() {
 				Namespace: "default",
 				Labels: map[string]string{
 					v1alpha1.ControlledByKusionStackLabelKey:                  "true",
-					fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):  time,
-					fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, id): time,
+					fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):  timestamp,
+					fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, id): timestamp,
 				},
 			},
 			Spec: podSpec,
@@ -205,14 +218,28 @@ var _ = Describe("podopslifecycle controller", func() {
 		<-request
 
 		pod = &corev1.Pod{}
-		err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
-			Name:      "test",
-			Namespace: "default",
-		}, pod)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(pod.Status.Conditions).To(HaveLen(1))
-		Expect(string(pod.Status.Conditions[0].Type)).To(Equal(v1alpha1.ReadinessGatePodServiceReady))
-		Expect(pod.Status.Conditions[0].Status).To(Equal(corev1.ConditionTrue))
+		Eventually(func() error {
+			if err := mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
+				Name:      "test",
+				Namespace: "default",
+			}, pod); err != nil {
+				return fmt.Errorf("fail to get pod: %s", err)
+			}
+
+			if len(pod.Status.Conditions) != 1 {
+				return fmt.Errorf("expected 1 condition, got %d", len(pod.Status.Conditions))
+			}
+
+			if string(pod.Status.Conditions[0].Type) != v1alpha1.ReadinessGatePodServiceReady {
+				return fmt.Errorf("expected type %s, got %s", v1alpha1.ReadinessGatePodServiceReady, pod.Status.Conditions[0].Type)
+			}
+
+			if pod.Status.Conditions[0].Status != corev1.ConditionTrue {
+				return fmt.Errorf("expected status %s, got %s", corev1.ConditionTrue, pod.Status.Conditions[0].Status)
+			}
+
+			return nil
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
 	})
 
 	It("update pod with label complete", func() {
@@ -238,23 +265,35 @@ var _ = Describe("podopslifecycle controller", func() {
 
 		pod.ObjectMeta.Labels = map[string]string{
 			v1alpha1.ControlledByKusionStackLabelKey:                  "true",
-			fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):  time,
-			fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, id): time,
+			fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):  timestamp,
+			fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, id): timestamp,
 		}
 		err = mgr.GetClient().Update(context.Background(), pod)
 		Expect(err).NotTo(HaveOccurred())
 
-		<-request
-
 		pod = &corev1.Pod{}
-		err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
-			Name:      "test",
-			Namespace: "default",
-		}, pod)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(pod.Status.Conditions).To(HaveLen(1))
-		Expect(string(pod.Status.Conditions[0].Type)).To(Equal(v1alpha1.ReadinessGatePodServiceReady))
-		Expect(pod.Status.Conditions[0].Status).To(Equal(corev1.ConditionTrue))
+		Eventually(func() error {
+			if err := mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
+				Name:      "test",
+				Namespace: "default",
+			}, pod); err != nil {
+				return fmt.Errorf("fail to get pod: %s", err)
+			}
+
+			if len(pod.Status.Conditions) != 1 {
+				return fmt.Errorf("expected 1 condition, got %d", len(pod.Status.Conditions))
+			}
+
+			if string(pod.Status.Conditions[0].Type) != v1alpha1.ReadinessGatePodServiceReady {
+				return fmt.Errorf("expected type %s, got %s", v1alpha1.ReadinessGatePodServiceReady, pod.Status.Conditions[0].Type)
+			}
+
+			if pod.Status.Conditions[0].Status != corev1.ConditionTrue {
+				return fmt.Errorf("expected status %s, got %s", corev1.ConditionTrue, pod.Status.Conditions[0].Status)
+			}
+
+			return nil
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
 	})
 })
 

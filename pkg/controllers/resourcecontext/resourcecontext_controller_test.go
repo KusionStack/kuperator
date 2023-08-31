@@ -222,7 +222,7 @@ var _ = Describe("ResourceContext controller", func() {
 		Eventually(func() bool {
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 			return len(podList.Items) == 0
-		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		}, 10*time.Second, 1*time.Second).Should(BeTrue())
 
 		resourceContext := &appsv1alpha1.ResourceContext{}
 		Eventually(func() error {
