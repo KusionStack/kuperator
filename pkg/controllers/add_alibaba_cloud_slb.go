@@ -21,6 +21,8 @@ import (
 
 	"kusionstack.io/kafed/pkg/controllers/alibaba_cloud_slb"
 	"kusionstack.io/kafed/pkg/controllers/resourceconsist"
+	"kusionstack.io/kafed/pkg/features"
+	"kusionstack.io/kafed/pkg/utils/feature"
 )
 
 func init() {
@@ -28,6 +30,9 @@ func init() {
 }
 
 func Add(manager manager.Manager) error {
+	if !feature.DefaultFeatureGate.Enabled(features.AlibabaCloudSlb) {
+		return nil
+	}
 	reconcileAdapter, err := alibaba_cloud_slb.NewReconcileAdapter(manager.GetClient())
 	if err != nil {
 		return err

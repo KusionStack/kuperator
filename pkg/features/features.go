@@ -24,12 +24,12 @@ import (
 )
 
 const (
-	// PodOpsLifecycle enables the PodOpsLifecycle controller.
-	PodOpsLifecycle featuregate.Feature = "PodOpsLifecycle"
+	// AlibabaCloudSlb enables the alibaba_cloud_slb controller.
+	AlibabaCloudSlb featuregate.Feature = "AlibabaCloudSlb"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	PodOpsLifecycle: {Default: true, PreRelease: featuregate.Alpha},
+	AlibabaCloudSlb: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

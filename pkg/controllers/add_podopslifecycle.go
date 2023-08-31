@@ -18,12 +18,8 @@ package controllers
 
 import (
 	"kusionstack.io/kafed/pkg/controllers/podopslifecycle"
-	"kusionstack.io/kafed/pkg/features"
-	"kusionstack.io/kafed/pkg/utils/feature"
 )
 
 func init() {
-	if feature.DefaultFeatureGate.Enabled(features.PodOpsLifecycle) {
-		AddToManagerFuncs = append(AddToManagerFuncs, podopslifecycle.Add)
-	}
+	AddToManagerFuncs = append(AddToManagerFuncs, podopslifecycle.Add)
 }
