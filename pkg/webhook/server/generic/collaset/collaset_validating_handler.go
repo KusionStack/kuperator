@@ -1,17 +1,17 @@
 /*
- Copyright 2023 The KusionStack Authors.
+Copyright 2023 The KusionStack Authors.
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-     http://www.apache.org/licenses/LICENSE-2.0
+    http://www.apache.org/licenses/LICENSE-2.0
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package collaset
@@ -81,9 +81,21 @@ func (h *ValidatingHandler) validate(cls *appsv1alpha1.CollaSet) error {
 	}
 	allErrs = append(allErrs, h.validatePodTemplateSpec(cls, fSpec)...)
 	allErrs = append(allErrs, h.validateSelector(cls, fSpec)...)
+	allErrs = append(allErrs, h.validateScaleStrategy(cls, fSpec)...)
 	allErrs = append(allErrs, h.validateUpdateStrategy(cls, fSpec)...)
 
 	return allErrs.ToAggregate()
+}
+
+func (h *ValidatingHandler) validateScaleStrategy(cls *appsv1alpha1.CollaSet, fSpec *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if cls.Spec.ScaleStrategy.OperationDelaySeconds != nil && *cls.Spec.ScaleStrategy.OperationDelaySeconds < 0 {
+		allErrs = append(allErrs, field.Invalid(fSpec.Child("scaleStrategy", "operationDelaySeconds"),
+			*cls.Spec.ScaleStrategy.OperationDelaySeconds, "operationDelaySeconds should not be smaller than 0"))
+	}
+
+	return allErrs
 }
 
 func (h *ValidatingHandler) validateUpdateStrategy(cls *appsv1alpha1.CollaSet, fSpec *field.Path) field.ErrorList {
@@ -106,6 +118,11 @@ func (h *ValidatingHandler) validateUpdateStrategy(cls *appsv1alpha1.CollaSet, f
 		allErrs = append(allErrs, field.Invalid(fSpec.Child("updateStrategy", "rollingUpdate",
 			"byPartition", "partition"), *cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition,
 			"partition should not be smaller than 0"))
+	}
+
+	if cls.Spec.UpdateStrategy.OperationDelaySeconds != nil && *cls.Spec.UpdateStrategy.OperationDelaySeconds < 0 {
+		allErrs = append(allErrs, field.Invalid(fSpec.Child("updateStrategy", "operationDelaySeconds"),
+			*cls.Spec.UpdateStrategy.OperationDelaySeconds, "operationDelaySeconds should not be smaller than 0"))
 	}
 
 	return allErrs

@@ -119,7 +119,7 @@ func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// if Pod is allow to operate, delete it
-	if podopslifecycle.AllowOps(OpsLifecycleAdapter, instance) {
+	if _, allowed := podopslifecycle.AllowOps(OpsLifecycleAdapter, 0, instance); allowed {
 		logger.Info("try to delete Pod with deletion indication")
 		if err := r.Client.Delete(context.TODO(), instance); err != nil {
 			return ctrl.Result{}, fmt.Errorf("fail to delete Pod %s with deletion indication: %s", req, err)

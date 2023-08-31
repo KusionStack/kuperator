@@ -19,6 +19,7 @@ package collaset
 import (
 	"context"
 	"fmt"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -160,38 +161,41 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		UpdatedRevision: updatedRevision.Name,
 	}
 
-	newStatus, err = r.DoReconcile(instance, updatedRevision, revisions, newStatus)
+	requeueAfter, newStatus, err := r.DoReconcile(instance, updatedRevision, revisions, newStatus)
 	// update status anyway
 	if err := r.updateStatus(ctx, instance, newStatus); err != nil {
-		return ctrl.Result{}, fmt.Errorf("fail to update status of CollaSet %s: %s", req, err)
+		return ctrl.Result{RequeueAfter: requeueAfter}, fmt.Errorf("fail to update status of CollaSet %s: %s", req, err)
 	}
 
-	return ctrl.Result{}, err
+	return ctrl.Result{RequeueAfter: requeueAfter}, err
 }
 
-func (r *CollaSetReconciler) DoReconcile(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, revisions []*appsv1.ControllerRevision, newStatus *appsv1alpha1.CollaSetStatus) (*appsv1alpha1.CollaSetStatus, error) {
-	podWrappers, newStatus, syncErr := r.doSync(instance, updatedRevision, revisions, newStatus)
-	return calculateStatus(instance, newStatus, updatedRevision, podWrappers, syncErr), syncErr
+func (r *CollaSetReconciler) DoReconcile(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, revisions []*appsv1.ControllerRevision, newStatus *appsv1alpha1.CollaSetStatus) (time.Duration, *appsv1alpha1.CollaSetStatus, error) {
+	podWrappers, newStatus, requeueAfter, syncErr := r.doSync(instance, updatedRevision, revisions, newStatus)
+	return requeueAfter, calculateStatus(instance, newStatus, updatedRevision, podWrappers, syncErr), syncErr
 }
 
 // doSync is responsible for reconcile Pods with CollaSet spec.
 // 1. sync Pods to prepare information, especially IDs, for following Scale and Update
 // 2. scale Pods to match the Pod number indicated in `spec.replcas`. if an error thrown out or Pods is not matched recently, update will be skipped.
 // 3. update Pods, to update each Pod to the updated revision indicated by `spec.template`
-func (r *CollaSetReconciler) doSync(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, revisions []*appsv1.ControllerRevision, newStatus *appsv1alpha1.CollaSetStatus) ([]*collasetutils.PodWrapper, *appsv1alpha1.CollaSetStatus, error) {
+func (r *CollaSetReconciler) doSync(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, revisions []*appsv1.ControllerRevision, newStatus *appsv1alpha1.CollaSetStatus) ([]*collasetutils.PodWrapper, *appsv1alpha1.CollaSetStatus, time.Duration, error) {
 	synced, podWrappers, ownedIDs, err := r.syncControl.SyncPods(instance, updatedRevision, newStatus)
 	if err != nil || synced {
-		return podWrappers, newStatus, err
+		return podWrappers, newStatus, 0, err
 	}
 
-	scaling, err := r.syncControl.Scale(instance, podWrappers, revisions, updatedRevision, ownedIDs, newStatus)
+	scaling, scaleRequeueAfter, err := r.syncControl.Scale(instance, podWrappers, revisions, updatedRevision, ownedIDs, newStatus)
 	if err != nil || scaling {
-		return podWrappers, newStatus, err
+		return podWrappers, newStatus, scaleRequeueAfter, err
 	}
 
-	_, err = r.syncControl.Update(instance, podWrappers, revisions, updatedRevision, ownedIDs, newStatus)
+	_, updateRequeueAfter, err := r.syncControl.Update(instance, podWrappers, revisions, updatedRevision, ownedIDs, newStatus)
+	if updateRequeueAfter > 0 && (scaleRequeueAfter == 0 || updateRequeueAfter < scaleRequeueAfter) {
+		return podWrappers, newStatus, updateRequeueAfter, err
+	}
 
-	return podWrappers, newStatus, err
+	return podWrappers, newStatus, scaleRequeueAfter, err
 }
 
 func calculateStatus(instance *appsv1alpha1.CollaSet, newStatus *appsv1alpha1.CollaSetStatus, updatedRevision *appsv1.ControllerRevision, podWrappers []*collasetutils.PodWrapper, syncErr error) *appsv1alpha1.CollaSetStatus {
