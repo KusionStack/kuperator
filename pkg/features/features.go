@@ -17,10 +17,21 @@ limitations under the License.
 package features
 
 import (
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/component-base/featuregate"
+
+	"kusionstack.io/kafed/pkg/utils/feature"
 )
 
 const (
 	// AlibabaCloudSlb enables the alibaba_cloud_slb controller.
 	AlibabaCloudSlb featuregate.Feature = "AlibabaCloudSlb"
 )
+
+var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	AlibabaCloudSlb: {Default: false, PreRelease: featuregate.Alpha},
+}
+
+func init() {
+	runtime.Must(feature.DefaultMutableFeatureGate.Add(defaultFeatureGates))
+}
