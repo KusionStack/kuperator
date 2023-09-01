@@ -65,14 +65,22 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	if err := h.validate(cls); err != nil {
+	var oldCls *appsv1alpha1.CollaSet
+	if req.Operation == admissionv1.Update || req.Operation == admissionv1.Delete {
+		oldCls = &appsv1alpha1.CollaSet{}
+		if err := h.Decoder.DecodeRaw(req.OldObject, oldCls); err != nil {
+			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to unmarshal old object: %s", err))
+		}
+	}
+
+	if err := h.validate(cls, oldCls); err != nil {
 		return admission.Errored(http.StatusUnprocessableEntity, err)
 	}
 
 	return admission.Allowed("")
 }
 
-func (h *ValidatingHandler) validate(cls *appsv1alpha1.CollaSet) error {
+func (h *ValidatingHandler) validate(cls, oldCls *appsv1alpha1.CollaSet) error {
 	var allErrs field.ErrorList
 	fSpec := field.NewPath("spec")
 
@@ -81,18 +89,22 @@ func (h *ValidatingHandler) validate(cls *appsv1alpha1.CollaSet) error {
 	}
 	allErrs = append(allErrs, h.validatePodTemplateSpec(cls, fSpec)...)
 	allErrs = append(allErrs, h.validateSelector(cls, fSpec)...)
-	allErrs = append(allErrs, h.validateScaleStrategy(cls, fSpec)...)
+	allErrs = append(allErrs, h.validateScaleStrategy(cls, oldCls, fSpec)...)
 	allErrs = append(allErrs, h.validateUpdateStrategy(cls, fSpec)...)
 
 	return allErrs.ToAggregate()
 }
 
-func (h *ValidatingHandler) validateScaleStrategy(cls *appsv1alpha1.CollaSet, fSpec *field.Path) field.ErrorList {
+func (h *ValidatingHandler) validateScaleStrategy(cls, oldCls *appsv1alpha1.CollaSet, fSpec *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if cls.Spec.ScaleStrategy.OperationDelaySeconds != nil && *cls.Spec.ScaleStrategy.OperationDelaySeconds < 0 {
 		allErrs = append(allErrs, field.Invalid(fSpec.Child("scaleStrategy", "operationDelaySeconds"),
 			*cls.Spec.ScaleStrategy.OperationDelaySeconds, "operationDelaySeconds should not be smaller than 0"))
+	}
+
+	if oldCls != nil && oldCls.Spec.ScaleStrategy.Context != cls.Spec.ScaleStrategy.Context {
+		allErrs = append(allErrs, field.Forbidden(fSpec.Child("scaleStrategy", "context"), fmt.Sprintf("scaleStrategy.context is not allowed to be changed")))
 	}
 
 	return allErrs
@@ -105,11 +117,10 @@ func (h *ValidatingHandler) validateUpdateStrategy(cls *appsv1alpha1.CollaSet, f
 		appsv1alpha1.CollaSetInPlaceOnlyPodUpdateStrategyType,
 		appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType:
 	default:
-		allErrs = append(allErrs, field.Invalid(fSpec.Child("updateStrategy", "podUpdatePolicy"),
-			cls.Spec.UpdateStrategy.PodUpdatePolicy, fmt.Sprintf("podUpdatePolicy should be one of %v",
-				[]appsv1alpha1.PodUpdateStrategyType{appsv1alpha1.CollaSetRecreatePodUpdateStrategyType,
-					appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType,
-					appsv1alpha1.CollaSetInPlaceOnlyPodUpdateStrategyType})))
+		allErrs = append(allErrs, field.NotSupported(fSpec.Child("updateStrategy", "podUpdatePolicy"),
+			cls.Spec.UpdateStrategy.PodUpdatePolicy, []string{string(appsv1alpha1.CollaSetRecreatePodUpdateStrategyType),
+				string(appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType),
+				string(appsv1alpha1.CollaSetInPlaceOnlyPodUpdateStrategyType)}))
 	}
 
 	if cls.Spec.UpdateStrategy.RollingUpdate != nil && cls.Spec.UpdateStrategy.RollingUpdate.ByPartition != nil &&

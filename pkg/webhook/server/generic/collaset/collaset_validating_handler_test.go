@@ -27,6 +27,7 @@ import (
 
 type testCase struct {
 	cls             *appsv1alpha1.CollaSet
+	old             *appsv1alpha1.CollaSet
 	messageKeyWords string
 }
 
@@ -69,7 +70,7 @@ func TestValidatingCollaSet(t *testing.T) {
 
 	for i, tc := range successCases {
 		mutatingHandler.setDetaultCollaSet(tc.cls)
-		if err := validatingHandler.validate(tc.cls); err != nil {
+		if err := validatingHandler.validate(tc.cls, tc.old); err != nil {
 			t.Fatalf("got unexpected err for %d case: %s", i, err)
 		}
 	}
@@ -191,7 +192,7 @@ func TestValidatingCollaSet(t *testing.T) {
 			},
 		},
 		"invalid-update-policy": {
-			messageKeyWords: "podUpdatePolicy should be one of",
+			messageKeyWords: "supported values: \"ReCreate\", \"InPlaceIfPossible\", \"InPlaceOnly\"",
 			cls: &appsv1alpha1.CollaSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -330,16 +331,79 @@ func TestValidatingCollaSet(t *testing.T) {
 				},
 			},
 		},
+		"context-change-forbidden": {
+			messageKeyWords: "scaleStrategy.context is not allowed to be changed",
+			cls: &appsv1alpha1.CollaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: appsv1alpha1.CollaSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "foo",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "foo",
+									Image: "image:v1",
+								},
+							},
+						},
+					},
+					ScaleStrategy: appsv1alpha1.ScaleStrategy{
+						Context: "context",
+					},
+				},
+			},
+			old: &appsv1alpha1.CollaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: appsv1alpha1.CollaSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "foo",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "foo",
+									Image: "image:v1",
+								},
+							},
+						},
+					},
+					ScaleStrategy: appsv1alpha1.ScaleStrategy{
+						Context: "context-old",
+					},
+				},
+			},
+		},
 	}
 
 	for key, tc := range failureCases {
 		mutatingHandler.setDetaultCollaSet(tc.cls)
-		err := validatingHandler.validate(tc.cls)
+		err := validatingHandler.validate(tc.cls, tc.old)
 		if err == nil {
 			t.Fatalf("expected err, got nil in case %s", key)
 		}
 		if !strings.Contains(err.Error(), tc.messageKeyWords) {
-			t.Fatalf("can not find message key words [%s] in case %s", tc.messageKeyWords, key)
+			t.Fatalf("can not find message key words [%s] in case %s, got %s", tc.messageKeyWords, key, err)
 		}
 	}
 }
