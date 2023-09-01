@@ -104,7 +104,7 @@ func (h *ValidatingHandler) validateScaleStrategy(cls, oldCls *appsv1alpha1.Coll
 	}
 
 	if oldCls != nil && oldCls.Spec.ScaleStrategy.Context != cls.Spec.ScaleStrategy.Context {
-		allErrs = append(allErrs, field.Forbidden(fSpec.Child("scaleStrategy", "context"), fmt.Sprintf("scaleStrategy.context is not allowed to be changed")))
+		allErrs = append(allErrs, field.Forbidden(fSpec.Child("scaleStrategy", "context"), "scaleStrategy.context is not allowed to be changed"))
 	}
 
 	return allErrs
