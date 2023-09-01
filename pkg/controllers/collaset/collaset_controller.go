@@ -246,8 +246,8 @@ func calculateStatus(instance *appsv1alpha1.CollaSet, newStatus *appsv1alpha1.Co
 	newStatus.UpdatedReadyReplicas = updatedReadyReplicas
 	newStatus.UpdatedAvailableReplicas = updatedAvailableReplicas
 
-	if (instance.Spec.Replicas == nil && newStatus.UpdatedAvailableReplicas == 0) ||
-		*instance.Spec.Replicas == newStatus.UpdatedAvailableReplicas {
+	if (instance.Spec.Replicas == nil && newStatus.UpdatedReadyReplicas >= 0) ||
+		newStatus.UpdatedReadyReplicas >= *instance.Spec.Replicas {
 		newStatus.CurrentRevision = updatedRevision.Name
 	}
 
