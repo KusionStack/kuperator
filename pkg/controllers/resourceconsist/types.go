@@ -54,16 +54,16 @@ type ReconcileAdapter interface {
 	GetExpectEmployer(ctx context.Context, employer client.Object) ([]IEmployer, error)
 	GetCurrentEmployer(ctx context.Context, employer client.Object) ([]IEmployer, error)
 
+	// todo, ctx as an input
 	CreateEmployer(employer client.Object, toCreate []IEmployer) ([]IEmployer, []IEmployer, error)
 	UpdateEmployer(employer client.Object, toUpdate []IEmployer) ([]IEmployer, []IEmployer, error)
 	DeleteEmployer(employer client.Object, toDelete []IEmployer) ([]IEmployer, []IEmployer, error)
-
-	RecordEmployer(succCreate, succUpdate, succDelete []IEmployer) error
 
 	// GetExpectEmployee and GetCurrentEmployee return expect/current status of employees from related backend provider
 	GetExpectEmployee(ctx context.Context, employer client.Object) ([]IEmployee, error)
 	GetCurrentEmployee(ctx context.Context, employer client.Object) ([]IEmployee, error)
 
+	// todo, ctx as an input
 	CreateEmployees(employer client.Object, toCreate []IEmployee) ([]IEmployee, []IEmployee, error)
 	UpdateEmployees(employer client.Object, toUpdate []IEmployee) ([]IEmployee, []IEmployee, error)
 	DeleteEmployees(employer client.Object, toDelete []IEmployee) ([]IEmployee, []IEmployee, error)
@@ -72,7 +72,7 @@ type ReconcileAdapter interface {
 type IEmployer interface {
 	GetEmployerId() string
 	GetEmployerStatuses() interface{}
-	EmployerEqual(employerStatuses interface{}) (bool, error)
+	EmployerEqual(employer IEmployer) (bool, error)
 }
 
 type IEmployee interface {

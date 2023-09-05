@@ -97,10 +97,6 @@ func (r *ReconcileAdapter) DeleteEmployer(employer client.Object, toDelete []res
 	return nil, nil, nil
 }
 
-func (r *ReconcileAdapter) RecordEmployer(succCreate, succUpdate, succDelete []resourceconsist.IEmployer) error {
-	return nil
-}
-
 func (r *ReconcileAdapter) GetExpectEmployee(ctx context.Context, employer client.Object) ([]resourceconsist.IEmployee, error) {
 	svc, ok := employer.(*corev1.Service)
 	if !ok {

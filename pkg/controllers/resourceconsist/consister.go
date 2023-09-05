@@ -38,22 +38,17 @@ func (r *Consist) syncEmployer(ctx context.Context, employer client.Object, expe
 	if err != nil {
 		return false, false, fmt.Errorf("diff employer failed, err: %s", err.Error())
 	}
-	succCreate, failCreate, err := r.adapter.CreateEmployer(employer, toCudEmployer.ToCreate)
+	_, failCreate, err := r.adapter.CreateEmployer(employer, toCudEmployer.ToCreate)
 	if err != nil {
 		return false, false, fmt.Errorf("syncCreate failed, err: %s", err.Error())
 	}
-	succUpdate, failUpdate, err := r.adapter.UpdateEmployer(employer, toCudEmployer.ToUpdate)
+	_, failUpdate, err := r.adapter.UpdateEmployer(employer, toCudEmployer.ToUpdate)
 	if err != nil {
 		return false, false, fmt.Errorf("syncUpdate failed, err: %s", err.Error())
 	}
-	succDelete, failDelete, err := r.adapter.DeleteEmployer(employer, toCudEmployer.ToDelete)
+	_, failDelete, err := r.adapter.DeleteEmployer(employer, toCudEmployer.ToDelete)
 	if err != nil {
 		return false, false, fmt.Errorf("syncDelete failed, err: %s", err.Error())
-	}
-
-	err = r.adapter.RecordEmployer(succCreate, succUpdate, succDelete)
-	if err != nil {
-		return false, false, fmt.Errorf("record employer failed, err: %s", err.Error())
 	}
 
 	isClean := len(toCudEmployer.Unchanged) == 0 && len(toCudEmployer.ToCreate) == 0 && len(toCudEmployer.ToUpdate) == 0 && len(toCudEmployer.ToDelete) == 0
@@ -85,7 +80,7 @@ func (r *Consist) diffEmployer(expectEmployer, currentEmployer []IEmployer) (ToC
 			toCreateIdx++
 			continue
 		}
-		equal, err := expect.EmployerEqual(current.GetEmployerStatuses())
+		equal, err := expect.EmployerEqual(current)
 		if err != nil {
 			return ToCUDEmployer{}, err
 		}
@@ -190,10 +185,6 @@ func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, exp
 		return false, false, err
 	}
 
-	// todo, to be removed, for demo
-	r.Recorder.Eventf(employer, corev1.EventTypeNormal, "diffEmployees", "toCreate: %v, toUpdate: %v, toDelete: %v, unchanged: %v",
-		toCudEmployees.ToCreate, toCudEmployees.ToUpdate, toCudEmployees.ToDelete, toCudEmployees.Unchanged)
-
 	succCreate, failCreate, err := r.adapter.CreateEmployees(employer, toCudEmployees.ToCreate)
 	if err != nil {
 		return false, false, fmt.Errorf("syncCreate failed, err: %s", err.Error())
@@ -255,6 +246,12 @@ func (r *Consist) ensureExpectedFinalizer(ctx context.Context, employer client.O
 		}
 		patch := client.MergeFrom(employer.DeepCopyObject().(client.Object))
 		annos := employer.GetAnnotations()
+		if annos == nil {
+			annos = make(map[string]string)
+		}
+		if annos[expectedFinalizerAddedAnnoKey] == strings.Join(notDeletedPodNames, ",") {
+			return len(notDeletedPodNames) == 0, nil
+		}
 		annos[expectedFinalizerAddedAnnoKey] = strings.Join(notDeletedPodNames, ",")
 		employer.SetAnnotations(annos)
 		return len(notDeletedPodNames) == 0, r.Client.Patch(ctx, employer, patch)
@@ -302,6 +299,12 @@ func (r *Consist) ensureExpectedFinalizer(ctx context.Context, employer client.O
 
 	patch := client.MergeFrom(employer.DeepCopyObject().(client.Object))
 	annos := employer.GetAnnotations()
+	if annos == nil {
+		annos = make(map[string]string)
+	}
+	if annos[expectedFinalizerAddedAnnoKey] == strings.Join(addedNames, ",") {
+		return len(addedNames) == 0, nil
+	}
 	annos[expectedFinalizerAddedAnnoKey] = strings.Join(addedNames, ",")
 	employer.SetAnnotations(annos)
 	return len(addedNames) == 0, r.Client.Patch(ctx, employer, patch)
