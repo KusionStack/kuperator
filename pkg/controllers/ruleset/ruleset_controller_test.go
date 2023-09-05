@@ -24,6 +24,7 @@ import (
 
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -85,7 +86,6 @@ func TestRuleSet(t *testing.T) {
 		for _, po := range podList.Items {
 			g.Expect(c.Delete(ctx, &po)).NotTo(gomega.HaveOccurred())
 		}
-		g.Expect(c.Delete(ctx, rs)).NotTo(gomega.HaveOccurred())
 	}()
 
 	g.Expect(c.List(ctx, podList, &client.ListOptions{
@@ -148,6 +148,11 @@ func TestRuleSet(t *testing.T) {
 	printJson(rs)
 	g.Expect(c.List(ctx, ruleSetList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(inject.FieldIndexRuleSet, "pod-test-1")})).NotTo(gomega.HaveOccurred())
 	g.Expect(len(ruleSetList.Items)).Should(gomega.BeEquivalentTo(0))
+
+	g.Expect(c.Delete(ctx, rs)).NotTo(gomega.HaveOccurred())
+	waitProcessFinished(request)
+	err := c.Get(ctx, types.NamespacedName{Namespace: "default", Name: "ruleset-default"}, rs)
+	g.Expect(errors.IsNotFound(err)).Should(gomega.BeTrue())
 }
 
 const (
