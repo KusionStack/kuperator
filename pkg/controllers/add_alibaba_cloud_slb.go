@@ -19,7 +19,7 @@ package controllers
 import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"kusionstack.io/kafed/pkg/controllers/alibaba_cloud_slb"
+	"kusionstack.io/kafed/pkg/controllers/alibabacloudslb"
 	"kusionstack.io/kafed/pkg/controllers/resourceconsist"
 	"kusionstack.io/kafed/pkg/features"
 	"kusionstack.io/kafed/pkg/utils/feature"
@@ -33,7 +33,7 @@ func Add(manager manager.Manager) error {
 	if !feature.DefaultFeatureGate.Enabled(features.AlibabaCloudSlb) {
 		return nil
 	}
-	reconcileAdapter, err := alibaba_cloud_slb.NewReconcileAdapter(manager.GetClient())
+	reconcileAdapter, err := alibabacloudslb.NewReconcileAdapter(manager.GetClient())
 	if err != nil {
 		return err
 	}
