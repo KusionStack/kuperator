@@ -26,6 +26,10 @@ spec:
       jsonPath: .status.replicas
       name: CURRENT
       type: integer
+    - description: The number of pods available.
+      jsonPath: .status.availableReplicas
+      name: AVAILABLE
+      type: integer
     - description: The number of pods updated.
       jsonPath: .status.updatedReplicas
       name: UPDATED
