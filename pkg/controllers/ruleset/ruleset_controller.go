@@ -109,7 +109,7 @@ func (r *RuleSetReconciler) Reconcile(ctx context.Context, request reconcile.Req
 	}
 
 	if !rulesetutils.RulesetVersionExpectation.SatisfiedExpectations(commonutils.ObjectKeyString(ruleSet), ruleSet.ResourceVersion) {
-		logger.Info("ruleSet's resourceVerison is too old, retry later", "resourceVerison.now", ruleSet.ResourceVersion)
+		logger.Info("ruleSet's resourceVersion is too old, retry later", "resourceVersion.now", ruleSet.ResourceVersion)
 		return reconcile.Result{}, nil
 	}
 
@@ -272,7 +272,7 @@ func (r *RuleSetReconciler) cleanUpRuleSetPods(ctx context.Context, ruleSet *app
 	return nil
 }
 
-func (r *RuleSetReconciler) updateRuleSetOnPod(ctx context.Context, ruleSet, name, namespace string, fn func(pod *corev1.Pod, name string) bool) (*corev1.Pod, error) {
+func (r *RuleSetReconciler) updateRuleSetOnPod(ctx context.Context, ruleSet, name, namespace string, fn func(*corev1.Pod, string) bool) (*corev1.Pod, error) {
 	pod := &corev1.Pod{}
 	return pod, retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if err := r.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, pod); err != nil {

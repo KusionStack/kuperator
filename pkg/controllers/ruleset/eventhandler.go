@@ -138,7 +138,7 @@ func (p *RulesetEventHandler) Create(e event.CreateEvent, q workqueue.RateLimiti
 func (p *RulesetEventHandler) Update(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	oldRuleset := e.ObjectOld.(*appsv1alpha1.RuleSet)
 	newRuleset := e.ObjectNew.(*appsv1alpha1.RuleSet)
-	if equality.Semantic.DeepEqual(oldRuleset.Spec, newRuleset.Spec) {
+	if equality.Semantic.DeepEqual(oldRuleset.Spec, newRuleset.Spec) && newRuleset.DeletionTimestamp == nil {
 		return
 	}
 	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
