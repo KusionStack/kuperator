@@ -162,7 +162,7 @@ func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 
-	expectEmployer, err := r.adapter.GetExpectEmployer(ctx, employer)
+	expectEmployer, err := r.adapter.GetExpectedEmployer(ctx, employer)
 	if err != nil {
 		r.Logger.Error(err, "get expect employer failed")
 		r.Recorder.Eventf(employer, corev1.EventTypeWarning, "GetExpectEmployerFailed",
@@ -184,7 +184,7 @@ func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 
-	expectEmployees, err := r.adapter.GetExpectEmployee(ctx, employer)
+	expectEmployees, err := r.adapter.GetExpectedEmployee(ctx, employer)
 	if err != nil {
 		r.Logger.Error(err, "get expect employees failed")
 		r.Recorder.Eventf(employer, corev1.EventTypeWarning, "GetExpectEmployeeFailed",

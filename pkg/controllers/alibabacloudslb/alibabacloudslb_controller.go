@@ -57,7 +57,7 @@ func (r *ReconcileAdapter) NotFollowPodOpsLifeCycle() bool {
 	return false
 }
 
-func (r *ReconcileAdapter) GetExpectEmployer(ctx context.Context, employer client.Object) ([]resourceconsist.IEmployer, error) {
+func (r *ReconcileAdapter) GetExpectedEmployer(ctx context.Context, employer client.Object) ([]resourceconsist.IEmployer, error) {
 	return nil, nil
 }
 
@@ -85,19 +85,19 @@ func (r *ReconcileAdapter) GetCurrentEmployer(ctx context.Context, employer clie
 	return nil, nil
 }
 
-func (r *ReconcileAdapter) CreateEmployer(employer client.Object, toCreate []resourceconsist.IEmployer) ([]resourceconsist.IEmployer, []resourceconsist.IEmployer, error) {
+func (r *ReconcileAdapter) CreateEmployer(ctx context.Context, employer client.Object, toCreates []resourceconsist.IEmployer) ([]resourceconsist.IEmployer, []resourceconsist.IEmployer, error) {
 	return nil, nil, nil
 }
 
-func (r *ReconcileAdapter) UpdateEmployer(employer client.Object, toUpdate []resourceconsist.IEmployer) ([]resourceconsist.IEmployer, []resourceconsist.IEmployer, error) {
+func (r *ReconcileAdapter) UpdateEmployer(ctx context.Context, employer client.Object, toUpdates []resourceconsist.IEmployer) ([]resourceconsist.IEmployer, []resourceconsist.IEmployer, error) {
 	return nil, nil, nil
 }
 
-func (r *ReconcileAdapter) DeleteEmployer(employer client.Object, toDelete []resourceconsist.IEmployer) ([]resourceconsist.IEmployer, []resourceconsist.IEmployer, error) {
+func (r *ReconcileAdapter) DeleteEmployer(ctx context.Context, employer client.Object, toDeletes []resourceconsist.IEmployer) ([]resourceconsist.IEmployer, []resourceconsist.IEmployer, error) {
 	return nil, nil, nil
 }
 
-func (r *ReconcileAdapter) GetExpectEmployee(ctx context.Context, employer client.Object) ([]resourceconsist.IEmployee, error) {
+func (r *ReconcileAdapter) GetExpectedEmployee(ctx context.Context, employer client.Object) ([]resourceconsist.IEmployee, error) {
 	svc, ok := employer.(*corev1.Service)
 	if !ok {
 		return nil, fmt.Errorf("expect employer kind is Service")
@@ -182,16 +182,16 @@ func (r *ReconcileAdapter) GetCurrentEmployee(ctx context.Context, employer clie
 }
 
 // CreateEmployees returns (nil, toCreate, nil) since CCM of ACK will sync bs of slb
-func (r *ReconcileAdapter) CreateEmployees(employer client.Object, toCreate []resourceconsist.IEmployee) ([]resourceconsist.IEmployee, []resourceconsist.IEmployee, error) {
-	return nil, toCreate, nil
+func (r *ReconcileAdapter) CreateEmployees(ctx context.Context, employer client.Object, toCreates []resourceconsist.IEmployee) ([]resourceconsist.IEmployee, []resourceconsist.IEmployee, error) {
+	return nil, toCreates, nil
 }
 
 // UpdateEmployees returns (nil, toUpdate, nil) since CCM of ACK will sync bs of slb
-func (r *ReconcileAdapter) UpdateEmployees(employer client.Object, toUpdate []resourceconsist.IEmployee) ([]resourceconsist.IEmployee, []resourceconsist.IEmployee, error) {
-	return nil, toUpdate, nil
+func (r *ReconcileAdapter) UpdateEmployees(ctx context.Context, employer client.Object, toUpdates []resourceconsist.IEmployee) ([]resourceconsist.IEmployee, []resourceconsist.IEmployee, error) {
+	return nil, toUpdates, nil
 }
 
 // DeleteEmployees returns (nil, toDelete, nil) since CCM of ACK will sync bs of slb
-func (r *ReconcileAdapter) DeleteEmployees(employer client.Object, toDelete []resourceconsist.IEmployee) ([]resourceconsist.IEmployee, []resourceconsist.IEmployee, error) {
-	return nil, toDelete, nil
+func (r *ReconcileAdapter) DeleteEmployees(ctx context.Context, employer client.Object, toDeletes []resourceconsist.IEmployee) ([]resourceconsist.IEmployee, []resourceconsist.IEmployee, error) {
+	return nil, toDeletes, nil
 }

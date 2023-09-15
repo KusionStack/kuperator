@@ -18,28 +18,28 @@ package resourceconsist
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/mock"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"kusionstack.io/kafed/apis"
-	"kusionstack.io/kafed/apis/apps/v1alpha1"
-	"kusionstack.io/kafed/pkg/utils/inject"
+	"kusionstack.io/operating/apis"
+	"kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/utils/inject"
 )
 
 var (
@@ -48,6 +48,8 @@ var (
 
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	rc = &DemoResourceProviderClient{}
 )
 
 var _ = Describe("resource-consist-controller", func() {
@@ -94,38 +96,38 @@ var _ = Describe("resource-consist-controller", func() {
 	})
 
 	Context("employer synced", func() {
+		rc.On("QueryVip", mock.Anything).Return(&DemoResourceVipOps{}, nil)
+		rc.On("CreateVip", mock.Anything).Return(&DemoResourceVipOps{}, nil)
+		rc.On("UpdateVip", mock.Anything).Return(&DemoResourceVipOps{}, nil)
+		rc.On("DeleteVip", mock.Anything).Return(&DemoResourceVipOps{}, nil)
 		It("employer created", func() {
 			Eventually(func() bool {
-				service1 := corev1.Service{}
-				Expect(mgr.GetClient().Get(context.TODO(), types.NamespacedName{
-					Name:      service.Name,
-					Namespace: service.Namespace,
-				}, &service1)).Should(BeNil())
-				return service1.GetAnnotations()["demo-current-employer"] == "[{\"EmployerId\":\"demo-expect-employer-id\",\"EmployerStatuses\":{\"RemoteVIP\":\"demo-remote-VIP\",\"RemoteVIPQPS\":100}}]"
+				details, exist := demoResourceVipStatusInProvider.Load("demo-expect-employer-id")
+				return exist && details.(DemoServiceDetails).RemoteVIP == "demo-remote-VIP" && details.(DemoServiceDetails).RemoteVIPQPS == 100
 			}, 3*time.Second, 100*time.Millisecond).Should(BeTrue())
 		})
 
 		It("employer updated", func() {
+			demoResourceVipStatusInProvider.Store("demo-expect-employer-id", DemoServiceDetails{
+				RemoteVIP:    "demo-remote-VIP",
+				RemoteVIPQPS: 200,
+			})
+
+			// trigger reconcile
 			service1 := corev1.Service{}
 			Expect(mgr.GetClient().Get(context.TODO(), types.NamespacedName{
 				Name:      service.Name,
 				Namespace: service.Namespace,
 			}, &service1)).Should(BeNil())
-			patch := client.MergeFrom(service1.DeepCopy())
-			annos := service1.GetAnnotations()
-			if annos == nil {
-				annos = make(map[string]string)
+			if service1.Labels == nil {
+				service1.Labels = make(map[string]string)
 			}
-			annos["demo-current-employer"] = "[{\"EmployerId\":\"demo-expect-employer-id\",\"EmployerStatuses\":{\"RemoteVIP\":\"demo-remote-VIP\",\"RemoteVIPQPS\":200}}]"
-			service1.SetAnnotations(annos)
-			Expect(mgr.GetClient().Patch(context.Background(), &service1, patch)).Should(BeNil())
+			service1.Labels["demo-controller-trigger-reconcile"] = fmt.Sprintf("%d", time.Now().Unix())
+			Expect(mgr.GetClient().Update(context.TODO(), &service1)).Should(BeNil())
+
 			Eventually(func() bool {
-				service1 := corev1.Service{}
-				Expect(mgr.GetClient().Get(context.TODO(), types.NamespacedName{
-					Name:      service.Name,
-					Namespace: service.Namespace,
-				}, &service1)).Should(BeNil())
-				return service1.GetAnnotations()["demo-current-employer"] == "[{\"EmployerId\":\"demo-expect-employer-id\",\"EmployerStatuses\":{\"RemoteVIP\":\"demo-remote-VIP\",\"RemoteVIPQPS\":100}}]"
+				details, exist := demoResourceVipStatusInProvider.Load("demo-expect-employer-id")
+				return exist && details.(DemoServiceDetails).RemoteVIP == "demo-remote-VIP" && details.(DemoServiceDetails).RemoteVIPQPS == 100
 			}, 3*time.Second, 100*time.Millisecond).Should(BeTrue())
 		})
 
@@ -152,12 +154,8 @@ var _ = Describe("resource-consist-controller", func() {
 				return !service1.GetDeletionTimestamp().IsZero()
 			}, 3*time.Second, 100*time.Millisecond).Should(BeTrue())
 			Eventually(func() bool {
-				service1 := corev1.Service{}
-				Expect(mgr.GetClient().Get(context.TODO(), types.NamespacedName{
-					Name:      service.Name,
-					Namespace: service.Namespace,
-				}, &service1)).Should(BeNil())
-				return service1.GetAnnotations()["demo-current-employer"] == ""
+				_, exist := demoResourceVipStatusInProvider.Load("demo-expect-employer-id")
+				return !exist
 			}, 3*time.Second, 100*time.Millisecond).Should(BeTrue())
 
 			Eventually(func() bool {
@@ -189,6 +187,11 @@ var _ = Describe("resource-consist-controller", func() {
 	})
 
 	Context("employee synced", func() {
+		rc.On("QueryRealServer", mock.Anything).Return(&DemoResourceRsOps{}, nil)
+		rc.On("CreateRealServer", mock.Anything).Return(&DemoResourceRsOps{}, nil)
+		rc.On("UpdateRealServer", mock.Anything).Return(&DemoResourceRsOps{}, nil)
+		rc.On("DeleteRealServer", mock.Anything).Return(&DemoResourceRsOps{}, nil)
+
 		svc := corev1.Service{
 			ObjectMeta: v1.ObjectMeta{
 				Name:      "resource-consist-ut-svc-1",
@@ -238,15 +241,8 @@ var _ = Describe("resource-consist-controller", func() {
 		It("employee synced, employer created", func() {
 			Expect(mgr.GetClient().Create(context.Background(), &svc)).Should(BeNil())
 			Eventually(func() bool {
-				service1 := corev1.Service{}
-				err := mgr.GetClient().Get(context.TODO(), types.NamespacedName{
-					Name:      svc.Name,
-					Namespace: svc.Namespace,
-				}, &service1)
-				if err != nil {
-					return false
-				}
-				return service1.GetAnnotations()["demo-current-employer"] == "[{\"EmployerId\":\"demo-expect-employer-id\",\"EmployerStatuses\":{\"RemoteVIP\":\"demo-remote-VIP\",\"RemoteVIPQPS\":100}}]"
+				details, exist := demoResourceVipStatusInProvider.Load("demo-expect-employer-id")
+				return exist && details.(DemoServiceDetails).RemoteVIP == "demo-remote-VIP" && details.(DemoServiceDetails).RemoteVIPQPS == 100
 			}, 3*time.Second, 100*time.Millisecond).Should(BeTrue())
 		})
 
@@ -278,12 +274,10 @@ var _ = Describe("resource-consist-controller", func() {
 			}, 3*time.Second, 100*time.Millisecond).Should(BeTrue())
 
 			Eventually(func() bool {
-				service1 := corev1.Service{}
-				Expect(mgr.GetClient().Get(context.TODO(), types.NamespacedName{
-					Name:      svc.Name,
-					Namespace: svc.Namespace,
-				}, &service1)).Should(BeNil())
-				return service1.GetAnnotations()["demo-added-pods"] == pod.Name
+				details, exist := demoResourceRsStatusInProvider.Load(pod.Name)
+				return exist && details.(DemoPodStatus).GetEmployeeName() == pod.Name &&
+					details.(DemoPodStatus).GetEmployeeStatuses().(PodEmployeeStatuses).ExtraStatus.(PodExtraStatus).TrafficWeight == 100 &&
+					details.(DemoPodStatus).GetEmployeeStatuses().(PodEmployeeStatuses).ExtraStatus.(PodExtraStatus).TrafficOn == true
 			}, 3*time.Second, 100*time.Millisecond).Should(BeTrue())
 
 			Eventually(func() bool {
@@ -299,8 +293,7 @@ var _ = Describe("resource-consist-controller", func() {
 						break
 					}
 				}
-				return containsLifecycleFlz && pod1.GetLabels()["demo-traffic-on"] == "true" &&
-					pod1.GetLabels()["demo-traffic-weight"] == "100"
+				return containsLifecycleFlz
 			}, 3*time.Second, 100*time.Millisecond).Should(BeTrue())
 
 			Eventually(func() bool {
@@ -340,32 +333,10 @@ var _ = Describe("resource-consist-controller", func() {
 			}, 3*time.Second, 100*time.Millisecond).Should(BeTrue())
 
 			Eventually(func() bool {
-				pod1 := corev1.Pod{}
-				err := mgr.GetClient().Get(context.TODO(), types.NamespacedName{
-					Name:      pod.Name,
-					Namespace: pod.Namespace,
-				}, &pod1)
-				if err != nil {
-					return false
-				}
-				containsLifecycleFlz := false
-				for _, flz := range pod1.GetFinalizers() {
-					if flz == GenerateLifecycleFinalizer(svc.Name) {
-						containsLifecycleFlz = true
-						break
-					}
-				}
-				return !containsLifecycleFlz && pod1.GetLabels()["demo-traffic-on"] == "false" &&
-					pod1.GetLabels()["demo-traffic-weight"] == "0"
-			}, 3*time.Second, 100*time.Millisecond).Should(BeTrue())
-
-			Eventually(func() bool {
-				service1 := corev1.Service{}
-				Expect(mgr.GetClient().Get(context.TODO(), types.NamespacedName{
-					Name:      svc.Name,
-					Namespace: svc.Namespace,
-				}, &service1)).Should(BeNil())
-				return service1.GetAnnotations()["demo-added-pods"] == pod.Name
+				details, exist := demoResourceRsStatusInProvider.Load(pod.Name)
+				return exist && details.(DemoPodStatus).GetEmployeeName() == pod.Name &&
+					details.(DemoPodStatus).GetEmployeeStatuses().(PodEmployeeStatuses).ExtraStatus.(PodExtraStatus).TrafficWeight == 0 &&
+					details.(DemoPodStatus).GetEmployeeStatuses().(PodEmployeeStatuses).ExtraStatus.(PodExtraStatus).TrafficOn == false
 			}, 3*time.Second, 100*time.Millisecond).Should(BeTrue())
 
 			Eventually(func() bool {
@@ -391,15 +362,10 @@ var _ = Describe("resource-consist-controller", func() {
 			}, 3*time.Second, 100*time.Millisecond).Should(BeTrue())
 
 			Eventually(func() bool {
-				pod1 := corev1.Pod{}
-				err := mgr.GetClient().Get(context.TODO(), types.NamespacedName{
-					Name:      pod.Name,
-					Namespace: pod.Namespace,
-				}, &pod1)
-				if err != nil {
-					return false
-				}
-				return pod1.GetLabels()["demo-traffic-on"] == "true" && pod1.GetLabels()["demo-traffic-weight"] == "100"
+				details, exist := demoResourceRsStatusInProvider.Load(pod.Name)
+				return exist && details.(DemoPodStatus).GetEmployeeName() == pod.Name &&
+					details.(DemoPodStatus).GetEmployeeStatuses().(PodEmployeeStatuses).ExtraStatus.(PodExtraStatus).TrafficWeight == 100 &&
+					details.(DemoPodStatus).GetEmployeeStatuses().(PodEmployeeStatuses).ExtraStatus.(PodExtraStatus).TrafficOn == true
 			}, 3*time.Second, 100*time.Millisecond).Should(BeTrue())
 		})
 
@@ -422,15 +388,11 @@ var _ = Describe("resource-consist-controller", func() {
 			}, 3*time.Second, 100*time.Millisecond).Should(BeTrue())
 
 			Eventually(func() bool {
-				service1 := corev1.Service{}
-				Expect(mgr.GetClient().Get(context.TODO(), types.NamespacedName{
-					Name:      svc.Name,
-					Namespace: svc.Namespace,
-				}, &service1)).Should(BeNil())
-				return !strings.Contains(service1.GetAnnotations()["demo-added-pods"], pod.Name) &&
-					!strings.Contains(service1.GetAnnotations()[expectedFinalizerAddedAnnoKey], pod.Name)
+				_, exist := demoResourceRsStatusInProvider.Load(pod.Name)
+				return !exist
 			}, 3*time.Second, 100*time.Millisecond).Should(BeTrue())
 		})
+
 	})
 })
 
@@ -460,7 +422,7 @@ var _ = BeforeSuite(func() {
 	err = apis.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = AddToMgr(mgr, NewDemoReconcileAdapter(mgr.GetClient()))
+	err = AddToMgr(mgr, NewDemoReconcileAdapter(mgr.GetClient(), rc))
 	Expect(err).NotTo(HaveOccurred())
 
 	go func() {

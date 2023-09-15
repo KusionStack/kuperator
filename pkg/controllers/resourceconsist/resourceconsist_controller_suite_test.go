@@ -18,28 +18,27 @@ package resourceconsist
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
-	"strconv"
-	"strings"
+	"sync"
 
+	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type DemoReconcile struct {
 	client.Client
+	resourceProviderClient *DemoResourceProviderClient
 }
 
 var _ ReconcileAdapter = &DemoReconcile{}
 
-func NewDemoReconcileAdapter(c client.Client) *DemoReconcile {
+func NewDemoReconcileAdapter(c client.Client, rc *DemoResourceProviderClient) *DemoReconcile {
 	return &DemoReconcile{
-		Client: c,
+		Client:                 c,
+		resourceProviderClient: rc,
 	}
 }
 
@@ -71,7 +70,7 @@ func (r *DemoReconcile) NotFollowPodOpsLifeCycle() bool {
 	return false
 }
 
-func (r *DemoReconcile) GetExpectEmployer(ctx context.Context, employer client.Object) ([]IEmployer, error) {
+func (r *DemoReconcile) GetExpectedEmployer(ctx context.Context, employer client.Object) ([]IEmployer, error) {
 	if !employer.GetDeletionTimestamp().IsZero() {
 		return nil, nil
 	}
@@ -88,170 +87,81 @@ func (r *DemoReconcile) GetExpectEmployer(ctx context.Context, employer client.O
 
 func (r *DemoReconcile) GetCurrentEmployer(ctx context.Context, employer client.Object) ([]IEmployer, error) {
 	var current []IEmployer
-	if employer.GetAnnotations()["demo-current-employer"] == "" {
-		return current, nil
-	}
-	var currentDemoServiceStatus []DemoServiceStatus
-	err := json.Unmarshal([]byte(employer.GetAnnotations()["demo-current-employer"]), &currentDemoServiceStatus)
+
+	req := &DemoResourceVipOps{}
+	resp, err := r.resourceProviderClient.QueryVip(req)
 	if err != nil {
 		return current, err
 	}
-	for _, employerStatus := range currentDemoServiceStatus {
+	if resp == nil {
+		return current, fmt.Errorf("demo resource vip query resp is nil")
+	}
+
+	for _, employerStatus := range resp.VipStatuses {
 		current = append(current, employerStatus)
 	}
 	return current, nil
 }
 
-func (r *DemoReconcile) CreateEmployer(employer client.Object, toCreate []IEmployer) ([]IEmployer, []IEmployer, error) {
-	var currentDemoServiceStatus []DemoServiceStatus
-	if employer.GetAnnotations()["demo-current-employer"] != "" {
-		err := json.Unmarshal([]byte(employer.GetAnnotations()["demo-current-employer"]), &currentDemoServiceStatus)
-		if err != nil {
-			return nil, toCreate, err
-		}
-	}
-	for _, create := range toCreate {
+func (r *DemoReconcile) CreateEmployer(ctx context.Context, employer client.Object, toCreates []IEmployer) ([]IEmployer, []IEmployer, error) {
+	toCreateDemoServiceStatus := make([]DemoServiceStatus, len(toCreates))
+	for idx, create := range toCreates {
 		createDemoServiceStatus, ok := create.(DemoServiceStatus)
 		if !ok {
-			return nil, toCreate, fmt.Errorf("toCreate employer is not DemoServiceStatus")
+			return nil, toCreates, fmt.Errorf("toCreates employer is not DemoServiceStatus")
 		}
-		currentDemoServiceStatus = append(currentDemoServiceStatus, createDemoServiceStatus)
+		toCreateDemoServiceStatus[idx] = createDemoServiceStatus
 	}
 
-	patch := client.MergeFrom(employer.DeepCopyObject().(client.Object))
-	annos := employer.GetAnnotations()
-	if annos == nil {
-		annos = make(map[string]string)
-	}
-	annos["demo-current-employer"] = ""
-	if currentDemoServiceStatus != nil {
-		b, err := json.Marshal(currentDemoServiceStatus)
-		if err != nil {
-			return nil, toCreate, err
-		}
-		annos["demo-current-employer"] = string(b)
-	}
-	employer.SetAnnotations(annos)
-	err := r.Patch(context.Background(), employer, patch)
+	_, err := r.resourceProviderClient.CreateVip(&DemoResourceVipOps{
+		VipStatuses: toCreateDemoServiceStatus,
+	})
 	if err != nil {
-		return nil, toCreate, err
+		return nil, toCreates, err
 	}
-
-	return toCreate, nil, nil
+	return toCreates, nil, nil
 }
 
-func (r *DemoReconcile) UpdateEmployer(employer client.Object, toUpdate []IEmployer) ([]IEmployer, []IEmployer, error) {
-	var currentDemoServiceStatus []DemoServiceStatus
-	if employer.GetAnnotations()["demo-current-employer"] != "" {
-		err := json.Unmarshal([]byte(employer.GetAnnotations()["demo-current-employer"]), &currentDemoServiceStatus)
-		if err != nil {
-			return nil, toUpdate, err
+func (r *DemoReconcile) UpdateEmployer(ctx context.Context, employer client.Object, toUpdates []IEmployer) ([]IEmployer, []IEmployer, error) {
+	toUpdateDemoServiceStatus := make([]DemoServiceStatus, len(toUpdates))
+	for idx, update := range toUpdates {
+		updateDemoServiceStatus, ok := update.(DemoServiceStatus)
+		if !ok {
+			return nil, toUpdates, fmt.Errorf("toUpdates employer is not DemoServiceStatus")
 		}
+		toUpdateDemoServiceStatus[idx] = updateDemoServiceStatus
 	}
 
-	toUpdateEmployerMap := make(map[string]IEmployer)
-	updated := make(map[string]bool)
-	for _, update := range toUpdate {
-		toUpdateEmployerMap[update.GetEmployerId()] = update
-	}
-
-	for idx, cur := range currentDemoServiceStatus {
-		if toUpdateEmployerStatus, ok := toUpdateEmployerMap[cur.EmployerId]; ok {
-			currentDemoServiceStatus[idx] = toUpdateEmployerStatus.(DemoServiceStatus)
-			updated[cur.EmployerId] = true
-		}
-	}
-
-	patch := client.MergeFrom(employer.DeepCopyObject().(client.Object))
-	annos := employer.GetAnnotations()
-	annos["demo-current-employer"] = ""
-	if currentDemoServiceStatus != nil {
-		b, err := json.Marshal(currentDemoServiceStatus)
-		if err != nil {
-			return nil, toUpdate, err
-		}
-		annos["demo-current-employer"] = string(b)
-	}
-	employer.SetAnnotations(annos)
-	err := r.Patch(context.Background(), employer, patch)
+	_, err := r.resourceProviderClient.UpdateVip(&DemoResourceVipOps{
+		VipStatuses: toUpdateDemoServiceStatus,
+	})
 	if err != nil {
-		return nil, toUpdate, err
+		return nil, toUpdates, err
 	}
-
-	var succ []IEmployer
-	var fail []IEmployer
-	for employerId, updatedSucc := range updated {
-		if updatedSucc {
-			succ = append(succ, toUpdateEmployerMap[employerId])
-		} else {
-			fail = append(fail, toUpdateEmployerMap[employerId])
-		}
-	}
-
-	return succ, fail, nil
+	return toUpdates, nil, nil
 }
 
-func (r *DemoReconcile) DeleteEmployer(employer client.Object, toDelete []IEmployer) ([]IEmployer, []IEmployer, error) {
-	var currentDemoServiceStatus []DemoServiceStatus
-	if employer.GetAnnotations()["demo-current-employer"] == "" {
-		return toDelete, nil, nil
+func (r *DemoReconcile) DeleteEmployer(ctx context.Context, employer client.Object, toDeletes []IEmployer) ([]IEmployer, []IEmployer, error) {
+	toDeleteDemoServiceStatus := make([]DemoServiceStatus, len(toDeletes))
+	for idx, update := range toDeletes {
+		deleteDemoServiceStatus, ok := update.(DemoServiceStatus)
+		if !ok {
+			return nil, toDeletes, fmt.Errorf("toDeletes employer is not DemoServiceStatus")
+		}
+		toDeleteDemoServiceStatus[idx] = deleteDemoServiceStatus
 	}
 
-	err := json.Unmarshal([]byte(employer.GetAnnotations()["demo-current-employer"]), &currentDemoServiceStatus)
+	_, err := r.resourceProviderClient.DeleteVip(&DemoResourceVipOps{
+		VipStatuses: toDeleteDemoServiceStatus,
+	})
 	if err != nil {
-		return nil, toDelete, err
+		return nil, toDeletes, err
 	}
-
-	toDeleteEmployerMap := make(map[string]IEmployer)
-	deleted := make(map[string]bool)
-	for _, del := range toDelete {
-		toDeleteEmployerMap[del.GetEmployerId()] = del
-	}
-
-	var afterDeletedDemoServiceStatus []DemoServiceStatus
-	for _, cur := range currentDemoServiceStatus {
-		if _, ok := toDeleteEmployerMap[cur.EmployerId]; ok {
-			deleted[cur.EmployerId] = true
-			continue
-		}
-		afterDeletedDemoServiceStatus = append(afterDeletedDemoServiceStatus, cur)
-	}
-
-	patch := client.MergeFrom(employer.DeepCopyObject().(client.Object))
-	annos := employer.GetAnnotations()
-	if annos == nil {
-		return toDelete, nil, nil
-	}
-	annos["demo-current-employer"] = ""
-	if afterDeletedDemoServiceStatus != nil {
-		b, err := json.Marshal(afterDeletedDemoServiceStatus)
-		if err != nil {
-			return nil, toDelete, err
-		}
-		annos["demo-current-employer"] = string(b)
-	}
-
-	employer.SetAnnotations(annos)
-	err = r.Patch(context.Background(), employer, patch)
-	if err != nil {
-		return nil, toDelete, err
-	}
-
-	var succ []IEmployer
-	var fail []IEmployer
-	for employerId, delSucc := range deleted {
-		if delSucc {
-			succ = append(succ, toDeleteEmployerMap[employerId])
-		} else {
-			fail = append(fail, toDeleteEmployerMap[employerId])
-		}
-	}
-
-	return succ, fail, nil
+	return toDeletes, nil, nil
 }
 
 // GetExpectEmployeeStatus return expect employee status
-func (r *DemoReconcile) GetExpectEmployee(ctx context.Context, employer client.Object) ([]IEmployee, error) {
+func (r *DemoReconcile) GetExpectedEmployee(ctx context.Context, employer client.Object) ([]IEmployee, error) {
 	if !employer.GetDeletionTimestamp().IsZero() {
 		return []IEmployee{}, nil
 	}
@@ -300,152 +210,83 @@ func (r *DemoReconcile) GetExpectEmployee(ctx context.Context, employer client.O
 }
 
 func (r *DemoReconcile) GetCurrentEmployee(ctx context.Context, employer client.Object) ([]IEmployee, error) {
-	svc, ok := employer.(*corev1.Service)
-	if !ok {
-		return nil, fmt.Errorf("expect employer kind is Service")
-	}
-
-	if svc.GetAnnotations()["demo-added-pods"] == "" {
-		return nil, nil
-	}
-
-	addedPodNames := strings.Split(svc.GetAnnotations()["demo-added-pods"], ",")
-	current := make([]IEmployee, len(addedPodNames))
-	currentIdx := 0
-
-	for _, podName := range addedPodNames {
-		pod := &corev1.Pod{}
-		err := r.Get(ctx, types.NamespacedName{
-			Namespace: employer.GetNamespace(),
-			Name:      podName,
-		}, pod)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				continue
-			}
-			return nil, err
-		}
-		status := DemoPodStatus{
-			EmployeeId:   podName,
-			EmployeeName: podName,
-		}
-		employeeStatus, err := GetCommonPodEmployeeStatus(pod)
-		if err != nil {
-			return nil, err
-		}
-		extraStatus := PodExtraStatus{}
-		if pod.GetLabels()["demo-traffic-on"] == "true" {
-			extraStatus.TrafficOn = true
-		}
-		if pod.GetLabels()["demo-traffic-weight"] != "" {
-			extraStatus.TrafficWeight, _ = strconv.Atoi(pod.GetLabels()["demo-traffic-weight"])
-		}
-		employeeStatus.ExtraStatus = extraStatus
-		status.EmployeeStatuses = employeeStatus
-		current[currentIdx] = status
-		currentIdx++
-	}
-	return current[:currentIdx], nil
-}
-
-func (r *DemoReconcile) CreateEmployees(employer client.Object, toCreate []IEmployee) ([]IEmployee, []IEmployee, error) {
-	if employer == nil {
-		return nil, nil, fmt.Errorf("employer is nil")
-	}
-	if len(toCreate) == 0 {
-		return toCreate, nil, nil
-	}
-	toAddNames := make([]string, len(toCreate))
-	toAddIdx := 0
-	for _, employee := range toCreate {
-		toAddNames[toAddIdx] = employee.GetEmployeeName()
-		toAddIdx++
-	}
-	toAddNames = toAddNames[:toAddIdx]
-	anno := employer.GetAnnotations()
-	if anno["demo-added-pods"] == "" {
-		anno["demo-added-pods"] = strings.Join(toAddNames, ",")
-	} else {
-		anno["demo-added-pods"] = anno["demo-added-pods"] + "," + strings.Join(toAddNames, ",")
-	}
-	employer.SetAnnotations(anno)
-	err := r.Client.Update(context.Background(), employer)
+	var current []IEmployee
+	req := &DemoResourceRsOps{}
+	resp, err := r.resourceProviderClient.QueryRealServer(req)
 	if err != nil {
-		return nil, nil, err
+		return current, err
 	}
-	return toCreate, nil, nil
+	if resp == nil {
+		return current, fmt.Errorf("demo resource rs query resp is nil")
+	}
+
+	for _, rsStatus := range resp.RsStatuses {
+		current = append(current, rsStatus)
+	}
+	return current, nil
 }
 
-func (r *DemoReconcile) UpdateEmployees(employer client.Object, toUpdate []IEmployee) ([]IEmployee, []IEmployee, error) {
-	if employer == nil {
-		return nil, nil, fmt.Errorf("employer is nil")
-	}
-	if len(toUpdate) == 0 {
-		return toUpdate, nil, nil
-	}
-	succUpdate := make([]IEmployee, len(toUpdate))
-	failUpdate := make([]IEmployee, len(toUpdate))
-	succUpdateIdx, failUpdateIdx := 0, 0
-	for _, employee := range toUpdate {
-		pod := &corev1.Pod{}
-		err := r.Get(context.Background(), types.NamespacedName{
-			Namespace: employer.GetNamespace(),
-			Name:      employee.GetEmployeeName(),
-		}, pod)
-		podEmployeeStatus := employee.GetEmployeeStatuses().(PodEmployeeStatuses)
-		if err != nil {
-			return succUpdate, failUpdate, err
-		}
-		extraStatus := podEmployeeStatus.ExtraStatus.(PodExtraStatus)
-		if extraStatus.TrafficOn {
-			pod.GetLabels()["demo-traffic-on"] = "true"
-		} else {
-			pod.GetLabels()["demo-traffic-on"] = "false"
-		}
-		pod.GetLabels()["demo-traffic-weight"] = strconv.Itoa(extraStatus.TrafficWeight)
-		err = r.Client.Update(context.Background(), pod)
-		if err != nil {
-			failUpdate[failUpdateIdx] = employee
-			failUpdateIdx++
-			continue
-		}
-		succUpdate[succUpdateIdx] = employee
-		succUpdateIdx++
-	}
-	return succUpdate[:succUpdateIdx], failUpdate[:failUpdateIdx], nil
-}
+func (r *DemoReconcile) CreateEmployees(ctx context.Context, employer client.Object, toCreates []IEmployee) ([]IEmployee, []IEmployee, error) {
+	toCreateDemoPodStatuses := make([]DemoPodStatus, len(toCreates))
 
-func (r *DemoReconcile) DeleteEmployees(employer client.Object, toDelete []IEmployee) ([]IEmployee, []IEmployee, error) {
-	if employer == nil {
-		return nil, nil, fmt.Errorf("employer is nil")
-	}
-	if len(toDelete) == 0 {
-		return toDelete, nil, nil
+	for idx, toCreate := range toCreates {
+		podStatus, ok := toCreate.(DemoPodStatus)
+		if !ok {
+			return nil, toCreates, fmt.Errorf("toCreate is not DemoPodStatus")
+		}
+		toCreateDemoPodStatuses[idx] = podStatus
 	}
 
-	toDeleteMap := make(map[string]bool)
-	for _, employee := range toDelete {
-		toDeleteMap[employee.GetEmployeeName()] = true
-	}
-
-	addedPodNames := strings.Split(employer.GetAnnotations()["demo-added-pods"], ",")
-
-	afterDeleteIdx := 0
-	for _, added := range addedPodNames {
-		if !toDeleteMap[added] {
-			addedPodNames[afterDeleteIdx] = added
-			afterDeleteIdx++
-		}
-	}
-	addedPodNames = addedPodNames[:afterDeleteIdx]
-	anno := employer.GetAnnotations()
-	anno["demo-added-pods"] = strings.Join(addedPodNames, ",")
-	employer.SetAnnotations(anno)
-	err := r.Client.Update(context.Background(), employer)
+	_, err := r.resourceProviderClient.CreateRealServer(&DemoResourceRsOps{
+		RsStatuses: toCreateDemoPodStatuses,
+	})
 	if err != nil {
-		return nil, nil, err
+		return nil, toCreates, err
 	}
-	return toDelete, nil, nil
+
+	return toCreates, nil, nil
+}
+
+func (r *DemoReconcile) UpdateEmployees(ctx context.Context, employer client.Object, toUpdates []IEmployee) ([]IEmployee, []IEmployee, error) {
+	toUpdateDemoPodStatuses := make([]DemoPodStatus, len(toUpdates))
+
+	for idx, toUpdate := range toUpdates {
+		podStatus, ok := toUpdate.(DemoPodStatus)
+		if !ok {
+			return nil, toUpdates, fmt.Errorf("toUpdate is not DemoPodStatus")
+		}
+		toUpdateDemoPodStatuses[idx] = podStatus
+	}
+
+	_, err := r.resourceProviderClient.UpdateRealServer(&DemoResourceRsOps{
+		RsStatuses: toUpdateDemoPodStatuses,
+	})
+	if err != nil {
+		return nil, toUpdates, err
+	}
+
+	return toUpdates, nil, nil
+}
+
+func (r *DemoReconcile) DeleteEmployees(ctx context.Context, employer client.Object, toDeletes []IEmployee) ([]IEmployee, []IEmployee, error) {
+	toDeleteDemoPodStatuses := make([]DemoPodStatus, len(toDeletes))
+
+	for idx, toDelete := range toDeletes {
+		podStatus, ok := toDelete.(DemoPodStatus)
+		if !ok {
+			return nil, toDeletes, fmt.Errorf("toDelete is not DemoPodStatus")
+		}
+		toDeleteDemoPodStatuses[idx] = podStatus
+	}
+
+	_, err := r.resourceProviderClient.DeleteRealServer(&DemoResourceRsOps{
+		RsStatuses: toDeleteDemoPodStatuses,
+	})
+	if err != nil {
+		return nil, toDeletes, err
+	}
+
+	return toDeletes, nil, nil
 }
 
 var _ IEmployer = DemoServiceStatus{}
@@ -519,4 +360,114 @@ func (d DemoPodStatus) EmployeeEqual(employeeStatus IEmployee) (bool, error) {
 type PodExtraStatus struct {
 	TrafficOn     bool
 	TrafficWeight int
+}
+
+var demoResourceVipStatusInProvider sync.Map
+var demoResourceRsStatusInProvider sync.Map
+
+type DemoResourceProviderClient struct {
+	mock.Mock
+}
+
+type DemoResourceVipOps struct {
+	VipStatuses []DemoServiceStatus `json:"vipStatuses,omitempty"`
+	MockData    bool                `json:"mockData,omitempty"`
+}
+
+type DemoResourceRsOps struct {
+	RsStatuses []DemoPodStatus `json:"rsStatuses,omitempty"`
+	MockData   bool            `json:"mockData,omitempty"`
+}
+
+func (d *DemoResourceProviderClient) CreateVip(req *DemoResourceVipOps) (*DemoResourceVipOps, error) {
+	args := d.Called(req)
+	if !args.Get(0).(*DemoResourceVipOps).MockData {
+		for _, vipStatus := range req.VipStatuses {
+			demoResourceVipStatusInProvider.Store(vipStatus.EmployerId, vipStatus.EmployerStatuses)
+		}
+	}
+	return args.Get(0).(*DemoResourceVipOps), args.Error(1)
+}
+
+func (d *DemoResourceProviderClient) UpdateVip(req *DemoResourceVipOps) (*DemoResourceVipOps, error) {
+	args := d.Called(req)
+	if !args.Get(0).(*DemoResourceVipOps).MockData {
+		for _, vipStatus := range req.VipStatuses {
+			demoResourceVipStatusInProvider.Store(vipStatus.EmployerId, vipStatus.EmployerStatuses)
+		}
+	}
+	return args.Get(0).(*DemoResourceVipOps), args.Error(1)
+}
+
+func (d *DemoResourceProviderClient) DeleteVip(req *DemoResourceVipOps) (*DemoResourceVipOps, error) {
+	args := d.Called(req)
+	if !args.Get(0).(*DemoResourceVipOps).MockData {
+		for _, vipStatus := range req.VipStatuses {
+			demoResourceVipStatusInProvider.Delete(vipStatus.EmployerId)
+		}
+	}
+	return args.Get(0).(*DemoResourceVipOps), args.Error(1)
+}
+
+func (d *DemoResourceProviderClient) QueryVip(req *DemoResourceVipOps) (*DemoResourceVipOps, error) {
+	args := d.Called(req)
+	if !args.Get(0).(*DemoResourceVipOps).MockData {
+		vipStatuses := make([]DemoServiceStatus, 0)
+		demoResourceVipStatusInProvider.Range(func(key, value any) bool {
+			vipStatuses = append(vipStatuses, DemoServiceStatus{
+				EmployerId:       key.(string),
+				EmployerStatuses: value.(DemoServiceDetails),
+			})
+			return true
+		})
+		return &DemoResourceVipOps{
+			VipStatuses: vipStatuses,
+		}, args.Error(1)
+	}
+	return args.Get(0).(*DemoResourceVipOps), args.Error(1)
+}
+
+func (d *DemoResourceProviderClient) CreateRealServer(req *DemoResourceRsOps) (*DemoResourceRsOps, error) {
+	args := d.Called(req)
+	if !args.Get(0).(*DemoResourceRsOps).MockData {
+		for _, employeeStatus := range req.RsStatuses {
+			demoResourceRsStatusInProvider.Store(employeeStatus.GetEmployeeId(), employeeStatus)
+		}
+	}
+	return args.Get(0).(*DemoResourceRsOps), args.Error(1)
+}
+
+func (d *DemoResourceProviderClient) UpdateRealServer(req *DemoResourceRsOps) (*DemoResourceRsOps, error) {
+	args := d.Called(req)
+	if !args.Get(0).(*DemoResourceRsOps).MockData {
+		for _, employeeStatus := range req.RsStatuses {
+			demoResourceRsStatusInProvider.Store(employeeStatus.GetEmployeeId(), employeeStatus)
+		}
+	}
+	return args.Get(0).(*DemoResourceRsOps), args.Error(1)
+}
+
+func (d *DemoResourceProviderClient) DeleteRealServer(req *DemoResourceRsOps) (*DemoResourceRsOps, error) {
+	args := d.Called(req)
+	if !args.Get(0).(*DemoResourceRsOps).MockData {
+		for _, employeeStatus := range req.RsStatuses {
+			demoResourceRsStatusInProvider.Delete(employeeStatus.GetEmployeeId())
+		}
+	}
+	return args.Get(0).(*DemoResourceRsOps), args.Error(1)
+}
+
+func (d *DemoResourceProviderClient) QueryRealServer(req *DemoResourceRsOps) (*DemoResourceRsOps, error) {
+	args := d.Called(req)
+	if !args.Get(0).(*DemoResourceRsOps).MockData {
+		rsStatuses := make([]DemoPodStatus, 0)
+		demoResourceRsStatusInProvider.Range(func(key, value any) bool {
+			rsStatuses = append(rsStatuses, value.(DemoPodStatus))
+			return true
+		})
+		return &DemoResourceRsOps{
+			RsStatuses: rsStatuses,
+		}, args.Error(1)
+	}
+	return args.Get(0).(*DemoResourceRsOps), args.Error(1)
 }

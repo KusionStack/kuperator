@@ -38,15 +38,15 @@ func (r *Consist) syncEmployer(ctx context.Context, employer client.Object, expe
 	if err != nil {
 		return false, false, fmt.Errorf("diff employer failed, err: %s", err.Error())
 	}
-	_, failCreate, err := r.adapter.CreateEmployer(employer, toCudEmployer.ToCreate)
+	_, failCreate, err := r.adapter.CreateEmployer(ctx, employer, toCudEmployer.ToCreate)
 	if err != nil {
 		return false, false, fmt.Errorf("syncCreate failed, err: %s", err.Error())
 	}
-	_, failUpdate, err := r.adapter.UpdateEmployer(employer, toCudEmployer.ToUpdate)
+	_, failUpdate, err := r.adapter.UpdateEmployer(ctx, employer, toCudEmployer.ToUpdate)
 	if err != nil {
 		return false, false, fmt.Errorf("syncUpdate failed, err: %s", err.Error())
 	}
-	_, failDelete, err := r.adapter.DeleteEmployer(employer, toCudEmployer.ToDelete)
+	_, failDelete, err := r.adapter.DeleteEmployer(ctx, employer, toCudEmployer.ToDelete)
 	if err != nil {
 		return false, false, fmt.Errorf("syncDelete failed, err: %s", err.Error())
 	}
@@ -185,15 +185,15 @@ func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, exp
 		return false, false, err
 	}
 
-	succCreate, failCreate, err := r.adapter.CreateEmployees(employer, toCudEmployees.ToCreate)
+	succCreate, failCreate, err := r.adapter.CreateEmployees(ctx, employer, toCudEmployees.ToCreate)
 	if err != nil {
 		return false, false, fmt.Errorf("syncCreate failed, err: %s", err.Error())
 	}
-	succUpdate, failUpdate, err := r.adapter.UpdateEmployees(employer, toCudEmployees.ToUpdate)
+	succUpdate, failUpdate, err := r.adapter.UpdateEmployees(ctx, employer, toCudEmployees.ToUpdate)
 	if err != nil {
 		return false, false, fmt.Errorf("syncUpdate failed, err: %s", err.Error())
 	}
-	succDelete, failDelete, err := r.adapter.DeleteEmployees(employer, toCudEmployees.ToDelete)
+	succDelete, failDelete, err := r.adapter.DeleteEmployees(ctx, employer, toCudEmployees.ToDelete)
 	if err != nil {
 		return false, false, fmt.Errorf("syncDelete failed, err: %s", err.Error())
 	}
