@@ -42,12 +42,12 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"kusionstack.io/kafed/apis"
-	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
-	"kusionstack.io/kafed/pkg/controllers/collaset/synccontrol"
-	collasetutils "kusionstack.io/kafed/pkg/controllers/collaset/utils"
-	"kusionstack.io/kafed/pkg/controllers/utils/podopslifecycle"
-	"kusionstack.io/kafed/pkg/utils/inject"
+	"kusionstack.io/operating/apis"
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/collaset/synccontrol"
+	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
+	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/operating/pkg/utils/inject"
 )
 
 var (

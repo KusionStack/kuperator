@@ -2,9 +2,9 @@
 # This file is used to track the info used to scaffold your project
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
-domain: kafed.io
+domain: kusionstack.io
 layout:
 - go.kubebuilder.io/v3
-projectName: kafed
-repo: kusionstack.io/kafed
+projectName: operating
+repo: kusionstack.io/operating
 resources:

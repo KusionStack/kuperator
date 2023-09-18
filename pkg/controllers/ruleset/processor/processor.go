@@ -31,10 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
-	"kusionstack.io/kafed/pkg/controllers/ruleset/processor/rules"
-	"kusionstack.io/kafed/pkg/controllers/ruleset/register"
-	"kusionstack.io/kafed/pkg/controllers/ruleset/utils"
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/ruleset/processor/rules"
+	"kusionstack.io/operating/pkg/controllers/ruleset/register"
+	"kusionstack.io/operating/pkg/controllers/ruleset/utils"
 )
 
 func NewRuleProcessor(client client.Client, stage string, ruleSet *appsv1alpha1.RuleSet, log logr.Logger) *Processor {

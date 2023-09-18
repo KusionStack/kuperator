@@ -35,12 +35,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"kusionstack.io/kafed/apis/apps/v1alpha1"
-	"kusionstack.io/kafed/pkg/controllers/ruleset"
-	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
-	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
-	"kusionstack.io/kafed/pkg/utils"
-	"kusionstack.io/kafed/pkg/utils/mixin"
+	"kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/ruleset"
+	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
+	"kusionstack.io/operating/pkg/controllers/utils/expectations"
+	"kusionstack.io/operating/pkg/utils"
+	"kusionstack.io/operating/pkg/utils/mixin"
 )
 
 const (

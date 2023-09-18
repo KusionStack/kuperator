@@ -27,10 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	errors2 "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"kusionstack.io/kafed/apis/apps/v1alpha1"
+	"kusionstack.io/operating/apis/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"kusionstack.io/kafed/pkg/controllers/utils"
+	"kusionstack.io/operating/pkg/controllers/utils"
 )
 
 func (r *Consist) syncEmployer(ctx context.Context, employer client.Object, expectEmployerStatus, currentEmployerStatus []IEmployer) (bool, bool, error) {

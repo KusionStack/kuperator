@@ -21,7 +21,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"kusionstack.io/kafed/apis/apps/v1alpha1"
+	"kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
 // DumpJSON returns the JSON encoding

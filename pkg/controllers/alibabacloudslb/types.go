@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"kusionstack.io/kafed/pkg/controllers/resourceconsist"
+	"kusionstack.io/operating/pkg/controllers/resourceconsist"
 )
 
 var _ resourceconsist.IEmployee = AlibabaSlbPodStatus{}

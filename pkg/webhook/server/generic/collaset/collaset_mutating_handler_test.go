@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
 func TestMutatingCollaSet(t *testing.T) {

@@ -19,10 +19,10 @@ package controllers
 import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"kusionstack.io/kafed/pkg/controllers/alibabacloudslb"
-	"kusionstack.io/kafed/pkg/controllers/resourceconsist"
-	"kusionstack.io/kafed/pkg/features"
-	"kusionstack.io/kafed/pkg/utils/feature"
+	"kusionstack.io/operating/pkg/controllers/alibabacloudslb"
+	"kusionstack.io/operating/pkg/controllers/resourceconsist"
+	"kusionstack.io/operating/pkg/features"
+	"kusionstack.io/operating/pkg/utils/feature"
 )
 
 func init() {

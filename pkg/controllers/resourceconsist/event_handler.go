@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"kusionstack.io/kafed/apis/apps/v1alpha1"
+	"kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
 var _ handler.EventHandler = &EnqueueServiceWithRateLimit{}

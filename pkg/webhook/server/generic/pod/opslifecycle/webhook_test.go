@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"kusionstack.io/kafed/apis/apps/v1alpha1"
+	"kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
 func TestValidating(t *testing.T) {
@@ -434,7 +434,7 @@ func TestMutating(t *testing.T) {
 		oldPod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "old",
-				Namespace: "kafed",
+				Namespace: "operating",
 				Labels:    v.oldPodLabels,
 			},
 		}
@@ -445,7 +445,7 @@ func TestMutating(t *testing.T) {
 		newPod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "new",
-				Namespace: "kafed",
+				Namespace: "operating",
 				Labels:    v.newPodLabels,
 			},
 		}

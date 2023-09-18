@@ -32,17 +32,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
-	"kusionstack.io/kafed/pkg/controllers/collaset/podcontext"
-	"kusionstack.io/kafed/pkg/controllers/collaset/podcontrol"
-	"kusionstack.io/kafed/pkg/controllers/collaset/synccontrol"
-	"kusionstack.io/kafed/pkg/controllers/collaset/utils"
-	collasetutils "kusionstack.io/kafed/pkg/controllers/collaset/utils"
-	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
-	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
-	"kusionstack.io/kafed/pkg/controllers/utils/podopslifecycle"
-	"kusionstack.io/kafed/pkg/controllers/utils/revision"
-	"kusionstack.io/kafed/pkg/utils/mixin"
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/collaset/podcontext"
+	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
+	"kusionstack.io/operating/pkg/controllers/collaset/synccontrol"
+	"kusionstack.io/operating/pkg/controllers/collaset/utils"
+	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
+	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
+	"kusionstack.io/operating/pkg/controllers/utils/expectations"
+	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/operating/pkg/controllers/utils/revision"
+	"kusionstack.io/operating/pkg/utils/mixin"
 )
 
 const (

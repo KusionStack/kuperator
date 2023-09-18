@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/pflag"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -33,14 +32,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
-	"kusionstack.io/kafed/apis"
-	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
-	"kusionstack.io/kafed/pkg/controllers"
-	"kusionstack.io/kafed/pkg/utils/feature"
-	"kusionstack.io/kafed/pkg/utils/inject"
-	"kusionstack.io/kafed/pkg/webhook"
+	"kusionstack.io/operating/apis"
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers"
+	"kusionstack.io/operating/pkg/utils/feature"
+	"kusionstack.io/operating/pkg/utils/inject"
+	"kusionstack.io/operating/pkg/webhook"
 
-	_ "kusionstack.io/kafed/pkg/features"
+	_ "kusionstack.io/operating/pkg/features"
 	//+kubebuilder:scaffold:imports
 )
 

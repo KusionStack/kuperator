@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
-	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
+	"kusionstack.io/operating/pkg/controllers/utils/expectations"
 )
 
 var (
@@ -46,7 +46,7 @@ func (h *ExpectationEventHandler) Update(event.UpdateEvent, workqueue.RateLimiti
 // Delete is called in response to a delete event - e.g. Pod Deleted.
 func (h *ExpectationEventHandler) Delete(e event.DeleteEvent, _ workqueue.RateLimitingInterface) {
 	if err := activeExpectations.Delete(e.Object.GetNamespace(), e.Object.GetName()); err != nil {
-		klog.Error("fail to delete expectation in ResourceContextController for %s/%s: %s", e.Object.GetNamespace(), e.Object.GetName(), err)
+		klog.Errorf("fail to delete expectation in ResourceContextController for %s/%s: %s", e.Object.GetNamespace(), e.Object.GetName(), err)
 	}
 }
 

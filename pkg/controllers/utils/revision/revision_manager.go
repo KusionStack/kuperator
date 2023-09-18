@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
-	refmanagerutil "kusionstack.io/kafed/pkg/controllers/utils/refmanager"
+	refmanagerutil "kusionstack.io/operating/pkg/controllers/utils/refmanager"
 )
 
 const ControllerRevisionHashLabel = "controller.kubernetes.io/hash"

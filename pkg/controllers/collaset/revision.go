@@ -21,7 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	appsalphav1 "kusionstack.io/kafed/apis/apps/v1alpha1"
+	appsalphav1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
 func getCollaSetPatch(cls *appsalphav1.CollaSet) ([]byte, error) {

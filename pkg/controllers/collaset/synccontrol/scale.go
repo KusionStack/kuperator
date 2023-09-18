@@ -19,9 +19,9 @@ package synccontrol
 import (
 	"sort"
 
-	collasetutils "kusionstack.io/kafed/pkg/controllers/collaset/utils"
-	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
-	"kusionstack.io/kafed/pkg/controllers/utils/podopslifecycle"
+	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
+	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
+	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 )
 
 func getPodsToDelete(filteredPods []*collasetutils.PodWrapper, diff int) []*collasetutils.PodWrapper {

@@ -29,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
-	"kusionstack.io/kafed/apis/apps/v1alpha1"
-	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
-	revisionutils "kusionstack.io/kafed/pkg/controllers/utils/revision"
+	"kusionstack.io/operating/apis/apps/v1alpha1"
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	revisionutils "kusionstack.io/operating/pkg/controllers/utils/revision"
 )
 
 func GetPodRevisionPatch(revision *appsv1.ControllerRevision) ([]byte, error) {

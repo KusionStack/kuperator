@@ -17,7 +17,7 @@ limitations under the License.
 package controllers
 
 import (
-	"kusionstack.io/kafed/pkg/controllers/resourcecontext"
+	"kusionstack.io/operating/pkg/controllers/resourcecontext"
 )
 
 func init() {

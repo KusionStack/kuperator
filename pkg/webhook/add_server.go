@@ -17,7 +17,7 @@ limitations under the License.
 package webhook
 
 import (
-	server "kusionstack.io/kafed/pkg/webhook/server"
+	server "kusionstack.io/operating/pkg/webhook/server"
 )
 
 func init() {

@@ -17,7 +17,7 @@
 package utils
 
 import (
-	"kusionstack.io/kafed/pkg/utils/expectation"
+	"kusionstack.io/operating/pkg/utils/expectation"
 )
 
 var (

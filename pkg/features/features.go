@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/component-base/featuregate"
 
-	"kusionstack.io/kafed/pkg/utils/feature"
+	"kusionstack.io/operating/pkg/utils/feature"
 )
 
 const (

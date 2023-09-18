@@ -17,7 +17,7 @@ limitations under the License.
 package apis
 
 import (
-	api "kusionstack.io/kafed/apis/apps/v1alpha1"
+	api "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
 func init() {

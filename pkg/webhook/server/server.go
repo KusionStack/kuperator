@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"kusionstack.io/kafed/pkg/webhook/server/generic"
+	"kusionstack.io/operating/pkg/webhook/server/generic"
 )
 
 // Add adds itself to the manager

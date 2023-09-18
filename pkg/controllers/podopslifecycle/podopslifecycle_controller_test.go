@@ -36,9 +36,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"kusionstack.io/kafed/apis/apps/v1alpha1"
-	"kusionstack.io/kafed/pkg/controllers/ruleset"
-	"kusionstack.io/kafed/pkg/controllers/ruleset/checker"
+	"kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/ruleset"
+	"kusionstack.io/operating/pkg/controllers/ruleset/checker"
 )
 
 var (

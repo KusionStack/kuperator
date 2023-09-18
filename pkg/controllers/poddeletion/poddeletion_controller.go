@@ -28,9 +28,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
-	"kusionstack.io/kafed/pkg/controllers/utils/podopslifecycle"
-	"kusionstack.io/kafed/pkg/utils/mixin"
+	"kusionstack.io/operating/pkg/controllers/utils/expectations"
+	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/operating/pkg/utils/mixin"
 )
 
 const (
@@ -79,7 +79,7 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch
 
-// Reconcile aims to delete Pod through PodOpsLifecycle. It will watch Pod with label `kafed.kusionstack.io/to-delete`.
+// Reconcile aims to delete Pod through PodOpsLifecycle. It will watch Pod with deleting indication label.
 // If a Pod is labeled, controller will first trigger a deletion PodOpsLifecycle. If all conditions are satisfied,
 // it will then delete Pod.
 func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
