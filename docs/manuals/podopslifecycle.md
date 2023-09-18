@@ -1,14 +1,30 @@
 ## Summary
 
-Kubernetes provides a set of default controllers for workload management, like StatefulSet, Deployment, DaemonSet for instances. While at the same time, when a pod managed by this controllers undergoes changes, if the traffic is not completely stopped, it will result in some degree of traffic loss.
+Kubernetes provides a set of default controllers for workload management, like StatefulSet, Deployment, DaemonSet for instances. While at the same time, when a pod managed by this controllers undergoes changes, if the traffic is not completely stopped, it will result in some degree of traffic loss. The important reasion is that user services around pods have difficulty to participate in the operation lifecycle of a pod.
 
-PodOpsLifecycle attempts to provide Kubernetes administrators and developers with finer-grained control the entire lifecycle of a pod. For example, we can develop a controller to do some necessary things in both the trafficoff and trafficon phases to avoid traffic loss.
+PodOpsLifecycle attempts to provide Kubernetes administrators and developers with finer-grained control the entire lifecycle of a pod. For example, we can develop a controller to do some necessary things in both the traffic off and traffic on phases to avoid traffic loss.
 
 ## Goals
 
-1. Provides extensibility that allows users to control the lifecycle of pods using the podopslifecycle mechanism.
+1. Provides extensibility that allows users to control the lifecycle of pods using the podopslifecycle mechanism. Avoiding traffic loss is only one case.
 2. Provide some concurrency, multi controllers can operate the pod in the same time. For example, when a pod is going to be replaced, other controllers may want to delete it.
 3. All the lifecycle phases of a pod can be tracing.
+
+## Proposal
+
+### User Stories
+
+#### Story 1
+
+As a developer that focus on ingress controller, I should remove the endpoint once the label `prepare.podopslifecycle.kusionstack.io/<id>=<time>` added which means traffic to the pod should be turned off, and I should add the endpoint once the label `complete.podopslifecycle.kusionstack.io/<id>=<time>` added which means traffic to the pod should be turned on.
+
+#### Story 2
+
+As a video transcoding system developer, I need to finish the existing task as soon as possible once the label `prepare.podopslifecycle.kusionstack.io/<id>=<time>` added which means the pod is going to be operated and the long running task may be in interrupted if timeout.
+
+#### Story 3
+
+As a developer that maintain a system that provide pod operations like replace, delete, scale out, and so on, I should add the label `operating.podopslifecycle.kusionstack.io/<id>=<time>` and `operation-type.podopslifecycle.kusionstack.io/<id>=<type>` at the same time when I want to operate a pod, and I should remove the label `operating.podopslifecycle.kusionstack.io/<id>=<time>` and `operation-type.podopslifecycle.kusionstack.io/<id>=<type>` at the same time when the operation is completed. If I want to cancel the operation, I should add the label `undo-operation-type.podopslifecycle.kusionstack.io/<id>=<type>`.
 
 ## Design Details
 
@@ -19,7 +35,7 @@ PodOpsLifecycle attempts to provide Kubernetes administrators and developers wit
 5. The special label `podopslifecycle.kusionstack.io/service-available` indicate a pod is available to serve.
 6. We can use the message `<id>=<time>` and `<id>=<type>` in the labels to tracing a pod. The `<time>` is a unix time.
 
-Below is the sequence diagram of podopslifecycle mechanism.
+Below we use a sequence diagram to show how to use podopslifecycle mechanism to avoid traffic loss. You can also use this podopslifecycle mechanism to do others things, for example, to prevent tasks to be interrupted when they are need to run for a long time.
 
 ```mermaid
 sequenceDiagram
