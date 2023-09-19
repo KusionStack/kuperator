@@ -21,8 +21,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"kusionstack.io/kafed/pkg/controllers/ruleset/checker"
-	"kusionstack.io/kafed/pkg/controllers/ruleset/register"
+	"kusionstack.io/operating/pkg/controllers/ruleset/checker"
+	"kusionstack.io/operating/pkg/controllers/ruleset/register"
 )
 
 // ManagerInterface is ruleset manager interface to init and setup one ruleset controller

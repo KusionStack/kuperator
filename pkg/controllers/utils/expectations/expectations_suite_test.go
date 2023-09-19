@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"kusionstack.io/kafed/apis"
+	"kusionstack.io/operating/apis"
 )
 
 var cfg *rest.Config

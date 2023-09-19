@@ -19,8 +19,8 @@ package utils
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
-	"kusionstack.io/kafed/pkg/controllers/utils/podopslifecycle"
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 )
 
 var (

@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"kusionstack.io/kafed/apis/apps/v1alpha1"
+	"kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
 func init() {

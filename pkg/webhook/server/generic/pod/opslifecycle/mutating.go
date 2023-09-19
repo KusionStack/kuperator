@@ -25,10 +25,10 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"kusionstack.io/kafed/apis/apps/v1alpha1"
-	"kusionstack.io/kafed/pkg/controllers/podopslifecycle"
-	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
-	"kusionstack.io/kafed/pkg/utils"
+	"kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/podopslifecycle"
+	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
+	"kusionstack.io/operating/pkg/utils"
 )
 
 func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) error {

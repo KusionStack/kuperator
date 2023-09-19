@@ -19,7 +19,7 @@ package collaset
 import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
-	"kusionstack.io/kafed/pkg/utils"
+	"kusionstack.io/operating/pkg/utils"
 )
 
 type PodPredicate struct {

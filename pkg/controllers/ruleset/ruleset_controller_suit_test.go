@@ -32,8 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
-	"kusionstack.io/kafed/pkg/utils/inject"
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/utils/inject"
 )
 
 var (

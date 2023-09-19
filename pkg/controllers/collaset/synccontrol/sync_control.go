@@ -29,15 +29,15 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
-	"kusionstack.io/kafed/pkg/controllers/collaset/podcontext"
-	"kusionstack.io/kafed/pkg/controllers/collaset/podcontrol"
-	"kusionstack.io/kafed/pkg/controllers/collaset/utils"
-	collasetutils "kusionstack.io/kafed/pkg/controllers/collaset/utils"
-	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
-	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
-	"kusionstack.io/kafed/pkg/controllers/utils/podopslifecycle"
-	commonutils "kusionstack.io/kafed/pkg/utils"
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/collaset/podcontext"
+	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
+	"kusionstack.io/operating/pkg/controllers/collaset/utils"
+	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
+	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
+	"kusionstack.io/operating/pkg/controllers/utils/expectations"
+	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
+	commonutils "kusionstack.io/operating/pkg/utils"
 )
 
 const (

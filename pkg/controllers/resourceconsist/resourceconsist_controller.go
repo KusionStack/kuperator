@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"kusionstack.io/kafed/pkg/utils/mixin"
+	"kusionstack.io/operating/pkg/utils/mixin"
 )
 
 // Add creates a new Controller of specified reconcileAdapter and adds it to the Manager with default RBAC.

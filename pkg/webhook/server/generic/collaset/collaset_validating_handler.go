@@ -33,10 +33,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
-	commonutils "kusionstack.io/kafed/pkg/utils"
-	"kusionstack.io/kafed/pkg/utils/mixin"
-	"kusionstack.io/kafed/pkg/webhook/server/generic/utils"
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	commonutils "kusionstack.io/operating/pkg/utils"
+	"kusionstack.io/operating/pkg/utils/mixin"
+	"kusionstack.io/operating/pkg/webhook/server/generic/utils"
 )
 
 type ValidatingHandler struct {

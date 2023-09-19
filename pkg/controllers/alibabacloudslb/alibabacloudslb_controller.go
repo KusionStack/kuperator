@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"kusionstack.io/kafed/pkg/controllers/resourceconsist"
+	"kusionstack.io/operating/pkg/controllers/resourceconsist"
 )
 
 var _ resourceconsist.ReconcileAdapter = &ReconcileAdapter{}

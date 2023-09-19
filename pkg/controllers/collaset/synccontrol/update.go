@@ -25,11 +25,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
-	"kusionstack.io/kafed/pkg/controllers/collaset/utils"
-	collasetutils "kusionstack.io/kafed/pkg/controllers/collaset/utils"
-	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
-	"kusionstack.io/kafed/pkg/controllers/utils/podopslifecycle"
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/collaset/utils"
+	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
+	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
+	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 )
 
 type PodUpdateInfo struct {

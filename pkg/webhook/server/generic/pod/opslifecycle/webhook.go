@@ -24,8 +24,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"kusionstack.io/kafed/apis/apps/v1alpha1"
-	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
+	"kusionstack.io/operating/apis/apps/v1alpha1"
+	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 )
 
 const (

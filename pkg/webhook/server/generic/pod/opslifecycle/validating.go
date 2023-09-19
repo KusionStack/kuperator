@@ -25,8 +25,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	controllerutils "kusionstack.io/kafed/pkg/controllers/utils"
-	"kusionstack.io/kafed/pkg/utils"
+	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
+	"kusionstack.io/operating/pkg/utils"
 )
 
 func (lc *OpsLifecycle) Validating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) error {

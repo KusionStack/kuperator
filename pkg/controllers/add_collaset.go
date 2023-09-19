@@ -16,7 +16,7 @@ limitations under the License.
 
 package controllers
 
-import "kusionstack.io/kafed/pkg/controllers/collaset"
+import "kusionstack.io/operating/pkg/controllers/collaset"
 
 func init() {
 	AddToManagerFuncs = append(AddToManagerFuncs, collaset.Add)

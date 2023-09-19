@@ -23,9 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
-	"kusionstack.io/kafed/pkg/controllers/ruleset/register"
-	"kusionstack.io/kafed/pkg/utils/inject"
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/ruleset/register"
+	"kusionstack.io/operating/pkg/utils/inject"
 )
 
 type Checker interface {

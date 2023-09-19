@@ -36,7 +36,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"kusionstack.io/kafed/pkg/utils"
+	"kusionstack.io/operating/pkg/utils"
 )
 
 const (

@@ -30,8 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 
-	appsv1alpha1 "kusionstack.io/kafed/apis/apps/v1alpha1"
-	commonutils "kusionstack.io/kafed/pkg/utils"
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	commonutils "kusionstack.io/operating/pkg/utils"
 )
 
 var _ inject.Client = &EventHandler{}

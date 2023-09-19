@@ -5,7 +5,7 @@ set -o nounset
 set -o pipefail
 
 readonly KIND_VERSION=v0.17.0
-readonly CLUSTER_NAME=kafed
+readonly CLUSTER_NAME=operating
 
 cleanup() {
     echo 'Removing kind cluster...'

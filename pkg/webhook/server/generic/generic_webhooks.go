@@ -17,12 +17,12 @@ limitations under the License.
 package generic
 
 import (
-	"kusionstack.io/kafed/pkg/webhook/server/generic/collaset"
+	"kusionstack.io/operating/pkg/webhook/server/generic/collaset"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	webhookdmission "kusionstack.io/kafed/pkg/webhook/admission"
-	"kusionstack.io/kafed/pkg/webhook/server/generic/pod"
-	"kusionstack.io/kafed/pkg/webhook/server/generic/ruleset"
+	webhookdmission "kusionstack.io/operating/pkg/webhook/admission"
+	"kusionstack.io/operating/pkg/webhook/server/generic/pod"
+	"kusionstack.io/operating/pkg/webhook/server/generic/ruleset"
 )
 
 var (

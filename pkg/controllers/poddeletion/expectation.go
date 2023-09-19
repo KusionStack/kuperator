@@ -19,7 +19,7 @@ package poddeletion
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"kusionstack.io/kafed/pkg/controllers/utils/expectations"
+	"kusionstack.io/operating/pkg/controllers/utils/expectations"
 )
 
 var (

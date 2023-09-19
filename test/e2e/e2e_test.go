@@ -23,9 +23,12 @@ import (
 	"testing"
 	"time"
 
-	"kusionstack.io/kafed/apis"
-	"kusionstack.io/kafed/test/e2e/framework"
-	"kusionstack.io/kafed/test/e2e/framework/testfiles"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog/v2"
+
+	"kusionstack.io/operating/apis"
+	"kusionstack.io/operating/test/e2e/framework"
+	"kusionstack.io/operating/test/e2e/framework/testfiles"
 
 	// Never, ever remove the line with "/ginkgo". Without it,
 	// the ginkgo test runner will not detect that this
@@ -33,11 +36,8 @@ import (
 	// See https://github.com/kubernetes/kubernetes/issues/74827
 	// "github.com/onsi/ginkgo"
 
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2"
-
 	// test sources
-	_ "kusionstack.io/kafed/test/e2e/apps"
+	_ "kusionstack.io/operating/test/e2e/apps"
 )
 
 // handleFlags sets up all flags and parses the command line.

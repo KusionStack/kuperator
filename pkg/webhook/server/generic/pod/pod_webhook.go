@@ -23,8 +23,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"kusionstack.io/kafed/pkg/webhook/server/generic/pod/opslifecycle"
-	"kusionstack.io/kafed/pkg/webhook/server/generic/pod/resourceconsist"
+	"kusionstack.io/operating/pkg/webhook/server/generic/pod/opslifecycle"
+	"kusionstack.io/operating/pkg/webhook/server/generic/pod/resourceconsist"
 )
 
 var (

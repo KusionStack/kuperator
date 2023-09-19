@@ -14,7 +14,7 @@
 package controllers
 
 import (
-	"kusionstack.io/kafed/pkg/controllers/ruleset"
+	"kusionstack.io/operating/pkg/controllers/ruleset"
 )
 
 func init() {

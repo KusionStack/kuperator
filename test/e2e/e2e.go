@@ -23,9 +23,9 @@ import (
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/gomega"
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/klog/v2"
+	"k8s.io/klog"
 
-	"kusionstack.io/kafed/test/e2e/framework"
+	"kusionstack.io/operating/test/e2e/framework"
 )
 
 // Similar to SynchronizedBeforeSuite, we want to run some operations only once (such as collecting cluster logs).
