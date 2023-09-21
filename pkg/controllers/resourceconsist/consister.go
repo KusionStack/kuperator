@@ -51,7 +51,7 @@ func (r *Consist) syncEmployer(ctx context.Context, employer client.Object, expe
 		return false, false, fmt.Errorf("syncDelete failed, err: %s", err.Error())
 	}
 
-	isClean := len(toCudEmployer.Unchanged) == 0 && len(toCudEmployer.ToCreate) == 0 && len(toCudEmployer.ToUpdate) == 0 && len(toCudEmployer.ToDelete) == 0
+	isClean := len(toCudEmployer.Unchanged) == 0 && len(toCudEmployer.ToCreate) == 0 && len(toCudEmployer.ToUpdate) == 0 && len(failDelete) == 0
 	cudFailedExist := len(failCreate) > 0 || len(failUpdate) > 0 || len(failDelete) > 0
 	return isClean, cudFailedExist, nil
 }

@@ -76,7 +76,7 @@ func (r *DemoReconcile) GetExpectedEmployer(ctx context.Context, employer client
 	}
 	var expect []IEmployer
 	expect = append(expect, DemoServiceStatus{
-		EmployerId: "demo-expect-employer-id",
+		EmployerId: employer.GetName(),
 		EmployerStatuses: DemoServiceDetails{
 			RemoteVIP:    "demo-remote-VIP",
 			RemoteVIPQPS: 100,
@@ -104,6 +104,10 @@ func (r *DemoReconcile) GetCurrentEmployer(ctx context.Context, employer client.
 }
 
 func (r *DemoReconcile) CreateEmployer(ctx context.Context, employer client.Object, toCreates []IEmployer) ([]IEmployer, []IEmployer, error) {
+	if toCreates == nil || len(toCreates) == 0 {
+		return toCreates, nil, nil
+	}
+
 	toCreateDemoServiceStatus := make([]DemoServiceStatus, len(toCreates))
 	for idx, create := range toCreates {
 		createDemoServiceStatus, ok := create.(DemoServiceStatus)
@@ -123,6 +127,10 @@ func (r *DemoReconcile) CreateEmployer(ctx context.Context, employer client.Obje
 }
 
 func (r *DemoReconcile) UpdateEmployer(ctx context.Context, employer client.Object, toUpdates []IEmployer) ([]IEmployer, []IEmployer, error) {
+	if toUpdates == nil || len(toUpdates) == 0 {
+		return toUpdates, nil, nil
+	}
+
 	toUpdateDemoServiceStatus := make([]DemoServiceStatus, len(toUpdates))
 	for idx, update := range toUpdates {
 		updateDemoServiceStatus, ok := update.(DemoServiceStatus)
@@ -142,6 +150,10 @@ func (r *DemoReconcile) UpdateEmployer(ctx context.Context, employer client.Obje
 }
 
 func (r *DemoReconcile) DeleteEmployer(ctx context.Context, employer client.Object, toDeletes []IEmployer) ([]IEmployer, []IEmployer, error) {
+	if toDeletes == nil || len(toDeletes) == 0 {
+		return toDeletes, nil, nil
+	}
+
 	toDeleteDemoServiceStatus := make([]DemoServiceStatus, len(toDeletes))
 	for idx, update := range toDeletes {
 		deleteDemoServiceStatus, ok := update.(DemoServiceStatus)
@@ -227,6 +239,9 @@ func (r *DemoReconcile) GetCurrentEmployee(ctx context.Context, employer client.
 }
 
 func (r *DemoReconcile) CreateEmployees(ctx context.Context, employer client.Object, toCreates []IEmployee) ([]IEmployee, []IEmployee, error) {
+	if toCreates == nil || len(toCreates) == 0 {
+		return toCreates, nil, nil
+	}
 	toCreateDemoPodStatuses := make([]DemoPodStatus, len(toCreates))
 
 	for idx, toCreate := range toCreates {
@@ -248,6 +263,10 @@ func (r *DemoReconcile) CreateEmployees(ctx context.Context, employer client.Obj
 }
 
 func (r *DemoReconcile) UpdateEmployees(ctx context.Context, employer client.Object, toUpdates []IEmployee) ([]IEmployee, []IEmployee, error) {
+	if toUpdates == nil || len(toUpdates) == 0 {
+		return toUpdates, nil, nil
+	}
+
 	toUpdateDemoPodStatuses := make([]DemoPodStatus, len(toUpdates))
 
 	for idx, toUpdate := range toUpdates {
@@ -269,6 +288,10 @@ func (r *DemoReconcile) UpdateEmployees(ctx context.Context, employer client.Obj
 }
 
 func (r *DemoReconcile) DeleteEmployees(ctx context.Context, employer client.Object, toDeletes []IEmployee) ([]IEmployee, []IEmployee, error) {
+	if toDeletes == nil || len(toDeletes) == 0 {
+		return toDeletes, nil, nil
+	}
+
 	toDeleteDemoPodStatuses := make([]DemoPodStatus, len(toDeletes))
 
 	for idx, toDelete := range toDeletes {
@@ -370,13 +393,13 @@ type DemoResourceProviderClient struct {
 }
 
 type DemoResourceVipOps struct {
-	VipStatuses []DemoServiceStatus `json:"vipStatuses,omitempty"`
-	MockData    bool                `json:"mockData,omitempty"`
+	VipStatuses []DemoServiceStatus
+	MockData    bool
 }
 
 type DemoResourceRsOps struct {
-	RsStatuses []DemoPodStatus `json:"rsStatuses,omitempty"`
-	MockData   bool            `json:"mockData,omitempty"`
+	RsStatuses []DemoPodStatus
+	MockData   bool
 }
 
 func (d *DemoResourceProviderClient) CreateVip(req *DemoResourceVipOps) (*DemoResourceVipOps, error) {

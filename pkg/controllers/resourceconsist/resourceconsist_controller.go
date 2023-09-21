@@ -200,7 +200,7 @@ func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (rec
 	}
 	isCleanEmployee, syncEmployeeFailedExist, err := r.syncEmployees(ctx, employer, expectEmployees, currentEmployees)
 	if err != nil {
-		r.Logger.Error(err, "sync employees status failed: %s")
+		r.Logger.Error(err, "sync employees status failed")
 		r.Recorder.Eventf(employer, corev1.EventTypeWarning, "syncEmployeesFailed",
 			"sync employees status failed: %s", err.Error())
 		return reconcile.Result{}, err
