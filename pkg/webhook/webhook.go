@@ -231,7 +231,7 @@ func generateSelfSignedCert(caCert *x509.Certificate, caKey crypto.Signer, dnsNa
 
 func ensureWebhookCert(certDir string, tlsKey, tlsCert []byte) error {
 	if _, err := os.Stat(certDir); os.IsNotExist(err) {
-		err := os.MkdirAll(certDir, 0755)
+		err := os.MkdirAll(certDir, 0777)
 		if err != nil {
 			return err
 		}

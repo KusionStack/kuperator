@@ -24,7 +24,6 @@ COPY pkg/ pkg/
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -a -o manager main.go
 
 FROM alpine:3.17
-RUN mkdir /webhook-certs
 WORKDIR /
 COPY --from=builder /workspace/manager .
 
