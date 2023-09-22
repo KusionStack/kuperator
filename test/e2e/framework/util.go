@@ -90,9 +90,6 @@ const (
 	// Poll indicates how often to Poll pods, nodes and claims.
 	Poll = 2 * time.Second
 
-	pollShortTimeout = 1 * time.Minute
-	pollLongTimeout  = 5 * time.Minute
-
 	// ServiceAccountProvisionTimeout indicates a service account provision timeout.
 	// service accounts are provisioned after namespace creation
 	// a service account is required to support pod creation in a namespace as part of admission control
@@ -110,13 +107,6 @@ const (
 	// PodReadyBeforeTimeout indicates how long pods have to be "ready" when a test begins.
 	PodReadyBeforeTimeout = 5 * time.Minute
 
-	// How long pods have to become scheduled onto nodes
-	podScheduledBeforeTimeout = PodListTimeout + (20 * time.Second)
-
-	podRespondingTimeout     = 15 * time.Minute
-	serviceRespondingTimeout = 2 * time.Minute
-	endpointRegisterTimeout  = time.Minute
-
 	// ClaimProvisionTimeout indicates how long claims have to become dynamically provisioned
 	ClaimProvisionTimeout = 5 * time.Minute
 
@@ -126,15 +116,6 @@ const (
 
 	// ClaimBindingTimeout indicates how long claims have to become bound
 	ClaimBindingTimeout = 3 * time.Minute
-
-	// ClaimDeletingTimeout indicates how long claims have to become deleted
-	ClaimDeletingTimeout = 3 * time.Minute
-
-	// PVReclaimingTimeout indicates how long PVs have to beome reclaimed
-	PVReclaimingTimeout = 3 * time.Minute
-
-	// PVBindingTimeout indicates how long PVs have to become bound
-	PVBindingTimeout = 3 * time.Minute
 
 	// PVDeletingTimeout indicates how long PVs have to become deleted
 	PVDeletingTimeout = 3 * time.Minute
@@ -146,19 +127,6 @@ const (
 	// RestartPodReadyAgainTimeout indicates how long a pod is allowed to become "running" and "ready" after a node
 	// restart before test is considered failed.
 	RestartPodReadyAgainTimeout = 5 * time.Minute
-
-	// Number of objects that gc can delete in a second.
-	// GC issues 2 requestes for single delete.
-	gcThroughput = 10
-
-	// Minimal number of nodes for the cluster to be considered large.
-	largeClusterThreshold = 100
-
-	// TODO(justinsb): Avoid hardcoding this.
-	awsMasterIP = "172.20.0.9"
-
-	// ssh port
-	sshPort = "22"
 )
 
 var (
