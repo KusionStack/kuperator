@@ -117,6 +117,8 @@ type Consist struct {
 }
 
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
 
 func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	var employer client.Object
@@ -160,7 +162,7 @@ func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 
-	expectEmployer, err := r.adapter.GetExpectEmployer(ctx, employer)
+	expectEmployer, err := r.adapter.GetExpectedEmployer(ctx, employer)
 	if err != nil {
 		r.Logger.Error(err, "get expect employer failed")
 		r.Recorder.Eventf(employer, corev1.EventTypeWarning, "GetExpectEmployerFailed",
@@ -182,7 +184,7 @@ func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 
-	expectEmployees, err := r.adapter.GetExpectEmployee(ctx, employer)
+	expectEmployees, err := r.adapter.GetExpectedEmployee(ctx, employer)
 	if err != nil {
 		r.Logger.Error(err, "get expect employees failed")
 		r.Recorder.Eventf(employer, corev1.EventTypeWarning, "GetExpectEmployeeFailed",
@@ -198,7 +200,7 @@ func (r *Consist) Reconcile(ctx context.Context, request reconcile.Request) (rec
 	}
 	isCleanEmployee, syncEmployeeFailedExist, err := r.syncEmployees(ctx, employer, expectEmployees, currentEmployees)
 	if err != nil {
-		r.Logger.Error(err, "sync employees status failed: %s")
+		r.Logger.Error(err, "sync employees status failed")
 		r.Recorder.Eventf(employer, corev1.EventTypeWarning, "syncEmployeesFailed",
 			"sync employees status failed: %s", err.Error())
 		return reconcile.Result{}, err
