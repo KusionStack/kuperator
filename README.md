@@ -1,94 +1,31 @@
 # Operating
-// TODO(user): Add simple overview of use/purpose
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+KusionStack Operating provides a set of workloads and operators built on Kubernetes Custom Resource Definitions (CRDs), with a primary aim of bridging the gap between application management and Kubernetes.
 
-## Getting Started
-You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
-**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
+## Key features
 
-### Running on the cluster
-1. Install Instances of Custom Resources:
+KusionStack Operating collaborates with various KusionStack components to achieve the following two key features, streamlining both platform development and application operations based on Kubernetes:
 
-```sh
-kubectl apply -f config/samples/
-```
+### Advanced operational capabilities
 
-2. Build and push your image to the location specified by `IMG`:
-	
-```sh
-make docker-build docker-push IMG=<some-registry>/operating:tag
-```
-	
-3. Deploy the controller to the cluster with the image specified by `IMG`:
+* Advanced workloads
 
-```sh
-make deploy IMG=<some-registry>/operating:tag
-```
+KusionStack Operating offers multiple workloads to ensure the convenient and effective delivery and operation of application resources.
 
-### Uninstall CRDs
-To delete the CRDs from the cluster:
+[**CollaSet** designed to manage Pods with a range of scale and update strategies]()
 
-```sh
-make uninstall
-```
+* Fine-grained operations
 
-### Undeploy controller
-UnDeploy the controller to the cluster:
+[**PodOpsLifecycle** allows various roles like application developers and SREs to collaboratively operate on a single Pod in parallel]()
 
-```sh
-make undeploy
-```
+* Risk management
 
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
+[**PodTransitionRule** is responsible to keep operational risks under control]()
 
-### How it works
-This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
+### Platform friendly approach
 
-It uses [Controllers](https://kubernetes.io/docs/concepts/architecture/controller/) 
-which provides a reconcile function responsible for synchronizing resources untile the desired state is reached on the cluster 
+* Resource consist framework
 
-### Test It Out
-1. Install the CRDs into the cluster:
+[**ResourceConsist** framework facilitates the graceful participation of multiple resources related to Pods in the Pod operation process]()
 
-```sh
-make install
-```
-
-2. Run your controller (this will run in the foreground, so switch to a new terminal if you want to leave it running):
-
-```sh
-make run
-```
-
-**NOTE:** You can also run this in one step by running: `make install run`
-
-### Modifying the API definitions
-If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
-
-```sh
-make manifests
-```
-
-**NOTE:** Run `make --help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
-
-## License
-
-Copyright 2023.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
+## Installation
