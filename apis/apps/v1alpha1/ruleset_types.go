@@ -22,16 +22,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// RuleSetSpec defines the desired state of RuleSet
-type RuleSetSpec struct {
-	// Selector select the targets controlled by ruleset
+// PodTransitionRuleSpec defines the desired state of PodTransitionRule
+type PodTransitionRuleSpec struct {
+	// Selector select the targets controlled by podtransitionrule
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
 	// Rules is a set of rules that need to be checked in certain situations
-	Rules []RuleSetRule `json:"rules,omitempty"`
+	Rules []TransitionRule `json:"rules,omitempty"`
 }
 
-type RuleSetRule struct {
+type TransitionRule struct {
 	// Name is the name of this rule.
 	Name string `json:"name,omitempty"`
 
@@ -48,19 +48,19 @@ type RuleSetRule struct {
 
 	// Filter is used to filter the resource which will be applied with this rule.
 	// +optional
-	Filter *RuleSetRuleFilter `json:"filter,omitempty"`
+	Filter *TransitionRuleFilter `json:"filter,omitempty"`
 
-	// RuleSetRuleDefinition describes the detail of the rule.
-	RuleSetRuleDefinition `json:",inline"`
+	// TransitionRuleDefinition describes the detail of the rule.
+	TransitionRuleDefinition `json:",inline"`
 }
 
-type RuleSetRuleFilter struct {
+type TransitionRuleFilter struct {
 	// LabelSelector is used to filter resource with label match expresion.
 	// +optional
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 }
 
-type RuleSetRuleDefinition struct {
+type TransitionRuleDefinition struct {
 
 	// AvailablePolicy is the rule to check if the max unavailable number is reached by current resource updated.
 	// +optional
@@ -71,7 +71,7 @@ type RuleSetRuleDefinition struct {
 	LabelCheck *LabelCheckRule `json:"labelCheck,omitempty"`
 
 	// +optional
-	Webhook *RuleSetRuleWebhook `json:"webhook,omitempty"`
+	Webhook *TransitionRuleWebhook `json:"webhook,omitempty"`
 }
 
 type LabelCheckRule struct {
@@ -89,7 +89,7 @@ type AvailableRule struct {
 	MinAvailableValue *intstr.IntOrString `json:"minAvailableValue,omitempty"`
 }
 
-type RuleSetRuleWebhook struct {
+type TransitionRuleWebhook struct {
 
 	// ClientConfig is the configuration for accessing webhook.
 	ClientConfig ClientConfig `json:"clientConfig,omitempty"`
@@ -179,21 +179,21 @@ type ClientConfig struct {
 	TraceTimeoutSeconds *int64 `json:"traceTimeoutSeconds,omitempty"`
 }
 
-// RuleSetStatus defines the observed state of RuleSet
-type RuleSetStatus struct {
+// PodTransitionRuleStatus defines the observed state of PodTransitionRule
+type PodTransitionRuleStatus struct {
 	UpdateTime *metav1.Time `json:"updateTime,omitempty"`
 
-	// ObservedGeneration is the most recent generation observed for RuleSet
+	// ObservedGeneration is the most recent generation observed for PodTransitionRule
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// Targets contains the target resource names this RuleSet is able to select.
+	// Targets contains the target resource names this PodTransitionRule is able to select.
 	Targets []string `json:"targets,omitempty"`
 
 	// RuleStates contains the RuleState resource info in webhook processing progress.
 	// +optional
 	RuleStates []*RuleState `json:"ruleStates,omitempty"`
 
-	// Details contains all pods ruleset details
+	// Details contains all pods podtransitionrule details
 	// +optional
 	Details []*Detail `json:"details,omitempty"`
 }
@@ -209,7 +209,7 @@ type RuleState struct {
 
 // WebhookStatus defines the webhook processing status
 type WebhookStatus struct {
-	// RuleSetPodStatus is async request status representing the info of pods
+	// PodTransitionRulePodStatus is async request status representing the info of pods
 	ItemStatus []*ItemStatus `json:"itemStatus,omitempty"`
 
 	// TraceStates is a list of tracing info
@@ -257,24 +257,24 @@ type RejectInfo struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=rs
 
-// RuleSet is the Schema for the rulesets API
-type RuleSet struct {
+// PodTransitionRule is the Schema for the podtransitionrules API
+type PodTransitionRule struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   RuleSetSpec   `json:"spec,omitempty"`
-	Status RuleSetStatus `json:"status,omitempty"`
+	Spec   PodTransitionRuleSpec   `json:"spec,omitempty"`
+	Status PodTransitionRuleStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// RuleSetList contains a list of RuleSet
-type RuleSetList struct {
+// PodTransitionRuleList contains a list of PodTransitionRule
+type PodTransitionRuleList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []RuleSet `json:"items"`
+	Items           []PodTransitionRule `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&RuleSet{}, &RuleSetList{})
+	SchemeBuilder.Register(&PodTransitionRule{}, &PodTransitionRuleList{})
 }

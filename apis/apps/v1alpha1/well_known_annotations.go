@@ -22,8 +22,8 @@ const (
 	LastPodStatusAnnotationKey = "collaset.kusionstack.io/last-pod-status"
 )
 
-// RuleSet Annotation
+// PodTransitionRule Annotation
 const (
-	AnnotationPodSkipRuleConditions = "ruleset.kusionstack.io/skip-rule-conditions"
-	AnnotationRuleSetDetailPrefix   = "detail.ruleset.kusionstack.io"
+	AnnotationPodSkipRuleConditions         = "podtransitionrule.kusionstack.io/skip-rule-conditions"
+	AnnotationPodTransitionRuleDetailPrefix = "detail.podtransitionrule.kusionstack.io"
 )

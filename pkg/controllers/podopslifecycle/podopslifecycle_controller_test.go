@@ -37,8 +37,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"kusionstack.io/operating/apis/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/ruleset"
-	"kusionstack.io/operating/pkg/controllers/ruleset/checker"
+	"kusionstack.io/operating/pkg/controllers/podtransitionrule"
+	"kusionstack.io/operating/pkg/controllers/podtransitionrule/checker"
 )
 
 var (
@@ -74,7 +74,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	podOpsLifecycle = NewReconciler(mgr)
-	podOpsLifecycle.ruleSetManager = &mockRuleSetManager{}
+	podOpsLifecycle.podTransitionRuleManager = &mockPodTransitionRuleManager{}
 
 	var r reconcile.Reconciler
 	r, request = testReconcile(podOpsLifecycle)
@@ -309,23 +309,23 @@ func testReconcile(inner reconcile.Reconciler) (reconcile.Reconciler, chan recon
 	return fn, requests
 }
 
-var _ ruleset.ManagerInterface = &mockRuleSetManager{}
+var _ podtransitionrule.ManagerInterface = &mockPodTransitionRuleManager{}
 
-type mockRuleSetManager struct {
+type mockPodTransitionRuleManager struct {
 	*checker.CheckState
 }
 
-func (rsm *mockRuleSetManager) RegisterStage(key string, inStage func(obj client.Object) bool) {
+func (rsm *mockPodTransitionRuleManager) RegisterStage(key string, inStage func(obj client.Object) bool) {
 }
 
-func (rsm *mockRuleSetManager) RegisterCondition(opsCondition string, inCondition func(obj client.Object) bool) {
+func (rsm *mockPodTransitionRuleManager) RegisterCondition(opsCondition string, inCondition func(obj client.Object) bool) {
 }
 
-func (rsm *mockRuleSetManager) SetupRuleSetController(manager.Manager) error {
+func (rsm *mockPodTransitionRuleManager) SetupPodTransitionRuleController(manager.Manager) error {
 	return nil
 }
 
-func (rsm *mockRuleSetManager) GetState(client.Client, client.Object) (checker.CheckState, error) {
+func (rsm *mockPodTransitionRuleManager) GetState(client.Client, client.Object) (checker.CheckState, error) {
 	if rsm.CheckState == nil {
 		return checker.CheckState{}, nil
 	}

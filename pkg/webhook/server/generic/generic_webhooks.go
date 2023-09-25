@@ -22,7 +22,7 @@ import (
 
 	webhookdmission "kusionstack.io/operating/pkg/webhook/admission"
 	"kusionstack.io/operating/pkg/webhook/server/generic/pod"
-	"kusionstack.io/operating/pkg/webhook/server/generic/ruleset"
+	"kusionstack.io/operating/pkg/webhook/server/generic/podtransitionrule"
 )
 
 var (
@@ -42,8 +42,8 @@ func init() {
 	MutatingTypeHandlerMap["Pod/status"] = podMutatingHandler
 	ValidatingTypeHandlerMap["Pod"] = pod.NewValidatingHandler()
 
-	MutatingTypeHandlerMap["RuleSet"] = ruleset.NewMutatingHandler()
-	ValidatingTypeHandlerMap["RuleSet"] = ruleset.NewValidatingHandler()
+	MutatingTypeHandlerMap["PodTransitionRule"] = podtransitionrule.NewMutatingHandler()
+	ValidatingTypeHandlerMap["PodTransitionRule"] = podtransitionrule.NewValidatingHandler()
 
 	MutatingTypeHandlerMap["CollaSet"] = collaset.NewMutatingHandler()
 	ValidatingTypeHandlerMap["CollaSet"] = collaset.NewValidatingHandler()

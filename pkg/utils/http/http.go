@@ -55,7 +55,7 @@ func ParseResponse(resp *http.Response, data interface{}) error {
 }
 
 /*
-DoHttpAndHttpsRequestWithCa only used by lifecycleHook and ruleSet controller. Ca with base64
+DoHttpAndHttpsRequestWithCa only used by lifecycleHook and podTransitionRule controller. Ca with base64
 */
 func DoHttpAndHttpsRequestWithCa(method, url string, body interface{}, header map[string]string, ca string) (*http.Response, error) {
 	req, err := buildReq(method, url, body, header)
