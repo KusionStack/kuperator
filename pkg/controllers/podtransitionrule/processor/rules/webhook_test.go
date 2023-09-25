@@ -84,9 +84,9 @@ func TestWebhookCase1(t *testing.T) {
 		<-finish
 	}()
 	targets := map[string]*corev1.Pod{
-		"test-pod-a": (&podTemplate{Name: "test-pod-a", Ip: "11.166.170.58"}).GetPod(),
-		"test-pod-b": (&podTemplate{Name: "test-pod-b", Ip: "11.166.170.59"}).GetPod(),
-		"test-pod-c": (&podTemplate{Name: "test-pod-c", Ip: "11.166.170.60"}).GetPod(),
+		"test-pod-a": (&podTemplate{Name: "test-pod-a", Ip: "1.1.1.58"}).GetPod(),
+		"test-pod-b": (&podTemplate{Name: "test-pod-b", Ip: "1.1.1.59"}).GetPod(),
+		"test-pod-c": (&podTemplate{Name: "test-pod-c", Ip: "1.1.1.60"}).GetPod(),
 	}
 	subjects := sets.NewString("test-pod-a", "test-pod-b")
 	g := gomega.NewGomegaWithT(t)
@@ -107,9 +107,9 @@ func TestWebhookCase2(t *testing.T) {
 		<-finish
 	}()
 	targets := map[string]*corev1.Pod{
-		"test-pod-a": (&podTemplate{Name: "test-pod-a", Ip: "11.166.170.58"}).GetPod(),
-		"test-pod-b": (&podTemplate{Name: "test-pod-b", Ip: "11.166.170.59"}).GetPod(),
-		"test-pod-c": (&podTemplate{Name: "test-pod-c", Ip: "11.166.170.60"}).GetPod(),
+		"test-pod-a": (&podTemplate{Name: "test-pod-a", Ip: "1.1.1.58"}).GetPod(),
+		"test-pod-b": (&podTemplate{Name: "test-pod-b", Ip: "1.1.1.59"}).GetPod(),
+		"test-pod-c": (&podTemplate{Name: "test-pod-c", Ip: "1.1.1.60"}).GetPod(),
 	}
 	subjects := sets.NewString("test-pod-a")
 	g := gomega.NewGomegaWithT(t)
@@ -130,9 +130,9 @@ func TestWebhookCase3(t *testing.T) {
 		<-finish
 	}()
 	targets := map[string]*corev1.Pod{
-		"test-pod-a": (&podTemplate{Name: "test-pod-a", Ip: "11.166.170.58"}).GetPod(),
-		"test-pod-b": (&podTemplate{Name: "test-pod-b", Ip: "11.166.170.59"}).GetPod(),
-		"test-pod-c": (&podTemplate{Name: "test-pod-c", Ip: "11.166.170.60"}).GetPod(),
+		"test-pod-a": (&podTemplate{Name: "test-pod-a", Ip: "1.1.1.58"}).GetPod(),
+		"test-pod-b": (&podTemplate{Name: "test-pod-b", Ip: "1.1.1.59"}).GetPod(),
+		"test-pod-c": (&podTemplate{Name: "test-pod-c", Ip: "1.1.1.60"}).GetPod(),
 	}
 	subjects := sets.NewString("test-pod-a", "test-pod-b", "test-pod-c")
 	g := gomega.NewGomegaWithT(t)
