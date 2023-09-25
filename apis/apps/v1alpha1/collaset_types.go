@@ -275,6 +275,7 @@ type CollaSetCondition struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="DESIRED",type="integer",JSONPath=".spec.replicas",description="The desired number of pods."
 // +kubebuilder:printcolumn:name="CURRENT",type="integer",JSONPath=".status.replicas",description="The number of currently all pods."
+// +kubebuilder:printcolumn:name="AVAILABLE",type="integer",JSONPath=".status.availableReplicas",description="The number of pods available."
 // +kubebuilder:printcolumn:name="UPDATED",type="integer",JSONPath=".status.updatedReplicas",description="The number of pods updated."
 // +kubebuilder:printcolumn:name="UPDATED_READY",type="integer",JSONPath=".status.updatedReadyReplicas",description="The number of pods ready."
 // +kubebuilder:printcolumn:name="UPDATED_AVAILABLE",type="integer",JSONPath=".status.updatedAvailableReplicas",description="The number of pods updated available."
