@@ -28,10 +28,10 @@ type PodTransitionRuleSpec struct {
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
 	// Rules is a set of rules that need to be checked in certain situations
-	Rules []PodTransitionRuleRule `json:"rules,omitempty"`
+	Rules []TransitionRule `json:"rules,omitempty"`
 }
 
-type PodTransitionRuleRule struct {
+type TransitionRule struct {
 	// Name is the name of this rule.
 	Name string `json:"name,omitempty"`
 
@@ -48,19 +48,19 @@ type PodTransitionRuleRule struct {
 
 	// Filter is used to filter the resource which will be applied with this rule.
 	// +optional
-	Filter *PodTransitionRuleRuleFilter `json:"filter,omitempty"`
+	Filter *TransitionRuleFilter `json:"filter,omitempty"`
 
-	// PodTransitionRuleRuleDefinition describes the detail of the rule.
-	PodTransitionRuleRuleDefinition `json:",inline"`
+	// TransitionRuleDefinition describes the detail of the rule.
+	TransitionRuleDefinition `json:",inline"`
 }
 
-type PodTransitionRuleRuleFilter struct {
+type TransitionRuleFilter struct {
 	// LabelSelector is used to filter resource with label match expresion.
 	// +optional
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 }
 
-type PodTransitionRuleRuleDefinition struct {
+type TransitionRuleDefinition struct {
 
 	// AvailablePolicy is the rule to check if the max unavailable number is reached by current resource updated.
 	// +optional
@@ -71,7 +71,7 @@ type PodTransitionRuleRuleDefinition struct {
 	LabelCheck *LabelCheckRule `json:"labelCheck,omitempty"`
 
 	// +optional
-	Webhook *PodTransitionRuleRuleWebhook `json:"webhook,omitempty"`
+	Webhook *TransitionRuleWebhook `json:"webhook,omitempty"`
 }
 
 type LabelCheckRule struct {
@@ -89,7 +89,7 @@ type AvailableRule struct {
 	MinAvailableValue *intstr.IntOrString `json:"minAvailableValue,omitempty"`
 }
 
-type PodTransitionRuleRuleWebhook struct {
+type TransitionRuleWebhook struct {
 
 	// ClientConfig is the configuration for accessing webhook.
 	ClientConfig ClientConfig `json:"clientConfig,omitempty"`

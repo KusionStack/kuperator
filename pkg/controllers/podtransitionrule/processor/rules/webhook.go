@@ -45,7 +45,7 @@ const (
 func GetWebhook(rs *appsv1alpha1.PodTransitionRule, names ...string) (webs []*Webhook) {
 	ruleNames := sets.NewString(names...)
 	for i, rule := range rs.Spec.Rules {
-		var web *appsv1alpha1.PodTransitionRuleRuleWebhook
+		var web *appsv1alpha1.TransitionRuleWebhook
 		if rule.Webhook == nil {
 			continue
 		}
@@ -88,7 +88,7 @@ type Webhook struct {
 	RuleName string
 	Stage    *string
 
-	Webhook *appsv1alpha1.PodTransitionRuleRuleWebhook
+	Webhook *appsv1alpha1.TransitionRuleWebhook
 	State   *appsv1alpha1.RuleState
 
 	targets  map[string]*corev1.Pod

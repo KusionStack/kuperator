@@ -39,12 +39,12 @@ var (
 			Namespace: "default",
 		},
 		Spec: appsv1alpha1.PodTransitionRuleSpec{
-			Rules: []appsv1alpha1.PodTransitionRuleRule{
+			Rules: []appsv1alpha1.TransitionRule{
 				{
 					Name:  "test-webhook",
 					Stage: &stage,
-					PodTransitionRuleRuleDefinition: appsv1alpha1.PodTransitionRuleRuleDefinition{
-						Webhook: &appsv1alpha1.PodTransitionRuleRuleWebhook{
+					TransitionRuleDefinition: appsv1alpha1.TransitionRuleDefinition{
+						Webhook: &appsv1alpha1.TransitionRuleWebhook{
 							ClientConfig: appsv1alpha1.ClientConfig{
 								URL: "http://127.0.0.1:8888",
 							},

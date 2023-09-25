@@ -65,11 +65,11 @@ func TestPodTransitionRule(t *testing.T) {
 					"test": "gen",
 				},
 			},
-			Rules: []appsv1alpha1.PodTransitionRuleRule{
+			Rules: []appsv1alpha1.TransitionRule{
 				{
 					Stage: &stage,
 					Name:  "serviceAvailable",
-					PodTransitionRuleRuleDefinition: appsv1alpha1.PodTransitionRuleRuleDefinition{
+					TransitionRuleDefinition: appsv1alpha1.TransitionRuleDefinition{
 						AvailablePolicy: &appsv1alpha1.AvailableRule{
 							MaxUnavailableValue: &istr,
 						},

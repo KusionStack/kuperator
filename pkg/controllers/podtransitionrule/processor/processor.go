@@ -64,7 +64,7 @@ func (p *Processor) Process(targets map[string]*corev1.Pod) *ProcessResult {
 		if p.podTransitionRule.Spec.Rules[i].Disabled || needSkip(&p.podTransitionRule.Spec.Rules[i]) {
 			continue
 		}
-		if p.podTransitionRule.Spec.Rules[i].Stage == nil && register.GetRuleStage(&p.podTransitionRule.Spec.Rules[i].PodTransitionRuleRuleDefinition) == p.stage {
+		if p.podTransitionRule.Spec.Rules[i].Stage == nil && register.GetRuleStage(&p.podTransitionRule.Spec.Rules[i].TransitionRuleDefinition) == p.stage {
 			effectiveRules = append(effectiveRules, &p.podTransitionRule.Spec.Rules[i])
 		}
 		if p.podTransitionRule.Spec.Rules[i].Stage != nil && *p.podTransitionRule.Spec.Rules[i].Stage == p.stage {
@@ -195,16 +195,16 @@ type RejectInfo struct {
 }
 
 const (
-	EnvSkipPodTransitionRuleRules = "SKIP_RULESET_RULES"
+	EnvSkipTransitionRules = "SKIP_RULESET_RULES"
 )
 
 var (
-	SkipPodTransitionRuleRules = sets.NewString()
+	SkipTransitionRules = sets.NewString()
 )
 
-func needSkip(rule *appsv1alpha1.PodTransitionRuleRule) bool {
-	typRule := reflect.TypeOf(rule.PodTransitionRuleRuleDefinition)
-	valRule := reflect.ValueOf(rule.PodTransitionRuleRuleDefinition)
+func needSkip(rule *appsv1alpha1.TransitionRule) bool {
+	typRule := reflect.TypeOf(rule.TransitionRuleDefinition)
+	valRule := reflect.ValueOf(rule.TransitionRuleDefinition)
 	fCount := valRule.NumField()
 	for i := 0; i < fCount; i++ {
 		if valRule.Field(i).IsNil() {
@@ -212,7 +212,7 @@ func needSkip(rule *appsv1alpha1.PodTransitionRuleRule) bool {
 		}
 
 		name := strings.ToLower(string(typRule.Field(i).Name[0])) + typRule.Field(i).Name[1:]
-		if SkipPodTransitionRuleRules.Has(name) {
+		if SkipTransitionRules.Has(name) {
 			return true
 		}
 	}
@@ -221,7 +221,7 @@ func needSkip(rule *appsv1alpha1.PodTransitionRuleRule) bool {
 }
 
 func init() {
-	valStr := os.Getenv(EnvSkipPodTransitionRuleRules)
+	valStr := os.Getenv(EnvSkipTransitionRules)
 	if len(valStr) == 0 {
 		return
 	}
@@ -229,7 +229,7 @@ func init() {
 	for _, v := range parts {
 		v = strings.TrimSpace(v)
 		if len(v) > 0 {
-			SkipPodTransitionRuleRules.Insert(v)
+			SkipTransitionRules.Insert(v)
 		}
 	}
 }

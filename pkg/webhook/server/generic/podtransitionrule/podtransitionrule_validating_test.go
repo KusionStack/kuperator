@@ -32,7 +32,7 @@ var _ = Describe("PodTransitionRule Validating", func() {
 	It("validate ca", func() {
 		testCA := "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUMvVENDQWVXZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFmTVIwd0d3WURWUVFERXhSelpXeG0KTFhOcFoyNWxaQzFyT0hNdFkyVnlkREFnRncweU16QTNNVGN3TmpJNU16RmFHQTh5TVRJek1EWXlNekEyTWpregpNVm93SHpFZE1Cc0dBMVVFQXhNVWMyVnNaaTF6YVdkdVpXUXRhemh6TFdObGNuUXdnZ0VpTUEwR0NTcUdTSWIzCkRRRUJBUVVBQTRJQkR3QXdnZ0VLQW9JQkFRRHhEQytBS05oSGVxRThqaThBNllIUGNZbGVyeERrMmNoQlpabzAKaEJqTUpMZno1STU0aENhR0wwT08vMU0yMFQyZnFZWEFrRWwzRnlhU1VIY3liNnNGbEMwWHRkLzVaK0tMZkRKTgpTK2YrdHB3QmxZZ3U0S2hHN1U5VmpiV3RZRWk2OGZKNFNIRHBGd3BWZnFzSzhhVjYrZis1cElPclZFYS9rbmhsCitFd2ZBeG1uNm1xVlpZQXhManBVNXF3TERqU3ZXcnhIcTQ2UWx1eTBwV09maXBYelg4L3BLT0d2YWN6L1R2emMKRy9uNnY1NDNSeXArV05PV0hvajdSTXA3YTVYczdQcjFMM040ZjhscWJkMWs3WGZJa1lXWlR2OWpqeFRFRFp6Wgo3Y3BwRXZ1OHRBK0MxVzhMeDdOSGk1a1BXcjM5YUhkb201NUpHT2tWZDdEdDB2RHhBZ01CQUFHalFqQkFNQTRHCkExVWREd0VCL3dRRUF3SUNwREFQQmdOVkhSTUJBZjhFQlRBREFRSC9NQjBHQTFVZERnUVdCQlN3c05CZjRjbVoKMFV4S0pwWCtpblUvWGdKWHdUQU5CZ2txaGtpRzl3MEJBUXNGQUFPQ0FRRUFXWFNibXlMWXAwZHFXTjVaaHNXVgphWUwxbEh4SmlyaE5IbHZqYkM2cXpnd2VUNWRJWFB6U3lQZ25DajBDOHJ1bHJiQUV4R3Jva1hkQzJiVTBoYUw3CngxU2M4R1lPSU9pSFdHQnM1VitrbUh0bzdmeVR4cFV0OGFSNU1TWitCZkFBNHJRZzJWRWNxUkkzRE9aTDdRYXAKRVZLWnpqSTJObkRRbUN2N2oxZERrajVRMWRsTW96QWRlN1ZUZXE0Y1pVTW8ydUNmeEViZlZMSXVzRXI3cmc1cwpIa2M4U3piVUpudTdDc0dRbE1JNTBMV3FxWHlkT3ZCNk5nTjhvNDNBdlY0ck9NOGx5WklnbG14ZkRPMVRyUlVCCmMza0wzZ0JHazlHZnJ0OFI1d1dOamlMQkJRQnBRMFdqVlh2QlNaSzdOcHlYSEFranVUSjlTa0ZaQXBUZ2JmM2UKSFE9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg=="
 		invalidCA := "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUMvVENDQWVXZ0F3SUJBZ0lCQURBTkJna3Foa"
-		webhook := &appsv1alpha1.PodTransitionRuleRuleWebhook{
+		webhook := &appsv1alpha1.TransitionRuleWebhook{
 			ClientConfig: appsv1alpha1.ClientConfig{
 				URL:      "https://github.com",
 				CABundle: "Cg==",
@@ -56,10 +56,10 @@ var _ = Describe("PodTransitionRule Validating", func() {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"test": "test"},
 			},
-			Rules: []appsv1alpha1.PodTransitionRuleRule{
+			Rules: []appsv1alpha1.TransitionRule{
 				{
-					Name:                            "",
-					PodTransitionRuleRuleDefinition: appsv1alpha1.PodTransitionRuleRuleDefinition{},
+					Name:                     "",
+					TransitionRuleDefinition: appsv1alpha1.TransitionRuleDefinition{},
 				},
 			},
 		}
@@ -70,11 +70,11 @@ var _ = Describe("PodTransitionRule Validating", func() {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"test": "test"},
 			},
-			Rules: []appsv1alpha1.PodTransitionRuleRule{
+			Rules: []appsv1alpha1.TransitionRule{
 				{
 					Name: "webhook",
-					PodTransitionRuleRuleDefinition: appsv1alpha1.PodTransitionRuleRuleDefinition{
-						Webhook: &appsv1alpha1.PodTransitionRuleRuleWebhook{},
+					TransitionRuleDefinition: appsv1alpha1.TransitionRuleDefinition{
+						Webhook: &appsv1alpha1.TransitionRuleWebhook{},
 					},
 				},
 			},
@@ -84,11 +84,11 @@ var _ = Describe("PodTransitionRule Validating", func() {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"test": "test"},
 			},
-			Rules: []appsv1alpha1.PodTransitionRuleRule{
+			Rules: []appsv1alpha1.TransitionRule{
 				{
 					Name: "webhook",
-					PodTransitionRuleRuleDefinition: appsv1alpha1.PodTransitionRuleRuleDefinition{
-						Webhook: &appsv1alpha1.PodTransitionRuleRuleWebhook{
+					TransitionRuleDefinition: appsv1alpha1.TransitionRuleDefinition{
+						Webhook: &appsv1alpha1.TransitionRuleWebhook{
 							ClientConfig: appsv1alpha1.ClientConfig{
 								URL: "https://github.com",
 							},
@@ -104,10 +104,10 @@ var _ = Describe("PodTransitionRule Validating", func() {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"test": "test"},
 			},
-			Rules: []appsv1alpha1.PodTransitionRuleRule{
+			Rules: []appsv1alpha1.TransitionRule{
 				{
 					Name: "available",
-					PodTransitionRuleRuleDefinition: appsv1alpha1.PodTransitionRuleRuleDefinition{
+					TransitionRuleDefinition: appsv1alpha1.TransitionRuleDefinition{
 						AvailablePolicy: &appsv1alpha1.AvailableRule{},
 					},
 				},
@@ -119,10 +119,10 @@ var _ = Describe("PodTransitionRule Validating", func() {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"test": "test"},
 			},
-			Rules: []appsv1alpha1.PodTransitionRuleRule{
+			Rules: []appsv1alpha1.TransitionRule{
 				{
 					Name: "available",
-					PodTransitionRuleRuleDefinition: appsv1alpha1.PodTransitionRuleRuleDefinition{
+					TransitionRuleDefinition: appsv1alpha1.TransitionRuleDefinition{
 						AvailablePolicy: &appsv1alpha1.AvailableRule{
 							MaxUnavailableValue: &istr,
 						},
@@ -137,10 +137,10 @@ var _ = Describe("PodTransitionRule Validating", func() {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"test": "test"},
 			},
-			Rules: []appsv1alpha1.PodTransitionRuleRule{
+			Rules: []appsv1alpha1.TransitionRule{
 				{
 					Name: "label",
-					PodTransitionRuleRuleDefinition: appsv1alpha1.PodTransitionRuleRuleDefinition{
+					TransitionRuleDefinition: appsv1alpha1.TransitionRuleDefinition{
 						LabelCheck: &appsv1alpha1.LabelCheckRule{},
 					},
 				},
@@ -151,10 +151,10 @@ var _ = Describe("PodTransitionRule Validating", func() {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"test": "test"},
 			},
-			Rules: []appsv1alpha1.PodTransitionRuleRule{
+			Rules: []appsv1alpha1.TransitionRule{
 				{
 					Name: "label",
-					PodTransitionRuleRuleDefinition: appsv1alpha1.PodTransitionRuleRuleDefinition{
+					TransitionRuleDefinition: appsv1alpha1.TransitionRuleDefinition{
 						LabelCheck: &appsv1alpha1.LabelCheckRule{
 							Requires: &metav1.LabelSelector{
 								MatchLabels: map[string]string{"test": "test"},

@@ -40,7 +40,7 @@ type FilterResult struct {
 	RuleState *appsv1alpha1.RuleState
 }
 
-func GetRuler(rule *appsv1alpha1.PodTransitionRuleRule, client client.Client) Ruler {
+func GetRuler(rule *appsv1alpha1.TransitionRule, client client.Client) Ruler {
 
 	if rule.AvailablePolicy != nil {
 		return &AvailableRuler{

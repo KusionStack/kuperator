@@ -26,11 +26,11 @@ var (
 	ruleStage = map[string]string{}
 )
 
-func InitDefaultRuleStage(ruleDef *appsv1alpha1.PodTransitionRuleRuleDefinition, stage string) {
+func InitDefaultRuleStage(ruleDef *appsv1alpha1.TransitionRuleDefinition, stage string) {
 	ruleStage[GetRuleType(ruleDef)] = stage
 }
 
-func GetRuleStage(ruleDef *appsv1alpha1.PodTransitionRuleRuleDefinition) string {
+func GetRuleStage(ruleDef *appsv1alpha1.TransitionRuleDefinition) string {
 	stage := ruleStage[GetRuleType(ruleDef)]
 	if stage == "" && len(defaultCache.GetStages()) > 0 {
 		stage = defaultCache.GetStages()[0]
@@ -38,7 +38,7 @@ func GetRuleStage(ruleDef *appsv1alpha1.PodTransitionRuleRuleDefinition) string 
 	return stage
 }
 
-func GetRuleType(ruleDef *appsv1alpha1.PodTransitionRuleRuleDefinition) string {
+func GetRuleType(ruleDef *appsv1alpha1.TransitionRuleDefinition) string {
 	typRule := reflect.TypeOf(*ruleDef)
 	valRule := reflect.ValueOf(*ruleDef)
 	fCount := valRule.NumField()

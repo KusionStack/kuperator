@@ -20,7 +20,7 @@ import (
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
-type Rules []*appsv1alpha1.PodTransitionRuleRule
+type Rules []*appsv1alpha1.TransitionRule
 
 func (e Rules) Len() int      { return len(e) }
 func (e Rules) Swap(i, j int) { e[i], e[j] = e[j], e[i] }
@@ -28,7 +28,7 @@ func (e Rules) Less(i, j int) bool {
 	return weight(e[i]) < weight(e[j])
 }
 
-func weight(rule *appsv1alpha1.PodTransitionRuleRule) int {
+func weight(rule *appsv1alpha1.TransitionRule) int {
 
 	if rule.AvailablePolicy != nil {
 		return 1

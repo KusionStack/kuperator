@@ -101,7 +101,7 @@ func (h *ValidatingHandler) validate(rs *appsv1alpha1.PodTransitionRule) error {
 	return errList.ToAggregate()
 }
 
-func ValidateWebhook(webhook *appsv1alpha1.PodTransitionRuleRuleWebhook, f *field.Path) *field.Error {
+func ValidateWebhook(webhook *appsv1alpha1.TransitionRuleWebhook, f *field.Path) *field.Error {
 
 	if err := CheckServerReachable(webhook.ClientConfig.URL); err != nil {
 		return field.Invalid(f.Child("clientConfig").Child("url"), webhook.ClientConfig.URL, err.Error())

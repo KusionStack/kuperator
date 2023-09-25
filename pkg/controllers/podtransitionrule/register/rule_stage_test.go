@@ -26,7 +26,7 @@ import (
 
 func TestStage(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
-	def := appsv1alpha1.PodTransitionRuleRuleDefinition{
+	def := appsv1alpha1.TransitionRuleDefinition{
 		AvailablePolicy: &appsv1alpha1.AvailableRule{},
 	}
 	InitDefaultRuleStage(&def, "test-stage")
