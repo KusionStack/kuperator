@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"kusionstack.io/operating/apis/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/ruleset"
+	"kusionstack.io/operating/pkg/controllers/podtransitionrule"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
 	"kusionstack.io/operating/pkg/utils"
@@ -80,10 +80,10 @@ func NewReconciler(mgr manager.Manager) *ReconcilePodOpsLifecycle {
 	r := &ReconcilePodOpsLifecycle{
 		ReconcilerMixin: mixin,
 
-		ruleSetManager: ruleset.RuleSetManager(),
-		expectation:    expectation,
+		podTransitionRuleManager: podtransitionrule.PodTransitionRuleManager(),
+		expectation:              expectation,
 	}
-	r.initRuleSetManager()
+	r.initPodTransitionRuleManager()
 
 	return r
 }
@@ -91,8 +91,8 @@ func NewReconciler(mgr manager.Manager) *ReconcilePodOpsLifecycle {
 type ReconcilePodOpsLifecycle struct {
 	*mixin.ReconcilerMixin
 
-	ruleSetManager ruleset.ManagerInterface
-	expectation    *expectations.ResourceVersionExpectation
+	podTransitionRuleManager podtransitionrule.ManagerInterface
+	expectation              *expectations.ResourceVersionExpectation
 }
 
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
@@ -138,7 +138,7 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 		}
 	}
 
-	state, err := r.ruleSetManager.GetState(r.Client, pod)
+	state, err := r.podTransitionRuleManager.GetState(r.Client, pod)
 	if err != nil {
 		logger.Error(err, "failed to get pod state")
 		return reconcile.Result{}, err
@@ -352,16 +352,16 @@ func (r *ReconcilePodOpsLifecycle) addLabels(ctx context.Context, pod *corev1.Po
 	return err
 }
 
-func (r *ReconcilePodOpsLifecycle) initRuleSetManager() {
-	r.ruleSetManager.RegisterStage(v1alpha1.PodOpsLifecyclePreTrafficOffStage, func(po client.Object) bool {
+func (r *ReconcilePodOpsLifecycle) initPodTransitionRuleManager() {
+	r.podTransitionRuleManager.RegisterStage(v1alpha1.PodOpsLifecyclePreTrafficOffStage, func(po client.Object) bool {
 		labels := po.GetLabels()
 		return labels != nil && labelHasPrefix(labels, v1alpha1.PodPreCheckLabelPrefix)
 	})
-	r.ruleSetManager.RegisterStage(v1alpha1.PodOpsLifecyclePreTrafficOnStage, func(po client.Object) bool {
+	r.podTransitionRuleManager.RegisterStage(v1alpha1.PodOpsLifecyclePreTrafficOnStage, func(po client.Object) bool {
 		labels := po.GetLabels()
 		return labels != nil && labelHasPrefix(labels, v1alpha1.PodPostCheckLabelPrefix)
 	})
-	ruleset.AddUnAvailableFunc(func(po *corev1.Pod) (bool, *int64) {
+	podtransitionrule.AddUnAvailableFunc(func(po *corev1.Pod) (bool, *int64) {
 		return !controllerutils.IsServiceAvailable(po), nil
 	})
 }

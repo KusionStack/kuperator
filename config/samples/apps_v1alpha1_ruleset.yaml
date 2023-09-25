@@ -1,13 +1,13 @@
 apiVersion: apps.kusionstack.io/v1alpha1
-kind: RuleSet
+kind: PodTransitionRule
 metadata:
   labels:
-    app.kubernetes.io/name: ruleset
-    app.kubernetes.io/instance: ruleset-sample
+    app.kubernetes.io/name: podtransitionrule
+    app.kubernetes.io/instance: podtransitionrule-sample
     app.kubernetes.io/part-of: kusionstack
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: kusionstack
-  name: ruleset-sample
+  name: podtransitionrule-sample
 spec:
   rules:
   - availablePolicy:

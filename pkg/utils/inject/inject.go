@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	FieldIndexOwnerRefUID = "ownerRefUID"
-	FieldIndexRuleSet     = "rulesetIndex"
+	FieldIndexOwnerRefUID       = "ownerRefUID"
+	FieldIndexPodTransitionRule = "podtransitionruleIndex"
 )
 
 func NewCacheWithFieldIndex(config *rest.Config, opts cache.Options) (cache.Cache, error) {
@@ -58,8 +58,8 @@ func NewCacheWithFieldIndex(config *rest.Config, opts cache.Options) (cache.Cach
 		return []string{string(ownerRef.UID)}
 	})
 
-	c.IndexField(context.TODO(), &appsv1alpha1.RuleSet{}, FieldIndexRuleSet, func(obj client.Object) []string {
-		rs, ok := obj.(*appsv1alpha1.RuleSet)
+	c.IndexField(context.TODO(), &appsv1alpha1.PodTransitionRule{}, FieldIndexPodTransitionRule, func(obj client.Object) []string {
+		rs, ok := obj.(*appsv1alpha1.PodTransitionRule)
 		if !ok {
 			return nil
 		}

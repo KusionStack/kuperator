@@ -353,8 +353,8 @@ spec:
                         processing progress
                       properties:
                         itemStatus:
-                          description: PodTransitionRulePodStatus is async request status representing
-                            the info of pods
+                          description: PodTransitionRulePodStatus is async request
+                            status representing the info of pods
                           items:
                             description: ItemStatus defines async request info of
                               resources
