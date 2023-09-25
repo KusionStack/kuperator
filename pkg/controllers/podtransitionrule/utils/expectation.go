@@ -21,6 +21,6 @@ import (
 )
 
 var (
-	PodVersionExpectation     = expectation.NewResourceVersionExpectation()
-	RulesetVersionExpectation = expectation.NewResourceVersionExpectation()
+	PodVersionExpectation               = expectation.NewResourceVersionExpectation()
+	PodTransitionRuleVersionExpectation = expectation.NewResourceVersionExpectation()
 )

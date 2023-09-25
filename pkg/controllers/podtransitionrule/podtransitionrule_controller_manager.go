@@ -38,7 +38,7 @@ type ManagerInterface interface {
 	SetupPodTransitionRuleController(manager.Manager) error
 }
 
-var defaultManager = newRulesetManager()
+var defaultManager = newPodTransitionRuleManager()
 
 func PodTransitionRuleManager() ManagerInterface {
 	return defaultManager
@@ -48,7 +48,7 @@ func AddUnAvailableFunc(f func(pod *corev1.Pod) (bool, *int64)) {
 	register.UnAvailableFuncList = append(register.UnAvailableFuncList, f)
 }
 
-func newRulesetManager() ManagerInterface {
+func newPodTransitionRuleManager() ManagerInterface {
 	return &rsManager{
 		Register: register.DefaultRegister(),
 		Checker:  checker.NewCheck(),

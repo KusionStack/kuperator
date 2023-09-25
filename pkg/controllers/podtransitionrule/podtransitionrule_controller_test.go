@@ -101,7 +101,7 @@ func TestPodTransitionRule(t *testing.T) {
 	for i := range podList.Items {
 		g.Expect(setPodOnStage(&podList.Items[i], PreTrafficOffStage)).NotTo(gomega.HaveOccurred())
 	}
-	// Ruleset Processing rules
+	// PodTransitionRule Processing rules
 	waitProcessFinished(request)
 	g.Expect(c.List(ctx, podList, &client.ListOptions{
 		LabelSelector: labels.SelectorFromSet(rs.Spec.Selector.MatchLabels),
@@ -165,7 +165,7 @@ const (
 	DeletePodCondition = "DeletePod"
 )
 
-func initRulesetManager() {
+func initPodTransitionRuleManager() {
 
 	register.UnAvailableFuncList = []register.UnAvailableFunc{func(pod *corev1.Pod) (bool, *int64) {
 		if pod.GetLabels() == nil {

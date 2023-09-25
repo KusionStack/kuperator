@@ -143,7 +143,7 @@ func (p *Processor) Process(targets map[string]*corev1.Pod) *ProcessResult {
 
 		if result.Err != nil {
 			retry = true
-			p.Error(result.Err, "podtransitionrule process rule error", "Ruleset", p.podTransitionRule.Name, "rule", rule.Name)
+			p.Error(result.Err, "podtransitionrule process rule error", "PodTransitionRule", p.podTransitionRule.Name, "rule", rule.Name)
 		}
 
 		// update retry interval
@@ -195,7 +195,7 @@ type RejectInfo struct {
 }
 
 const (
-	EnvSkipTransitionRules = "SKIP_RULESET_RULES"
+	EnvSkipTransitionRules = "SKIP_POD_TRANSITION_RULES"
 )
 
 var (

@@ -72,7 +72,7 @@ func addToMgr(mgr manager.Manager, r reconcile.Reconciler) (controller.Controlle
 		return nil, err
 	}
 	// Watch for changes to PodTransitionRule
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.PodTransitionRule{}}, &RulesetEventHandler{})
+	err = c.Watch(&source.Kind{Type: &appsv1alpha1.PodTransitionRule{}}, &PodTransitionRuleEventHandler{})
 	if err != nil {
 		return c, err
 	}
@@ -108,7 +108,7 @@ func (r *PodTransitionRuleReconciler) Reconcile(ctx context.Context, request rec
 		return reconcile.Result{}, err
 	}
 
-	if !podtransitionruleutils.RulesetVersionExpectation.SatisfiedExpectations(commonutils.ObjectKeyString(podTransitionRule), podTransitionRule.ResourceVersion) {
+	if !podtransitionruleutils.PodTransitionRuleVersionExpectation.SatisfiedExpectations(commonutils.ObjectKeyString(podTransitionRule), podTransitionRule.ResourceVersion) {
 		logger.Info("podTransitionRule's resourceVersion is too old, retry later", "resourceVersion.now", podTransitionRule.ResourceVersion)
 		return reconcile.Result{}, nil
 	}
@@ -193,10 +193,10 @@ func (r *PodTransitionRuleReconciler) Reconcile(ctx context.Context, request rec
 	}
 
 	if !equalStatus(newStatus, &podTransitionRule.Status) {
-		podtransitionruleutils.RulesetVersionExpectation.ExpectUpdate(commonutils.ObjectKeyString(podTransitionRule), podTransitionRule.ResourceVersion)
+		podtransitionruleutils.PodTransitionRuleVersionExpectation.ExpectUpdate(commonutils.ObjectKeyString(podTransitionRule), podTransitionRule.ResourceVersion)
 		podTransitionRule.Status = *newStatus
 		if err := r.Client.Status().Update(ctx, podTransitionRule); err != nil {
-			podtransitionruleutils.RulesetVersionExpectation.DeleteExpectations(commonutils.ObjectKeyString(podTransitionRule))
+			podtransitionruleutils.PodTransitionRuleVersionExpectation.DeleteExpectations(commonutils.ObjectKeyString(podTransitionRule))
 			logger.Error(err, "failed to update podtransitionrule status")
 			return reconcile.Result{}, err
 		}

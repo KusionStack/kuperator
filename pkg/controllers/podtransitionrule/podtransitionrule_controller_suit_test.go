@@ -58,7 +58,7 @@ func TestMain(m *testing.M) {
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 	}
 
-	initRulesetManager()
+	initPodTransitionRuleManager()
 
 	config, err := env.Start()
 	if err != nil {

@@ -125,29 +125,29 @@ func involvedPodTransitionRules(c client.Client, obj client.Object) ([]*appsv1al
 	return podTransitionRules, nil
 }
 
-type RulesetEventHandler struct {
+type PodTransitionRuleEventHandler struct {
 }
 
-func (p *RulesetEventHandler) Create(e event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (p *PodTransitionRuleEventHandler) Create(e event.CreateEvent, q workqueue.RateLimitingInterface) {
 	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
 		Name:      e.Object.GetName(),
 		Namespace: e.Object.GetNamespace(),
 	}})
 }
 
-func (p *RulesetEventHandler) Update(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	oldRuleset := e.ObjectOld.(*appsv1alpha1.PodTransitionRule)
-	newRuleset := e.ObjectNew.(*appsv1alpha1.PodTransitionRule)
-	if equality.Semantic.DeepEqual(oldRuleset.Spec, newRuleset.Spec) && newRuleset.DeletionTimestamp == nil {
+func (p *PodTransitionRuleEventHandler) Update(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+	oldPodTransitionRule := e.ObjectOld.(*appsv1alpha1.PodTransitionRule)
+	newPodTransitionRule := e.ObjectNew.(*appsv1alpha1.PodTransitionRule)
+	if equality.Semantic.DeepEqual(oldPodTransitionRule.Spec, newPodTransitionRule.Spec) && newPodTransitionRule.DeletionTimestamp == nil {
 		return
 	}
 	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
-		Name:      newRuleset.Name,
-		Namespace: newRuleset.Namespace,
+		Name:      newPodTransitionRule.Name,
+		Namespace: newPodTransitionRule.Namespace,
 	}})
 }
 
-func (p *RulesetEventHandler) Delete(e event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (p *PodTransitionRuleEventHandler) Delete(e event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	if e.Object == nil {
 		return
 	}
@@ -157,5 +157,5 @@ func (p *RulesetEventHandler) Delete(e event.DeleteEvent, q workqueue.RateLimiti
 	}})
 }
 
-func (p *RulesetEventHandler) Generic(e event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (p *PodTransitionRuleEventHandler) Generic(e event.GenericEvent, q workqueue.RateLimitingInterface) {
 }

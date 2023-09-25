@@ -24,11 +24,11 @@ import (
 )
 
 func IsPodPassRule(po *corev1.Pod, podtransitionrule *appsv1alpha1.PodTransitionRule, rule string) bool {
-	passedRules := GetPodPassedRulesetRules(po, podtransitionrule)
+	passedRules := GetPodPassedRules(po, podtransitionrule)
 	return passedRules.Has(rule)
 }
 
-func GetPodPassedRulesetRules(po *corev1.Pod, podtransitionrule *appsv1alpha1.PodTransitionRule) (rules sets.String) {
+func GetPodPassedRules(po *corev1.Pod, podtransitionrule *appsv1alpha1.PodTransitionRule) (rules sets.String) {
 	rules = sets.NewString()
 	if podtransitionrule.Status.Details == nil {
 		return rules
