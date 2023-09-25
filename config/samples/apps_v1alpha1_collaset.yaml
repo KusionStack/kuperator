@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/created-by: kusionstack
   name: collaset-sample
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: foo
