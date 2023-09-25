@@ -29,3 +29,11 @@ KusionStack Operating offers multiple workloads to ensure the convenient and eff
 [**ResourceConsist** framework facilitates the graceful participation of multiple resources related to Pods in the Pod operation process]()
 
 ## Installation
+
+# Contact Us
+- Twitter: [KusionStack](https://twitter.com/KusionStack)
+- Slack: [Kusionstack](https://join.slack.com/t/kusionstack/shared_invite/zt-19lqcc3a9-_kTNwagaT5qwBE~my5Lnxg)
+- DingTalk (Chinese): 42753001
+- Wechat Group (Chinese)
+
+  <img src="docs/wx_spark.jpg" width="200" height="200"/>
