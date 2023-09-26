@@ -28,12 +28,12 @@ const (
 
 	PodPreCheckLabelPrefix    = "pre-check.podopslifecycle.kusionstack.io"    // indicate a pod is in pre-check phase
 	PodPreCheckedLabelPrefix  = "pre-checked.podopslifecycle.kusionstack.io"  // indicate a pod has finished pre-check phase
-	PodPrepareLabelPrefix     = "prepare.podopslifecycle.kusionstack.io"      // indicate a pod is in prepare phase
+	PodPreparingLabelPrefix   = "preparing.podopslifecycle.kusionstack.io"    // indicate a pod is preparing for operation
 	PodOperateLabelPrefix     = "operate.podopslifecycle.kusionstack.io"      // indicate a pod is in operate phase
 	PodOperatedLabelPrefix    = "operated.podopslifecycle.kusionstack.io"     // indicate a pod has finished operate phase
 	PodPostCheckLabelPrefix   = "post-check.podopslifecycle.kusionstack.io"   // indicate a pod is in post-check phase
 	PodPostCheckedLabelPrefix = "post-checked.podopslifecycle.kusionstack.io" // indicate a pod has finished post-check phase
-	PodCompleteLabelPrefix    = "complete.podopslifecycle.kusionstack.io"     // indicate a pod has finished all phases
+	PodCompletingLabelPrefix  = "completing.podopslifecycle.kusionstack.io"   // indicate a pod is completing operation
 
 	PodServiceAvailableLabel      = "podopslifecycle.kusionstack.io/service-available" // indicate a pod is available to serve
 	PodDeletionIndicationLabelKey = "podopslifecycle.kusionstack.io/to-delete"         // users can use this label to indicate a pod to delete
@@ -47,6 +47,6 @@ const (
 
 var (
 	WellKnownLabelPrefixesWithID = []string{PodOperatingLabelPrefix, PodOperationTypeLabelPrefix, PodPreCheckLabelPrefix, PodPreCheckedLabelPrefix,
-		PodPrepareLabelPrefix, PodDoneOperationTypeLabelPrefix, PodUndoOperationTypeLabelPrefix, PodOperateLabelPrefix, PodOperatedLabelPrefix, PodPostCheckLabelPrefix,
-		PodPostCheckedLabelPrefix, PodCompleteLabelPrefix}
+		PodPreparingLabelPrefix, PodDoneOperationTypeLabelPrefix, PodUndoOperationTypeLabelPrefix, PodOperateLabelPrefix, PodOperatedLabelPrefix, PodPostCheckLabelPrefix,
+		PodPostCheckedLabelPrefix, PodCompletingLabelPrefix}
 )

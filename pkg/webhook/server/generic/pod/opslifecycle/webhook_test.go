@@ -178,7 +178,7 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, "123"):              "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "upgrade"): "1402144848",
 
-				fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, "123"): "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPreparingLabelPrefix, "123"): "1402144848",
 			},
 
 			readyToUpgrade: readyToUpgradeReturnFalse,
@@ -222,7 +222,7 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, "456"):              "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "replace"): "1402144848",
 
-				fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, "456"): "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPreparingLabelPrefix, "456"): "1402144848",
 			},
 			readyToUpgrade: readyToUpgradeReturnFalse,
 		},
@@ -246,7 +246,7 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, "123"):              "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "upgrade"): "1402144848",
 
-				fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, "123"): "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPreparingLabelPrefix, "123"): "1402144848",
 
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "456"):     "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "456"): "replace",
@@ -273,7 +273,7 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, "123"):              "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "upgrade"): "1402144848",
 
-				fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, "123"): "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPreparingLabelPrefix, "123"): "1402144848",
 			},
 		},
 
@@ -371,7 +371,7 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "123"):         "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, "123"):       "1402144848",
 
-				fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, "123"): "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodCompletingLabelPrefix, "123"): "1402144848",
 
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "456"):           "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "456"):          "1402144848",
@@ -379,7 +379,7 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "456"):         "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, "456"):       "1402144848",
 
-				fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, "456"): "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodCompletingLabelPrefix, "456"): "1402144848",
 			},
 		},
 
@@ -391,7 +391,7 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "123"):         "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, "123"):       "1402144848",
 
-				fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, "123"): "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodCompletingLabelPrefix, "123"): "1402144848",
 			},
 			expectedLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1402144848",
@@ -399,7 +399,7 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "123"):         "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, "123"):       "1402144848",
 
-				fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, "123"): "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodCompletingLabelPrefix, "123"): "1402144848",
 			},
 		},
 
@@ -412,7 +412,7 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "123"):         "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, "123"):       "1402144848",
 
-				fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, "123"): "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodCompletingLabelPrefix, "123"): "1402144848",
 
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "456"):           "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "456"):          "1402144848",
@@ -420,7 +420,7 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "456"):         "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, "456"):       "1402144848",
 
-				fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, "456"): "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodCompletingLabelPrefix, "456"): "1402144848",
 			},
 			expectedLabels: map[string]string{},
 		},

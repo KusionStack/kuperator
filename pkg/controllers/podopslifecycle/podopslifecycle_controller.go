@@ -163,8 +163,8 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 	}
 
 	expected := map[string]bool{
-		v1alpha1.PodPrepareLabelPrefix:  false, // set readiness gate to false, traffic off
-		v1alpha1.PodCompleteLabelPrefix: true,  // set readiness gate to true, traffic on
+		v1alpha1.PodPreparingLabelPrefix:  false, // set readiness gate to false, traffic off
+		v1alpha1.PodCompletingLabelPrefix: true,  // set readiness gate to true, traffic on
 	}
 	for _, labels := range idToLabelsMap {
 		for k, v := range expected {

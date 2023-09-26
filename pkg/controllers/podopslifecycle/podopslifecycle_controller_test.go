@@ -166,7 +166,7 @@ var _ = Describe("podopslifecycle controller", func() {
 				Labels: map[string]string{
 					v1alpha1.ControlledByKusionStackLabelKey:                   "true",
 					fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, id): timestamp,
-					fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, id):   timestamp,
+					fmt.Sprintf("%s/%s", v1alpha1.PodPreparingLabelPrefix, id): timestamp,
 				},
 			},
 			Spec: podSpec,
@@ -205,9 +205,9 @@ var _ = Describe("podopslifecycle controller", func() {
 				Name:      "test",
 				Namespace: "default",
 				Labels: map[string]string{
-					v1alpha1.ControlledByKusionStackLabelKey:                  "true",
-					fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):  timestamp,
-					fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, id): timestamp,
+					v1alpha1.ControlledByKusionStackLabelKey:                    "true",
+					fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):    timestamp,
+					fmt.Sprintf("%s/%s", v1alpha1.PodCompletingLabelPrefix, id): timestamp,
 				},
 			},
 			Spec: podSpec,
@@ -264,9 +264,9 @@ var _ = Describe("podopslifecycle controller", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		pod.ObjectMeta.Labels = map[string]string{
-			v1alpha1.ControlledByKusionStackLabelKey:                  "true",
-			fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):  timestamp,
-			fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, id): timestamp,
+			v1alpha1.ControlledByKusionStackLabelKey:                    "true",
+			fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):    timestamp,
+			fmt.Sprintf("%s/%s", v1alpha1.PodCompletingLabelPrefix, id): timestamp,
 		}
 		err = mgr.GetClient().Update(context.Background(), pod)
 		Expect(err).NotTo(HaveOccurred())
