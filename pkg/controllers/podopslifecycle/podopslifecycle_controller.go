@@ -147,10 +147,10 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 	var labels map[string]string
 	if state.InStageAndPassed() {
 		switch state.Stage {
-		case v1alpha1.PodOpsLifecyclePreTrafficOffStage:
-			labels, err = r.preTrafficOffStage(pod, idToLabelsMap)
-		case v1alpha1.PodOpsLifecyclePreTrafficOnStage:
-			labels, err = r.preTrafficOnStage(pod, idToLabelsMap)
+		case v1alpha1.PodOpsLifecyclePreCheckStage:
+			labels, err = r.preCheckStage(pod, idToLabelsMap)
+		case v1alpha1.PodOpsLifecyclePostCheckStage:
+			labels, err = r.postCheckStage(pod, idToLabelsMap)
 		}
 	}
 	if err != nil {
@@ -286,7 +286,7 @@ func (r *ReconcilePodOpsLifecycle) setServiceReadiness(pod *corev1.Pod, isReady 
 	return true, fmt.Sprintf("update service readiness gate to: %s", string(status))
 }
 
-func (r *ReconcilePodOpsLifecycle) preTrafficOffStage(pod *corev1.Pod, idToLabelsMap map[string]map[string]string) (labels map[string]string, err error) {
+func (r *ReconcilePodOpsLifecycle) preCheckStage(pod *corev1.Pod, idToLabelsMap map[string]map[string]string) (labels map[string]string, err error) {
 	labels = map[string]string{}
 	currentTime := strconv.FormatInt(time.Now().Unix(), 10)
 	for k, v := range idToLabelsMap {
@@ -309,7 +309,7 @@ func (r *ReconcilePodOpsLifecycle) preTrafficOffStage(pod *corev1.Pod, idToLabel
 	return
 }
 
-func (r *ReconcilePodOpsLifecycle) preTrafficOnStage(pod *corev1.Pod, idToLabelsMap map[string]map[string]string) (labels map[string]string, err error) {
+func (r *ReconcilePodOpsLifecycle) postCheckStage(pod *corev1.Pod, idToLabelsMap map[string]map[string]string) (labels map[string]string, err error) {
 	labels = map[string]string{}
 	currentTime := strconv.FormatInt(time.Now().Unix(), 10)
 	for k := range idToLabelsMap {
@@ -353,11 +353,11 @@ func (r *ReconcilePodOpsLifecycle) addLabels(ctx context.Context, pod *corev1.Po
 }
 
 func (r *ReconcilePodOpsLifecycle) initPodTransitionRuleManager() {
-	r.podTransitionRuleManager.RegisterStage(v1alpha1.PodOpsLifecyclePreTrafficOffStage, func(po client.Object) bool {
+	r.podTransitionRuleManager.RegisterStage(v1alpha1.PodOpsLifecyclePreCheckStage, func(po client.Object) bool {
 		labels := po.GetLabels()
 		return labels != nil && labelHasPrefix(labels, v1alpha1.PodPreCheckLabelPrefix)
 	})
-	r.podTransitionRuleManager.RegisterStage(v1alpha1.PodOpsLifecyclePreTrafficOnStage, func(po client.Object) bool {
+	r.podTransitionRuleManager.RegisterStage(v1alpha1.PodOpsLifecyclePostCheckStage, func(po client.Object) bool {
 		labels := po.GetLabels()
 		return labels != nil && labelHasPrefix(labels, v1alpha1.PodPostCheckLabelPrefix)
 	})
