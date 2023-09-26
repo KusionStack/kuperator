@@ -1,6 +1,6 @@
 # Operating
 
-KusionStack Operating provides a set of workloads and operators built on Kubernetes Custom Resource Definitions (CRDs), with a primary aim of bridging the gap between application management and Kubernetes.
+KusionStack Operating ([documentation site](https://kusionstack.io/docs/operating)) provides a set of workloads and operators built on Kubernetes Custom Resource Definitions (CRDs), with a primary aim of bridging the gap between application management and Kubernetes.
 
 ## Key features
 
@@ -12,21 +12,21 @@ KusionStack Operating collaborates with various KusionStack components to achiev
 
 KusionStack Operating offers multiple workloads to ensure the convenient and effective delivery and operation of application resources.
 
-[**CollaSet** designed to manage Pods with a range of scale and update strategies]()
+[**CollaSet**](https://kusionstack.io/docs/operating/manuals/collaset) designed to manage Pods with a range of scale and update strategies
 
 * Fine-grained operations
 
-[**PodOpsLifecycle** allows various roles like application developers and SREs to collaboratively operate on a single Pod in parallel]()
+[**PodOpsLifecycle**]() allows various roles like application developers and SREs to collaboratively operate on a single Pod in parallel
 
 * Risk management
 
-[**PodTransitionRule** is responsible to keep operational risks under control]()
+[**PodTransitionRule**]() is responsible to keep operational risks under control
 
 ### Platform friendly approach
 
 * Resource consist framework
 
-[**ResourceConsist** framework facilitates the graceful participation of multiple resources related to Pods in the Pod operation process]()
+[**ResourceConsist**]() framework facilitates the graceful participation of multiple resources related to Pods in the Pod operation process
 
 ## Installation
 
