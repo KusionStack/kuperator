@@ -5,5 +5,5 @@ FROM alpine:3.17
 WORKDIR /
 
 COPY manager /manager
-RUN mkdir /webhook-certs && chmod 777 /webhook-certs
+#RUN mkdir /webhook-certs && chmod 777 /webhook-certs
 ENTRYPOINT ["/manager"]
