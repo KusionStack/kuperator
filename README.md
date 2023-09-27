@@ -1,94 +1,52 @@
 # Operating
-// TODO(user): Add simple overview of use/purpose
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+KusionStack Operating ([official site](https://kusionstack.io/docs/operating/introduction/)) provides a set of workloads and operators
+built on Kubernetes Custom Resource Definitions (CRDs), with a primary aim of bridging the gap 
+between application management and Kubernetes.
 
-## Getting Started
-You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
-**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
+## Key features
 
-### Running on the cluster
-1. Install Instances of Custom Resources:
+KusionStack Operating collaborates with various KusionStack components to achieve the following features, 
+streamlining both platform development and application operations based on Kubernetes:
 
-```sh
-kubectl apply -f config/samples/
-```
+* Advanced workloads
 
-2. Build and push your image to the location specified by `IMG`:
-	
-```sh
-make docker-build docker-push IMG=<some-registry>/operating:tag
-```
-	
-3. Deploy the controller to the cluster with the image specified by `IMG`:
+KusionStack Operating offers multiple workloads to ensure the convenient and effective delivery and operation of application resources.
 
-```sh
-make deploy IMG=<some-registry>/operating:tag
-```
+[**CollaSet**](https://kusionstack.io/docs/operating/manuals/collaset) designed to manage Pods with a range of scale and update strategies.
 
-### Uninstall CRDs
-To delete the CRDs from the cluster:
+* Fine-grained operations
 
-```sh
-make uninstall
-```
+[**PodOpsLifecycle**](https://kusionstack.io/docs/operating/concepts/podopslifecycle) allows various roles like application developers and SREs to collaboratively operate on a single Pod in parallel.
 
-### Undeploy controller
-UnDeploy the controller to the cluster:
+* Streamlined pod operation
 
-```sh
-make undeploy
-```
+[**ResourceConsist**](https://kusionstack.io/docs/operating/manuals/resourceconsist) framework facilitates the graceful participation of multiple resources related to Pods in the Pod operation process.
 
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
+* Integrated risk management
 
-### How it works
-This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
+[**PodTransitionRule**](https://kusionstack.io/docs/operating/manuals/podtransitionrule) is responsible to keep operational risks under control.
 
-It uses [Controllers](https://kubernetes.io/docs/concepts/architecture/controller/) 
-which provides a reconcile function responsible for synchronizing resources untile the desired state is reached on the cluster 
+## Getting started
 
-### Test It Out
-1. Install the CRDs into the cluster:
+### Installation
 
-```sh
-make install
-```
+You can install Operating following [installation doc](https://kusionstack.io/docs/operating/started/install).
 
-2. Run your controller (this will run in the foreground, so switch to a new terminal if you want to leave it running):
+### Tutorial
 
-```sh
-make run
-```
+Please visit this [tutorial](https://kusionstack.io/docs/operating/started/demo-graceful-operation) to gracefully operate an application.
 
-**NOTE:** You can also run this in one step by running: `make install run`
+Alternatively, this [video](https://www.bilibili.com/video/BV1n8411q7sP/?t=15.7) also records the e2e experience.
 
-### Modifying the API definitions
-If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
+## Contact us
+- Twitter: [KusionStack](https://twitter.com/KusionStack)
+- Slack: [Kusionstack](https://join.slack.com/t/kusionstack/shared_invite/zt-19lqcc3a9-_kTNwagaT5qwBE~my5Lnxg)
+- DingTalk (Chinese): 42753001
+- Wechat Group (Chinese)
 
-```sh
-make manifests
-```
+  <img src="docs/wx_spark.jpg" width="200" height="200"/>
 
-**NOTE:** Run `make --help` for more information on all potential `make` targets
+## 🎖︎ Contribution guide
 
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
-
-## License
-
-Copyright 2023.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
+KusionStack Operating is currently in development, and there are many capabilities that need to be made up, so we welcome everyone to participate in construction with us. Visit the [Contribution Guide](docs/contributing.md) to understand how to participate in the contribution KusionStack project. If you have any questions, please [Submit the Issue](https://github.com/KusionStack/operating/issues).
