@@ -21,7 +21,7 @@ extends native Pod lifecycle with more phase, like `PreCheck`, `Preparing`, `Pos
 * Streamlined pod operation
 
 [**ResourceConsist**](https://kusionstack.io/docs/operating/manuals/resourceconsist) framework facilitates 
-a graceful way to integrate resource operation around Pods, like traffic control, into PodOpsLifecycle.
+a graceful way to integrate resource management around Pods, like traffic control, into PodOpsLifecycle.
 
 * Risk management
 
