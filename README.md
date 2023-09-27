@@ -49,7 +49,7 @@ Alternatively, this [video](https://www.bilibili.com/video/BV1n8411q7sP/?t=15.7)
 
 ## 🎖︎ Contribution guide
 
-KusionStack Operating is currently in its early stagesOur goal is to simplify platform development. 
+KusionStack Operating is currently in its early stages. Our goal is to simplify platform development. 
 We will continue building in areas such as application operations, observability, and insight.
 We welcome everyone to participate in construction with us. Visit the [Contribution Guide](docs/contributing.md) 
 to understand how to participate in the contribution KusionStack project. 
