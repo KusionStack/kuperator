@@ -28,6 +28,6 @@ const (
 
 // well known variables
 const (
-	PodOpsLifecyclePreTrafficOffStage = "PreTrafficOff"
-	PodOpsLifecyclePreTrafficOnStage  = "PreTrafficOn"
+	PodOpsLifecyclePreCheckStage  = "PreCheck"
+	PodOpsLifecyclePostCheckStage = "PostCheck"
 )

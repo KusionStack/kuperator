@@ -62,7 +62,7 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 				v1alpha1.PodOperationTypeLabelPrefix,
 				v1alpha1.PodPreCheckLabelPrefix,
 				v1alpha1.PodPreCheckedLabelPrefix,
-				v1alpha1.PodPrepareLabelPrefix,
+				v1alpha1.PodPreparingLabelPrefix,
 				v1alpha1.PodOperateLabelPrefix} {
 
 				delete(newPod.Labels, fmt.Sprintf("%s/%s", v, id))
@@ -76,16 +76,16 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 			operatingCount++
 
 			if _, ok := labels[v1alpha1.PodPreCheckedLabelPrefix]; ok { // pre-checked
-				_, hasPrepare := labels[v1alpha1.PodPrepareLabelPrefix]
+				_, hasPrepare := labels[v1alpha1.PodPreparingLabelPrefix]
 				_, hasOperate := labels[v1alpha1.PodOperateLabelPrefix]
 
 				if !hasPrepare && !hasOperate {
 					delete(newPod.Labels, v1alpha1.PodServiceAvailableLabel)
 
-					lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, id)) // prepare
+					lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodPreparingLabelPrefix, id)) // prepare
 				} else if !hasOperate {
 					if ready, _ := lc.readyToUpgrade(newPod); ready {
-						delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodPrepareLabelPrefix, id))
+						delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodPreparingLabelPrefix, id))
 
 						lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id)) // operate
 					}
@@ -98,8 +98,8 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 		}
 
 		if _, ok := labels[v1alpha1.PodPostCheckedLabelPrefix]; ok { // post-checked
-			if _, ok := labels[v1alpha1.PodCompleteLabelPrefix]; !ok {
-				lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodCompleteLabelPrefix, id)) // complete
+			if _, ok := labels[v1alpha1.PodCompletingLabelPrefix]; !ok {
+				lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodCompletingLabelPrefix, id)) // complete
 			}
 		}
 
@@ -109,7 +109,7 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 		if _, ok := labels[v1alpha1.PodOperatedLabelPrefix]; ok {
 			operatedCount++
 		}
-		if _, ok := labels[v1alpha1.PodCompleteLabelPrefix]; ok { // complete
+		if _, ok := labels[v1alpha1.PodCompletingLabelPrefix]; ok { // complete
 			completeCount++
 		}
 	}
@@ -138,7 +138,7 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 				v1alpha1.PodDoneOperationTypeLabelPrefix,
 				v1alpha1.PodPostCheckLabelPrefix,
 				v1alpha1.PodPostCheckedLabelPrefix,
-				v1alpha1.PodCompleteLabelPrefix} {
+				v1alpha1.PodCompletingLabelPrefix} {
 
 				delete(newPod.Labels, fmt.Sprintf("%s/%s", v, id))
 			}
