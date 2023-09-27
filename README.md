@@ -9,7 +9,7 @@ between platform development and Kubernetes.
 KusionStack Operating currently provides the following features,
 streamlining application operations when developing platforms based on Kubernetes:
 
-* Fine-grained operations
+* Pod operation lifecycle
 
 [**PodOpsLifecycle**](https://kusionstack.io/docs/operating/concepts/podopslifecycle) 
 extends native Pod lifecycle to allow fine-grained operation management, like `PreCheck`, `Preparing` `PostCheck`, etc. 
