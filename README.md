@@ -37,6 +37,8 @@ You can install Operating following [installation doc](https://kusionstack.io/do
 
 Please visit this [tutorial](https://kusionstack.io/docs/operating/started/demo-graceful-operation) to gracefully operate an application.
 
+Alternatively, this [video](https://www.bilibili.com/video/BV1n8411q7sP/?t=15.7) also records the e2e experience.
+
 ## Contact us
 - Twitter: [KusionStack](https://twitter.com/KusionStack)
 - Slack: [Kusionstack](https://join.slack.com/t/kusionstack/shared_invite/zt-19lqcc3a9-_kTNwagaT5qwBE~my5Lnxg)
