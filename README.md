@@ -12,7 +12,7 @@ streamlining application operations when developing platforms based on Kubernete
 * Fine-grained operations
 
 [**PodOpsLifecycle**](https://kusionstack.io/docs/operating/concepts/podopslifecycle) 
-extends native Pod lifecycle to allow fine-grained operation management. 
+extends native Pod lifecycle to allow fine-grained operation management, like `PreCheck`, `Preparing` `PostCheck`, etc. 
 
 * Advanced workloads
 
@@ -20,11 +20,13 @@ extends native Pod lifecycle to allow fine-grained operation management.
 
 * Streamlined pod operation
 
-[**ResourceConsist**](https://kusionstack.io/docs/operating/manuals/resourceconsist) framework facilitates a graceful way to integrate resource operation around Pods, like traffic control, into PodOpsLifecycle.
+[**ResourceConsist**](https://kusionstack.io/docs/operating/manuals/resourceconsist) framework facilitates 
+a graceful way to integrate resource operation around Pods, like traffic control, into PodOpsLifecycle.
 
 * Risk management
 
-[**PodTransitionRule**](https://kusionstack.io/docs/operating/manuals/podtransitionrule) is responsible to keep operational risks under control.
+[**PodTransitionRule**](https://kusionstack.io/docs/operating/manuals/podtransitionrule) 
+is responsible to keep Pod operation risks under control.
 
 ## Getting started
 
