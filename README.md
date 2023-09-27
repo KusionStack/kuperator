@@ -2,12 +2,12 @@
 
 KusionStack Operating ([official site](https://kusionstack.io/docs/operating/introduction/)) provides a set of workloads and operators
 built on Kubernetes Custom Resource Definitions (CRDs), with a primary aim of bridging the gap 
-between application management and Kubernetes.
+between platform development and Kubernetes.
 
 ## Key features
 
 KusionStack Operating collaborates with various KusionStack components to achieve the following features, 
-streamlining both platform development and application operations based on Kubernetes:
+streamlining application operations when developing platform based on Kubernetes:
 
 * Advanced workloads
 
@@ -49,4 +49,8 @@ Alternatively, this [video](https://www.bilibili.com/video/BV1n8411q7sP/?t=15.7)
 
 ## 🎖︎ Contribution guide
 
-KusionStack Operating is currently in development, and there are many capabilities that need to be made up, so we welcome everyone to participate in construction with us. Visit the [Contribution Guide](docs/contributing.md) to understand how to participate in the contribution KusionStack project. If you have any questions, please [Submit the Issue](https://github.com/KusionStack/operating/issues).
+KusionStack Operating is currently in its early stagesOur goal is to simplify platform development. 
+We will continue building in areas such as application operations, observability, and insight.
+We welcome everyone to participate in construction with us. Visit the [Contribution Guide](docs/contributing.md) 
+to understand how to participate in the contribution KusionStack project. 
+If you have any questions, please [Submit the Issue](https://github.com/KusionStack/operating/issues).
