@@ -6,7 +6,7 @@ between platform development and Kubernetes.
 
 ## Key features
 
-KusionStack Operating collaborates with various KusionStack components to achieve the following features, 
+KusionStack Operating currently provides the following features,
 streamlining application operations when developing platforms based on Kubernetes:
 
 * Advanced workloads
