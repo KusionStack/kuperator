@@ -1,6 +1,6 @@
 # Operating
 
-KusionStack Operating ([official site](https://kusionstack.io/docs/operating)) provides a set of workloads and operators
+KusionStack Operating ([official site](https://kusionstack.io/docs/operating/introduction/)) provides a set of workloads and operators
 built on Kubernetes Custom Resource Definitions (CRDs), with a primary aim of bridging the gap 
 between application management and Kubernetes.
 
