@@ -9,21 +9,20 @@ between platform development and Kubernetes.
 KusionStack Operating currently provides the following features,
 streamlining application operations when developing platforms based on Kubernetes:
 
-* Advanced workloads
-
-KusionStack Operating offers multiple workloads to ensure the convenient and effective delivery and operation of application resources.
-
-[**CollaSet**](https://kusionstack.io/docs/operating/manuals/collaset) designed to manage Pods with a range of scale and update strategies.
-
 * Fine-grained operations
 
-[**PodOpsLifecycle**](https://kusionstack.io/docs/operating/concepts/podopslifecycle) allows various roles like application developers and SREs to collaboratively operate on a single Pod in parallel.
+[**PodOpsLifecycle**](https://kusionstack.io/docs/operating/concepts/podopslifecycle) 
+extends native Pod lifecycle to allow fine-grained operation management. 
+
+* Advanced workloads
+
+[**CollaSet**](https://kusionstack.io/docs/operating/manuals/collaset) designed to manage Pods with respect to PodOpsLifecycle.
 
 * Streamlined pod operation
 
-[**ResourceConsist**](https://kusionstack.io/docs/operating/manuals/resourceconsist) framework facilitates the graceful participation of multiple resources related to Pods in the Pod operation process.
+[**ResourceConsist**](https://kusionstack.io/docs/operating/manuals/resourceconsist) framework facilitates a graceful way to integrate resource operation around Pods, like traffic control, into PodOpsLifecycle.
 
-* Integrated risk management
+* Risk management
 
 [**PodTransitionRule**](https://kusionstack.io/docs/operating/manuals/podtransitionrule) is responsible to keep operational risks under control.
 
