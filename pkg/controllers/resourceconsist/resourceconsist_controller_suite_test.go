@@ -34,12 +34,23 @@ type DemoReconcile struct {
 }
 
 var _ ReconcileAdapter = &DemoReconcile{}
+var _ ReconcileLifecycleOptions = &DemoReconcile{}
+
+var needRecordEmployees = false
 
 func NewDemoReconcileAdapter(c client.Client, rc *DemoResourceProviderClient) *DemoReconcile {
 	return &DemoReconcile{
 		Client:                 c,
 		resourceProviderClient: rc,
 	}
+}
+
+func (r *DemoReconcile) FollowPodOpsLifeCycle() bool {
+	return true
+}
+
+func (r *DemoReconcile) NeedRecordEmployees() bool {
+	return needRecordEmployees
 }
 
 func (r *DemoReconcile) GetSelectedEmployeeNames(ctx context.Context, employer client.Object) ([]string, error) {
@@ -64,10 +75,6 @@ func (r *DemoReconcile) GetSelectedEmployeeNames(ctx context.Context, employer c
 
 func (r *DemoReconcile) GetControllerName() string {
 	return "demo-controller"
-}
-
-func (r *DemoReconcile) NotFollowPodOpsLifeCycle() bool {
-	return false
 }
 
 func (r *DemoReconcile) GetExpectedEmployer(ctx context.Context, employer client.Object) ([]IEmployer, error) {
