@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -202,7 +203,6 @@ func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, exp
 	toAddLifecycleFlzEmployees, toDeleteLifecycleFlzEmployees := r.getToAddDeleteLifecycleFlzEmployees(
 		succCreate, succDelete, succUpdate, toCudEmployees.Unchanged)
 
-	recordedNotSelected := make(map[string]bool)
 	lifecycleOptions, lifecycleOptionsImplemented := r.adapter.(ReconcileLifecycleOptions)
 	needRecordEmployees := lifecycleOptionsImplemented && lifecycleOptions.FollowPodOpsLifeCycle() && lifecycleOptions.NeedRecordEmployees()
 	if needRecordEmployees {
@@ -215,7 +215,6 @@ func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, exp
 			selectedSet := sets.NewString(selectedEmployees...)
 			for _, recordedEmployee := range recordedEmployees {
 				if !selectedSet.Has(recordedEmployee) {
-					recordedNotSelected[recordedEmployee] = true
 					toDeleteLifecycleFlzEmployees = append(toDeleteLifecycleFlzEmployees, recordedEmployee)
 				}
 			}
@@ -237,8 +236,14 @@ func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, exp
 			}
 		} else {
 			recordedEmployees := strings.Split(employer.GetAnnotations()[lifecycleFinalizerRecordedAnnoKey], ",")
-			if !reflect.DeepEqual(recordedEmployees, toAddLifecycleFlzEmployees) {
+			if len(recordedEmployees) != len(toAddLifecycleFlzEmployees) {
 				needUpdate = true
+			} else {
+				sort.Strings(recordedEmployees)
+				sort.Strings(toAddLifecycleFlzEmployees)
+				if !reflect.DeepEqual(recordedEmployees, toAddLifecycleFlzEmployees) {
+					needUpdate = true
+				}
 			}
 		}
 		if needUpdate {
