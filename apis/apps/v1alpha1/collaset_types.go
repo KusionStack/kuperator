@@ -204,7 +204,7 @@ type CollaSetStatus struct {
 	// +optional
 	UpdatedRevision string `json:"updatedRevision,omitempty"`
 
-	// Count of hash collisions for the DaemonSet. The DaemonSet controller
+	// Count of hash collisions for the CollaSet. The CollaSet controller
 	// uses this field as a collision avoidance mechanism when it needs to
 	// create the name for the newest ControllerRevision.
 	// +optional
