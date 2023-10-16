@@ -34,6 +34,10 @@ type ReconcileOptions interface {
 
 // ReconcileWatchOptions defines what employer and employee is and how controller watch
 // default employer: Service, default employee: Pod
+// Recommend:
+// implement ReconcileWatchOptions if Employer resource might be reconciled by other controller,
+// different Predicates make an employer won't be reconciled by more than one controller so that LifecycleFinalizer won't
+// be solved incorrectly.
 type ReconcileWatchOptions interface {
 	NewEmployer() client.Object
 	NewEmployee() client.Object
@@ -43,10 +47,19 @@ type ReconcileWatchOptions interface {
 	EmployeePredicates() predicate.Funcs
 }
 
+// ReconcileLifecycleOptions defines whether PodOpsLifecycle followed and
+// whether employees' LifecycleFinalizer conditions need to be Record/Erase to employer's anno
+// actually NeedRecordEmployees only needed for those adapters that follow PodOpsLifecycle,
+// in the case of employment relationship might change and resources in backend provider might be changed by others.
+// if not implemented, the two options would be FollowPodOpsLifeCycle: true and NeedRecordEmployees: false
+type ReconcileLifecycleOptions interface {
+	FollowPodOpsLifeCycle() bool
+	NeedRecordEmployees() bool
+}
+
 // ReconcileAdapter is the interface that customized controllers should implement.
 type ReconcileAdapter interface {
 	GetControllerName() string
-	NotFollowPodOpsLifeCycle() bool
 
 	GetSelectedEmployeeNames(ctx context.Context, employer client.Object) ([]string, error)
 

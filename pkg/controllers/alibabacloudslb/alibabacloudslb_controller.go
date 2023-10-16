@@ -28,6 +28,7 @@ import (
 )
 
 var _ resourceconsist.ReconcileAdapter = &ReconcileAdapter{}
+var _ resourceconsist.ReconcileLifecycleOptions = &ReconcileAdapter{}
 
 type ReconcileAdapter struct {
 	client.Client
@@ -49,12 +50,16 @@ func NewReconcileAdapter(c client.Client) (*ReconcileAdapter, error) {
 	}, nil
 }
 
-func (r *ReconcileAdapter) GetControllerName() string {
-	return "alibaba-cloud-slb-controller"
+func (r *ReconcileAdapter) FollowPodOpsLifeCycle() bool {
+	return true
 }
 
-func (r *ReconcileAdapter) NotFollowPodOpsLifeCycle() bool {
-	return false
+func (r *ReconcileAdapter) NeedRecordEmployees() bool {
+	return true
+}
+
+func (r *ReconcileAdapter) GetControllerName() string {
+	return "alibaba-cloud-slb-controller"
 }
 
 func (r *ReconcileAdapter) GetExpectedEmployer(ctx context.Context, employer client.Object) ([]resourceconsist.IEmployer, error) {

@@ -17,7 +17,8 @@ limitations under the License.
 package resourceconsist
 
 const (
-	defaultMaxConcurrentReconciles = 5
-	expectedFinalizerAddedAnnoKey  = "resource-consist.kusionstack.io/employees-expected-finalizer-added"
-	cleanFinalizerPrefix           = "resource-consist.kusionstack.io/clean-"
+	defaultMaxConcurrentReconciles    = 5
+	expectedFinalizerAddedAnnoKey     = "resource-consist.kusionstack.io/employees-expected-finalizer-added"
+	lifecycleFinalizerRecordedAnnoKey = "resource-consist.kusionstack.io/employees-lifecycle-finalizer-recorded"
+	cleanFinalizerPrefix              = "resource-consist.kusionstack.io/clean-"
 )

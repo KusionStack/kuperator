@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"sort"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -201,11 +203,62 @@ func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, exp
 	toAddLifecycleFlzEmployees, toDeleteLifecycleFlzEmployees := r.getToAddDeleteLifecycleFlzEmployees(
 		succCreate, succDelete, succUpdate, toCudEmployees.Unchanged)
 
+	lifecycleOptions, lifecycleOptionsImplemented := r.adapter.(ReconcileLifecycleOptions)
+	needRecordEmployees := lifecycleOptionsImplemented && lifecycleOptions.FollowPodOpsLifeCycle() && lifecycleOptions.NeedRecordEmployees()
+	if needRecordEmployees {
+		if employer.GetAnnotations()[lifecycleFinalizerRecordedAnnoKey] != "" {
+			selectedEmployees, err := r.adapter.GetSelectedEmployeeNames(ctx, employer)
+			if err != nil {
+				return false, false, fmt.Errorf("GetSelectedEmployeeNames failed, err: %s", err.Error())
+			}
+			recordedEmployees := strings.Split(employer.GetAnnotations()[lifecycleFinalizerRecordedAnnoKey], ",")
+			selectedSet := sets.NewString(selectedEmployees...)
+			for _, recordedEmployee := range recordedEmployees {
+				if !selectedSet.Has(recordedEmployee) {
+					toDeleteLifecycleFlzEmployees = append(toDeleteLifecycleFlzEmployees, recordedEmployee)
+				}
+			}
+		}
+	}
+
 	ns := employer.GetNamespace()
 	lifecycleFlz := GenerateLifecycleFinalizer(employer.GetName())
 	err = r.ensureLifecycleFinalizer(ctx, ns, lifecycleFlz, toAddLifecycleFlzEmployees, toDeleteLifecycleFlzEmployees)
 	if err != nil {
 		return false, false, fmt.Errorf("ensureLifecycleFinalizer failed, err: %s", err.Error())
+	}
+
+	if needRecordEmployees {
+		needUpdate := false
+		if employer.GetAnnotations()[lifecycleFinalizerRecordedAnnoKey] == "" {
+			if len(toAddLifecycleFlzEmployees) != 0 {
+				needUpdate = true
+			}
+		} else {
+			recordedEmployees := strings.Split(employer.GetAnnotations()[lifecycleFinalizerRecordedAnnoKey], ",")
+			if len(recordedEmployees) != len(toAddLifecycleFlzEmployees) {
+				needUpdate = true
+			} else {
+				sort.Strings(recordedEmployees)
+				sort.Strings(toAddLifecycleFlzEmployees)
+				if !reflect.DeepEqual(recordedEmployees, toAddLifecycleFlzEmployees) {
+					needUpdate = true
+				}
+			}
+		}
+		if needUpdate {
+			patch := client.MergeFrom(employer.DeepCopyObject().(client.Object))
+			annos := employer.GetAnnotations()
+			if annos == nil {
+				annos = make(map[string]string)
+			}
+			annos[lifecycleFinalizerRecordedAnnoKey] = strings.Join(toAddLifecycleFlzEmployees, ",")
+			employer.SetAnnotations(annos)
+			err = r.Client.Patch(ctx, employer, patch)
+			if err != nil {
+				return false, false, fmt.Errorf("patch lifecycleFinalizerRecordedAnno failed, err: %s", err.Error())
+			}
+		}
 	}
 
 	isClean := len(toCudEmployees.ToCreate) == 0 && len(toCudEmployees.ToUpdate) == 0 && len(toCudEmployees.Unchanged) == 0 && len(failDelete) == 0
@@ -217,7 +270,8 @@ func (r *Consist) syncEmployees(ctx context.Context, employer client.Object, exp
 func (r *Consist) ensureExpectedFinalizer(ctx context.Context, employer client.Object) (bool, error) {
 	// employee is not pod or not follow PodOpsLifecycle
 	watchOptions, watchOptionsImplemented := r.adapter.(ReconcileWatchOptions)
-	if r.adapter.NotFollowPodOpsLifeCycle() || (watchOptionsImplemented && !isPod(watchOptions.NewEmployee())) {
+	lifecycleOptions, lifecycleOptionsImplemented := r.adapter.(ReconcileLifecycleOptions)
+	if (lifecycleOptionsImplemented && !lifecycleOptions.FollowPodOpsLifeCycle()) || (watchOptionsImplemented && !isPod(watchOptions.NewEmployee())) {
 		return true, nil
 	}
 
@@ -550,7 +604,8 @@ func (r *Consist) getToAddDeleteLifecycleFlzEmployees(succCreate, succDelete, su
 
 	watchOptions, watchOptionsImplemented := r.adapter.(ReconcileWatchOptions)
 
-	if r.adapter.NotFollowPodOpsLifeCycle() || (watchOptionsImplemented && !isPod(watchOptions.NewEmployee())) {
+	lifecycleOptions, lifecycleOptionsImplemented := r.adapter.(ReconcileLifecycleOptions)
+	if (lifecycleOptionsImplemented && !lifecycleOptions.FollowPodOpsLifeCycle()) || (watchOptionsImplemented && !isPod(watchOptions.NewEmployee())) {
 		return toAddLifecycleFlz[:toAddIdx], toDeleteLifecycleFlz[:toDeleteIdx]
 	}
 
