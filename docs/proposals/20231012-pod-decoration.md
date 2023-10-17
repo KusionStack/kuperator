@@ -54,42 +54,41 @@ spec:
     group: envoy    # PDs with same group do injection exclusively. 
     weight: 10      # In same group, heavier PD has higher priority to inject exclusively.
   template:
-    podTemplate:
-      metadata:
-        labels:
-          extra-label: label-value
-          existing-label: label-value
-      spec:
-        containers:              # Update by replace. If there is app container with the same name, overwrite it.
-        - name: sidecar
-          image: nginx:1.23.0
-          orderPriority: 1       # Order to inject. The greater ones placed at the front. Zero represents the position of containers from CollaSet podTemplate.
-        appContainers:           # Update by merge. If a name indicated, then merge to the contrainer with the matched name, otherwise update the last one.
-        - name: app
-          image: nginx: 1.23.0
-          env:
-          - name: SIDECAR_INJECTED
-            value: "true"
-          volumeMounts:
-          - name: foo
-            mountPath: /tmp/foo
-        volumes:
+    metadata:
+      labels:
+        extra-label: label-value
+        existing-label: label-value
+    spec:
+      containers:                         # Update by replace. If there is a container with the same name, overwrite it.
+      - name: sidecar
+        image: nginx:1.23.0
+        injectPolicy: BeforeAppContainer  # Position to inject.
+      appContainers:                      # Update by merge. If a name indicated, then merge to the container with the matched name, otherwise update the one indicated by its policy.
+      - image: nginx: 1.23.0
+        env:
+        - name: SIDECAR_INJECTED
+          value: "true"
+        volumeMounts:
         - name: foo
-          hostPath:
-            path: /tmp/foo
-        affinity:
-          overrideAffinity:     # Update by replace
-            nodeAffinity:
-            podAffinity:
-            podAntiAffinity:
-          nodeSelectorTerm:     # Update by merge
-            matchExpressions:
-            matchFields:
-        tolerations:
-        - key: schedule         # Replace item with same key
-          operator: Equal
-          value: foo
-        runtimeClassName: rund
+          mountPath: /tmp/foo
+        targetSelectPolicy: AllAppContainers  # Indicates this configuration should be injected into all app containers.
+      volumes:
+      - name: foo
+        hostPath:
+          path: /tmp/foo
+      affinity:
+        overrideAffinity:     # Update by replace
+          nodeAffinity:
+          podAffinity:
+          podAntiAffinity:
+        nodeSelectorTerm:     # Update by merge
+          matchExpressions:
+          matchFields:
+      tolerations:
+      - key: schedule         # Replace item with same key
+        operator: Equal
+        value: foo
+      runtimeClassName: rund
 status:
   affectedWorkloads:
   - name: collaset-a
