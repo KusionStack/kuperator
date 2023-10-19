@@ -85,10 +85,13 @@ var _ = Describe("resource-consist-controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(func() bool {
 				svcTmp := corev1.Service{}
-				Expect(mgr.GetClient().Get(context.TODO(), types.NamespacedName{
+				err = mgr.GetClient().Get(context.TODO(), types.NamespacedName{
 					Name:      svc0.Name,
 					Namespace: svc0.Namespace,
-				}, &svcTmp)).Should(BeNil())
+				}, &svcTmp)
+				if err != nil {
+					return false
+				}
 				for _, flz := range svcTmp.GetFinalizers() {
 					if flz == cleanFinalizerPrefix+svc0.GetName() {
 						return true
