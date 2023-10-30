@@ -105,8 +105,7 @@ release:
 
 dockers:
 - image_templates:
-  - 'kusionstack/{{ .ProjectName }}:{{ .Tag }}'
-  - 'kusionstack/{{ .ProjectName }}:latest'
+  - 'kusionstack/{{ .ProjectName }}:{{ .Tag }}-amd64'
   dockerfile: releaser.Dockerfile
   goos: linux
   goarch: amd64
@@ -119,3 +118,27 @@ dockers:
   - "--label=org.opencontainers.image.version={{.Version}}"
   - "--label=org.opencontainers.image.source={{.GitURL}}"
   - "--platform=linux/amd64"
+- image_templates:
+  - 'kusionstack/{{ .ProjectName }}:{{ .Tag }}-arm64'
+  dockerfile: releaser.Dockerfile
+  goos: linux
+  goarch: arm64
+  use: docker
+  build_flag_templates:
+  - "--pull"
+  - "--label=org.opencontainers.image.created={{.Date}}"
+  - "--label=org.opencontainers.image.name={{.ProjectName}}"
+  - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+  - "--label=org.opencontainers.image.version={{.Version}}"
+  - "--label=org.opencontainers.image.source={{.GitURL}}"
+  - "--platform=linux/arm64"
+
+docker_manifests:
+- name_template: 'kusionstack/{{ .ProjectName }}:{{ .Tag }}'
+  image_templates:
+  - 'kusionstack/{{ .ProjectName }}:{{ .Tag }}-amd64'
+  - 'kusionstack/{{ .ProjectName }}:{{ .Tag }}-arm64'
+- name_template: 'kusionstack/{{ .ProjectName }}:latest'
+  image_templates:
+  - 'kusionstack/{{ .ProjectName }}:{{ .Tag }}-amd64'
+  - 'kusionstack/{{ .ProjectName }}:{{ .Tag }}-arm64'
