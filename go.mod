@@ -57,7 +57,6 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
-	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/googleapis/gnostic v0.5.5 // indirect
@@ -119,6 +118,7 @@ replace (
 	k8s.io/klog/v2 => k8s.io/klog/v2 v2.9.0
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.22.6
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.22.6
+	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20211109043538-20434351676c
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.22.6
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.22.6
 	k8s.io/kubectl => k8s.io/kubectl v0.22.6
