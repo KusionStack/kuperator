@@ -99,8 +99,8 @@ require (
 )
 
 replace (
-	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.6.3
 	github.com/go-logr/logr => github.com/go-logr/logr v0.4.0
+	github.com/go-logr/zapr => github.com/go-logr/zapr v0.4.0
 	github.com/onsi/gomega => github.com/onsi/gomega v1.15.0
 	k8s.io/api => k8s.io/api v0.22.6
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.22.6
