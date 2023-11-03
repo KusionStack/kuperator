@@ -28,6 +28,10 @@ func init() {
 	AddToManagerFuncs = append(AddToManagerFuncs, Add)
 }
 
+// +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
+
 func Add(manager manager.Manager) error {
 	if !feature.DefaultFeatureGate.Enabled(features.AlibabaCloudSlb) {
 		return nil
