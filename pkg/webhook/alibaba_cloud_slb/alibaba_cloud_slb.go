@@ -14,6 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package alibabacloudslb
+package alibaba_cloud_slb
 
-const alibabaCloudSlbLbIdLabelKey = "service.k8s.alibaba/loadbalancer-id"
+import (
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	"kusionstack.io/resourceconsist/pkg/adapters"
+)
+
+func Add(mgr manager.Manager) error {
+	return adapters.AddBuiltinWebhookAdaptersToMgr(mgr, []adapters.AdapterName{adapters.AdapterAlibabaCloudSlb})
+}
