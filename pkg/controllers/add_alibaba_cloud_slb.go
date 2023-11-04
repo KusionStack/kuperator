@@ -19,23 +19,23 @@ package controllers
 import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"kusionstack.io/operating/pkg/controllers/alibabacloudslb"
-	"kusionstack.io/operating/pkg/controllers/resourceconsist"
 	"kusionstack.io/operating/pkg/features"
 	"kusionstack.io/operating/pkg/utils/feature"
+	"kusionstack.io/resourceconsist/pkg/adapters"
 )
 
 func init() {
 	AddToManagerFuncs = append(AddToManagerFuncs, Add)
 }
 
+// +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
+
 func Add(manager manager.Manager) error {
 	if !feature.DefaultFeatureGate.Enabled(features.AlibabaCloudSlb) {
 		return nil
 	}
-	reconcileAdapter, err := alibabacloudslb.NewReconcileAdapter(manager.GetClient())
-	if err != nil {
-		return err
-	}
-	return resourceconsist.Add(manager, reconcileAdapter)
+
+	return adapters.AddBuiltinControllerAdaptersToMgr(manager, []adapters.AdapterName{adapters.AdapterAlibabaCloudSlb})
 }

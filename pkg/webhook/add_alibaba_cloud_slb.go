@@ -14,11 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package resourceconsist
+package webhook
 
-const (
-	defaultMaxConcurrentReconciles    = 5
-	expectedFinalizerAddedAnnoKey     = "resource-consist.kusionstack.io/employees-expected-finalizer-added"
-	lifecycleFinalizerRecordedAnnoKey = "resource-consist.kusionstack.io/employees-lifecycle-finalizer-recorded"
-	cleanFinalizerPrefix              = "resource-consist.kusionstack.io/clean-"
+import (
+	"kusionstack.io/operating/pkg/webhook/alibaba_cloud_slb"
 )
+
+func init() {
+	// AddToManagerFuncs is a list of functions to create webhook servers and add them to a manager.
+	AddToManagerFuncs = append(AddToManagerFuncs, alibaba_cloud_slb.Add)
+}
