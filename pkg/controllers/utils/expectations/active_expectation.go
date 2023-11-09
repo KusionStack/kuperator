@@ -70,18 +70,10 @@ func init() {
 	}
 }
 
-func ActiveExpectationKeyFunc(object interface{}) (string, error) {
-	expectation, ok := object.(*ActiveExpectation)
-	if !ok {
-		return "", fmt.Errorf("fail to convert to active expectation")
-	}
-	return expectation.key, nil
-}
-
 func NewActiveExpectations(client client.Client) *ActiveExpectations {
 	return &ActiveExpectations{
 		Client:   client,
-		subjects: cache.NewStore(ActiveExpectationKeyFunc),
+		subjects: cache.NewStore(ExpKeyFunc),
 	}
 }
 

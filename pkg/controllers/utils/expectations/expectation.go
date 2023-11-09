@@ -229,5 +229,8 @@ var ExpKeyFunc = func(obj interface{}) (string, error) {
 	if e, ok := obj.(*ResourceVersionExpectationItem); ok {
 		return e.key, nil
 	}
+	if e, ok := obj.(*ActiveExpectation); ok {
+		return e.key, nil
+	}
 	panic(fmt.Sprintf("Could not find key for obj %#v", obj))
 }
