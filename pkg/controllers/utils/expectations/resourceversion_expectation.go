@@ -53,24 +53,24 @@ func (r *ResourceVersionExpectation) DeleteExpectations(controllerKey string) {
 func (r *ResourceVersionExpectation) SatisfiedExpectations(controllerKey string, resourceVersion string) bool {
 	if exp, exists, err := r.GetExpectations(controllerKey); exists {
 		if exp.Fulfilled(resourceVersion) {
-			klog.Infof("Accuracy expectations fulfilled %s", controllerKey)
+			klog.Infof("ResourceVersion expectations fulfilled %s", controllerKey)
 			return true
 		} else if exp.isExpired() {
-			klog.Errorf("Accuracy expectation expired for key %s", controllerKey)
-			panic(fmt.Sprintf("expected panic for accuracy expectation timeout for key %s", controllerKey))
+			klog.Errorf("ResourceVersion expectation expired for key %s", controllerKey)
+			panic(fmt.Sprintf("expected panic for resourceversion expectation timeout for key %s", controllerKey))
 		} else {
-			klog.V(4).Infof("Controller still waiting on accuracy expectations %s", controllerKey)
+			klog.V(4).Infof("Controller still waiting on resourceversion expectations %s", controllerKey)
 			return false
 		}
 	} else if err != nil {
-		klog.V(2).Infof("Error encountered while checking accuracy expectations %#v, forcing sync", err)
+		klog.V(2).Infof("Error encountered while checking resourceversion expectations %#v, forcing sync", err)
 	} else {
 		// When a new controller is created, it doesn't have expectations.
 		// When it doesn't see expected watch events for > TTL, the expectations expire.
 		//	- In this case it wakes up, creates/deletes controllees, and sets expectations again.
 		// When it has satisfied expectations and no controllees need to be created/destroyed > TTL, the expectations expire.
 		//	- In this case it continues without setting expectations till it needs to create/delete controllees.
-		klog.V(4).Infof("Accuracy controller %v either never recorded expectations, or the ttl expired.", controllerKey)
+		klog.V(4).Infof("ResourceVersion controller %v either never recorded expectations, or the ttl expired.", controllerKey)
 	}
 	// Trigger a sync if we either encountered and error (which shouldn't happen since we're
 	// getting from local store) or this controller hasn't established expectations.

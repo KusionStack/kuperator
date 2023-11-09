@@ -27,6 +27,7 @@ import (
 	"github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -82,4 +83,18 @@ func StartTestManager(mgr manager.Manager, g *gomega.GomegaWithT) (chan struct{}
 		g.Expect(mgr.Start(ctx)).NotTo(gomega.HaveOccurred())
 	}()
 	return stop, wg
+}
+
+func Setup(t *testing.T) (g *gomega.GomegaWithT, r reconcile.Reconciler, mgr manager.Manager, client client.Client, stopFun func()) {
+	g = gomega.NewGomegaWithT(t)
+	mgr, err := manager.New(cfg, manager.Options{
+		MetricsBindAddress: "0",
+	})
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+
+	stopMgr, mgrStopped := StartTestManager(mgr, g)
+	return g, r, mgr, mgr.GetClient(), func() {
+		close(stopMgr)
+		mgrStopped.Wait()
+	}
 }

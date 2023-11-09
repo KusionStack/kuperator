@@ -24,34 +24,9 @@ import (
 	"golang.org/x/net/context"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-var c client.Client
-
-var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}
-
-var depKey = types.NamespacedName{Name: "foo-deployment", Namespace: "default"}
-
-func Setup(t *testing.T) (g *gomega.GomegaWithT, r reconcile.Reconciler, mgr manager.Manager, client client.Client, stopFun func()) {
-	g = gomega.NewGomegaWithT(t)
-	mgr, err := manager.New(cfg, manager.Options{
-		MetricsBindAddress: "0",
-	})
-	g.Expect(err).NotTo(gomega.HaveOccurred())
-	c = mgr.GetClient()
-
-	stopMgr, mgrStopped := StartTestManager(mgr, g)
-	return g, r, mgr, mgr.GetClient(), func() {
-		close(stopMgr)
-		mgrStopped.Wait()
-	}
-}
-
-func TestReconcileResponsePodEvent(t *testing.T) {
+func TestActiveExpectations(t *testing.T) {
 	g, _, _, client, stopFunc := Setup(t)
 	defer func() {
 		stopFunc()
