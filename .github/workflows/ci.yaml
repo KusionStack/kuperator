@@ -39,12 +39,13 @@ jobs:
       run: |
         make test
         git status
-    # TODO: enable after public
-    #    - name: Publish Unit Test Coverage
-    #      uses: codecov/codecov-action@v3
-    #      with:
-    #        flags: unittests
-    #        file: cover.out
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3.1.4
+      with:
+        flags: unittests
+        file: cover.out
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     - name: Check diff
       run: '[[ -z $(git status -s) ]] || (printf "Existing modified/untracked files.\nPlease run \"make generate manifests fmt vet\" and push again.\n"; exit 1)'
 
