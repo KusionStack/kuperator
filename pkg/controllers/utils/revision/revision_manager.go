@@ -163,6 +163,7 @@ func (rm *RevisionManager) ConstructRevisions(set client.Object, dryRun bool) (*
 			}
 		}
 
+		revisions = append(revisions, updateRevision)
 		createNewRevision = true
 	}
 
@@ -181,11 +182,8 @@ func (rm *RevisionManager) ConstructRevisions(set client.Object, dryRun bool) (*
 	return currentRevision, updateRevision, revisions, collisionCount, createNewRevision, nil
 }
 
-func (rm *RevisionManager) cleanExpiredRevision(cd metav1.Object, sortedRevisions *[]*apps.ControllerRevision) (*[]*apps.ControllerRevision, error) {
-	limit := int(rm.ownerGetter.GetHistoryLimit(cd))
-	if limit <= 0 {
-		limit = 10
-	}
+func (rm *RevisionManager) cleanExpiredRevision(set metav1.Object, sortedRevisions *[]*apps.ControllerRevision) (*[]*apps.ControllerRevision, error) {
+	limit := int(rm.ownerGetter.GetHistoryLimit(set))
 
 	// reserve 2 extra unused revisions for diagnose
 	exceedNum := len(*sortedRevisions) - limit - 2
@@ -198,7 +196,7 @@ func (rm *RevisionManager) cleanExpiredRevision(cd metav1.Object, sortedRevision
 			break
 		}
 
-		if rm.ownerGetter.IsInUsed(cd, revision.Name) {
+		if rm.ownerGetter.IsInUsed(set, revision.Name) {
 			continue
 		}
 

@@ -210,7 +210,7 @@ func calculateStatus(instance *appsv1alpha1.CollaSet, newStatus *appsv1alpha1.Co
 		replicas++
 
 		isUpdated := false
-		if isUpdated = controllerutils.IsPodUpdatedRevision(podWrapper.Pod, updatedRevision.Name); isUpdated {
+		if isUpdated = utils.IsPodUpdatedRevision(podWrapper.Pod, updatedRevision.Name); isUpdated {
 			updatedReplicas++
 		}
 
@@ -229,7 +229,7 @@ func calculateStatus(instance *appsv1alpha1.CollaSet, newStatus *appsv1alpha1.Co
 			}
 		}
 
-		if controllerutils.IsServiceAvailable(podWrapper.Pod) {
+		if controllerutils.IsPodServiceAvailable(podWrapper.Pod) {
 			availableReplicas++
 			if isUpdated {
 				updatedAvailableReplicas++

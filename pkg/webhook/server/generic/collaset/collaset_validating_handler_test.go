@@ -66,10 +66,9 @@ func TestValidatingCollaSet(t *testing.T) {
 	}
 
 	validatingHandler := NewValidatingHandler()
-	mutatingHandler := NewMutatingHandler()
 
 	for i, tc := range successCases {
-		mutatingHandler.setDetaultCollaSet(tc.cls)
+		appsv1alpha1.SetDetaultCollaSet(tc.cls)
 		if err := validatingHandler.validate(tc.cls, tc.old); err != nil {
 			t.Fatalf("got unexpected err for %d case: %s", i, err)
 		}
@@ -397,7 +396,7 @@ func TestValidatingCollaSet(t *testing.T) {
 	}
 
 	for key, tc := range failureCases {
-		mutatingHandler.setDetaultCollaSet(tc.cls)
+		appsv1alpha1.SetDetaultCollaSet(tc.cls)
 		err := validatingHandler.validate(tc.cls, tc.old)
 		if err == nil {
 			t.Fatalf("expected err, got nil in case %s", key)

@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsalphav1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/utils/revision"
 )
 
 func getCollaSetPatch(cls *appsalphav1.CollaSet) ([]byte, error) {
@@ -51,6 +52,8 @@ func getCollaSetPatch(cls *appsalphav1.CollaSet) ([]byte, error) {
 	patch, err := json.Marshal(objCopy)
 	return patch, err
 }
+
+var _ revision.OwnerAdapter = &revisionOwnerAdapter{}
 
 type revisionOwnerAdapter struct {
 }
