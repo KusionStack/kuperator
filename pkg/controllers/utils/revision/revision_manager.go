@@ -26,6 +26,7 @@ import (
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
@@ -41,12 +43,13 @@ import (
 
 const ControllerRevisionHashLabel = "controller.kubernetes.io/hash"
 
+var PodCodec = scheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion)
+
 type OwnerAdapter interface {
 	GetSelector(obj metav1.Object) *metav1.LabelSelector
 	GetCollisionCount(obj metav1.Object) *int32
 	GetHistoryLimit(obj metav1.Object) int32
 	GetPatch(obj metav1.Object) ([]byte, error)
-	GetSelectorLabels(obj metav1.Object) map[string]string
 	GetCurrentRevision(obj metav1.Object) string
 	IsInUsed(obj metav1.Object, controllerRevision string) bool
 }
@@ -259,9 +262,6 @@ func hashControllerRevision(revision *apps.ControllerRevision, probe *int32) str
 	if len(revision.Data.Raw) > 0 {
 		hf.Write(revision.Data.Raw)
 	}
-	if revision.Data.Object != nil {
-		DeepHashObject(hf, revision.Data.Object)
-	}
 	if probe != nil {
 		hf.Write([]byte(strconv.FormatInt(int64(*probe), 10)))
 	}
@@ -287,11 +287,7 @@ func (rm *RevisionManager) newRevision(set metav1.Object, revision int64, collis
 		return nil, err
 	}
 
-	revisionLabels := rm.ownerGetter.GetSelectorLabels(set)
-	if revisionLabels == nil {
-		revisionLabels = map[string]string{}
-	}
-
+	revisionLabels := map[string]string{}
 	if selector := rm.ownerGetter.GetSelector(set); selector != nil {
 		for k, v := range selector.MatchLabels {
 			revisionLabels[k] = v
@@ -309,16 +305,6 @@ func (rm *RevisionManager) newRevision(set metav1.Object, revision int64, collis
 	}
 
 	cr.Namespace = set.GetNamespace()
-	if cr.ObjectMeta.Annotations == nil {
-		cr.ObjectMeta.Annotations = make(map[string]string)
-	}
-	for key, value := range set.GetAnnotations() {
-		cr.ObjectMeta.Annotations[key] = value
-	}
-
-	if cr.ObjectMeta.Labels == nil {
-		cr.ObjectMeta.Labels = make(map[string]string)
-	}
 
 	return cr, nil
 }

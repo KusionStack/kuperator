@@ -78,16 +78,6 @@ func (roa *revisionOwnerAdapter) GetPatch(obj metav1.Object) ([]byte, error) {
 	return getCollaSetPatch(cs)
 }
 
-func (roa *revisionOwnerAdapter) GetSelectorLabels(obj metav1.Object) map[string]string {
-	ips, _ := obj.(*appsalphav1.CollaSet)
-	labels := map[string]string{}
-	for k, v := range ips.Spec.Template.Labels {
-		labels[k] = v
-	}
-
-	return labels
-}
-
 func (roa *revisionOwnerAdapter) GetCurrentRevision(obj metav1.Object) string {
 	ips, _ := obj.(*appsalphav1.CollaSet)
 	return ips.Status.CurrentRevision
