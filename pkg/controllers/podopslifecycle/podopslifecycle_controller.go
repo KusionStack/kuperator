@@ -223,7 +223,8 @@ func (r *ReconcilePodOpsLifecycle) addServiceAvailable(pod *corev1.Pod) (bool, e
 func (r *ReconcilePodOpsLifecycle) removeDirtyExpectedFinalizer(pod *corev1.Pod, notSatisfiedFinalizers map[string]string) (bool, error) {
 	var notDirtyExist bool
 	dirtyExpectedFinalizer := make(map[string]string)
-	// expectedFinalizerKey = fmt.Sprintf("%s/%s/%s", employer.GetObjectKind().GroupVersionKind().Kind, employer.GetNamespace(), employer.GetName())
+	// expectedFinalizerKey is generated under the format(defined in kusionstack.io/resourceconsist):
+	// fmt.Sprintf("%s/%s/%s", employer.GetObjectKind().GroupVersionKind().Kind, employer.GetNamespace(), employer.GetName())
 	// in kusionstack.io/operating, just check Service since we can't determine how a CR selecting pod
 	for expectedFinalizerKey, finalizer := range notSatisfiedFinalizers {
 		keySplits := strings.Split(expectedFinalizerKey, "/")
@@ -264,7 +265,7 @@ func (r *ReconcilePodOpsLifecycle) removeDirtyExpectedFinalizer(pod *corev1.Pod,
 		for dirtyExpectedFinalizerKey := range dirtyExpectedFinalizer {
 			delete(podAvailableConditions.ExpectedFinalizers, dirtyExpectedFinalizerKey)
 		}
-		err = r.patchAvailableConditions(pod, podAvailableConditions)
+		err = r.updateAvailableConditions(pod, podAvailableConditions)
 		if err != nil {
 			return notDirtyExist, err
 		}
@@ -273,25 +274,13 @@ func (r *ReconcilePodOpsLifecycle) removeDirtyExpectedFinalizer(pod *corev1.Pod,
 	return notDirtyExist, nil
 }
 
-func (r *ReconcilePodOpsLifecycle) patchAvailableConditions(pod *corev1.Pod, conditions *v1alpha1.PodAvailableConditions) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		po := &corev1.Pod{}
-		err := r.Client.Get(context.Background(), types.NamespacedName{
-			Namespace: pod.Namespace,
-			Name:      pod.Name,
-		}, po)
-		if err != nil {
-			return err
-		}
-		newAvailableConditions := utils.DumpJSON(conditions)
-		patch := client.RawPatch(types.MergePatchType, controllerutils.GetLabelAnnoPatchBytes(nil, nil,
-			map[string]string{
-				v1alpha1.PodAvailableConditionsAnnotation: pod.GetAnnotations()[v1alpha1.PodAvailableConditionsAnnotation],
-			}, map[string]string{
-				v1alpha1.PodAvailableConditionsAnnotation: newAvailableConditions,
-			}))
-		return r.Client.Patch(context.Background(), po, patch)
-	})
+func (r *ReconcilePodOpsLifecycle) updateAvailableConditions(pod *corev1.Pod, conditions *v1alpha1.PodAvailableConditions) error {
+	newAvailableConditions := utils.DumpJSON(conditions)
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	pod.Annotations[v1alpha1.PodAvailableConditionsAnnotation] = newAvailableConditions
+	return r.Client.Update(context.Background(), pod)
 }
 
 func (r *ReconcilePodOpsLifecycle) updateServiceReadiness(ctx context.Context, pod *corev1.Pod, isReady bool) (bool, error) {

@@ -284,7 +284,7 @@ func SatisfyExpectedFinalizers(pod *corev1.Pod) (bool, map[string]string, error)
 
 	availableConditions, err := PodAvailableConditions(pod)
 	if err != nil {
-		return satisfied, notSatisfiedFinalizers, err
+		return true, notSatisfiedFinalizers, err
 	}
 
 	if availableConditions != nil && len(availableConditions.ExpectedFinalizers) != 0 {
