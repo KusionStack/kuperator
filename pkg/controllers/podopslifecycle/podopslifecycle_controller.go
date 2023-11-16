@@ -261,7 +261,7 @@ func (r *ReconcilePodOpsLifecycle) removeDirtyExpectedFinalizer(pod *corev1.Pod,
 		if err != nil {
 			return notDirtyExist, err
 		}
-		for dirtyExpectedFinalizerKey, _ := range dirtyExpectedFinalizer {
+		for dirtyExpectedFinalizerKey := range dirtyExpectedFinalizer {
 			delete(podAvailableConditions.ExpectedFinalizers, dirtyExpectedFinalizerKey)
 		}
 		err = r.patchAvailableConditions(pod, podAvailableConditions)
