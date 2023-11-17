@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -193,19 +194,102 @@ func (r *ReconcilePodOpsLifecycle) addServiceAvailable(pod *corev1.Pod) (bool, e
 		return false, nil
 	}
 
-	satisfied, _, err := controllerutils.SatisfyExpectedFinalizers(pod) // whether all expected finalizers are satisfied
-	if err != nil || !satisfied {
+	satisfied, notSatisfiedFinalizers, err := controllerutils.SatisfyExpectedFinalizers(pod) // whether all expected finalizers are satisfied
+	if err != nil {
 		return false, err
+	}
+
+	if !satisfied {
+		allDirty, err := r.removeDirtyExpectedFinalizer(pod, notSatisfiedFinalizers)
+		if err != nil {
+			return false, err
+		}
+		if !allDirty {
+			return false, nil
+		}
+		// all not satisfied expected finalizers are dirty, so actually the pod satisfied expected finalizer now
 	}
 
 	if !controllerutils.IsPodReady(pod) {
 		return false, nil
 	}
 
-	labels := map[string]string{
+	podLabelsToAdd := map[string]string{
 		v1alpha1.PodServiceAvailableLabel: strconv.FormatInt(time.Now().Unix(), 10),
 	}
-	return true, r.addLabels(context.Background(), pod, labels)
+	return true, r.addLabels(context.Background(), pod, podLabelsToAdd)
+}
+
+func (r *ReconcilePodOpsLifecycle) removeDirtyExpectedFinalizer(pod *corev1.Pod, notSatisfiedFinalizers map[string]string) (bool, error) {
+	var allDirty bool
+	dirtyExpectedFinalizer := make(map[string]string)
+
+	for expectedFlzKey, finalizer := range notSatisfiedFinalizers {
+		isDirty, err := r.isAvailableConditionDirty(pod, expectedFlzKey)
+		if err != nil {
+			return allDirty, err
+		}
+		if !isDirty {
+			allDirty = false
+			break
+		}
+		dirtyExpectedFinalizer[expectedFlzKey] = finalizer
+	}
+
+	if len(dirtyExpectedFinalizer) > 0 {
+		podAvailableConditions, err := controllerutils.PodAvailableConditions(pod)
+		if err != nil {
+			return allDirty, err
+		}
+		for dirtyExpectedFinalizerKey := range dirtyExpectedFinalizer {
+			delete(podAvailableConditions.ExpectedFinalizers, dirtyExpectedFinalizerKey)
+		}
+		err = r.updateAvailableConditions(pod, podAvailableConditions)
+		if err != nil {
+			return allDirty, err
+		}
+	}
+
+	return allDirty, nil
+}
+
+func (r *ReconcilePodOpsLifecycle) isAvailableConditionDirty(pod *corev1.Pod, expectedFinalizerKey string) (bool, error) {
+	// expectedFinalizerKey is generated under the format(defined in kusionstack.io/resourceconsist):
+	// fmt.Sprintf("%s/%s/%s", employer.GetObjectKind().GroupVersionKind().Kind, employer.GetNamespace(), employer.GetName())
+	// in kusionstack.io/operating, just check Service since we can't determine how a CR selecting pod
+	keySplits := strings.Split(expectedFinalizerKey, "/")
+	if len(keySplits) != 3 {
+		return false, nil
+	}
+	if keySplits[0] != "Service" {
+		return false, nil
+	}
+
+	var svc corev1.Service
+	err := r.Client.Get(context.Background(), types.NamespacedName{
+		Namespace: keySplits[1],
+		Name:      keySplits[2],
+	}, &svc)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	}
+
+	if !labels.Set(svc.Spec.Selector).AsSelector().Matches(labels.Set(pod.GetLabels())) {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (r *ReconcilePodOpsLifecycle) updateAvailableConditions(pod *corev1.Pod, conditions *v1alpha1.PodAvailableConditions) error {
+	newAvailableConditions := utils.DumpJSON(conditions)
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	pod.Annotations[v1alpha1.PodAvailableConditionsAnnotation] = newAvailableConditions
+	return r.Client.Update(context.Background(), pod)
 }
 
 func (r *ReconcilePodOpsLifecycle) updateServiceReadiness(ctx context.Context, pod *corev1.Pod, isReady bool) (bool, error) {

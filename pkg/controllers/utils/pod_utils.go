@@ -278,13 +278,13 @@ func IsPodUpdatedRevision(pod *corev1.Pod, revision string) bool {
 	return pod.Labels[appsv1.ControllerRevisionHashLabelKey] == revision
 }
 
-func SatisfyExpectedFinalizers(pod *corev1.Pod) (bool, []string, error) {
+func SatisfyExpectedFinalizers(pod *corev1.Pod) (bool, map[string]string, error) {
 	satisfied := true
-	var expectedFinalizers []string // expected finalizers that are not satisfied
+	notSatisfiedFinalizers := make(map[string]string) // expected finalizers that are not satisfied
 
 	availableConditions, err := PodAvailableConditions(pod)
 	if err != nil {
-		return satisfied, expectedFinalizers, err
+		return true, notSatisfiedFinalizers, err
 	}
 
 	if availableConditions != nil && len(availableConditions.ExpectedFinalizers) != 0 {
@@ -293,15 +293,15 @@ func SatisfyExpectedFinalizers(pod *corev1.Pod) (bool, []string, error) {
 			existFinalizers.Insert(finalizer)
 		}
 
-		for _, finalizer := range availableConditions.ExpectedFinalizers {
+		for expectedFlzKey, finalizer := range availableConditions.ExpectedFinalizers {
 			if !existFinalizers.Has(finalizer) {
 				satisfied = false
-				expectedFinalizers = append(expectedFinalizers, finalizer)
+				notSatisfiedFinalizers[expectedFlzKey] = finalizer
 			}
 		}
 	}
 
-	return satisfied, expectedFinalizers, nil
+	return satisfied, notSatisfiedFinalizers, nil
 }
 
 func PodAvailableConditions(pod *corev1.Pod) (*v1alpha1.PodAvailableConditions, error) {
