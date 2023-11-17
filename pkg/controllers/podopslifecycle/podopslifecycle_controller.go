@@ -230,11 +230,11 @@ func (r *ReconcilePodOpsLifecycle) removeDirtyExpectedFinalizer(pod *corev1.Pod,
 		keySplits := strings.Split(expectedFinalizerKey, "/")
 		if len(keySplits) != 3 {
 			notDirtyExist = true
-			continue
+			break
 		}
 		if keySplits[0] != "Service" {
 			notDirtyExist = true
-			continue
+			break
 		}
 
 		var svc corev1.Service
@@ -255,6 +255,7 @@ func (r *ReconcilePodOpsLifecycle) removeDirtyExpectedFinalizer(pod *corev1.Pod,
 			continue
 		}
 		notDirtyExist = true
+		break
 	}
 
 	if len(dirtyExpectedFinalizer) > 0 {
