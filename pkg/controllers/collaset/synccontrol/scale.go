@@ -20,7 +20,6 @@ import (
 	"sort"
 
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
-	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 )
 
@@ -52,5 +51,5 @@ func (s ActivePodsForDeletion) Less(i, j int) bool {
 		return false
 	}
 
-	return controllerutils.ComparePod(l.Pod, r.Pod)
+	return collasetutils.ComparePod(l.Pod, r.Pod)
 }

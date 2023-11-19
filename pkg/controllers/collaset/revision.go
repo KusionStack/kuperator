@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsalphav1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/utils/revision"
 )
 
 func getCollaSetPatch(cls *appsalphav1.CollaSet) ([]byte, error) {
@@ -52,6 +53,8 @@ func getCollaSetPatch(cls *appsalphav1.CollaSet) ([]byte, error) {
 	return patch, err
 }
 
+var _ revision.OwnerAdapter = &revisionOwnerAdapter{}
+
 type revisionOwnerAdapter struct {
 }
 
@@ -73,16 +76,6 @@ func (roa *revisionOwnerAdapter) GetHistoryLimit(obj metav1.Object) int32 {
 func (roa *revisionOwnerAdapter) GetPatch(obj metav1.Object) ([]byte, error) {
 	cs, _ := obj.(*appsalphav1.CollaSet)
 	return getCollaSetPatch(cs)
-}
-
-func (roa *revisionOwnerAdapter) GetSelectorLabels(obj metav1.Object) map[string]string {
-	ips, _ := obj.(*appsalphav1.CollaSet)
-	labels := map[string]string{}
-	for k, v := range ips.Spec.Template.Labels {
-		labels[k] = v
-	}
-
-	return labels
 }
 
 func (roa *revisionOwnerAdapter) GetCurrentRevision(obj metav1.Object) string {

@@ -194,7 +194,7 @@ func (r *ReconcilePodOpsLifecycle) addServiceAvailable(pod *corev1.Pod) (bool, e
 		return false, nil
 	}
 
-	satisfied, notSatisfiedFinalizers, err := controllerutils.SatisfyExpectedFinalizers(pod) // whether all expected finalizers are satisfied
+	satisfied, notSatisfiedFinalizers, err := controllerutils.IsExpectedFinalizerSatisfied(pod) // whether all expected finalizers are satisfied
 	if err != nil {
 		return false, err
 	}
@@ -446,7 +446,7 @@ func (r *ReconcilePodOpsLifecycle) initPodTransitionRuleManager() {
 		return labels != nil && labelHasPrefix(labels, v1alpha1.PodPostCheckLabelPrefix)
 	})
 	podtransitionrule.AddUnAvailableFunc(func(po *corev1.Pod) (bool, *int64) {
-		return !controllerutils.IsServiceAvailable(po), nil
+		return !controllerutils.IsPodServiceAvailable(po), nil
 	})
 }
 

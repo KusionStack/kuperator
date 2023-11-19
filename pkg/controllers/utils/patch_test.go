@@ -17,11 +17,12 @@
 package utils
 
 import (
-	"fmt"
 	"testing"
 )
 
 func TestPatch(t *testing.T) {
 	val := GetLabelAnnoPatchBytes(nil, nil, nil, map[string]string{"detailAnno": "newDetail"})
-	fmt.Println(string(val))
+	if "{\"metadata\":{\"annotations\":{\"detailAnno\":\"newDetail\"}}}" != string(val) {
+		t.Fatalf("get unexpected patch: %s", val)
+	}
 }

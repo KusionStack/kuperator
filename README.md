@@ -4,7 +4,6 @@
 [![Operating](https://github.com/KusionStack/operating/actions/workflows/release.yaml/badge.svg)](https://github.com/KusionStack/operating/actions/workflows/release.yaml)
 [![GitHub release](https://img.shields.io/github/release/KusionStack/operating.svg)](https://github.com/KusionStack/operating/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/KusionStack/operating)](https://goreportcard.com/report/github.com/KusionStack/operating)
-[![codecov](https://codecov.io/gh/KusionStack/operating/branch/master/graph/badge.svg)](https://codecov.io/gh/KusionStack/operating)
 
 KusionStack Operating ([official site](https://kusionstack.io/docs/operating/introduction/)) provides a set of workloads and operators
 built on Kubernetes Custom Resource Definitions (CRDs), with a primary aim of bridging the gap 
