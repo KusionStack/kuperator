@@ -98,17 +98,14 @@ func (mgr *RefManager) adopt(obj client.Object) error {
 	}
 
 	if mgr.schema == nil {
-		return nil
+		return fmt.Errorf("schema should not be nil")
 	}
 
 	if err := controllerutil.SetControllerReference(mgr.owner, obj, mgr.schema); err != nil {
 		return fmt.Errorf("can't set Object %v/%v (%v) owner reference: %v", obj.GetNamespace(), obj.GetName(), obj.GetUID(), err)
 	}
 
-	if err := mgr.client.Update(context.TODO(), obj); err != nil {
-		return fmt.Errorf("can't update Object %v/%v (%v) owner reference: %v", obj.GetNamespace(), obj.GetName(), obj.GetUID(), err)
-	}
-	return nil
+	return mgr.client.Update(context.TODO(), obj)
 }
 
 func (mgr *RefManager) release(obj client.Object) error {
@@ -122,8 +119,7 @@ func (mgr *RefManager) release(obj client.Object) error {
 	if idx > -1 {
 		obj.SetOwnerReferences(append(obj.GetOwnerReferences()[:idx], obj.GetOwnerReferences()[idx+1:]...))
 		if err := mgr.client.Update(context.TODO(), obj); err != nil {
-			return fmt.Errorf("can't remove Pod %v/%v (%v) owner reference %v/%v (%v): %v",
-				obj.GetNamespace(), obj.GetName(), obj.GetUID(), obj.GetNamespace(), obj.GetName(), mgr.owner.GetUID(), err)
+			return err
 		}
 	}
 

@@ -117,7 +117,7 @@ var _ = Describe("collaset controller", func() {
 		Eventually(func() bool {
 			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: podToDelete.Namespace, Name: podToDelete.Name}, podToDelete)).Should(BeNil())
 			return podToDelete.DeletionTimestamp != nil
-		}, 500*time.Second, 1*time.Second).Should(BeTrue())
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
 
 		// there should be 3 pods and one of them is terminating
 		Eventually(func() bool {

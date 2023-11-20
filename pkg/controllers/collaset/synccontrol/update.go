@@ -25,10 +25,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset/utils"
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
-	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 )
 
@@ -134,7 +134,7 @@ func (o orderByDefault) Less(i, j int) bool {
 		return false
 	}
 
-	return controllerutils.ComparePod(l.Pod, r.Pod)
+	return utils.ComparePod(l.Pod, r.Pod)
 }
 
 type PodUpdater interface {
@@ -191,7 +191,7 @@ func (u *InPlaceIfPossibleUpdater) AnalyseAndGetUpdatedPod(cls *appsv1alpha1.Col
 	}
 
 	inPlaceUpdateSupport = true
-	updatedPod, err = controllerutils.PatchToPod(currentPod, updatedPod, podUpdateInfo.Pod)
+	updatedPod, err = utils.PatchToPod(currentPod, updatedPod, podUpdateInfo.Pod)
 
 	if onlyMetadataChanged {
 		if updatedPod.Annotations != nil {

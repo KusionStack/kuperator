@@ -126,7 +126,7 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 	}
 
 	if completeCount == numOfIDs { // all operations are completed
-		satisfied, notSatisfiedFinalizers, err := controllerutils.SatisfyExpectedFinalizers(newPod) // whether all expected finalizers are satisfied
+		satisfied, notSatisfiedFinalizers, err := controllerutils.IsExpectedFinalizerSatisfied(newPod) // whether all expected finalizers are satisfied
 		if err != nil || !satisfied {
 			klog.Infof("pod: %s/%s, satisfied: %v, expectedFinalizer: %v, err: %v", newPod.Namespace, newPod.Name, satisfied, notSatisfiedFinalizers, err)
 			return err

@@ -24,30 +24,32 @@ import (
 
 func TestResourceVersionExpectation(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
+	key := "test"
 
 	exp := NewResourceVersionExpectation()
-	exp.SetExpectations("test", "1")
-	item, ok, err := exp.GetExpectations("test")
+	exp.SetExpectations(key, "1")
+	item, ok, err := exp.GetExpectations(key)
 	g.Expect(err).Should(gomega.BeNil())
 	g.Expect(ok).Should(gomega.BeTrue())
 	g.Expect(item.resourceVersion).Should(gomega.Equal(int64(1)))
 
-	exp.ExpectUpdate("test", "2")
-	item, ok, err = exp.GetExpectations("test")
+	exp.ExpectUpdate(key, "2")
+	item, ok, err = exp.GetExpectations(key)
 	g.Expect(err).Should(gomega.BeNil())
 	g.Expect(ok).Should(gomega.BeTrue())
 	g.Expect(item.resourceVersion).Should(gomega.Equal(int64(2)))
 
-	ok = exp.SatisfiedExpectations("test", "1")
+	ok = exp.SatisfiedExpectations(key, "1")
 	g.Expect(ok).Should(gomega.BeFalse())
-	ok = exp.SatisfiedExpectations("test", "2")
+	ok = exp.SatisfiedExpectations(key, "2")
 	g.Expect(ok).Should(gomega.BeFalse())
-	ok = exp.SatisfiedExpectations("test", "3")
+	ok = exp.SatisfiedExpectations(key, "3")
 	g.Expect(ok).Should(gomega.BeTrue())
 
-	exp.DeleteExpectations("test")
-	item, ok, err = exp.GetExpectations("test")
+	exp.DeleteExpectations(key)
+	item, ok, err = exp.GetExpectations(key)
 	g.Expect(err).Should(gomega.BeNil())
 	g.Expect(ok).Should(gomega.BeFalse())
 	g.Expect(item).Should(gomega.BeNil())
+	g.Expect(exp.SatisfiedExpectations(key, "1")).Should(gomega.BeTrue())
 }
