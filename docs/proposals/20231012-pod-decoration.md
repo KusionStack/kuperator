@@ -64,8 +64,7 @@ spec:
     - name: init
       image: init-docker:0.1.0
     primaryContainers:               # Overwrite old container
-    - targetPolicy: ByName           # ByName | All | First | Last, default by name
-      name: existing-container-name  
+    - targetPolicy: All           # All | ByName | First | Last, default All 
       image: new-image:1.1.0 
       env:
       - name: SIDECAR_INJECTED
