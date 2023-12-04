@@ -18,12 +18,19 @@ package utils
 
 import (
 	"encoding/json"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"kusionstack.io/operating/apis/apps/v1alpha1"
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
+
+func BeforeReady(po *corev1.Pod) bool {
+	return len(po.Spec.NodeName) == 0 ||
+		po.Status.Phase != corev1.PodRunning ||
+		!IsPodReady(po)
+}
 
 func IsPodScheduled(pod *corev1.Pod) bool {
 	return IsPodScheduledConditionTrue(pod.Status)

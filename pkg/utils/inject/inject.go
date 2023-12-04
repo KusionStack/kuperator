@@ -22,6 +22,7 @@ import (
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,8 +31,10 @@ import (
 )
 
 const (
-	FieldIndexOwnerRefUID       = "ownerRefUID"
-	FieldIndexPodTransitionRule = "podtransitionruleIndex"
+	FieldIndexOwnerRefUID            = "ownerRefUID"
+	FieldIndexPodTransitionRule      = "podTransitionRuleIndex"
+	FieldIndexPodDecorationGroup     = "podDecorationGroup"
+	FieldIndexPodDecorationCollaSets = "podDecorationCollaSets"
 )
 
 func NewCacheWithFieldIndex(config *rest.Config, opts cache.Options) (cache.Cache, error) {
@@ -40,30 +43,63 @@ func NewCacheWithFieldIndex(config *rest.Config, opts cache.Options) (cache.Cach
 		return c, err
 	}
 
-	c.IndexField(context.TODO(), &corev1.Pod{}, FieldIndexOwnerRefUID, func(pod client.Object) []string {
-		ownerRef := metav1.GetControllerOf(pod)
-		if ownerRef == nil {
-			return nil
-		}
+	// TODO: opts.SelectorsByObject can be used to limit cache
+	//opts.SelectorsByObject = cache.SelectorsByObject{
+	//	&corev1.Pod{}: {
+	//		Label: labels.Set(map[string]string{v1alpha1.ControlledByKusionStackLabelKey: "true"}).AsSelector(),
+	//	},
+	//}
 
-		return []string{string(ownerRef.UID)}
-	})
+	runtime.Must(c.IndexField(
+		context.TODO(),
+		&corev1.Pod{},
+		FieldIndexOwnerRefUID,
+		func(pod client.Object) []string {
+			ownerRef := metav1.GetControllerOf(pod)
+			if ownerRef == nil {
+				return nil
+			}
+			return []string{string(ownerRef.UID)}
+		}))
 
-	c.IndexField(context.TODO(), &appv1.ControllerRevision{}, FieldIndexOwnerRefUID, func(revision client.Object) []string {
-		ownerRef := metav1.GetControllerOf(revision)
-		if ownerRef == nil {
-			return nil
-		}
+	runtime.Must(c.IndexField(
+		context.TODO(),
+		&appv1.ControllerRevision{},
+		FieldIndexOwnerRefUID,
+		func(revision client.Object) []string {
+			ownerRef := metav1.GetControllerOf(revision)
+			if ownerRef == nil {
+				return nil
+			}
+			return []string{string(ownerRef.UID)}
+		}))
 
-		return []string{string(ownerRef.UID)}
-	})
+	runtime.Must(c.IndexField(
+		context.TODO(),
+		&appsv1alpha1.PodTransitionRule{},
+		FieldIndexPodTransitionRule,
+		func(obj client.Object) []string {
+			return obj.(*appsv1alpha1.PodTransitionRule).Status.Targets
+		}))
 
-	c.IndexField(context.TODO(), &appsv1alpha1.PodTransitionRule{}, FieldIndexPodTransitionRule, func(obj client.Object) []string {
-		rs, ok := obj.(*appsv1alpha1.PodTransitionRule)
-		if !ok {
-			return nil
-		}
-		return rs.Status.Targets
-	})
-	return c, err
+	runtime.Must(c.IndexField(
+		context.TODO(),
+		&appsv1alpha1.PodDecoration{},
+		FieldIndexPodDecorationGroup,
+		func(obj client.Object) []string {
+			return []string{obj.(*appsv1alpha1.PodDecoration).Spec.InjectStrategy.Group}
+		}))
+
+	runtime.Must(c.IndexField(
+		context.TODO(),
+		&appsv1alpha1.PodDecoration{},
+		FieldIndexPodDecorationCollaSets,
+		func(obj client.Object) (res []string) {
+			for _, detail := range obj.(*appsv1alpha1.PodDecoration).Status.Details {
+				res = append(res, detail.CollaSet)
+			}
+			return
+		}))
+
+	return c, nil
 }

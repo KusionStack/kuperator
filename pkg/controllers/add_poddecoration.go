@@ -14,21 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package controllers
 
-// well known readiness gate
-const (
-	ReadinessGatePodServiceReady = "pod.kusionstack.io/service-ready"
+import (
+	"kusionstack.io/operating/pkg/controllers/poddecoration"
 )
 
-// well known finalizer
-const (
-	PodOperationProtectionFinalizerPrefix = "prot.podopslifecycle.kusionstack.io"
-	ProtectFinalizer                      = "finalizer.operating.kusionstack.io/protected"
-)
-
-// well known variables
-const (
-	PodOpsLifecyclePreCheckStage  = "PreCheck"
-	PodOpsLifecyclePostCheckStage = "PostCheck"
-)
+func init() {
+	// AddToManagerFuncs is a list of functions to create controllers and add them to a manager.
+	AddToManagerFuncs = append(AddToManagerFuncs, poddecoration.Add)
+}

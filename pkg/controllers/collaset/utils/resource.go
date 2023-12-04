@@ -14,21 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package utils
 
-// well known readiness gate
-const (
-	ReadinessGatePodServiceReady = "pod.kusionstack.io/service-ready"
+import (
+	appsv1 "k8s.io/api/apps/v1"
+
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
-// well known finalizer
-const (
-	PodOperationProtectionFinalizerPrefix = "prot.podopslifecycle.kusionstack.io"
-	ProtectFinalizer                      = "finalizer.operating.kusionstack.io/protected"
-)
+type RelatedResources struct {
+	Revisions       []*appsv1.ControllerRevision
+	CurrentRevision *appsv1.ControllerRevision
+	UpdatedRevision *appsv1.ControllerRevision
 
-// well known variables
-const (
-	PodOpsLifecyclePreCheckStage  = "PreCheck"
-	PodOpsLifecyclePostCheckStage = "PostCheck"
-)
+	// collaSet related PodDecoration
+	PodDecorations         []*appsv1alpha1.PodDecoration
+	OldRevisionDecorations map[string]*appsv1alpha1.PodDecoration
+
+	NewStatus *appsv1alpha1.CollaSetStatus
+}

@@ -14,21 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package poddecoration
 
-// well known readiness gate
-const (
-	ReadinessGatePodServiceReady = "pod.kusionstack.io/service-ready"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
-// well known finalizer
-const (
-	PodOperationProtectionFinalizerPrefix = "prot.podopslifecycle.kusionstack.io"
-	ProtectFinalizer                      = "finalizer.operating.kusionstack.io/protected"
-)
-
-// well known variables
-const (
-	PodOpsLifecyclePreCheckStage  = "PreCheck"
-	PodOpsLifecyclePostCheckStage = "PostCheck"
-)
+func IsCollaSetSelectedByPD(collaSet *appsv1alpha1.CollaSet, pd *appsv1alpha1.PodDecoration) bool {
+	sel := labels.Everything()
+	if pd.Spec.Selector != nil {
+		sel, _ = metav1.LabelSelectorAsSelector(pd.Spec.Selector)
+	}
+	return sel.Matches(labels.Set(collaSet.Spec.Template.Labels))
+}

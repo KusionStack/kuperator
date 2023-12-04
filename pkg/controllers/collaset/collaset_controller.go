@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -40,8 +39,10 @@ import (
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
+	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/operating/pkg/controllers/utils/revision"
+	commonutils "kusionstack.io/operating/pkg/utils"
 	"kusionstack.io/operating/pkg/utils/mixin"
 )
 
@@ -86,6 +87,11 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 	}
 
 	err = c.Watch(&source.Kind{Type: &appsv1alpha1.CollaSet{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
+	err = c.Watch(&source.Kind{Type: &appsv1alpha1.PodDecoration{}}, &podDecorationHandler{})
 	if err != nil {
 		return err
 	}
@@ -148,10 +154,10 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if !controllerutil.ContainsFinalizer(instance, preReclaimFinalizer) {
 		return ctrl.Result{}, controllerutils.AddFinalizer(context.TODO(), r.Client, instance, preReclaimFinalizer)
 	}
-
+	key := commonutils.ObjectKeyString(instance)
 	currentRevision, updatedRevision, revisions, collisionCount, _, err := r.revisionManager.ConstructRevisions(instance, false)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("fail to construct revision for CollaSet %s/%s: %s", instance.Namespace, instance.Name, err)
+		return ctrl.Result{}, fmt.Errorf("fail to construct revision for CollaSet %s: %s", key, err)
 	}
 
 	newStatus := &appsv1alpha1.CollaSetStatus{
@@ -161,44 +167,75 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		UpdatedRevision: updatedRevision.Name,
 	}
 
-	requeueAfter, newStatus, err := r.DoReconcile(instance, updatedRevision, revisions, newStatus)
-	// update status anyway
-	if err := r.updateStatus(ctx, instance, newStatus); err != nil {
-		return ctrl.Result{RequeueAfter: requeueAfter}, fmt.Errorf("fail to update status of CollaSet %s: %s", req, err)
+	resources := &collasetutils.RelatedResources{
+		Revisions:       revisions,
+		CurrentRevision: currentRevision,
+		UpdatedRevision: updatedRevision,
+		NewStatus:       newStatus,
+	}
+	resources.PodDecorations, resources.OldRevisionDecorations, err = utilspoddecoration.GetEffectiveDecorationsByCollaSet(ctx, r.Client, instance)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("fail to get effective pod decorations by CollaSet %s: %s", key, err)
+	}
+	for _, pd := range resources.PodDecorations {
+		if pd.Status.ObservedGeneration != pd.Generation {
+			logger.Info("wait for PodDecoration ObservedGeneration", "CollaSet", key, "PodDecoration", commonutils.ObjectKeyString(pd))
+			return ctrl.Result{}, nil
+		}
 	}
 
-	return ctrl.Result{RequeueAfter: requeueAfter}, err
+	requeueAfter, newStatus, err := r.DoReconcile(ctx, instance, resources)
+	// update status anyway
+	if err := r.updateStatus(ctx, instance, newStatus); err != nil {
+		return requeueResult(requeueAfter), fmt.Errorf("fail to update status of CollaSet %s: %s", req, err)
+	}
+
+	return requeueResult(requeueAfter), err
 }
 
-func (r *CollaSetReconciler) DoReconcile(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, revisions []*appsv1.ControllerRevision, newStatus *appsv1alpha1.CollaSetStatus) (time.Duration, *appsv1alpha1.CollaSetStatus, error) {
-	podWrappers, newStatus, requeueAfter, syncErr := r.doSync(instance, updatedRevision, revisions, newStatus)
-	return requeueAfter, calculateStatus(instance, newStatus, updatedRevision, podWrappers, syncErr), syncErr
+func (r *CollaSetReconciler) DoReconcile(
+	ctx context.Context,
+	instance *appsv1alpha1.CollaSet,
+	resources *collasetutils.RelatedResources) (
+	*time.Duration, *appsv1alpha1.CollaSetStatus, error) {
+	podWrappers, requeueAfter, syncErr := r.doSync(ctx, instance, resources)
+	return requeueAfter, calculateStatus(instance, resources, podWrappers, syncErr), syncErr
 }
 
 // doSync is responsible for reconcile Pods with CollaSet spec.
 // 1. sync Pods to prepare information, especially IDs, for following Scale and Update
 // 2. scale Pods to match the Pod number indicated in `spec.replcas`. if an error thrown out or Pods is not matched recently, update will be skipped.
 // 3. update Pods, to update each Pod to the updated revision indicated by `spec.template`
-func (r *CollaSetReconciler) doSync(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, revisions []*appsv1.ControllerRevision, newStatus *appsv1alpha1.CollaSetStatus) ([]*collasetutils.PodWrapper, *appsv1alpha1.CollaSetStatus, time.Duration, error) {
-	synced, podWrappers, ownedIDs, err := r.syncControl.SyncPods(instance, updatedRevision, newStatus)
+func (r *CollaSetReconciler) doSync(
+	ctx context.Context,
+	instance *appsv1alpha1.CollaSet,
+	resources *collasetutils.RelatedResources) (
+	[]*collasetutils.PodWrapper, *time.Duration, error) {
+
+	synced, podWrappers, ownedIDs, err := r.syncControl.SyncPods(ctx, instance, resources)
 	if err != nil || synced {
-		return podWrappers, newStatus, 0, err
+		return podWrappers, nil, err
 	}
 
-	scaling, scaleRequeueAfter, err := r.syncControl.Scale(instance, podWrappers, revisions, updatedRevision, ownedIDs, newStatus)
+	scaling, scaleRequeueAfter, err := r.syncControl.Scale(ctx, instance, resources, podWrappers, ownedIDs)
 	if err != nil || scaling {
-		return podWrappers, newStatus, scaleRequeueAfter, err
+		return podWrappers, scaleRequeueAfter, err
 	}
 
-	_, updateRequeueAfter, err := r.syncControl.Update(instance, podWrappers, revisions, updatedRevision, ownedIDs, newStatus)
-	if updateRequeueAfter > 0 && (scaleRequeueAfter == 0 || updateRequeueAfter < scaleRequeueAfter) {
-		return podWrappers, newStatus, updateRequeueAfter, err
+	_, updateRequeueAfter, err := r.syncControl.Update(ctx, instance, resources, podWrappers, ownedIDs)
+	if updateRequeueAfter != nil && (scaleRequeueAfter == nil || *updateRequeueAfter < *scaleRequeueAfter) {
+		return podWrappers, updateRequeueAfter, err
 	}
 
-	return podWrappers, newStatus, scaleRequeueAfter, err
+	return podWrappers, scaleRequeueAfter, err
 }
 
-func calculateStatus(instance *appsv1alpha1.CollaSet, newStatus *appsv1alpha1.CollaSetStatus, updatedRevision *appsv1.ControllerRevision, podWrappers []*collasetutils.PodWrapper, syncErr error) *appsv1alpha1.CollaSetStatus {
+func calculateStatus(
+	instance *appsv1alpha1.CollaSet,
+	resources *collasetutils.RelatedResources,
+	podWrappers []*collasetutils.PodWrapper,
+	syncErr error) *appsv1alpha1.CollaSetStatus {
+	newStatus := resources.NewStatus
 	if syncErr == nil {
 		newStatus.ObservedGeneration = instance.Generation
 	}
@@ -210,7 +247,7 @@ func calculateStatus(instance *appsv1alpha1.CollaSet, newStatus *appsv1alpha1.Co
 		replicas++
 
 		isUpdated := false
-		if isUpdated = utils.IsPodUpdatedRevision(podWrapper.Pod, updatedRevision.Name); isUpdated {
+		if isUpdated = utils.IsPodUpdatedRevision(podWrapper.Pod, resources.UpdatedRevision.Name); isUpdated {
 			updatedReplicas++
 		}
 
@@ -248,13 +285,16 @@ func calculateStatus(instance *appsv1alpha1.CollaSet, newStatus *appsv1alpha1.Co
 
 	if (instance.Spec.Replicas == nil && newStatus.UpdatedReadyReplicas >= 0) ||
 		newStatus.UpdatedReadyReplicas >= *instance.Spec.Replicas {
-		newStatus.CurrentRevision = updatedRevision.Name
+		newStatus.CurrentRevision = resources.UpdatedRevision.Name
 	}
 
 	return newStatus
 }
 
-func (r *CollaSetReconciler) updateStatus(ctx context.Context, instance *appsv1alpha1.CollaSet, newStatus *appsv1alpha1.CollaSetStatus) error {
+func (r *CollaSetReconciler) updateStatus(
+	ctx context.Context,
+	instance *appsv1alpha1.CollaSet,
+	newStatus *appsv1alpha1.CollaSetStatus) error {
 	if equality.Semantic.DeepEqual(instance.Status, newStatus) {
 		return nil
 	}
@@ -263,11 +303,8 @@ func (r *CollaSetReconciler) updateStatus(ctx context.Context, instance *appsv1a
 
 	err := r.Client.Status().Update(ctx, instance)
 	if err == nil {
-		if err := collasetutils.ActiveExpectations.ExpectUpdate(instance, expectations.CollaSet, instance.Name, instance.ResourceVersion); err != nil {
-			return err
-		}
+		return collasetutils.ActiveExpectations.ExpectUpdate(instance, expectations.CollaSet, instance.Name, instance.ResourceVersion)
 	}
-
 	return err
 }
 
@@ -278,4 +315,14 @@ func (r *CollaSetReconciler) reclaimResourceContext(cls *appsv1alpha1.CollaSet) 
 	}
 
 	return controllerutils.RemoveFinalizer(context.TODO(), r.Client, cls, preReclaimFinalizer)
+}
+
+func requeueResult(requeueTime *time.Duration) reconcile.Result {
+	if requeueTime != nil {
+		if *requeueTime == 0 {
+			return reconcile.Result{Requeue: true}
+		}
+		return reconcile.Result{RequeueAfter: *requeueTime}
+	}
+	return reconcile.Result{}
 }

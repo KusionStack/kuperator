@@ -46,6 +46,34 @@ rules:
 - apiGroups:
   - apps.kusionstack.io
   resources:
+  - poddecorations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kusionstack.io
+  resources:
+  - poddecorations/finalizers
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kusionstack.io
+  resources:
+  - poddecorations/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kusionstack.io
+  resources:
   - podtransitionrules
   verbs:
   - create
