@@ -258,7 +258,7 @@ func (r *ReconcilePodDecoration) filterOutPodAndCollaSet(
 	var sel labels.Selector
 	podList := &corev1.PodList{}
 	if instance.Spec.Selector != nil {
-		sel, err = metav1.LabelSelectorAsSelector(instance.Spec.Selector)
+		sel, _ = metav1.LabelSelectorAsSelector(instance.Spec.Selector)
 	}
 	affectedPods = map[string][]*corev1.Pod{}
 	if err = r.List(ctx, podList, &client.ListOptions{
