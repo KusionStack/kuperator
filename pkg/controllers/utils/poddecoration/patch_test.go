@@ -17,10 +17,13 @@ limitations under the License.
 package poddecoration
 
 import (
+	"context"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -337,7 +340,119 @@ var _ = Describe("PodDecoration controller", func() {
 		Expect(pod.Spec.Tolerations[0].Key).Should(Equal("test"))
 		Expect(pod.Spec.Affinity).ShouldNot(BeNil())
 	})
+
+	It("test anno utils", func() {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					appsv1alpha1.AnnotationResourceDecorationRevision: "",
+				},
+				Labels: map[string]string{
+					"app": "foo",
+				},
+			},
+		}
+		i0Int32 := int32(0)
+		i1Int32 := int32(1)
+		pdA := &appsv1alpha1.PodDecoration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pd-a",
+			},
+			Spec: appsv1alpha1.PodDecorationSpec{
+				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
+					Group:  "group-a",
+					Weight: &i0Int32,
+				},
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: appsv1alpha1.PodDecorationPodTemplate{
+					Metadata: []*appsv1alpha1.PodDecorationPodTemplateMeta{
+						{
+							Labels: map[string]string{"inj": "group-a"},
+						},
+					},
+				},
+			},
+			Status: appsv1alpha1.PodDecorationStatus{
+				UpdatedRevision: "100",
+			},
+		}
+		pdB := &appsv1alpha1.PodDecoration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pd-b",
+			},
+			Spec: appsv1alpha1.PodDecorationSpec{
+				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
+					Group:  "group-b",
+					Weight: &i1Int32,
+				},
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: appsv1alpha1.PodDecorationPodTemplate{
+					Metadata: []*appsv1alpha1.PodDecorationPodTemplateMeta{
+						{
+							Labels: map[string]string{"inj": "group-b"},
+						},
+					},
+				},
+			},
+			Status: appsv1alpha1.PodDecorationStatus{
+				UpdatedRevision: "101",
+			},
+		}
+		pdC := &appsv1alpha1.PodDecoration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pd-b",
+			},
+			Spec: appsv1alpha1.PodDecorationSpec{
+				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
+					Group:  "group-b",
+					Weight: &i1Int32,
+				},
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: appsv1alpha1.PodDecorationPodTemplate{
+					Metadata: []*appsv1alpha1.PodDecorationPodTemplateMeta{
+						{
+							Labels: map[string]string{"inj": "group-b-new"},
+						},
+					},
+				},
+			},
+			Status: appsv1alpha1.PodDecorationStatus{
+				UpdatedRevision: "102",
+			},
+		}
+		pds := map[string]*appsv1alpha1.PodDecoration{
+			"100": pdA,
+			"101": pdB,
+		}
+		Expect(ShouldUpdateDecorationInfo(pod, pds)).Should(BeTrue())
+		Expect(PatchListOfDecorations(pod, pds)).Should(BeNil())
+		Expect(len(GetPodEffectiveDecorations(pod, []*appsv1alpha1.PodDecoration{pdA, pdC}, pds))).Should(Equal(2))
+		Expect(GetDecorationGroupRevisionInfo(pod).Size()).Should(Equal(2))
+		appsv1alpha1.SchemeBuilder.AddToScheme(scheme.Scheme)
+		_, _, err := GetPodDecorationsByPodAnno(context.TODO(), &mockClient{}, pod)
+		Expect(err).ShouldNot(HaveOccurred())
+	})
 })
+
+type mockClient struct {
+	client.Client
+}
+
+func (*mockClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+	return nil
+}
 
 var _ = BeforeSuite(func() {
 

@@ -17,52 +17,12 @@ limitations under the License.
 package poddecoration
 
 import (
-	"context"
-	"fmt"
-	"sort"
-
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
-
-func GetEffectiveDecorationsByCollaSet(
-	ctx context.Context,
-	c client.Client,
-	colla *appsv1alpha1.CollaSet,
-) (
-	podDecorations []*appsv1alpha1.PodDecoration, oldRevisions map[string]*appsv1alpha1.PodDecoration, err error) {
-
-	pdList := &appsv1alpha1.PodDecorationList{}
-	if err = c.List(ctx, pdList, &client.ListOptions{Namespace: colla.Namespace}); err != nil {
-		return
-	}
-	for i := range pdList.Items {
-		if isAffectedCollaSet(&pdList.Items[i], colla) {
-			podDecorations = append(podDecorations, &pdList.Items[i])
-		}
-	}
-	oldRevisions = map[string]*appsv1alpha1.PodDecoration{}
-	for _, pd := range podDecorations {
-		if pd.Status.CurrentRevision != "" && pd.Status.CurrentRevision != pd.Status.UpdatedRevision {
-			revision := &appsv1.ControllerRevision{}
-			if err = c.Get(ctx, types.NamespacedName{Namespace: colla.Namespace, Name: pd.Status.CurrentRevision}, revision); err != nil {
-				return nil, nil, fmt.Errorf("fail to get PodDecoration ControllerRevision %s/%s: %v", colla.Namespace, pd.Status.CurrentRevision, err)
-			}
-			oldPD, err := GetPodDecorationFromRevision(revision)
-			if err != nil {
-				return nil, nil, err
-			}
-			oldRevisions[pd.Status.CurrentRevision] = oldPD
-		}
-	}
-	return
-}
 
 func GetPodEffectiveDecorations(pod *corev1.Pod, podDecorations []*appsv1alpha1.PodDecoration, oldRevisions map[string]*appsv1alpha1.PodDecoration) (res map[string]*appsv1alpha1.PodDecoration) {
 	type RevisionPD struct {
@@ -84,9 +44,11 @@ func GetPodEffectiveDecorations(pod *corev1.Pod, podDecorations []*appsv1alpha1.
 			}
 			return
 		}
-		currentGroupPD[pd.Spec.InjectStrategy.Group] = &RevisionPD{
-			Revision: revision,
-			PD:       heaviestPD(current.PD, pd),
+		if lessPD(pd, current.PD) {
+			currentGroupPD[pd.Spec.InjectStrategy.Group] = &RevisionPD{
+				Revision: revision,
+				PD:       pd,
+			}
 		}
 	}
 	for i, pd := range podDecorations {
@@ -123,27 +85,4 @@ func GetPodEffectiveDecorations(pod *corev1.Pod, podDecorations []*appsv1alpha1.
 		res[revisionPD.Revision] = revisionPD.PD
 	}
 	return
-}
-
-func PickGroupTop(podDecorations []*appsv1alpha1.PodDecoration) (res []*appsv1alpha1.PodDecoration) {
-	sort.Sort(PodDecorations(podDecorations))
-	for i, pd := range podDecorations {
-		if i == 0 {
-			res = append(res, podDecorations[i])
-			continue
-		}
-		if pd.Spec.InjectStrategy.Group == res[len(res)-1].Spec.InjectStrategy.Group {
-			continue
-		}
-		res = append(res, podDecorations[i])
-	}
-	return
-}
-
-func isAffectedCollaSet(pd *appsv1alpha1.PodDecoration, colla *appsv1alpha1.CollaSet) bool {
-	if pd.Status.IsEffective == nil || !*pd.Status.IsEffective {
-		return false
-	}
-	sel, _ := metav1.LabelSelectorAsSelector(pd.Spec.Selector)
-	return sel.Matches(labels.Set(colla.Spec.Template.Labels))
 }

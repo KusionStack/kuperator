@@ -39,7 +39,6 @@ import (
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
-	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/operating/pkg/controllers/utils/revision"
 	commonutils "kusionstack.io/operating/pkg/utils"
@@ -173,7 +172,7 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		UpdatedRevision: updatedRevision,
 		NewStatus:       newStatus,
 	}
-	resources.PodDecorations, resources.OldRevisionDecorations, err = utilspoddecoration.GetEffectiveDecorationsByCollaSet(ctx, r.Client, instance)
+	resources.PodDecorations, resources.OldRevisionDecorations, err = utils.GetEffectiveDecorationsByCollaSet(ctx, r.Client, instance)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("fail to get effective pod decorations by CollaSet %s: %s", key, err)
 	}

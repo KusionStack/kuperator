@@ -73,13 +73,6 @@ func GetHeaviestPDByGroup(ctx context.Context, c client.Client, namespace, group
 	return
 }
 
-func heaviestPD(a, b *appsv1alpha1.PodDecoration) *appsv1alpha1.PodDecoration {
-	if lessPD(a, b) {
-		return a
-	}
-	return b
-}
-
 func lessPD(a, b *appsv1alpha1.PodDecoration) bool {
 	if a.Spec.InjectStrategy.Group == b.Spec.InjectStrategy.Group {
 		if *a.Spec.InjectStrategy.Weight == *b.Spec.InjectStrategy.Weight {
