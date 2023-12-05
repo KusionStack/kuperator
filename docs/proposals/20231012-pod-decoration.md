@@ -1,9 +1,9 @@
 ---
 title: Pod Decoration Support 
 authors: "@wu8685"
-reviewers:
+reviewers: "@Eikykun"
 creation-date: 2023-10-12
-last-updated: 2023-10-12
+last-updated: 2023-11-21
 status: draft
 ---
 
@@ -20,7 +20,7 @@ In this proposal, we introduce the Kubernetes API PodDecoration, which aims to p
 
 The PodDecoration API is designed as follows:
 
-``` yaml
+```yaml
 apiVersion: apps.kusionstack.io/v1alpha1
 kind: PodDecoration
 metadata:
@@ -38,10 +38,9 @@ spec:
       - "0"
       - "1"
   updateStrategy:
-    rollingUpdate:      # Provide several ways to select Pods to update new revision.
-      byPartition:
-        partition: 2
-      bySelector:
+    rollingUpdate:       # Provide several ways to select Pods to update new revision.
+      partition: 2     
+      selector:		     # by partition or selector
         matchLabels:
           app: foo
         matchExpressions:
@@ -55,44 +54,58 @@ spec:
     weight: 10      # In same group, heavier PD has higher priority to inject exclusively.
   template:
     metadata:
+    - patchPolicy: Retain    # Retain | Overwrite | MergePatchJson, default Retain
       labels:
         extra-label: label-value
         existing-label: label-value
-    spec:
-      containers:                         # Update by replace. If there is a container with the same name, overwrite it.
-      - name: sidecar
-        image: nginx:1.23.0
-        injectPolicy: BeforeAppContainer  # Position to inject.
-      appContainers:                      # Update by merge. If a name indicated, then merge to the container with the matched name, otherwise update the one indicated by its policy.
-      - image: nginx: 1.23.0
-        env:
-        - name: SIDECAR_INJECTED
-          value: "true"
-        volumeMounts:
-        - name: foo
-          mountPath: /tmp/foo
-        targetSelectPolicy: AllAppContainers  # Indicates this configuration should be injected into all app containers.
-      volumes:
+      annotations:
+        extra-anno: anno-value
+    initContainers:                   
+    - name: init
+      image: init-docker:0.1.0
+    primaryContainers:               # Overwrite old container
+    - targetPolicy: All           # All | ByName | First | Last, default All 
+      image: new-image:1.1.0 
+      env:
+      - name: SIDECAR_INJECTED
+        value: "true"
+      volumeMounts:
       - name: foo
-        hostPath:
-          path: /tmp/foo
-      affinity:
-        overrideAffinity:     # Update by replace
-          nodeAffinity:
-          podAffinity:
-          podAntiAffinity:
-        nodeSelectorTerm:     # Update by merge
-          matchExpressions:
-          matchFields:
-      tolerations:
-      - key: schedule         # Replace item with same key
-        operator: Equal
-        value: foo
-      runtimeClassName: rund
+        mountPath: /tmp/foo
+    containers:                             # List of sidecar containers to be injected into the selected pod
+    - injectPolicy: BeforePrimaryContainer
+      name: nginx       
+      image: nginx:1.23.0
+    volumes:
+    - name: foo
+      hostPath:
+        path: /tmp/foo
+    affinity:
+      overrideAffinity:     # Update by replace
+        nodeAffinity:
+        podAffinity:
+        podAntiAffinity:
+      nodeSelectorTerms:     # Update by merge
+      - matchExpressions:
+        matchFields:
+    tolerations:
+    - key: schedule         # Replace item with same key
+      operator: Equal
+      value: foo
+    runtimeClassName: rund
 status:
-  affectedWorkloads:
-  - name: collaset-a
-  - name: collaset-b
+  observedGeneration: 1
+  currentRevision: 123
+  updatedRevision: 124
+  matchedPods: 2
+  updatedPods: 1
+  details:
+  - collaSet: collaSet-a
+    affectedReplicas: 2
+    pods:
+    - name: collaSet-a-00     # Updated
+    - name: collaSet-a-01     
+      revision: 123    # Old revision
 ```
 
 ## Implementation
@@ -118,7 +131,7 @@ Inject all the PDs one by one in chronological order, with the older ones being 
 
 ### Reuse CollaSet to update Pods
 
-PodDecoration selects Pods and update them under the control of CollaSet, not PodDecoration! 
+PodDecoration selects Pods and update them under the control of CollaSet, not PodDecoration!
 In this way, Pod additional configurations can be updated in the way app developers indicated in CollaSet spec.
 
 #### PodDecoration and CollaSet relationship maintaining
@@ -142,14 +155,14 @@ CollaSet controller need watch the events of PD, deciding the CollaSets need to 
 #### Case 2: Day-2 operation. Canary update Pod additional configuration
 
 When updating, PodDecoration controller will store and maintain the Pods partition information using a data in memory.
-This partition data will be used by CollaSet controller to decide the effective revision of each PodDecoration. 
+This partition data will be used by CollaSet controller to decide the effective revision of each PodDecoration.
 
 ![poddecoration-update-pods](../images/20231012-pod-decoration-2.png)
 
 #### Case 3: How to decide the Pod revision when it is created during PD update.
 
 * Users can set the policy to decide whether to use the current revision or updated revision to inject into the created Pod. Using updated revision by default.
-* Controllers should consider this new Pod and tolerate that its revision break the desired partition status, and do not update it to match the expected partition. 
+* Controllers should consider this new Pod and tolerate that its revision break the desired partition status, and do not update it to match the expected partition.
 
 ## Key features
 
@@ -160,7 +173,7 @@ PodDecoration will actively trigger Pods injection and update with latest revisi
 * All Pod configurations support
 
 Technically, PodDecoration is able to support to inject and update almost all Pod configurations.
-Recently, we plan to support some common configuration, such as container, initContainer, volume, affinity, toleration, etc. 
+Recently, we plan to support some common configuration, such as container, initContainer, volume, affinity, toleration, etc.
 
 * PodOpsLifecycle support
 
