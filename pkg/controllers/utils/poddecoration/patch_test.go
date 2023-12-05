@@ -443,6 +443,10 @@ var _ = Describe("PodDecoration controller", func() {
 		appsv1alpha1.SchemeBuilder.AddToScheme(scheme.Scheme)
 		_, _, err := GetPodDecorationsByPodAnno(context.TODO(), &mockClient{}, pod)
 		Expect(err).ShouldNot(HaveOccurred())
+
+		hav, err := GetHeaviestPDByGroup(context.TODO(), &mockClient{}, "", "")
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(hav.Name).Should(Equal("pd-d"))
 	})
 })
 
@@ -451,6 +455,64 @@ type mockClient struct {
 }
 
 func (*mockClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+	return nil
+}
+
+func (*mockClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	i0Int32 := int32(0)
+	i1Int32 := int32(1)
+	Tm1 := metav1.Now()
+	Tm2 := metav1.NewTime(Tm1.Time.Add(100))
+	list.(*appsv1alpha1.PodDecorationList).Items = []appsv1alpha1.PodDecoration{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "pd-a",
+				CreationTimestamp: Tm1,
+			},
+			Spec: appsv1alpha1.PodDecorationSpec{
+				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
+					Group:  "group-b",
+					Weight: &i1Int32,
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "pd-b",
+				CreationTimestamp: Tm2,
+			},
+			Spec: appsv1alpha1.PodDecorationSpec{
+				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
+					Group:  "group-b",
+					Weight: &i1Int32,
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "pd-c",
+				CreationTimestamp: Tm1,
+			},
+			Spec: appsv1alpha1.PodDecorationSpec{
+				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
+					Group:  "group-b",
+					Weight: &i0Int32,
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "pd-d",
+				CreationTimestamp: Tm2,
+			},
+			Spec: appsv1alpha1.PodDecorationSpec{
+				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
+					Group:  "group-a",
+					Weight: &i0Int32,
+				},
+			},
+		},
+	}
 	return nil
 }
 
