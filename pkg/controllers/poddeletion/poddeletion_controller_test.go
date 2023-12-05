@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -169,16 +170,16 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(config).NotTo(BeNil())
 
+	scheme := scheme.Scheme
+	err = appsv1.SchemeBuilder.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+	err = apis.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+
 	mgr, err = manager.New(config, manager.Options{
 		MetricsBindAddress: "0",
 		NewCache:           inject.NewCacheWithFieldIndex,
 	})
-	Expect(err).NotTo(HaveOccurred())
-
-	scheme := mgr.GetScheme()
-	err = appsv1.SchemeBuilder.AddToScheme(scheme)
-	Expect(err).NotTo(HaveOccurred())
-	err = apis.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	c = mgr.GetClient()
