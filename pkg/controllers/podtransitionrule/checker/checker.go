@@ -30,7 +30,7 @@ import (
 
 type Checker interface {
 	// GetState collects current states from all associated PodTransitionRules, and every state stage is not guaranteed to be consistent
-	GetState(client.Client, client.Object) (CheckState, error)
+	GetState(context.Context, client.Client, client.Object) (CheckState, error)
 }
 
 func NewCheck() Checker {
@@ -42,13 +42,13 @@ type checker struct {
 }
 
 // GetState get item current check state from all related podTransitionRules
-func (c *checker) GetState(cl client.Client, item client.Object) (CheckState, error) {
+func (c *checker) GetState(ctx context.Context, cl client.Client, item client.Object) (CheckState, error) {
 
 	result := CheckState{
 		Stage: c.policy.Stage(item),
 	}
 	podTransitionRuleList := &appsv1alpha1.PodTransitionRuleList{}
-	if err := cl.List(context.TODO(), podTransitionRuleList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(inject.FieldIndexPodTransitionRule, item.GetName())}); err != nil {
+	if err := cl.List(ctx, podTransitionRuleList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector(inject.FieldIndexPodTransitionRule, item.GetName())}); err != nil {
 		return result, err
 	}
 	for i := range podTransitionRuleList.Items {
@@ -71,7 +71,7 @@ func (c *checker) GetState(cl client.Client, item client.Object) (CheckState, er
 		if !findStatus {
 			result.States = append(result.States, State{
 				PodTransitionRuleName: rs.Name,
-				Detail: &appsv1alpha1.Detail{
+				Detail: &appsv1alpha1.PodTransitionDetail{
 					Passed: true,
 				},
 			})
@@ -111,10 +111,10 @@ func (cs *CheckState) InStageAndPassed() bool {
 type State struct {
 	PodTransitionRuleName string
 	Message               string
-	Detail                *appsv1alpha1.Detail
+	Detail                *appsv1alpha1.PodTransitionDetail
 }
 
-func CollectInfo(podtransitionrule string, detail *appsv1alpha1.Detail) string {
+func CollectInfo(podtransitionrule string, detail *appsv1alpha1.PodTransitionDetail) string {
 	res := ""
 	for _, rej := range detail.RejectInfo {
 		if res != "" {

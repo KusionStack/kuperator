@@ -30,18 +30,15 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/utils/inject"
 )
 
 var (
-	env     *envtest.Environment
-	mgr     manager.Manager
-	c       client.Client
-	request chan reconcile.Request
-
+	env    *envtest.Environment
+	mgr    manager.Manager
+	c      client.Client
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -70,12 +67,8 @@ func TestMain(m *testing.M) {
 			MetricsBindAddress: "0",
 			NewCache:           inject.NewCacheWithFieldIndex,
 		})
-		var r reconcile.Reconciler
-		r, request = testReconcile(newReconciler(mgr))
-		_, err = addToMgr(mgr, r)
-
+		_, err = addToMgr(mgr, newReconciler(mgr))
 		c = mgr.GetClient()
-
 		defer wg.Done()
 		err = mgr.Start(ctx)
 		if err != nil {
@@ -86,18 +79,6 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	env.Stop()
 	os.Exit(code)
-}
-
-func testReconcile(inner reconcile.Reconciler) (reconcile.Reconciler, chan reconcile.Request) {
-	requests := make(chan reconcile.Request, 5)
-	fn := reconcile.Func(func(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-		result, err := inner.Reconcile(ctx, req)
-		if _, done := ctx.Deadline(); !done && len(requests) == 0 {
-			requests <- req
-		}
-		return result, err
-	})
-	return fn, requests
 }
 
 func Stop() {

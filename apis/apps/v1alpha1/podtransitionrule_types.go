@@ -92,7 +92,7 @@ type AvailableRule struct {
 type TransitionRuleWebhook struct {
 
 	// ClientConfig is the configuration for accessing webhook.
-	ClientConfig ClientConfig `json:"clientConfig,omitempty"`
+	ClientConfig ClientConfigBeta1 `json:"clientConfig,omitempty"`
 
 	// FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
 	// allowed values are Ignore or Fail. Defaults to Ignore.
@@ -118,65 +118,38 @@ const (
 	DefaultWebhookTimeout  = int64(60)
 )
 
-// ResourceParameter is representing the request body of resource parameter
-type ResourceParameter struct {
-	// APIVersion defines the versioned schema of this representation of an object.
-	ApiVersion string `json:"apiVersion"`
-
-	// Kind is a string value representing the REST resource this object represents.
-	Kind string `json:"kind"`
-
-	// Name is a string value representing resource name
-	Name string `json:"name,omitempty"`
-
-	// Parameters is a string map representing parameters
-	Parameters map[string]string `json:"parameters,omitempty"`
-}
-
-type Parameter struct {
-	// Key is the parameter key.
-	Key string `json:"key,omitempty"`
-
-	// Value is the string value of this parameter.
-	// Defaults to "".
-	// +optional
-	Value string `json:"value,omitempty"`
-
-	// Source for the parameter's value. Cannot be used if value is not empty.
-	// +optional
-	ValueFrom *ParameterSource `json:"valueFrom,omitempty"`
-}
-
-type ParameterSource struct {
-
-	// Type defines target pod type.
-	// +optional
-	//Type TargetType `json:"type,omitempty"`
-
-	// Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations,
-	// spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP.
-	// +optional
-	FieldRef *corev1.ObjectFieldSelector `json:"fieldRef,omitempty"`
-}
-
-type ClientConfig struct {
-	// `url` gives the location of the webhook, in standard URL form
-	// (`scheme://host:port/path`). Exactly one of `url` or `service`
-	// must be specified.
+type ClientConfigBeta1 struct {
+	// URL gives the location of the webhook.
 	URL string `json:"url"`
 
-	// `caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
-	// If unspecified, system trust roots on the apiserver are used. After Base64.
+	// CABundle is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
 	// +optional
 	CABundle string `json:"caBundle,omitempty"`
 
-	// interval give the request time interval, default 5s
+	// Poll is the polling to query url.
+	// +optional
+	Poll *Poll `json:"poll,omitempty"`
+}
+
+type Poll struct {
+	// URL gives the location of the webhook, URL?task-id=<task-id>
+	URL string `json:"url"`
+
+	// ReplaceRawQuery used to replace raw key. QueryUrl=URL?rawQueryKey=<task-id>, default is task-id
+	// +optional
+	RawQueryKey string `json:"rawQueryKey,omitempty"`
+
+	// CABundle is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
+	// +optional
+	CABundle string `json:"caBundle,omitempty"`
+
+	// Interval give the request time interval
 	// +optional
 	IntervalSeconds *int64 `json:"intervalSeconds,omitempty"`
 
-	// timeout give the request time timeout, default 60s
+	// TimeoutSeconds give the request time timeout, default 60s
 	// +optional
-	TraceTimeoutSeconds *int64 `json:"traceTimeoutSeconds,omitempty"`
+	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty"`
 }
 
 // PodTransitionRuleStatus defines the observed state of PodTransitionRule
@@ -195,7 +168,7 @@ type PodTransitionRuleStatus struct {
 
 	// Details contains all pods podtransitionrule details
 	// +optional
-	Details []*Detail `json:"details,omitempty"`
+	Details []*PodTransitionDetail `json:"details,omitempty"`
 }
 
 // RuleState defines the resource info in webhook processing progress.
@@ -212,12 +185,12 @@ type WebhookStatus struct {
 	// PodTransitionRulePodStatus is async request status representing the info of pods
 	ItemStatus []*ItemStatus `json:"itemStatus,omitempty"`
 
-	// TraceStates is a list of tracing info
-	TraceStates []TraceInfo `json:"traceStates,omitempty"`
+	// TaskStates is a list of tracing info
+	TaskStates []TaskInfo `json:"taskStates,omitempty"`
 }
 
-type TraceInfo struct {
-	TraceId string `json:"traceId,omitempty"`
+type TaskInfo struct {
+	TaskId string `json:"taskId,omitempty"`
 
 	BeginTime *metav1.Time `json:"beginTime,omitempty"`
 
@@ -234,11 +207,11 @@ type ItemStatus struct {
 	// WebhookChecked representing the pod has pass check
 	WebhookChecked bool `json:"webhookChecked"`
 
-	// TraceId representing async request traceId
-	TraceId string `json:"traceId,omitempty"`
+	// TraceId representing poll request taskId
+	TaskId string `json:"taskId,omitempty"`
 }
 
-type Detail struct {
+type PodTransitionDetail struct {
 	Name        string       `json:"name,omitempty"`
 	Stage       string       `json:"stage,omitempty"`
 	Passed      bool         `json:"passed"`
@@ -277,4 +250,77 @@ type PodTransitionRuleList struct {
 
 func init() {
 	SchemeBuilder.Register(&PodTransitionRule{}, &PodTransitionRuleList{})
+}
+
+// WebhookRequest is representing the request parameter.
+type WebhookRequest struct {
+	TraceId string `json:"traceId,omitempty"`
+
+	RuleName string `json:"ruleName,omitempty"`
+
+	Stage *string `json:"stage,omitempty"`
+
+	// Resources contains the list of resource parameter
+	Resources []ResourceParameter `json:"resources,omitempty"`
+}
+
+// ResourceParameter is representing the request body of resource parameter
+type ResourceParameter struct {
+	// APIVersion defines the versioned schema of this representation of an object.
+	ApiVersion string `json:"apiVersion"`
+
+	// Kind is a string value representing the REST resource this object represents.
+	Kind string `json:"kind"`
+
+	// Name is a string value representing resource name
+	Name string `json:"name,omitempty"`
+
+	// Parameters is a string map representing parameters
+	Parameters map[string]string `json:"parameters,omitempty"`
+}
+
+type Parameter struct {
+	// Key is the parameter key.
+	Key string `json:"key,omitempty"`
+
+	// Value is the string value of this parameter.
+	// Defaults to "".
+	// +optional
+	Value string `json:"value,omitempty"`
+
+	// Source for the parameter's value. Cannot be used if value is not empty.
+	// +optional
+	ValueFrom *ParameterSource `json:"valueFrom,omitempty"`
+}
+
+type ParameterSource struct {
+
+	// Type defines target pod type.
+	// +optional
+	Type string `json:"type,omitempty"`
+
+	// Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations,
+	// spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP.
+	// +optional
+	FieldRef *corev1.ObjectFieldSelector `json:"fieldRef,omitempty"`
+}
+
+type WebhookResponse struct {
+	Success       bool     `json:"success"`
+	FinishedNames []string `json:"finishedNames,omitempty"`
+	Message       string   `json:"message"`
+	Poll          bool     `json:"poll"`
+	// Deprecated, will replace by Poll
+	Async bool `json:"async"`
+	// if Async, use TraceId as TaskId
+	TraceId string `json:"traceId"`
+	TaskId  string `json:"taskId"`
+}
+
+type PollResponse struct {
+	Success       bool     `json:"success"`
+	Message       string   `json:"message"`
+	Finished      bool     `json:"finished"`
+	FinishedNames []string `json:"finishedNames,omitempty"`
+	Stop          bool     `json:"stop"`
 }

@@ -325,7 +325,7 @@ func (rsm *mockPodTransitionRuleManager) SetupPodTransitionRuleController(manage
 	return nil
 }
 
-func (rsm *mockPodTransitionRuleManager) GetState(client.Client, client.Object) (checker.CheckState, error) {
+func (rsm *mockPodTransitionRuleManager) GetState(context.Context, client.Client, client.Object) (checker.CheckState, error) {
 	if rsm.CheckState == nil {
 		return checker.CheckState{}, nil
 	}

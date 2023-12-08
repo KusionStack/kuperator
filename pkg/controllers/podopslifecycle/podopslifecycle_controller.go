@@ -139,7 +139,7 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 		}
 	}
 
-	state, err := r.podTransitionRuleManager.GetState(r.Client, pod)
+	state, err := r.podTransitionRuleManager.GetState(ctx, r.Client, pod)
 	if err != nil {
 		logger.Error(err, "failed to get pod state")
 		return reconcile.Result{}, err
