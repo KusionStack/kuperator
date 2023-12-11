@@ -41,8 +41,6 @@ import (
 
 func TestPodTransitionRule(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
-	defer Stop()
-	<-time.After(1 * time.Second)
 	var pods []*corev1.Pod
 	pods = append(pods,
 		genDefaultPod("default", "pod-test-1"),
@@ -170,10 +168,8 @@ func TestPodTransitionRule(t *testing.T) {
 
 func TestWebhookRule(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
-
-	stop, finish := RunHttpServer(handleHttpAlwaysSuccess, "8888")
+	stop, finish := RunHttpServer(handleHttpAlwaysSuccess, "8899")
 	defer func() {
-		Stop()
 		stop <- struct{}{}
 		<-finish
 	}()
@@ -207,7 +203,7 @@ func TestWebhookRule(t *testing.T) {
 					TransitionRuleDefinition: appsv1alpha1.TransitionRuleDefinition{
 						Webhook: &appsv1alpha1.TransitionRuleWebhook{
 							ClientConfig: appsv1alpha1.ClientConfigBeta1{
-								URL: "http://127.0.0.1:8888",
+								URL: "http://127.0.0.1:8899",
 							},
 							FailurePolicy: &policy,
 							Parameters: []appsv1alpha1.Parameter{

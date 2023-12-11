@@ -166,6 +166,32 @@ var _ = Describe("PodTransitionRule Validating", func() {
 		}
 		Expect(NewValidatingHandler().validate(rs)).Should(BeNil())
 	})
+	It("Mutating PodTransitionRule", func() {
+		rs.Spec = appsv1alpha1.PodTransitionRuleSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"test": "test"},
+			},
+			Rules: []appsv1alpha1.TransitionRule{
+				{
+					Name: "webhook",
+					TransitionRuleDefinition: appsv1alpha1.TransitionRuleDefinition{
+						Webhook: &appsv1alpha1.TransitionRuleWebhook{
+							ClientConfig: appsv1alpha1.ClientConfigBeta1{
+								URL: "http://127.0.0.1:8899",
+								Poll: &appsv1alpha1.Poll{
+									URL: "http://127.0.0.1:8898",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		SetDefaultPodTransitionRule(rs)
+		Expect(*rs.Spec.Rules[0].Webhook.FailurePolicy).Should(Equal(appsv1alpha1.Ignore))
+		Expect(*rs.Spec.Rules[0].Webhook.ClientConfig.Poll.TimeoutSeconds).Should(Equal(int64(60)))
+		Expect(*rs.Spec.Rules[0].Webhook.ClientConfig.Poll.IntervalSeconds).Should(Equal(int64(5)))
+	})
 })
 
 func TestValidate(t *testing.T) {

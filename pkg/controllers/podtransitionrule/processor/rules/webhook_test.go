@@ -77,7 +77,7 @@ var (
 	}
 	timeout  = int64(60)
 	interval = int64(5)
-	pollRS   = &appsv1alpha1.PodTransitionRule{
+	poRS     = &appsv1alpha1.PodTransitionRule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "podtransitionrule-poll",
 			Namespace: "default",
@@ -212,6 +212,7 @@ func TestWebhookPollFail(t *testing.T) {
 	}
 	subjects := sets.NewString("test-pod-a", "test-pod-b", "test-pod-c")
 	g := gomega.NewGomegaWithT(t)
+	pollRS := poRS.DeepCopy()
 	webhooks := GetWebhook(pollRS)
 	g.Expect(len(webhooks)).Should(gomega.BeEquivalentTo(1))
 	web := webhooks[0]
@@ -276,6 +277,7 @@ func TestWebhookPoll(t *testing.T) {
 	}
 	subjects := sets.NewString("test-pod-a", "test-pod-b", "test-pod-c")
 	g := gomega.NewGomegaWithT(t)
+	pollRS := poRS.DeepCopy()
 	webhooks := GetWebhook(pollRS)
 	g.Expect(len(webhooks)).Should(gomega.BeEquivalentTo(1))
 	web := webhooks[0]
@@ -302,7 +304,7 @@ func TestWebhookPoll(t *testing.T) {
 	<-time.After(5 * time.Second)
 	state = &appsv1alpha1.RuleState{Name: web.RuleName, WebhookStatus: res.RuleState.WebhookStatus}
 	pollRS.Status.RuleStates = []*appsv1alpha1.RuleState{state}
-	webhooks = GetWebhook(pollRS)
+	webhooks = GetWebhook(pollRS.DeepCopy())
 	web = webhooks[0]
 	res = web.Do(targets, subjects)
 	rj, _ = json.Marshal(res)
@@ -314,7 +316,7 @@ func TestWebhookPoll(t *testing.T) {
 	<-time.After(5 * time.Second)
 	state = &appsv1alpha1.RuleState{Name: web.RuleName, WebhookStatus: res.RuleState.WebhookStatus}
 	pollRS.Status.RuleStates = []*appsv1alpha1.RuleState{state}
-	webhooks = GetWebhook(pollRS)
+	webhooks = GetWebhook(pollRS.DeepCopy())
 	web = webhooks[0]
 	res = web.Do(targets, subjects)
 	rj, _ = json.Marshal(res)

@@ -30,15 +30,18 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/utils/inject"
 )
 
 var (
-	env    *envtest.Environment
-	mgr    manager.Manager
-	c      client.Client
+	env     *envtest.Environment
+	mgr     manager.Manager
+	c       client.Client
+	request chan reconcile.Request
+
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -77,6 +80,7 @@ func TestMain(m *testing.M) {
 	}()
 	<-time.After(time.Second * 5)
 	code := m.Run()
+	Stop()
 	env.Stop()
 	os.Exit(code)
 }

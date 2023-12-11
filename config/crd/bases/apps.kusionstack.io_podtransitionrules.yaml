@@ -201,7 +201,8 @@ spec:
                                     certificate.
                                   type: string
                                 intervalSeconds:
-                                  description: Interval give the request time interval
+                                  description: Interval give the request time interval,
+                                    default 5s
                                   format: int64
                                   type: integer
                                 rawQueryKey:
@@ -329,8 +330,10 @@ spec:
                 items:
                   properties:
                     name:
+                      description: Name representing Pod name
                       type: string
                     passed:
+                      description: Passed indicates whether the pod passed all rules
                       type: boolean
                     passedRules:
                       items:
@@ -346,6 +349,7 @@ spec:
                         type: object
                       type: array
                     stage:
+                      description: Stage is pod current stage
                       type: string
                   required:
                   - passed

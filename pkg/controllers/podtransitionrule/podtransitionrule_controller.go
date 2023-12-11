@@ -232,7 +232,15 @@ func (r *PodTransitionRuleReconciler) updatePodDetail(ctx context.Context, pod *
 	})
 }
 
-func (r *PodTransitionRuleReconciler) process(rs *appsv1alpha1.PodTransitionRule, pods map[string]*corev1.Pod) (shouldRetry bool, interval *time.Duration, details map[string]*appsv1alpha1.PodTransitionDetail, ruleStates []*appsv1alpha1.RuleState) {
+func (r *PodTransitionRuleReconciler) process(
+	rs *appsv1alpha1.PodTransitionRule,
+	pods map[string]*corev1.Pod,
+) (
+	shouldRetry bool,
+	interval *time.Duration,
+	details map[string]*appsv1alpha1.PodTransitionDetail,
+	ruleStates []*appsv1alpha1.RuleState,
+) {
 	stages := r.GetStages()
 	wg := sync.WaitGroup{}
 	wg.Add(len(stages))
