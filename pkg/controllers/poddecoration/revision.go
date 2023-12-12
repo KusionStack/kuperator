@@ -75,12 +75,6 @@ func (roa *revisionOwnerAdapter) GetPatch(obj metav1.Object) ([]byte, error) {
 	return getPodDecorationPatch(cs)
 }
 
-func (roa *revisionOwnerAdapter) GetSelectorLabels(obj metav1.Object) map[string]string {
-	return map[string]string{
-		appsalphav1.PodDecorationControllerRevisionOwner: obj.GetName(),
-	}
-}
-
 func (roa *revisionOwnerAdapter) GetCurrentRevision(obj metav1.Object) string {
 	ips, _ := obj.(*appsalphav1.PodDecoration)
 	return ips.Status.CurrentRevision

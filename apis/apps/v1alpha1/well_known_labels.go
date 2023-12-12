@@ -45,11 +45,6 @@ const (
 	CollaSetUpdateIndicateLabelKey = "collaset.kusionstack.io/update-included"
 )
 
-// PodDecoration Labels
-const (
-	PodDecorationControllerRevisionOwner = "decoration.cafe.sofastack.io/controller-revision-owner"
-)
-
 var (
 	WellKnownLabelPrefixesWithID = []string{PodOperatingLabelPrefix, PodOperationTypeLabelPrefix, PodPreCheckLabelPrefix, PodPreCheckedLabelPrefix,
 		PodPreparingLabelPrefix, PodDoneOperationTypeLabelPrefix, PodUndoOperationTypeLabelPrefix, PodOperateLabelPrefix, PodOperatedLabelPrefix, PodPostCheckLabelPrefix,

@@ -190,13 +190,9 @@ func (r *ReconcilePodDecoration) calculateStatus(
 		for _, pod := range pods {
 			currentRevision := utilspoddecoration.GetDecorationGroupRevisionInfo(pod).
 				GetGroupPDRevision(instance.Spec.InjectStrategy.Group, instance.Name)
-			podInfo := appsv1alpha1.PodDecorationPodInfo{
-				Name: pod.Name,
-			}
 			if currentRevision != nil {
 				hasEffectivePods = true
 				status.InjectedPods++
-				podInfo.Revision = *currentRevision
 				if *currentRevision == status.UpdatedRevision {
 					status.UpdatedPods++
 					if controllerutils.IsPodReady(pod) {
@@ -206,17 +202,22 @@ func (r *ReconcilePodDecoration) calculateStatus(
 						status.UpdatedAvailablePods++
 					}
 				}
-			} else {
-				podInfo.IsNotInjected = true
 			}
 			if !disablePodDetail {
+				podInfo := appsv1alpha1.PodDecorationPodInfo{
+					Name:          pod.Name,
+					IsNotInjected: currentRevision == nil,
+				}
+				if currentRevision != nil {
+					podInfo.Revision = *currentRevision
+				}
 				detail.Pods = append(detail.Pods, podInfo)
 			}
 		}
 		details = append(details, detail)
 	}
 	fullControlByOthPD := heaviest != nil && heaviest.Name != instance.Name && heaviest.Status.CurrentRevision != ""
-	status.IsEffective = BoolPoint(instance.DeletionTimestamp == nil && (!fullControlByOthPD || hasEffectivePods))
+	status.IsEffective = BoolPointer(instance.DeletionTimestamp == nil && (!fullControlByOthPD || hasEffectivePods))
 	if status.UpdatedPods == status.MatchedPods {
 		status.CurrentRevision = status.UpdatedRevision
 	}
@@ -314,6 +315,6 @@ func (r *ReconcilePodDecoration) isPDEscaped(rd *appsv1alpha1.PodDecoration) boo
 	return rd.Status.InjectedPods == 0
 }
 
-func BoolPoint(val bool) *bool {
+func BoolPointer(val bool) *bool {
 	return &val
 }
