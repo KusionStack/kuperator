@@ -78,12 +78,13 @@ func reject(subjects, passed sets.String, rejects map[string]string, reason stri
 	}
 }
 
-type Response struct {
-	Success      bool     `json:"success"`
-	Message      string   `json:"message"`
-	RetryByTrace bool     `json:"retryByTrace"`
-	Passed       []string `json:"finishedNames,omitempty"`
-}
+//
+//type Response struct {
+//	Success      bool     `json:"success"`
+//	Message      string   `json:"message"`
+//	RetryByTrace bool     `json:"retryByTrace"`
+//	Passed       []string `json:"finishedNames,omitempty"`
+//}
 
 type HttpJob struct {
 	Url      string
@@ -98,77 +99,16 @@ type HttpJob struct {
 	Action string
 }
 
-// WebhookReq is representing the request parameter.
-type WebhookReq struct {
-	TraceId string `json:"traceId,omitempty"`
+func (w *Webhook) buildRequest(pods sets.String) (*appsv1alpha1.WebhookRequest, error) {
 
-	RetryByTrace bool `json:"retryByTrace,omitempty"`
-
-	RuleName string `json:"ruleName,omitempty"`
-
-	Stage *string `json:"stage,omitempty"`
-
-	// Resources contains the list of resource parameter
-	Resources []ResourceParameter `json:"resources,omitempty"`
-
-	Parameters map[string]string `json:"parameters,omitempty"`
-}
-
-// ResourceParameter is representing the request body of resource parameter
-type ResourceParameter struct {
-	// APIVersion defines the versioned schema of this representation of an object.
-	ApiVersion string `json:"apiVersion"`
-
-	// Kind is a string value representing the REST resource this object represents.
-	Kind string `json:"kind"`
-
-	// Name is a string value representing resource name
-	Name string `json:"name,omitempty"`
-
-	// Parameters is a string map representing parameters
-	Parameters map[string]string `json:"parameters,omitempty"`
-}
-
-type Parameter struct {
-	// Key is the parameter key.
-	Key string `json:"key,omitempty"`
-
-	// Value is the string value of this parameter.
-	// Defaults to "".
-	// +optional
-	Value string `json:"value,omitempty"`
-
-	// Source for the parameter's value. Cannot be used if value is not empty.
-	// +optional
-	ValueFrom *ParameterSource `json:"valueFrom,omitempty"`
-}
-
-type ParameterSource struct {
-
-	// Type defines target pod type.
-	// +optional
-	Type string `json:"type,omitempty"`
-
-	// Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations,
-	// spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP.
-	// +optional
-	FieldRef *corev1.ObjectFieldSelector `json:"fieldRef,omitempty"`
-}
-
-func (w *Webhook) buildRequest(pods sets.String, oldTrace *string) (*WebhookReq, error) {
-
-	req := &WebhookReq{
+	req := &appsv1alpha1.WebhookRequest{
 		RuleName: w.RuleName,
 		Stage:    w.Stage,
+		TraceId:  NewTrace(),
 	}
-	if oldTrace != nil {
-		req.TraceId = *oldTrace
-		req.RetryByTrace = true
-		return req, nil
-	}
-	webhookPodsParameters := make([]ResourceParameter, 0, pods.Len())
+	webhookPodsParameters := make([]appsv1alpha1.ResourceParameter, 0, pods.Len())
 	for podName := range pods {
-		podPara := ResourceParameter{
+		podPara := appsv1alpha1.ResourceParameter{
 			ApiVersion: "core/v1",
 			Kind:       "Pod",
 			Name:       podName,
@@ -184,7 +124,6 @@ func (w *Webhook) buildRequest(pods sets.String, oldTrace *string) (*WebhookReq,
 		podPara.Parameters = parameters
 		webhookPodsParameters = append(webhookPodsParameters, podPara)
 	}
-	req.TraceId = NewTrace()
 	req.Resources = webhookPodsParameters
 	return req, nil
 }

@@ -71,13 +71,15 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 func SetDefaultPodTransitionRule(rs *appsv1alpha1.PodTransitionRule) {
 	for i := range rs.Spec.Rules {
 		if rs.Spec.Rules[i].Webhook != nil {
-			if rs.Spec.Rules[i].Webhook.ClientConfig.IntervalSeconds == nil {
-				interval := appsv1alpha1.DefaultWebhookInterval
-				rs.Spec.Rules[i].Webhook.ClientConfig.IntervalSeconds = &interval
-			}
-			if rs.Spec.Rules[i].Webhook.ClientConfig.TraceTimeoutSeconds == nil {
-				timeout := appsv1alpha1.DefaultWebhookTimeout
-				rs.Spec.Rules[i].Webhook.ClientConfig.TraceTimeoutSeconds = &timeout
+			if rs.Spec.Rules[i].Webhook.ClientConfig.Poll != nil {
+				if rs.Spec.Rules[i].Webhook.ClientConfig.Poll.IntervalSeconds == nil {
+					interval := appsv1alpha1.DefaultWebhookInterval
+					rs.Spec.Rules[i].Webhook.ClientConfig.Poll.IntervalSeconds = &interval
+				}
+				if rs.Spec.Rules[i].Webhook.ClientConfig.Poll.TimeoutSeconds == nil {
+					timeout := appsv1alpha1.DefaultWebhookTimeout
+					rs.Spec.Rules[i].Webhook.ClientConfig.Poll.TimeoutSeconds = &timeout
+				}
 			}
 			if rs.Spec.Rules[i].Webhook.FailurePolicy == nil {
 				failurePolicy := appsv1alpha1.Ignore

@@ -172,7 +172,7 @@ func (r *PodTransitionRuleReconciler) Reconcile(ctx context.Context, request rec
 
 	// TODO: Sync WebhookStates in Details
 
-	detailList := make([]*appsv1alpha1.Detail, 0, len(details))
+	detailList := make([]*appsv1alpha1.PodTransitionDetail, 0, len(details))
 	keys := make([]string, 0, len(details))
 	for key := range details {
 		keys = append(keys, key)
@@ -208,20 +208,20 @@ func (r *PodTransitionRuleReconciler) Reconcile(ctx context.Context, request rec
 	return res, r.syncPodsDetail(ctx, podTransitionRule.Name, pods, details)
 }
 
-func (r *PodTransitionRuleReconciler) syncPodsDetail(ctx context.Context, podTransitionRuleName string, pods []*corev1.Pod, details map[string]*appsv1alpha1.Detail) error {
+func (r *PodTransitionRuleReconciler) syncPodsDetail(ctx context.Context, podTransitionRuleName string, pods []*corev1.Pod, details map[string]*appsv1alpha1.PodTransitionDetail) error {
 	_, err := controllerutils.SlowStartBatch(len(pods), 1, false, func(i int, _ error) error {
 		return r.updatePodDetail(ctx, pods[i], podTransitionRuleName, details[pods[i].Name])
 	})
 	return err
 }
 
-func (r *PodTransitionRuleReconciler) updatePodDetail(ctx context.Context, pod *corev1.Pod, podTransitionRuleName string, detail *appsv1alpha1.Detail) error {
+func (r *PodTransitionRuleReconciler) updatePodDetail(ctx context.Context, pod *corev1.Pod, podTransitionRuleName string, detail *appsv1alpha1.PodTransitionDetail) error {
 	detailAnno := appsv1alpha1.AnnotationPodTransitionRuleDetailPrefix + "/" + podTransitionRuleName
 	var newDetail string
 	if detail != nil {
-		newDetail = utils.DumpJSON(&appsv1alpha1.Detail{Stage: detail.Stage, Passed: detail.Passed})
+		newDetail = utils.DumpJSON(&appsv1alpha1.PodTransitionDetail{Stage: detail.Stage, Passed: detail.Passed})
 	} else {
-		newDetail = utils.DumpJSON(&appsv1alpha1.Detail{Stage: "Unknown", Passed: true})
+		newDetail = utils.DumpJSON(&appsv1alpha1.PodTransitionDetail{Stage: "Unknown", Passed: true})
 	}
 	if pod.Annotations != nil && pod.Annotations[detailAnno] == newDetail {
 		return nil
@@ -232,12 +232,20 @@ func (r *PodTransitionRuleReconciler) updatePodDetail(ctx context.Context, pod *
 	})
 }
 
-func (r *PodTransitionRuleReconciler) process(rs *appsv1alpha1.PodTransitionRule, pods map[string]*corev1.Pod) (shouldRetry bool, interval *time.Duration, details map[string]*appsv1alpha1.Detail, ruleStates []*appsv1alpha1.RuleState) {
+func (r *PodTransitionRuleReconciler) process(
+	rs *appsv1alpha1.PodTransitionRule,
+	pods map[string]*corev1.Pod,
+) (
+	shouldRetry bool,
+	interval *time.Duration,
+	details map[string]*appsv1alpha1.PodTransitionDetail,
+	ruleStates []*appsv1alpha1.RuleState,
+) {
 	stages := r.GetStages()
 	wg := sync.WaitGroup{}
 	wg.Add(len(stages))
 	mu := sync.RWMutex{}
-	details = map[string]*appsv1alpha1.Detail{}
+	details = map[string]*appsv1alpha1.PodTransitionDetail{}
 	for _, stage := range stages {
 		currentStage := stage
 		go func() {
@@ -297,7 +305,7 @@ func (r *PodTransitionRuleReconciler) hasRunningPod(pods *corev1.PodList) bool {
 	return false
 }
 
-func updateDetail(details map[string]*appsv1alpha1.Detail, passRules *processor.ProcessResult, stage string) {
+func updateDetail(details map[string]*appsv1alpha1.PodTransitionDetail, passRules *processor.ProcessResult, stage string) {
 	for po, rules := range passRules.PassRules {
 		var rejectInfo *appsv1alpha1.RejectInfo
 		if rej, ok := passRules.Rejected[po]; ok {
@@ -308,7 +316,7 @@ func updateDetail(details map[string]*appsv1alpha1.Detail, passRules *processor.
 		}
 		detail, ok := details[po]
 		if !ok {
-			detail = &appsv1alpha1.Detail{
+			detail = &appsv1alpha1.PodTransitionDetail{
 				Name:  po,
 				Stage: stage,
 			}

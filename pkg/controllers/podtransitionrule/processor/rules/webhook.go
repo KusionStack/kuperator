@@ -24,8 +24,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/utils"
 	utilshttp "kusionstack.io/operating/pkg/utils/http"
 )
 
@@ -33,7 +35,11 @@ type WebhookRuler struct {
 	Name string
 }
 
-func (r *WebhookRuler) Filter(podTransitionRule *appsv1alpha1.PodTransitionRule, targets map[string]*corev1.Pod, subjects sets.String) *FilterResult {
+func (r *WebhookRuler) Filter(
+	podTransitionRule *appsv1alpha1.PodTransitionRule,
+	targets map[string]*corev1.Pod,
+	subjects sets.String,
+) *FilterResult {
 	return GetWebhook(podTransitionRule, r.Name)[0].Do(targets, subjects)
 }
 
@@ -68,8 +74,8 @@ func GetWebhook(rs *appsv1alpha1.PodTransitionRule, names ...string) (webs []*We
 		if ruleState.WebhookStatus.ItemStatus == nil {
 			ruleState.WebhookStatus.ItemStatus = []*appsv1alpha1.ItemStatus{}
 		}
-		if ruleState.WebhookStatus.TraceStates == nil {
-			ruleState.WebhookStatus.TraceStates = []appsv1alpha1.TraceInfo{}
+		if ruleState.WebhookStatus.TaskStates == nil {
+			ruleState.WebhookStatus.TaskStates = []appsv1alpha1.TaskInfo{}
 		}
 
 		webs = append(webs, &Webhook{
@@ -95,7 +101,7 @@ type Webhook struct {
 	subjects sets.String
 
 	retryInterval *time.Duration
-	traceInfo     map[string]*appsv1alpha1.TraceInfo
+	taskInfo      map[string]*appsv1alpha1.TaskInfo
 }
 
 func (w *Webhook) updateInterval(interval time.Duration) {
@@ -114,7 +120,7 @@ func (w *Webhook) setItems(targets map[string]*corev1.Pod, subjects sets.String)
 
 func (w *Webhook) Do(targets map[string]*corev1.Pod, subjects sets.String) *FilterResult {
 	w.setItems(targets, subjects)
-	w.traceInfo = map[string]*appsv1alpha1.TraceInfo{}
+	w.taskInfo = map[string]*appsv1alpha1.TaskInfo{}
 	effectiveSubjects := sets.NewString(w.subjects.List()...)
 	passed := sets.NewString()
 	rejectedPods := map[string]string{}
@@ -127,180 +133,250 @@ func (w *Webhook) Do(targets map[string]*corev1.Pod, subjects sets.String) *Filt
 	}
 
 	newWebhookState := &appsv1alpha1.WebhookStatus{
-		TraceStates: []appsv1alpha1.TraceInfo{},
-		ItemStatus:  []*appsv1alpha1.ItemStatus{},
+		TaskStates: []appsv1alpha1.TaskInfo{},
+		ItemStatus: []*appsv1alpha1.ItemStatus{},
 	}
 	defer func() {
-		newWebhookState.TraceStates = w.convTraceInfo(w.traceInfo)
+		newWebhookState.TaskStates = w.convTaskInfo(w.taskInfo)
 		w.State.WebhookStatus = newWebhookState
 	}()
 
 	checked := sets.NewString()
-	tracePods := map[string]sets.String{}
+	taskPods := map[string]sets.String{}
 	allTracingPods := sets.NewString()
-	processingTrace := sets.NewString()
+	processingTask := sets.NewString()
 
 	for _, state := range w.State.WebhookStatus.ItemStatus {
 		if !effectiveSubjects.Has(state.Name) {
 			continue
 		}
 		//processingPods.Insert(podState.Name)
-		if tracePods[state.TraceId] == nil {
-			tracePods[state.TraceId] = sets.NewString(state.Name)
+		if taskPods[state.TaskId] == nil {
+			taskPods[state.TaskId] = sets.NewString(state.Name)
 		} else {
-			tracePods[state.TraceId].Insert(state.Name)
+			taskPods[state.TaskId].Insert(state.Name)
 		}
 
-		if state.TraceId != "" {
+		if state.TaskId != "" {
 			allTracingPods.Insert(state.Name)
 		}
 
 		if state.WebhookChecked {
 			checked.Insert(state.Name)
 		} else {
-			processingTrace.Insert(state.TraceId)
+			processingTask.Insert(state.TaskId)
 		}
 	}
 
 	// process trace
-	for traceId := range processingTrace {
-		if traceId == "" {
+	for taskId := range processingTask {
+		if taskId == "" {
 			continue
 		}
-		pods := tracePods[traceId]
+		pods := taskPods[taskId]
 
-		// trace timeout, retrace
-		if w.timeOut(traceId) {
+		// poll task timeout
+		if w.timeOut(taskId) {
 			for po := range pods {
 				if checked.Has(po) {
 					newWebhookState.ItemStatus = append(newWebhookState.ItemStatus, &appsv1alpha1.ItemStatus{
 						Name:           po,
 						WebhookChecked: true,
-						TraceId:        traceId,
+						TaskId:         taskId,
 					})
 				} else {
 					allTracingPods.Delete(po)
-					rejectedPods[po] = fmt.Sprintf("webhook check [%s] timeout, trace %s", w.key(), traceId)
+					rejectedPods[po] = fmt.Sprintf("webhook check [%s] timeout, trace %s", w.key(), taskId)
 				}
 			}
 			continue
 		}
 
-		if ok, wait, cost := w.outInterval(traceId); !ok {
+		if ok, wait, cost := w.outInterval(taskId); !ok {
 			var lastMsg string
-			info := w.getTraceInfo(traceId)
+			info := w.getTaskInfo(taskId)
 			if info != nil {
 				lastMsg = info.Message
 			}
 			newWebhookState.ItemStatus = appendStatus(newWebhookState.ItemStatus, pods, func(po string) bool {
 				hasChecked := checked.Has(po)
 				if !hasChecked {
-					rejectedPods[po] = fmt.Sprintf("webhook check [%s], traceId %s is waiting for next interval, msg: %s ,cost time %s", w.key(), traceId, lastMsg, cost.String())
+					rejectedPods[po] = fmt.Sprintf(
+						"webhook check [%s], traceId %s is waiting for next interval, msg: %s ,cost time %s",
+						w.key(),
+						taskId,
+						lastMsg,
+						cost.String(),
+					)
 				}
 				return hasChecked
-			}, traceId)
-			w.recordTimeOld(traceId)
+			}, taskId)
+			w.recordTimeOld(taskId)
 			w.updateInterval(wait / time.Second)
 			continue
 		}
 
-		res, err := w.queryTrace(traceId)
+		res, err := w.polling(taskId)
 
-		w.recordTime(traceId, res.Message)
+		w.recordTime(taskId, res.Message)
 
 		if err != nil {
 			newWebhookState.ItemStatus = appendStatus(newWebhookState.ItemStatus, pods, func(po string) bool {
 				hasChecked := checked.Has(po)
 				if !hasChecked {
-					rejectedPods[po] = fmt.Sprintf("webhook check [%s] error, traceId %s, err: %v", w.key(), traceId, err)
+					rejectedPods[po] = fmt.Sprintf("webhook check [%s] error, taskId %s, err: %v", w.key(), taskId, err)
 				}
 				return hasChecked
-			}, traceId)
+			}, taskId)
+			continue
+		}
+
+		// all failed
+		if !res.Success {
+			newWebhookState.ItemStatus = appendStatus(newWebhookState.ItemStatus, pods, func(po string) bool {
+				hasChecked := checked.Has(po)
+				if !hasChecked {
+					rejectedPods[po] = fmt.Sprintf("webhook check [%s] failed, taskId: %s, err: %v", w.key(), taskId, err)
+				}
+				return hasChecked
+			}, taskId)
 			continue
 		}
 
 		// all passed
-		if res.Success {
+		if res.Finished {
 			newWebhookState.ItemStatus = appendStatus(newWebhookState.ItemStatus, pods, func(po string) bool {
 				checked.Insert(po)
 				return true
-			}, traceId)
+			}, taskId)
 			continue
 		}
-		localFinished := sets.NewString(res.Passed...)
+
+		localFinished := sets.NewString(res.FinishedNames...)
 		// query trace
-		if res.RetryByTrace {
+		if !res.Stop {
 			newWebhookState.ItemStatus = appendStatus(newWebhookState.ItemStatus, pods, func(po string) bool {
 				if localFinished.Has(po) {
 					checked.Insert(po)
 				}
 				hasChecked := checked.Has(po)
 				if !hasChecked {
-					rejectedPods[po] = fmt.Sprintf("webhook check [%s] rejected, will retry by traceId %s, msg: %s", w.key(), traceId, res.Message)
+					rejectedPods[po] = fmt.Sprintf(
+						"webhook check [%s] rejected, will retry by taskId %s, msg: %s",
+						w.key(),
+						taskId,
+						res.Message,
+					)
 				}
 				return hasChecked
-			}, traceId)
+			}, taskId)
 			continue
 		}
-
-		// finish trace
+		// stop trace
 		newWebhookState.ItemStatus = appendStatus(newWebhookState.ItemStatus, pods, func(po string) bool {
 			if localFinished.Has(po) {
 				checked.Insert(po)
 			}
 			hasChecked := checked.Has(po)
 			if !hasChecked {
-				rejectedPods[po] = fmt.Sprintf("webhook check [%s] rejected by finish trace, traceId %s, msg: %v", w.key(), traceId, res.Message)
+				rejectedPods[po] = fmt.Sprintf(
+					"webhook check [%s] rejected by stop task, taskId %s, msg: %v",
+					w.key(),
+					taskId,
+					res.Message,
+				)
 			}
 			return hasChecked
 		}, "")
 	}
 
 	effectiveSubjects.Delete(allTracingPods.List()...)
+	effectiveSubjects.Delete(checked.List()...)
 
 	if effectiveSubjects.Len() == 0 {
-		return &FilterResult{Passed: checked, Rejected: rejectedPods, Interval: w.retryInterval, RuleState: &appsv1alpha1.RuleState{Name: w.RuleName, WebhookStatus: newWebhookState}}
+		return &FilterResult{
+			Passed:    checked,
+			Rejected:  rejectedPods,
+			Interval:  w.retryInterval,
+			RuleState: &appsv1alpha1.RuleState{Name: w.RuleName, WebhookStatus: newWebhookState},
+		}
 	}
 
 	// First request
-	traceId, res, err := w.query(effectiveSubjects)
-
+	selfTraceId, res, err := w.query(effectiveSubjects)
+	taskId := getTaskId(res)
+	klog.Infof(
+		"do podtransitionrule webhook [%s], pods: %v, taskId: %s, traceId: %s, resp: %s",
+		w.key(),
+		effectiveSubjects.List(),
+		taskId,
+		selfTraceId,
+		utils.DumpJSON(res),
+	)
 	if err != nil {
 		for eft := range effectiveSubjects {
-			rejectedPods[eft] = fmt.Sprintf("fail to do webhook [%s], %v, trace %s", w.key(), err, traceId)
+			rejectedPods[eft] = fmt.Sprintf(
+				"fail to do webhook [%s], %v, traceId %s, taskId %s",
+				w.key(),
+				err,
+				selfTraceId,
+				taskId,
+			)
 		}
-		return &FilterResult{Passed: checked, Rejected: rejectedPods, Err: err, RuleState: &appsv1alpha1.RuleState{Name: w.RuleName, WebhookStatus: newWebhookState}}
+		return &FilterResult{
+			Passed:    checked,
+			Rejected:  rejectedPods,
+			Err:       err,
+			RuleState: &appsv1alpha1.RuleState{Name: w.RuleName, WebhookStatus: newWebhookState},
+		}
 	}
-	w.recordTime(traceId, res.Message)
-	localFinished := sets.NewString(res.Passed...)
-	// All passed
-	if res.Success {
-		newWebhookState.ItemStatus = appendStatus(newWebhookState.ItemStatus, effectiveSubjects, func(po string) bool {
-			checked.Insert(po)
-			return true
-		}, traceId)
-	} else if res.RetryByTrace {
-		newWebhookState.ItemStatus = appendStatus(newWebhookState.ItemStatus, effectiveSubjects, func(po string) bool {
-			if localFinished.Has(po) {
-				checked.Insert(po)
-			}
-			hasChecked := checked.Has(po)
-			if !hasChecked {
-				rejectedPods[po] = fmt.Sprintf("webhook check [%s] rejected, will retry by traceId %s, msg: %s", w.key(), traceId, res.Message)
-			}
-			return hasChecked
-		}, traceId)
-	} else {
+
+	if taskId != "" {
+		w.recordTime(taskId, res.Message)
+	}
+
+	localFinished := sets.NewString(res.FinishedNames...)
+
+	if !res.Success {
 		newWebhookState.ItemStatus = appendStatus(newWebhookState.ItemStatus, effectiveSubjects, func(po string) bool {
 			if localFinished.Has(po) {
 				checked.Insert(po)
 			}
 			hasChecked := checked.Has(po)
 			if !hasChecked {
-				rejectedPods[po] = fmt.Sprintf("webhook check [%s] rejected, traceId %s, msg: %s", w.key(), traceId, res.Message)
+				rejectedPods[po] = fmt.Sprintf(
+					"webhook check [%s] rejected, traceId %s, taskId %s, msg: %s",
+					w.key(),
+					selfTraceId,
+					taskId,
+					res.Message,
+				)
 			}
 			return hasChecked
 		}, "")
+	} else if !shouldPoll(res) {
+		// success, All passed
+		newWebhookState.ItemStatus = appendStatus(newWebhookState.ItemStatus, effectiveSubjects, func(po string) bool {
+			checked.Insert(po)
+			return true
+		}, taskId)
+	} else {
+		// success, poll
+		newWebhookState.ItemStatus = appendStatus(newWebhookState.ItemStatus, effectiveSubjects, func(po string) bool {
+			if localFinished.Has(po) {
+				checked.Insert(po)
+			}
+			hasChecked := checked.Has(po)
+			if !hasChecked {
+				rejectedPods[po] = fmt.Sprintf(
+					"webhook check [%s] rejected, will retry by taskId %s, msg: %s",
+					w.key(),
+					taskId,
+					res.Message,
+				)
+			}
+			return hasChecked
+		}, taskId)
 	}
 
 	return &FilterResult{
@@ -311,82 +387,82 @@ func (w *Webhook) Do(targets map[string]*corev1.Pod, subjects sets.String) *Filt
 	}
 }
 
-func (w *Webhook) oldTraceMap() map[string]*appsv1alpha1.TraceInfo {
-	res := map[string]*appsv1alpha1.TraceInfo{}
-	for i, state := range w.State.WebhookStatus.TraceStates {
-		res[state.TraceId] = &w.State.WebhookStatus.TraceStates[i]
+func (w *Webhook) oldTraceMap() map[string]*appsv1alpha1.TaskInfo {
+	res := map[string]*appsv1alpha1.TaskInfo{}
+	for i, state := range w.State.WebhookStatus.TaskStates {
+		res[state.TaskId] = &w.State.WebhookStatus.TaskStates[i]
 	}
 	return res
 }
 
-func (w *Webhook) convTraceInfo(infoMap map[string]*appsv1alpha1.TraceInfo) []appsv1alpha1.TraceInfo {
-	states := make([]appsv1alpha1.TraceInfo, 0, len(infoMap))
+func (w *Webhook) convTaskInfo(infoMap map[string]*appsv1alpha1.TaskInfo) []appsv1alpha1.TaskInfo {
+	states := make([]appsv1alpha1.TaskInfo, 0, len(infoMap))
 	for _, v := range infoMap {
 		states = append(states, *v)
 	}
 	return states
 }
 
-func (w *Webhook) recordTime(traceId, msg string) {
+func (w *Webhook) recordTime(taskId, msg string) {
 	timeNow := time.Now()
-	newRecord := &appsv1alpha1.TraceInfo{
-		TraceId:   traceId,
+	newRecord := &appsv1alpha1.TaskInfo{
+		TaskId:    taskId,
 		BeginTime: &metav1.Time{Time: timeNow},
 		LastTime:  &metav1.Time{Time: timeNow},
 		Message:   msg,
 	}
-	tm := w.getTraceInfo(traceId)
+	tm := w.getTaskInfo(taskId)
 	if tm != nil && tm.BeginTime != nil {
 		newRecord.BeginTime = tm.BeginTime.DeepCopy()
 	}
-	w.traceInfo[traceId] = newRecord
+	w.taskInfo[taskId] = newRecord
 }
 
-func (w *Webhook) recordTimeOld(traceId string) {
-	tm := w.getTraceInfo(traceId)
+func (w *Webhook) recordTimeOld(taskId string) {
+	tm := w.getTaskInfo(taskId)
 	if tm != nil {
-		w.traceInfo[traceId] = &appsv1alpha1.TraceInfo{
+		w.taskInfo[taskId] = &appsv1alpha1.TaskInfo{
 			BeginTime: tm.BeginTime.DeepCopy(),
 			LastTime:  tm.LastTime.DeepCopy(),
 			Message:   tm.Message,
-			TraceId:   traceId,
+			TaskId:    taskId,
 		}
 	}
 }
 
-func (w *Webhook) timeOut(traceId string) bool {
+func (w *Webhook) timeOut(taskId string) bool {
 	timeNow := time.Now()
 	timeOut := defaultTimeout
-	tm := w.getTraceInfo(traceId)
+	tm := w.getTaskInfo(taskId)
 	if tm == nil || tm.BeginTime == nil {
 		return false
 	}
-	if w.Webhook.ClientConfig.TraceTimeoutSeconds != nil {
-		timeOut = time.Duration(*w.Webhook.ClientConfig.TraceTimeoutSeconds) * time.Second
+	if w.Webhook.ClientConfig.Poll.TimeoutSeconds != nil {
+		timeOut = time.Duration(*w.Webhook.ClientConfig.Poll.TimeoutSeconds) * time.Second
 	}
 	return timeNow.Sub(tm.BeginTime.Time) > timeOut
 }
 
-func (w *Webhook) getTraceInfo(traceId string) *appsv1alpha1.TraceInfo {
+func (w *Webhook) getTaskInfo(traceId string) *appsv1alpha1.TaskInfo {
 	if w.State.WebhookStatus == nil {
 		return nil
 	}
-	for i, state := range w.State.WebhookStatus.TraceStates {
-		if state.TraceId == traceId {
-			return &w.State.WebhookStatus.TraceStates[i]
+	for i, state := range w.State.WebhookStatus.TaskStates {
+		if state.TaskId == traceId {
+			return &w.State.WebhookStatus.TaskStates[i]
 		}
 	}
 	return nil
 }
 
 func (w *Webhook) outInterval(traceId string) (bool, time.Duration, time.Duration) {
-	tm := w.getTraceInfo(traceId)
+	tm := w.getTaskInfo(traceId)
 	if tm == nil || tm.LastTime == nil {
 		return true, 0, 0
 	}
 	interval := defaultInterval
-	if w.Webhook.ClientConfig.IntervalSeconds != nil {
-		interval = time.Duration(*w.Webhook.ClientConfig.IntervalSeconds) * time.Second
+	if w.Webhook.ClientConfig.Poll.IntervalSeconds != nil {
+		interval = time.Duration(*w.Webhook.ClientConfig.Poll.IntervalSeconds) * time.Second
 	}
 	allCost := time.Since(tm.BeginTime.Time)
 	nowInterval := time.Since(tm.LastTime.Time)
@@ -394,28 +470,37 @@ func (w *Webhook) outInterval(traceId string) (bool, time.Duration, time.Duratio
 	return nowInterval > interval, wait, allCost
 }
 
-func (w *Webhook) queryTrace(traceId string) (*Response, error) {
-	req, err := w.buildRequest(sets.NewString(), &traceId)
+func (w *Webhook) polling(taskId string) (*appsv1alpha1.PollResponse, error) {
+	pollUrl := fmt.Sprintf("%s?task-id=%s", w.Webhook.ClientConfig.Poll.URL, taskId)
+	if w.Webhook.ClientConfig.Poll.RawQueryKey != "" {
+		pollUrl = fmt.Sprintf("%s?%s=%s", w.Webhook.ClientConfig.Poll.URL, w.Webhook.ClientConfig.Poll.RawQueryKey, taskId)
+	}
+	httpResp, err := utilshttp.DoHttpAndHttpsRequestWithCa(http.MethodGet, pollUrl, nil, nil, w.Webhook.ClientConfig.Poll.CABundle)
 	if err != nil {
 		return nil, err
 	}
-	return w.doHttp(req)
+	resp := &appsv1alpha1.PollResponse{}
+	if err = utilshttp.ParseResponse(httpResp, resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
-func (w *Webhook) query(podSet sets.String) (string, *Response, error) {
-	req, err := w.buildRequest(podSet, nil)
+func (w *Webhook) query(podSet sets.String) (string, *appsv1alpha1.WebhookResponse, error) {
+	req, err := w.buildRequest(podSet)
 	if err != nil {
 		return req.TraceId, nil, err
 	}
 	res, err := w.doHttp(req)
 	return req.TraceId, res, err
 }
-func (w *Webhook) doHttp(req *WebhookReq) (*Response, error) {
+
+func (w *Webhook) doHttp(req *appsv1alpha1.WebhookRequest) (*appsv1alpha1.WebhookResponse, error) {
 	httpResp, err := utilshttp.DoHttpAndHttpsRequestWithCa(http.MethodPost, w.Webhook.ClientConfig.URL, *req, nil, w.Webhook.ClientConfig.CABundle)
 	if err != nil {
 		return nil, err
 	}
-	resp := &Response{}
+	resp := &appsv1alpha1.WebhookResponse{}
 	if err = utilshttp.ParseResponse(httpResp, resp); err != nil {
 		return nil, err
 	}
@@ -426,15 +511,29 @@ func (w *Webhook) key() string {
 	return w.Key
 }
 
-func appendStatus(current []*appsv1alpha1.ItemStatus, nameSet sets.String, checkFunc func(string) bool, trace string) []*appsv1alpha1.ItemStatus {
+func appendStatus(current []*appsv1alpha1.ItemStatus, nameSet sets.String, checkFunc func(string) bool, taskId string) []*appsv1alpha1.ItemStatus {
 	for name := range nameSet {
 		current = append(current, &appsv1alpha1.ItemStatus{
 			Name:           name,
 			WebhookChecked: checkFunc(name),
-			TraceId:        trace,
+			TaskId:         taskId,
 		})
 	}
 	return current
+}
+
+func shouldPoll(resp *appsv1alpha1.WebhookResponse) bool {
+	return resp.Async || resp.Poll
+}
+
+func getTaskId(resp *appsv1alpha1.WebhookResponse) string {
+	if resp.Async || resp.Poll {
+		if resp.TaskId != "" {
+			return resp.TaskId
+		}
+		return resp.TraceId
+	}
+	return ""
 }
 
 func alreadyApproved(po *corev1.Pod) bool {

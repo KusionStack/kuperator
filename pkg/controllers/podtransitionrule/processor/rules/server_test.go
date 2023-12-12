@@ -24,6 +24,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
 type Server struct {
@@ -50,12 +52,12 @@ func (s *Server) Run(stop <-chan struct{}) chan struct{} {
 	return finish
 }
 
-func RunHttpServer(f func(http.ResponseWriter, *http.Request)) (chan struct{}, chan struct{}) {
+func RunHttpServer(f func(http.ResponseWriter, *http.Request), port string) (chan struct{}, chan struct{}) {
 	fmt.Println("try run http server")
 	defer fmt.Println("running")
 	server := &Server{
 		server: &http.Server{
-			Addr:    "127.0.0.1:8888",
+			Addr:    fmt.Sprintf("127.0.0.1:%s", port),
 			Handler: http.HandlerFunc(f),
 		},
 	}
@@ -70,7 +72,7 @@ func handleHttpAlwaysSuccess(resp http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		fmt.Println(fmt.Sprintf("read body err: %s", err))
 	}
-	webReq := &WebhookReq{}
+	webReq := &appsv1alpha1.WebhookRequest{}
 	fmt.Printf("handle http req: %s", string(all))
 	err = json.Unmarshal(all, webReq)
 	if err != nil {
@@ -78,7 +80,7 @@ func handleHttpAlwaysSuccess(resp http.ResponseWriter, req *http.Request) {
 		http.Error(resp, fmt.Sprintf("fail to unmarshal webhook request %s", string(all)), http.StatusInternalServerError)
 		return
 	}
-	webhookResp := &Response{
+	webhookResp := &appsv1alpha1.WebhookResponse{
 		Success: true,
 		Message: "test success",
 	}
@@ -92,16 +94,43 @@ func handleHttpAlwaysFalse(resp http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		fmt.Println(fmt.Sprintf("read body err: %s", err))
 	}
-	webReq := &WebhookReq{}
+	webReq := &appsv1alpha1.WebhookRequest{}
 	err = json.Unmarshal(all, webReq)
 	if err != nil {
 		fmt.Printf("fail to unmarshal webhook request: %v", err)
 		http.Error(resp, fmt.Sprintf("fail to unmarshal webhook request %s", string(all)), http.StatusInternalServerError)
 		return
 	}
-	webhookResp := &Response{
+	webhookResp := &appsv1alpha1.WebhookResponse{
 		Success: false,
 		Message: "test false",
+	}
+	byt, _ := json.Marshal(webhookResp)
+	resp.Write(byt)
+}
+
+func handleHttpAlwaysSomeSucc(resp http.ResponseWriter, req *http.Request) {
+	fmt.Println(req.URL)
+	all, err := io.ReadAll(req.Body)
+	if err != nil {
+		fmt.Println(fmt.Sprintf("read body err: %s", err))
+	}
+	webReq := &appsv1alpha1.WebhookRequest{}
+	err = json.Unmarshal(all, webReq)
+	if err != nil {
+		fmt.Printf("fail to unmarshal webhook request: %v", err)
+		http.Error(resp, fmt.Sprintf("fail to unmarshal webhook request %s", string(all)), http.StatusInternalServerError)
+		return
+	}
+	pods := getPods(webReq)
+	var local []string
+	if pods.Len() > 0 {
+		local = pods.List()[0 : pods.Len()-1]
+	}
+	webhookResp := &appsv1alpha1.WebhookResponse{
+		Success:       false,
+		Message:       "test finishedNames",
+		FinishedNames: local,
 	}
 	byt, _ := json.Marshal(webhookResp)
 	resp.Write(byt)
@@ -125,67 +154,95 @@ func (s *setsTimer) getNow() (sets.String, bool) {
 	isAll := false
 	allTime := time.Now().Sub(s.tm)
 	cnt := int(allTime/s.interval) + 1
-	if cnt > s.pods.Len() {
+	if cnt >= s.pods.Len() {
 		cnt = s.pods.Len()
 		isAll = true
 	}
 	return sets.NewString(s.pods.List()[0:cnt]...), isAll
 }
 
-func handleHttpWithTrace(resp http.ResponseWriter, req *http.Request) {
+func handleFirstPollSucc(resp http.ResponseWriter, req *http.Request) {
 	fmt.Println(req.URL)
-
+	webReq := &appsv1alpha1.WebhookRequest{}
 	all, err := io.ReadAll(req.Body)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("read body err: %s", err))
 	}
-
-	webReq := &WebhookReq{}
 	err = json.Unmarshal(all, webReq)
 	if err != nil {
 		fmt.Printf("fail to unmarshal webhook request: %v", err)
 		http.Error(resp, fmt.Sprintf("fail to unmarshal webhook request %s", string(all)), http.StatusInternalServerError)
 		return
 	}
-	webhookResp := &Response{}
-	pods := getPods(webReq)
-	if webReq.RetryByTrace {
-		col, ok := traceCache[webReq.TraceId]
-		if !ok {
-			panic(fmt.Sprintf("no trace %s", webReq.TraceId))
-		}
-		passed, ok := col.getNow()
-		if ok {
-			webhookResp = &Response{
-				Success: true,
-				Message: "success",
-			}
-		} else {
-			webhookResp = &Response{
-				Success:      false,
-				Message:      fmt.Sprintf("server: success size %d", passed.Len()),
-				Passed:       passed.List(),
-				RetryByTrace: true,
-			}
-		}
-	} else {
-		col, ok := traceCache[webReq.TraceId]
-		if !ok {
-			col = newSetsTimer(pods)
-			traceCache[webReq.TraceId] = col
-		}
-		webhookResp = &Response{
-			Success:      false,
-			Message:      fmt.Sprintf("server: retry by trace %s", webReq.TraceId),
-			RetryByTrace: true,
-		}
+	// expect poll by trace id.
+	webhookResp := &appsv1alpha1.WebhookResponse{
+		Success: true,
+		Async:   true,
+		TraceId: NewTrace(),
 	}
-
+	pods := getPods(webReq)
+	col := newSetsTimer(pods)
+	traceCache[webhookResp.TraceId] = col
 	byt, _ := json.Marshal(webhookResp)
 	resp.Write(byt)
 }
 
-func getPods(req *WebhookReq) sets.String {
+func handleHttpWithTaskIdSucc(resp http.ResponseWriter, req *http.Request) {
+	fmt.Println(req.URL)
+	taskId := req.URL.Query().Get("trace-id")
+
+	col, ok := traceCache[taskId]
+	if !ok {
+		panic(fmt.Sprintf("taskId %s not found", taskId))
+	}
+	passed, ok := col.getNow()
+	webhookResp := &appsv1alpha1.PollResponse{}
+	if ok {
+		webhookResp = &appsv1alpha1.PollResponse{
+			Success:  true,
+			Message:  "success",
+			Finished: true,
+		}
+	} else {
+		webhookResp = &appsv1alpha1.PollResponse{
+			Success:       true,
+			Message:       fmt.Sprintf("server: success size %d", passed.Len()),
+			Finished:      false,
+			FinishedNames: passed.List(),
+		}
+	}
+	byt, _ := json.Marshal(webhookResp)
+	resp.Write(byt)
+}
+
+func handleHttpWithTaskIdFail(resp http.ResponseWriter, req *http.Request) {
+	fmt.Println(req.URL)
+	taskId := req.URL.Query().Get("trace-id")
+
+	col, ok := traceCache[taskId]
+	if !ok {
+		panic(fmt.Sprintf("taskId %s not found", taskId))
+	}
+	passed, ok := col.getNow()
+	webhookResp := &appsv1alpha1.PollResponse{}
+	if ok {
+		webhookResp = &appsv1alpha1.PollResponse{
+			Success: false,
+			Message: "fail",
+		}
+	} else {
+		webhookResp = &appsv1alpha1.PollResponse{
+			Success:       true,
+			Message:       fmt.Sprintf("server: success size %d", passed.Len()),
+			Finished:      false,
+			FinishedNames: passed.List(),
+		}
+	}
+	byt, _ := json.Marshal(webhookResp)
+	resp.Write(byt)
+}
+
+func getPods(req *appsv1alpha1.WebhookRequest) sets.String {
 	res := sets.NewString()
 	for _, param := range req.Resources {
 		res.Insert(param.Name)
