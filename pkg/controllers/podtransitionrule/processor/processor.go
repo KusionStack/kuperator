@@ -173,7 +173,7 @@ func (p *Processor) Process(targets map[string]*corev1.Pod) *ProcessResult {
 		RuleStates: ruleStates,
 	}
 
-	if minInterval != time.Duration(math.MaxInt32) {
+	if minInterval != time.Duration(math.MaxInt32)*time.Second {
 		res.Interval = &minInterval
 	}
 	return res

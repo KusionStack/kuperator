@@ -13,7 +13,7 @@ spec:
     listKind: PodTransitionRuleList
     plural: podtransitionrules
     shortNames:
-    - rs
+    - ptr
     singular: podtransitionrule
   scope: Namespaced
   versions:

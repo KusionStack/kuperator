@@ -231,7 +231,7 @@ type RejectInfo struct {
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:shortName=rs
+// +kubebuilder:resource:shortName=ptr
 
 // PodTransitionRule is the Schema for the podtransitionrules API
 type PodTransitionRule struct {

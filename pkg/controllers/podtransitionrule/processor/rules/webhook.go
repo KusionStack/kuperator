@@ -212,15 +212,14 @@ func (w *Webhook) Do(targets map[string]*corev1.Pod, subjects sets.String) *Filt
 				return hasChecked
 			}, taskId)
 			w.recordTimeOld(taskId)
-			w.updateInterval(wait / time.Second)
+			w.updateInterval(wait)
 			continue
 		}
 
 		res, err := w.polling(taskId)
 
-		w.recordTime(taskId, res.Message, false)
-
 		if err != nil {
+			w.recordTime(taskId, err.Error(), false)
 			newWebhookState.ItemStatus = appendStatus(newWebhookState.ItemStatus, pods, func(po string) bool {
 				hasChecked := checked.Has(po)
 				if !hasChecked {
@@ -230,6 +229,7 @@ func (w *Webhook) Do(targets map[string]*corev1.Pod, subjects sets.String) *Filt
 			}, taskId)
 			continue
 		}
+		w.recordTime(taskId, res.Message, false)
 
 		// all failed
 		if !res.Success {
@@ -251,7 +251,9 @@ func (w *Webhook) Do(targets map[string]*corev1.Pod, subjects sets.String) *Filt
 			}, taskId)
 			continue
 		}
-
+		if w.Webhook.ClientConfig.Poll.IntervalSeconds != nil {
+			w.updateInterval(time.Duration(*w.Webhook.ClientConfig.Poll.IntervalSeconds) * time.Second)
+		}
 		localFinished := sets.NewString(res.FinishedNames...)
 		// query trace
 		if !res.Stop {
