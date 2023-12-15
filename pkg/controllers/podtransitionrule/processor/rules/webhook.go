@@ -218,7 +218,7 @@ func (w *Webhook) Do(targets map[string]*corev1.Pod, subjects sets.String) *Filt
 
 		res, err := w.polling(taskId)
 
-		w.recordTime(taskId, res.Message)
+		w.recordTime(taskId, res.Message, false)
 
 		if err != nil {
 			newWebhookState.ItemStatus = appendStatus(newWebhookState.ItemStatus, pods, func(po string) bool {
@@ -304,25 +304,22 @@ func (w *Webhook) Do(targets map[string]*corev1.Pod, subjects sets.String) *Filt
 
 	// First request
 	selfTraceId, res, err := w.query(effectiveSubjects)
-	taskId := getTaskId(res)
-	klog.Infof(
-		"do podtransitionrule webhook [%s], pods: %v, taskId: %s, traceId: %s, resp: %s",
-		w.key(),
-		effectiveSubjects.List(),
-		taskId,
-		selfTraceId,
-		utils.DumpJSON(res),
-	)
 	if err != nil {
 		for eft := range effectiveSubjects {
 			rejectedPods[eft] = fmt.Sprintf(
-				"fail to do webhook [%s], %v, traceId %s, taskId %s",
+				"fail to request webhook [%s], %v, traceId %s",
 				w.key(),
 				err,
 				selfTraceId,
-				taskId,
 			)
 		}
+		klog.Errorf(
+			"fail to request podtransitionrule webhook [%s], pods: %v, traceId: %s, resp: %s",
+			w.key(),
+			effectiveSubjects.List(),
+			selfTraceId,
+			utils.DumpJSON(res),
+		)
 		return &FilterResult{
 			Passed:    checked,
 			Rejected:  rejectedPods,
@@ -330,11 +327,18 @@ func (w *Webhook) Do(targets map[string]*corev1.Pod, subjects sets.String) *Filt
 			RuleState: &appsv1alpha1.RuleState{Name: w.RuleName, WebhookStatus: newWebhookState},
 		}
 	}
-
+	taskId := getTaskId(res)
+	klog.Infof(
+		"request podtransitionrule webhook [%s], pods: %v, taskId: %s, traceId: %s, resp: %s",
+		w.key(),
+		effectiveSubjects.List(),
+		taskId,
+		selfTraceId,
+		utils.DumpJSON(res),
+	)
 	if taskId != "" {
-		w.recordTime(taskId, res.Message)
+		w.recordTime(taskId, res.Message, true)
 	}
-
 	localFinished := sets.NewString(res.FinishedNames...)
 
 	if !res.Success {
@@ -403,7 +407,7 @@ func (w *Webhook) convTaskInfo(infoMap map[string]*appsv1alpha1.TaskInfo) []apps
 	return states
 }
 
-func (w *Webhook) recordTime(taskId, msg string) {
+func (w *Webhook) recordTime(taskId, msg string, isFirst bool) {
 	timeNow := time.Now()
 	newRecord := &appsv1alpha1.TaskInfo{
 		TaskId:    taskId,
@@ -411,9 +415,11 @@ func (w *Webhook) recordTime(taskId, msg string) {
 		LastTime:  &metav1.Time{Time: timeNow},
 		Message:   msg,
 	}
-	tm := w.getTaskInfo(taskId)
-	if tm != nil && tm.BeginTime != nil {
-		newRecord.BeginTime = tm.BeginTime.DeepCopy()
+	if !isFirst {
+		tm := w.getTaskInfo(taskId)
+		if tm != nil && tm.BeginTime != nil {
+			newRecord.BeginTime = tm.BeginTime.DeepCopy()
+		}
 	}
 	w.taskInfo[taskId] = newRecord
 }
@@ -527,7 +533,7 @@ func shouldPoll(resp *appsv1alpha1.WebhookResponse) bool {
 }
 
 func getTaskId(resp *appsv1alpha1.WebhookResponse) string {
-	if resp.Async || resp.Poll {
+	if resp != nil && (resp.Async || resp.Poll) {
 		if resp.TaskId != "" {
 			return resp.TaskId
 		}
