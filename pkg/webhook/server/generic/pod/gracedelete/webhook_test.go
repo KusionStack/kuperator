@@ -24,8 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubectl/pkg/scheme"
 	"kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/poddeletion"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -37,62 +37,90 @@ func TestGraceDelete(t *testing.T) {
 
 	inputs := []struct {
 		keyWords string // used to check the error message
+		fakePod  corev1.Pod
+		oldPod   corev1.Pod
 
 		podLabels      map[string]string
 		expectedLabels map[string]string
 
-		reqName      string
-		reqNamespace string
+		reqOperation admissionv1.Operation
 	}{
 		{
-			reqName:      "notfounttest",
-			reqNamespace: "default",
+			reqOperation: admissionv1.Update,
 		},
 		{
-			reqName:      "uncontrolledtest",
-			reqNamespace: "default",
+			reqOperation: admissionv1.Delete,
 		},
 		{
-			podLabels: map[string]string{
-				fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
+			fakePod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test",
+				},
+			},
+			oldPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test2",
+				},
+			},
+			reqOperation: admissionv1.Delete,
+		},
+		{
+			fakePod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test",
+					Labels: map[string]string{
+						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
+					},
+				},
+			},
+			oldPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test",
+					Labels: map[string]string{
+						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
+					},
+				},
 			},
 			expectedLabels: map[string]string{
-				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, OpsLifecycleAdapter.GetID()):     "testvalue",
-				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, OpsLifecycleAdapter.GetID()): "testvalue",
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID()):     "testvalue",
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID()): "testvalue",
 			},
-			reqName:      "test",
-			reqNamespace: "default",
-			keyWords:     "podOpsLifecycle denied, waiting for pod resource processing",
+			keyWords:     "podOpsLifecycle denied",
+			reqOperation: admissionv1.Delete,
 		},
 		{
-			podLabels: map[string]string{
-				fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey):                             "true",
-				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, OpsLifecycleAdapter.GetID()): "true",
+			fakePod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test",
+					Labels: map[string]string{
+						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey):                                         "true",
+						fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID()): "true",
+					},
+				},
 			},
-			reqName:      "test",
-			reqNamespace: "default",
+			oldPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test",
+					Labels: map[string]string{
+						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey):                                         "true",
+						fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID()): "true",
+					},
+				},
+			},
+			reqOperation: admissionv1.Delete,
 		},
 	}
 
 	gd := New()
 	for _, v := range inputs {
-		client := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(
-			&corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "default",
-					Name:      "test",
-					Labels:    v.podLabels,
-				},
-			}).Build()
-		req := admission.Request{
-			AdmissionRequest: admissionv1.AdmissionRequest{
-				Name:      v.reqName,
-				Namespace: v.reqNamespace,
-				Operation: admissionv1.Update,
-			},
-		}
-
-		err := gd.Validating(context.Background(), client, req)
+		client := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(&v.fakePod).Build()
+		err := gd.Validating(context.Background(), client, &v.oldPod, nil, v.reqOperation)
 		if v.keyWords == "" {
 			assert.Nil(t, err)
 		} else {
@@ -101,7 +129,7 @@ func TestGraceDelete(t *testing.T) {
 		}
 		if len(v.expectedLabels) != 0 {
 			pod := &corev1.Pod{}
-			client.Get(context.Background(), types.NamespacedName{Namespace: req.Namespace, Name: req.Name}, pod)
+			client.Get(context.Background(), types.NamespacedName{Namespace: v.oldPod.Namespace, Name: v.oldPod.Name}, pod)
 			for k, _ := range v.expectedLabels {
 				_, exist := pod.Labels[k]
 				assert.True(t, exist)

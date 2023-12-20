@@ -30,7 +30,7 @@ import (
 )
 
 func (lc *OpsLifecycle) Validating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) error {
-	if !utils.ControlledByKusionStack(newPod) {
+	if operation == admissionv1.Delete || !utils.ControlledByKusionStack(newPod) {
 		return nil
 	}
 

@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"kusionstack.io/operating/pkg/webhook/server/generic/pod/gracedelete"
 	"kusionstack.io/operating/pkg/webhook/server/generic/pod/opslifecycle"
 	"kusionstack.io/operating/pkg/webhook/server/generic/pod/resourceconsist"
 )
@@ -39,6 +40,7 @@ type AdmissionWebhook interface {
 
 func init() {
 	webhooks = append(webhooks, opslifecycle.New())
+	webhooks = append(webhooks, gracedelete.New())
 	for _, podResourceConsistWebhook := range resourceconsist.PodResourceConsistWebhooks {
 		webhooks = append(webhooks, podResourceConsistWebhook)
 	}

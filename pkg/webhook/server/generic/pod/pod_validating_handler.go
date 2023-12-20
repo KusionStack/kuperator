@@ -29,7 +29,6 @@ import (
 
 	commonutils "kusionstack.io/operating/pkg/utils"
 	"kusionstack.io/operating/pkg/utils/mixin"
-	"kusionstack.io/operating/pkg/webhook/server/generic/pod/gracedelete"
 )
 
 var _ inject.Client = &ValidatingHandler{}
@@ -52,18 +51,12 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 		"pod", commonutils.AdmissionRequestObjectKeyString(req),
 	)
 
-	if req.Operation == admissionv1.Delete {
-		if err := gracedelete.New().Validating(ctx, h.Client, req); err != nil {
-			logger.Error(err, fmt.Sprintf("failed to delete pod: %v", err))
-			return admission.Denied(fmt.Sprintf("failed to delete pod: %v", err))
-		}
-		return admission.Allowed("pod is allowed by opslifecycle")
-	}
-
 	pod := &corev1.Pod{}
-	if err := h.Decoder.Decode(req, pod); err != nil {
-		s, _ := json.Marshal(req)
-		return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to decode old object from request %s: %s", s, err))
+	if req.Operation != admissionv1.Delete {
+		if err := h.Decoder.Decode(req, pod); err != nil {
+			s, _ := json.Marshal(req)
+			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to decode old object from request %s: %s", s, err))
+		}
 	}
 
 	var oldPod *corev1.Pod
