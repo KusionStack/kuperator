@@ -32,8 +32,9 @@ import (
 )
 
 const (
-	OwnerContextKey        = "Owner"
-	RevisionContextDataKey = "Revision"
+	OwnerContextKey          = "Owner"
+	RevisionContextDataKey   = "Revision"
+	PodDecorationRevisionKey = "PodDecorationRevisions"
 )
 
 func AllocateID(c client.Client, instance *appsv1alpha1.CollaSet, defaultRevision string, replicas int) (map[int]*appsv1alpha1.ContextDetail, error) {

@@ -45,6 +45,7 @@ func PrimaryContainerPatch(pod *corev1.Pod, patchs []*appsv1alpha1.PrimaryContai
 			for idx := range pod.Spec.Containers {
 				if patch.Name != nil && pod.Spec.Containers[idx].Name == *patch.Name {
 					patchContainer(&pod.Spec.Containers[idx], &patchs[i].PodDecorationPrimaryContainer)
+					break
 				}
 			}
 		case appsv1alpha1.InjectAllContainers:

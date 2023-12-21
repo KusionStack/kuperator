@@ -27,9 +27,7 @@ type RelatedResources struct {
 	CurrentRevision *appsv1.ControllerRevision
 	UpdatedRevision *appsv1.ControllerRevision
 
-	// collaSet related PodDecoration
-	PodDecorations         []*appsv1alpha1.PodDecoration
-	OldRevisionDecorations map[string]*appsv1alpha1.PodDecoration
+	PDGetter PodDecorationGetter
 
 	NewStatus *appsv1alpha1.CollaSetStatus
 }

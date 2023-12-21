@@ -33,7 +33,6 @@ import (
 const (
 	FieldIndexOwnerRefUID            = "ownerRefUID"
 	FieldIndexPodTransitionRule      = "podTransitionRuleIndex"
-	FieldIndexPodDecorationGroup     = "podDecorationGroup"
 	FieldIndexPodDecorationCollaSets = "podDecorationCollaSets"
 )
 
@@ -80,14 +79,6 @@ func NewCacheWithFieldIndex(config *rest.Config, opts cache.Options) (cache.Cach
 		FieldIndexPodTransitionRule,
 		func(obj client.Object) []string {
 			return obj.(*appsv1alpha1.PodTransitionRule).Status.Targets
-		}))
-
-	runtime.Must(c.IndexField(
-		context.TODO(),
-		&appsv1alpha1.PodDecoration{},
-		FieldIndexPodDecorationGroup,
-		func(obj client.Object) []string {
-			return []string{obj.(*appsv1alpha1.PodDecoration).Spec.InjectStrategy.Group}
 		}))
 
 	runtime.Must(c.IndexField(

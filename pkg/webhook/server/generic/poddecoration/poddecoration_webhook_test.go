@@ -41,6 +41,50 @@ var _ = Describe("PodDecoration webhook", func() {
 			},
 		}
 		Expect(ValidatePodDecoration(pd)).Should(HaveOccurred())
+		pd = &appsv1alpha1.PodDecoration{
+			Spec: appsv1alpha1.PodDecorationSpec{
+				Template: appsv1alpha1.PodDecorationPodTemplate{
+					Volumes: []corev1.Volume{
+						{
+							Name:         "",
+							VolumeSource: corev1.VolumeSource{},
+						},
+						{
+							Name:         "aaa",
+							VolumeSource: corev1.VolumeSource{},
+						},
+					},
+				},
+			},
+		}
+		Expect(ValidatePodDecoration(pd)).Should(HaveOccurred())
+		pd = &appsv1alpha1.PodDecoration{
+			Spec: appsv1alpha1.PodDecorationSpec{
+				Template: appsv1alpha1.PodDecorationPodTemplate{
+					InitContainers: []*corev1.Container{
+						{
+							Name:  "foo",
+							Image: "nginx:v1",
+						},
+					},
+				},
+			},
+		}
+		Expect(ValidatePodDecoration(pd)).ShouldNot(HaveOccurred())
+		pd = &appsv1alpha1.PodDecoration{
+			Spec: appsv1alpha1.PodDecorationSpec{
+				Template: appsv1alpha1.PodDecorationPodTemplate{
+					Tolerations: []corev1.Toleration{
+						{
+							Key:      "",
+							Operator: corev1.TolerationOpExists,
+							Value:    "foo",
+						},
+					},
+				},
+			},
+		}
+		Expect(ValidatePodDecoration(pd)).Should(HaveOccurred())
 	})
 	It("test mutating", func() {
 		pd := &appsv1alpha1.PodDecoration{

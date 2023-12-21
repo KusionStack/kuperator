@@ -17,14 +17,7 @@ limitations under the License.
 package poddecoration
 
 import (
-	"context"
-	"sort"
-
-	"k8s.io/apimachinery/pkg/fields"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/utils/inject"
 )
 
 type PodDecorations []*appsv1alpha1.PodDecoration
@@ -34,43 +27,11 @@ func (br PodDecorations) Len() int {
 }
 
 func (br PodDecorations) Less(i, j int) bool {
-	if br[i].Spec.InjectStrategy.Group == br[j].Spec.InjectStrategy.Group {
-		if *br[i].Spec.InjectStrategy.Weight == *br[j].Spec.InjectStrategy.Weight {
-			return br[i].CreationTimestamp.After(br[j].CreationTimestamp.Time)
-		}
-		return *br[i].Spec.InjectStrategy.Weight > *br[j].Spec.InjectStrategy.Weight
-	}
-	return br[i].Spec.InjectStrategy.Group < br[j].Spec.InjectStrategy.Group
+	return lessPD(br[i], br[j])
 }
 
 func (br PodDecorations) Swap(i, j int) {
 	br[i], br[j] = br[j], br[i]
-}
-
-func BuildSortedPodDecorationPointList(list *appsv1alpha1.PodDecorationList) []*appsv1alpha1.PodDecoration {
-	res := PodDecorations{}
-	for i := range list.Items {
-		res = append(res, &list.Items[i])
-	}
-	sort.Sort(res)
-	return res
-}
-
-func GetHeaviestPDByGroup(ctx context.Context, c client.Client, namespace, group string) (heaviest *appsv1alpha1.PodDecoration, err error) {
-	pdList := &appsv1alpha1.PodDecorationList{}
-	if err = c.List(ctx, pdList,
-		&client.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector(
-				inject.FieldIndexPodDecorationGroup, group),
-			Namespace: namespace,
-		}); err != nil {
-		return
-	}
-	podDecorations := BuildSortedPodDecorationPointList(pdList)
-	if len(podDecorations) > 0 {
-		return podDecorations[0], nil
-	}
-	return
 }
 
 func lessPD(a, b *appsv1alpha1.PodDecoration) bool {

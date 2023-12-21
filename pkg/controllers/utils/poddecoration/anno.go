@@ -17,53 +17,41 @@ limitations under the License.
 package poddecoration
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/utils"
 )
 
-type DecorationGroupRevisionInfo map[string]*DecorationInfo
+type DecorationRevisionInfo []*DecorationInfo
 
 type DecorationInfo struct {
 	Name     string `json:"name"`
 	Revision string `json:"revision"`
 }
 
-func (d DecorationGroupRevisionInfo) GetGroupPDRevision(group, rdName string) *string {
-	info, ok := d[group]
-	if ok && info.Name == rdName {
-		return &info.Revision
+func (d DecorationRevisionInfo) GetRevision(name string) *string {
+	for _, info := range d {
+		if info.Name == name {
+			return &info.Revision
+		}
 	}
 	return nil
 }
 
-func (d DecorationGroupRevisionInfo) GetCurrentPDNameByGroup(group string) *string {
-	info, ok := d[group]
-	if !ok {
-		return nil
-	}
-	return &info.Name
-}
-
-func (d DecorationGroupRevisionInfo) Size() int {
+func (d DecorationRevisionInfo) Size() int {
 	return len(d)
 }
 
-func GetDecorationGroupRevisionInfo(pod *corev1.Pod) (info DecorationGroupRevisionInfo) {
-	info = DecorationGroupRevisionInfo{}
+func GetDecorationRevisionInfo(pod *corev1.Pod) (info DecorationRevisionInfo) {
+	info = DecorationRevisionInfo{}
 	if pod.Annotations == nil {
 		return
 	}
@@ -78,32 +66,30 @@ func GetDecorationGroupRevisionInfo(pod *corev1.Pod) (info DecorationGroupRevisi
 }
 
 func setDecorationInfo(pod *corev1.Pod, podDecorations map[string]*appsv1alpha1.PodDecoration) {
-	info := DecorationGroupRevisionInfo{}
-	for revision, pd := range podDecorations {
-		info[pd.Spec.InjectStrategy.Group] = &DecorationInfo{
-			Name:     pd.Name,
-			Revision: revision,
-		}
-	}
-	byt, _ := json.Marshal(info)
 	if pod.Annotations == nil {
 		pod.Annotations = map[string]string{}
 	}
-	pod.Annotations[appsv1alpha1.AnnotationResourceDecorationRevision] = string(byt)
+	pod.Annotations[appsv1alpha1.AnnotationResourceDecorationRevision] = GetDecorationInfoString(podDecorations)
 }
 
-func ShouldUpdateDecorationInfo(pod *corev1.Pod, podDecorations map[string]*appsv1alpha1.PodDecoration) bool {
-	currentInfo := GetDecorationGroupRevisionInfo(pod)
-	if currentInfo.Size() != len(podDecorations) {
-		return true
+func GetDecorationInfoString(podDecorations map[string]*appsv1alpha1.PodDecoration) string {
+	info := DecorationRevisionInfo{}
+	for revision, pd := range podDecorations {
+		info = append(info, &DecorationInfo{
+			Name:     pd.Name,
+			Revision: revision,
+		})
 	}
-	for rv, pd := range podDecorations {
-		revision := currentInfo.GetGroupPDRevision(pd.Spec.InjectStrategy.Group, pd.Name)
-		if revision == nil || *revision != rv {
-			return true
-		}
+	byt, _ := json.Marshal(info)
+	return string(byt)
+}
+
+func UnmarshallFromString(val string) ([]*DecorationInfo, error) {
+	info := DecorationRevisionInfo{}
+	if err := json.Unmarshal([]byte(val), &info); err != nil {
+		return nil, err
 	}
-	return false
+	return info, nil
 }
 
 var PodDecorationCodec = scheme.Codecs.LegacyCodec(appsv1alpha1.GroupVersion)
@@ -136,44 +122,4 @@ func GetPodDecorationFromRevision(revision *appsv1.ControllerRevision) (*appsv1a
 		podDecoration.Name = ownerRef.Name
 	}
 	return podDecoration, nil
-}
-
-func GetPodDecorationsByPodAnno(ctx context.Context, c client.Client, pod *corev1.Pod) (notFound bool, podDecorations map[string]*appsv1alpha1.PodDecoration, err error) {
-	rdRevisions := getEffectivePodDecorationRevisionFromPod(pod)
-	podDecorations = map[string]*appsv1alpha1.PodDecoration{}
-	var revisions []*appsv1.ControllerRevision
-	for _, revisionName := range rdRevisions {
-		if len(revisionName) == 0 {
-			continue
-		}
-
-		revision := &appsv1.ControllerRevision{}
-		if err = c.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: revisionName}, revision); err != nil {
-			if errors.IsNotFound(err) {
-				klog.Errorf("fail to get PodDecoration revision %s for pod %s, [not found]: %v", revisionName, utils.ObjectKeyString(pod), err)
-				notFound = true
-				return
-			}
-			return false, podDecorations, fmt.Errorf("fail to get PodDecoration revision %s for pod %s: %v", revisionName, utils.ObjectKeyString(pod), err)
-		}
-		revisions = append(revisions, revision)
-	}
-
-	for _, revision := range revisions {
-		pd, err := GetPodDecorationFromRevision(revision)
-		if err != nil {
-			return false, podDecorations, fmt.Errorf("fail to get PodDecoration revision %s for pod %s: %v", revision.Name, utils.ObjectKeyString(pod), err)
-		}
-		podDecorations[revision.Name] = pd
-	}
-	return
-}
-
-func getEffectivePodDecorationRevisionFromPod(pod *corev1.Pod) map[string]string {
-	info := GetDecorationGroupRevisionInfo(pod)
-	res := map[string]string{}
-	for _, pdInfo := range info {
-		res[pdInfo.Name] = pdInfo.Revision
-	}
-	return res
 }

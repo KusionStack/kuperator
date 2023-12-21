@@ -65,9 +65,6 @@ func SetDefaultPodDecoration(pd *appsv1alpha1.PodDecoration) {
 		var int32Zero int32
 		pd.Spec.InjectStrategy.Weight = &int32Zero
 	}
-	if pd.Spec.InjectStrategy.Group == "" {
-		pd.Spec.InjectStrategy.Group = "default"
-	}
 	for i := range pd.Spec.Template.Metadata {
 		if pd.Spec.Template.Metadata[i].PatchPolicy == "" {
 			pd.Spec.Template.Metadata[i].PatchPolicy = appsv1alpha1.RetainMetadata

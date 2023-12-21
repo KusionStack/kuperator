@@ -344,9 +344,7 @@ var _ = Describe("PodDecoration controller", func() {
 	It("test anno utils", func() {
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					appsv1alpha1.AnnotationResourceDecorationRevision: "",
-				},
+				Annotations: map[string]string{},
 				Labels: map[string]string{
 					"app": "foo",
 				},
@@ -354,6 +352,7 @@ var _ = Describe("PodDecoration controller", func() {
 		}
 		i0Int32 := int32(0)
 		i1Int32 := int32(1)
+		i2Int32 := int32(3)
 		pdA := &appsv1alpha1.PodDecoration{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pd-a",
@@ -408,12 +407,12 @@ var _ = Describe("PodDecoration controller", func() {
 		}
 		pdC := &appsv1alpha1.PodDecoration{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "pd-b",
+				Name: "pd-c",
 			},
 			Spec: appsv1alpha1.PodDecorationSpec{
 				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
 					Group:  "group-b",
-					Weight: &i1Int32,
+					Weight: &i2Int32,
 				},
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -432,21 +431,53 @@ var _ = Describe("PodDecoration controller", func() {
 				UpdatedRevision: "102",
 			},
 		}
+		pdD := &appsv1alpha1.PodDecoration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pd-d",
+			},
+			Spec: appsv1alpha1.PodDecorationSpec{
+				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
+					Weight: &i2Int32,
+				},
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				UpdateStrategy: appsv1alpha1.PodDecorationUpdateStrategy{
+					RollingUpdate: &appsv1alpha1.PodDecorationRollingUpdate{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"id": "1",
+							},
+						},
+					},
+				},
+				Template: appsv1alpha1.PodDecorationPodTemplate{
+					Metadata: []*appsv1alpha1.PodDecorationPodTemplateMeta{
+						{
+							Labels: map[string]string{"inj": "group-b-new-1"},
+						},
+					},
+				},
+			},
+			Status: appsv1alpha1.PodDecorationStatus{
+				CurrentRevision: "201",
+				UpdatedRevision: "202",
+			},
+		}
 		pds := map[string]*appsv1alpha1.PodDecoration{
 			"100": pdA,
 			"101": pdB,
 		}
-		Expect(ShouldUpdateDecorationInfo(pod, pds)).Should(BeTrue())
 		Expect(PatchListOfDecorations(pod, pds)).Should(BeNil())
-		Expect(len(GetPodEffectiveDecorations(pod, []*appsv1alpha1.PodDecoration{pdA, pdC}, pds))).Should(Equal(2))
-		Expect(GetDecorationGroupRevisionInfo(pod).Size()).Should(Equal(2))
+		Expect(GetDecorationRevisionInfo(pod).Size()).Should(Equal(2))
 		appsv1alpha1.SchemeBuilder.AddToScheme(scheme.Scheme)
-		_, _, err := GetPodDecorationsByPodAnno(context.TODO(), &mockClient{}, pod)
-		Expect(err).ShouldNot(HaveOccurred())
-
-		hav, err := GetHeaviestPDByGroup(context.TODO(), &mockClient{}, "", "")
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(hav.Name).Should(Equal("pd-d"))
+		updatedRevisions, stableRevisions := GetEffectiveRevisionsFormLatestDecorations([]*appsv1alpha1.PodDecoration{pdA, pdB, pdC, pdD}, map[string]string{
+			"app": "foo",
+		})
+		Expect(updatedRevisions.Len()).Should(Equal(2))
+		Expect(stableRevisions.Len()).Should(Equal(1))
 	})
 })
 

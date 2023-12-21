@@ -50,7 +50,7 @@ type PodDecorationPodTemplate struct {
 	Metadata []*PodDecorationPodTemplateMeta `json:"metadata,omitempty"`
 
 	// InitContainers is the init containers needs to be attached to a pod.
-	// If there is a container with the same name, PodDecoration will override it entirely.
+	// If there is a container with the same name, PodDecoration will retain old Container.
 	InitContainers []*corev1.Container `json:"initContainers,omitempty"`
 
 	// Containers is the containers need to be attached to a pod.
@@ -63,6 +63,7 @@ type PodDecorationPodTemplate struct {
 	PrimaryContainers []*PrimaryContainerPatch `json:"primaryContainers,omitempty"`
 
 	// Volumes will be attached to a pod spec volume.
+	// If there is a volume with the same name, new volume will replace it.
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
 	// If specified, the pod's scheduling constraints
@@ -152,7 +153,6 @@ type PodDecorationInjectStrategy struct {
 	// Group provides the name of the group this PodDecoration belongs to.
 	// Only one PodDecoration is active when multiple PodDecorations share the same group value.
 	Group string `json:"group,omitempty"`
-
 	// Weight indicates the priority to apply for a group of PodDecorations with same group value.
 	// The greater one has higher priority to apply.
 	// Default value is 0.

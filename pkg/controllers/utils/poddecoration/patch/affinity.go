@@ -57,3 +57,21 @@ func MergeTolerations(original []corev1.Toleration, additional []corev1.Tolerati
 	}
 	return original
 }
+
+func MergeWithOverwriteTolerations(original []corev1.Toleration, additional []corev1.Toleration) []corev1.Toleration {
+	additionalMap := map[string]*corev1.Toleration{}
+	for i, toleration := range additional {
+		additionalMap[toleration.Key] = &additional[i]
+	}
+	for i, toleration := range original {
+		rep, ok := additionalMap[toleration.Key]
+		if ok {
+			original[i] = *rep
+			delete(additionalMap, toleration.Key)
+		}
+	}
+	for _, add := range additionalMap {
+		original = append(original, *add)
+	}
+	return original
+}

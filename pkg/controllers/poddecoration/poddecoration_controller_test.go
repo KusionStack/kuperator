@@ -92,6 +92,7 @@ var _ = Describe("PodDecoration controller", func() {
 				},
 			},
 		}
+		// 1, create collaSet
 		Expect(c.Create(ctx, collaSetA)).Should(BeNil())
 		podList := &corev1.PodList{}
 		Eventually(func() int {
@@ -136,7 +137,7 @@ var _ = Describe("PodDecoration controller", func() {
 				},
 			},
 		}
-		// create pd
+		// 2, create pd
 		Expect(c.Create(ctx, podDecoration)).Should(BeNil())
 		Eventually(func() error {
 			return c.Get(ctx, types.NamespacedName{Name: podDecoration.Name, Namespace: testcase}, podDecoration)
@@ -147,7 +148,11 @@ var _ = Describe("PodDecoration controller", func() {
 			return podDecoration.Status.MatchedPods
 		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(int32(2)))
 
-		// 2 pods during ops
+		Eventually(func() bool {
+			Expect(c.Get(ctx, types.NamespacedName{Name: podDecoration.Name, Namespace: testcase}, podDecoration)).Should(BeNil())
+			return podDecoration.Status.IsEffective != nil && *podDecoration.Status.IsEffective
+		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(true))
+		// 3, Expect two pods during ops
 		Eventually(func() int {
 			Expect(c.List(ctx, podList, client.InNamespace(testcase))).ShouldNot(HaveOccurred())
 			cnt := 0
@@ -158,7 +163,7 @@ var _ = Describe("PodDecoration controller", func() {
 			}
 			return cnt
 		}, 10*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
-		// allow Pod to do update
+		// 4, Allow Pod to update
 		Expect(c.List(ctx, podList, client.InNamespace(testcase))).ShouldNot(HaveOccurred())
 		for i := range podList.Items {
 			pod := &podList.Items[i]
@@ -169,13 +174,15 @@ var _ = Describe("PodDecoration controller", func() {
 				return true
 			})).Should(BeNil())
 		}
-
-		// 2 pods recreated
+		// 5, Two pods recreated
 		Eventually(func() int32 {
 			Expect(c.Get(ctx, types.NamespacedName{Name: podDecoration.Name, Namespace: testcase}, podDecoration)).Should(BeNil())
 			return podDecoration.Status.UpdatedPods
 		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(int32(2)))
-		//PodInstanceIDLabelKey
+		Expect(c.List(ctx, podList, client.InNamespace(testcase))).Should(BeNil())
+		for _, po := range podList.Items {
+			Expect(len(po.Spec.Containers)).Should(Equal(2))
+		}
 	})
 
 	It("test reconcile multi CollaSet with one PodDecoration", func() {
@@ -257,7 +264,6 @@ var _ = Describe("PodDecoration controller", func() {
 					},
 				},
 				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
-					Group:  "group-a",
 					Weight: int32Pointer(10),
 				},
 				UpdateStrategy: appsv1alpha1.PodDecorationUpdateStrategy{
@@ -292,6 +298,8 @@ var _ = Describe("PodDecoration controller", func() {
 			}
 			return false
 		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		Expect(podDecoration.Status.UpdatedRevision).ShouldNot(Equal(""))
+		Expect(podDecoration.Status.UpdatedRevision).Should(Equal(podDecoration.Status.CurrentRevision))
 		// create CollaSet after podDecoration, do not need to allow Pod to update
 		Expect(c.Create(ctx, collaSetA)).Should(BeNil())
 		Expect(c.Create(ctx, collaSetB)).Should(BeNil())
@@ -305,7 +313,58 @@ var _ = Describe("PodDecoration controller", func() {
 				}
 			}
 			return updatedCnt
-		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
+		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(4))
+
+		Eventually(func() error {
+			err := c.Get(ctx, types.NamespacedName{Name: podDecoration.Name, Namespace: testcase}, podDecoration)
+			if err != nil {
+				return err
+			}
+			podDecoration.Spec.Template.InitContainers = []*corev1.Container{
+				{
+					Name:  "init",
+					Image: "nginx:v3",
+				},
+			}
+			return c.Update(ctx, podDecoration)
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
+
+		// Expect two pods during ops
+		Eventually(func() int {
+			Expect(c.List(ctx, podList, client.InNamespace(testcase))).ShouldNot(HaveOccurred())
+			cnt := 0
+			for i := range podList.Items {
+				if podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, &podList.Items[i]) {
+					cnt++
+				}
+			}
+			return cnt
+		}, 10*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
+		// Allow Pod to update
+		Expect(c.List(ctx, podList, client.InNamespace(testcase))).ShouldNot(HaveOccurred())
+		for i := range podList.Items {
+			pod := &podList.Items[i]
+			// allow Pod to do update
+			if pod.Labels[appsv1alpha1.PodInstanceIDLabelKey] != "0" {
+				continue
+			}
+			Expect(updatePodWithRetry(ctx, c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+				return true
+			})).Should(BeNil())
+		}
+		// Two pods inject init container
+		Eventually(func() int {
+			Expect(c.List(ctx, podList, client.InNamespace(testcase))).ShouldNot(HaveOccurred())
+			cnt := 0
+			for _, po := range podList.Items {
+				if len(po.Spec.InitContainers) == 1 {
+					cnt++
+				}
+			}
+			return cnt
+		}, 10*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
 	})
 
 	It("test delete PodDecoration", func() {
@@ -355,7 +414,6 @@ var _ = Describe("PodDecoration controller", func() {
 					},
 				},
 				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
-					Group:  "group-a",
 					Weight: int32Pointer(10),
 				},
 				UpdateStrategy: appsv1alpha1.PodDecorationUpdateStrategy{
@@ -381,7 +439,7 @@ var _ = Describe("PodDecoration controller", func() {
 		Expect(c.Create(ctx, podDecoration)).Should(BeNil())
 		Eventually(func() bool {
 			if c.Get(ctx, types.NamespacedName{Name: podDecoration.Name, Namespace: testcase}, podDecoration) == nil {
-				return len(podDecoration.Finalizers) != 0
+				return len(podDecoration.Finalizers) != 0 && podDecoration.Status.IsEffective != nil && *podDecoration.Status.IsEffective
 			}
 			return false
 		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(true))
@@ -400,10 +458,23 @@ var _ = Describe("PodDecoration controller", func() {
 		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
 		Expect(c.Delete(ctx, podDecoration)).Should(BeNil())
 		// PodDecoration is disabled
+		Eventually(func() interface{} {
+			Expect(c.Get(ctx, types.NamespacedName{Name: podDecoration.Name, Namespace: testcase}, podDecoration)).Should(BeNil())
+			return podDecoration.DeletionTimestamp
+		}, 5*time.Second, 1*time.Second).ShouldNot(BeNil())
+
+		getter, err := collasetutils.NewPodDecorationGetter(ctx, c, testcase)
+		Expect(err).Should(BeNil())
+		if len(getter.GetLatestDecorations()) != 0 {
+			bt, _ := json.Marshal(getter.GetLatestDecorations()[0])
+			fmt.Printf("test : %s\n", string(bt))
+		}
+		Expect(len(getter.GetLatestDecorations())).Should(Equal(0))
+
 		Eventually(func() bool {
 			Expect(c.Get(ctx, types.NamespacedName{Name: podDecoration.Name, Namespace: testcase}, podDecoration)).Should(BeNil())
-			return podDecoration.Status.IsEffective != nil && !*podDecoration.Status.IsEffective
-		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(false))
+			return podDecoration.Status.IsEffective != nil && *podDecoration.Status.IsEffective
+		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(true))
 		// 2 pods during ops
 		Eventually(func() int {
 			Expect(c.List(ctx, podList, client.InNamespace(testcase))).ShouldNot(HaveOccurred())
@@ -414,7 +485,7 @@ var _ = Describe("PodDecoration controller", func() {
 				}
 			}
 			return cnt
-		}, 10*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
+		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
 		// allow Pod to do update
 		Expect(c.List(ctx, podList, client.InNamespace(testcase))).ShouldNot(HaveOccurred())
 		for i := range podList.Items {
@@ -439,14 +510,14 @@ var _ = Describe("PodDecoration controller", func() {
 		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
 		// annotation cleared
 		for _, po := range podList.Items {
-			Expect(po.Annotations[appsv1alpha1.AnnotationResourceDecorationRevision]).Should(BeEquivalentTo("{}"))
+			Expect(po.Annotations[appsv1alpha1.AnnotationResourceDecorationRevision]).Should(BeEquivalentTo("[]"))
 		}
 		Eventually(func() error {
 			return c.Get(ctx, types.NamespacedName{Name: podDecoration.Name, Namespace: testcase}, podDecoration)
 		}, 5*time.Second, 1*time.Second).Should(HaveOccurred())
 	})
 
-	It("test PodDecoration group weight", func() {
+	It("test PodDecoration weight", func() {
 		testcase := "test-pd-3"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
 		collaSetA := &appsv1alpha1.CollaSet{
@@ -508,7 +579,7 @@ var _ = Describe("PodDecoration controller", func() {
 						{
 							InjectPolicy: appsv1alpha1.AfterPrimaryContainer,
 							Container: corev1.Container{
-								Name:  "sidecar",
+								Name:  "sidecar-1",
 								Image: "nginx:v2",
 							},
 						},
@@ -544,8 +615,8 @@ var _ = Describe("PodDecoration controller", func() {
 						{
 							InjectPolicy: appsv1alpha1.AfterPrimaryContainer,
 							Container: corev1.Container{
-								Name:  "sidecar",
-								Image: "nginx:v2",
+								Name:  "sidecar-2",
+								Image: "nginx:v3",
 							},
 						},
 					},
@@ -610,10 +681,11 @@ var _ = Describe("PodDecoration controller", func() {
 		// 2 pods updated by PodDecoration-B
 		Eventually(func() int {
 			Expect(c.List(ctx, podList, client.InNamespace(testcase))).Should(BeNil())
+			Expect(c.Get(ctx, types.NamespacedName{Name: podDecorationB.Name, Namespace: podDecorationB.Namespace}, podDecorationB)).Should(BeNil())
 			updatedCnt := 0
 			for _, po := range podList.Items {
-				currentPD := utilspoddecoration.GetDecorationGroupRevisionInfo(&po).GetCurrentPDNameByGroup("group-a")
-				if currentPD != nil && *currentPD == "foo-b" {
+				info := utilspoddecoration.GetDecorationRevisionInfo(&po)
+				if info.Size() == 1 && info.GetRevision(podDecorationB.Name) != nil && *info.GetRevision(podDecorationB.Name) == podDecorationB.Status.UpdatedRevision {
 					updatedCnt++
 				}
 			}

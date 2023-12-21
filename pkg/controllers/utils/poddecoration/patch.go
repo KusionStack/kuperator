@@ -17,6 +17,8 @@ limitations under the License.
 package poddecoration
 
 import (
+	"sort"
+
 	corev1 "k8s.io/api/core/v1"
 
 	"kusionstack.io/operating/pkg/utils"
@@ -42,7 +44,7 @@ func PatchPodDecoration(pod *corev1.Pod, template *appsv1alpha1.PodDecorationPod
 	}
 
 	if len(template.Volumes) > 0 {
-		pod.Spec.Volumes = patch.MergeVolumes(pod.Spec.Volumes, template.Volumes)
+		pod.Spec.Volumes = patch.MergeWithOverwriteVolumes(pod.Spec.Volumes, template.Volumes)
 	}
 
 	if template.Affinity != nil {
@@ -50,14 +52,19 @@ func PatchPodDecoration(pod *corev1.Pod, template *appsv1alpha1.PodDecorationPod
 	}
 
 	if template.Tolerations != nil {
-		pod.Spec.Tolerations = patch.MergeTolerations(pod.Spec.Tolerations, template.Tolerations)
+		pod.Spec.Tolerations = patch.MergeWithOverwriteTolerations(pod.Spec.Tolerations, template.Tolerations)
 	}
 	return
 }
 
 func PatchListOfDecorations(pod *corev1.Pod, podDecorations map[string]*appsv1alpha1.PodDecoration) (err error) {
+	var pds []*appsv1alpha1.PodDecoration
 	for _, pd := range podDecorations {
-		if patchErr := PatchPodDecoration(pod, &pd.Spec.Template); patchErr != nil {
+		pds = append(pds, pd)
+	}
+	sort.Sort(PodDecorations(pds))
+	for i := range pds {
+		if patchErr := PatchPodDecoration(pod, &pds[i].Spec.Template); patchErr != nil {
 			err = utils.Join(err, patchErr)
 		}
 	}

@@ -17,72 +17,93 @@ limitations under the License.
 package poddecoration
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
-func GetPodEffectiveDecorations(pod *corev1.Pod, podDecorations []*appsv1alpha1.PodDecoration, oldRevisions map[string]*appsv1alpha1.PodDecoration) (res map[string]*appsv1alpha1.PodDecoration) {
-	type RevisionPD struct {
-		Revision string
-		PD       *appsv1alpha1.PodDecoration
-	}
-
-	// revision : PD
-	res = map[string]*appsv1alpha1.PodDecoration{}
-	// group : PD
-	currentGroupPD := map[string]*RevisionPD{}
-
-	tryReplace := func(pd *appsv1alpha1.PodDecoration, revision string) {
-		current, ok := currentGroupPD[pd.Spec.InjectStrategy.Group]
-		if !ok {
-			currentGroupPD[pd.Spec.InjectStrategy.Group] = &RevisionPD{
-				Revision: revision,
-				PD:       pd,
-			}
-			return
-		}
-		if lessPD(pd, current.PD) {
-			currentGroupPD[pd.Spec.InjectStrategy.Group] = &RevisionPD{
-				Revision: revision,
-				PD:       pd,
-			}
-		}
-	}
-	for i, pd := range podDecorations {
-		if pd.Spec.Selector != nil {
-			sel, _ := metav1.LabelSelectorAsSelector(pd.Spec.Selector)
-			if !sel.Matches(labels.Set(pod.Labels)) {
-				continue
-			}
-		}
-		// no rolling upgrade, upgrade all
-		if pd.Spec.UpdateStrategy.RollingUpdate == nil {
-			tryReplace(podDecorations[i], pd.Status.UpdatedRevision)
+func GetEffectiveRevisionsFormLatestDecorations(latestPodDecorations []*appsv1alpha1.PodDecoration, lb map[string]string) (updatedRevisions, stableRevisions sets.String) {
+	groupedDecorations := map[string]*appsv1alpha1.PodDecoration{}
+	groupIsUpdatedRevision := map[string]bool{}
+	groupRevision := map[string]string{}
+	updatedRevisions = sets.NewString()
+	stableRevisions = sets.NewString()
+	for i, pd := range latestPodDecorations {
+		revision, isUpdatedRevision := getEffectiveRevision(pd, lb)
+		if revision == "" {
 			continue
 		}
-		// by selector
-		if pd.Spec.UpdateStrategy.RollingUpdate.Selector != nil {
-			sel, _ := metav1.LabelSelectorAsSelector(pd.Spec.UpdateStrategy.RollingUpdate.Selector)
-			if sel.Matches(labels.Set(pod.Labels)) {
-				tryReplace(podDecorations[i], pd.Status.UpdatedRevision)
-			} else if pd.Status.CurrentRevision != "" {
-				// use CurrentRevision
-				oldPD, ok := oldRevisions[pd.Status.CurrentRevision]
-				if ok {
-					tryReplace(oldPD, pd.Status.CurrentRevision)
-				}
+		// no group PD is effective default
+		if pd.Spec.InjectStrategy.Group == "" {
+			if isUpdatedRevision {
+				updatedRevisions.Insert(revision)
+			} else {
+				stableRevisions.Insert(revision)
 			}
 			continue
 		}
-		// TODO: by partition
-		//if pd.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
-		//}
+
+		// update by heaviest one
+		stable, ok := groupedDecorations[pd.Spec.InjectStrategy.Group]
+		if !ok || isHeaviest(latestPodDecorations[i], stable) {
+			groupedDecorations[pd.Spec.InjectStrategy.Group] = latestPodDecorations[i]
+			groupRevision[pd.Spec.InjectStrategy.Group] = revision
+			groupIsUpdatedRevision[pd.Spec.InjectStrategy.Group] = isUpdatedRevision
+		}
 	}
-	for _, revisionPD := range currentGroupPD {
-		res[revisionPD.Revision] = revisionPD.PD
+	for group, revision := range groupRevision {
+		if groupIsUpdatedRevision[group] {
+			updatedRevisions.Insert(revision)
+		} else {
+			stableRevisions.Insert(revision)
+		}
 	}
 	return
+}
+
+func getEffectiveRevision(pd *appsv1alpha1.PodDecoration, lb map[string]string) (string, bool) {
+	sel, _ := metav1.LabelSelectorAsSelector(pd.Spec.Selector)
+	if !sel.Matches(labels.Set(lb)) && pd.Spec.Selector != nil {
+		return "", false
+	}
+	if inUpdateStrategy(pd, lb) {
+		return pd.Status.UpdatedRevision, true
+	}
+	return pd.Status.CurrentRevision, false
+}
+
+// if current is heaviest, return true
+func isHeaviest(current, t *appsv1alpha1.PodDecoration) bool {
+	if *current.Spec.InjectStrategy.Weight == *t.Spec.InjectStrategy.Weight {
+		return current.CreationTimestamp.Time.After(t.CreationTimestamp.Time)
+	}
+	return *current.Spec.InjectStrategy.Weight > *t.Spec.InjectStrategy.Weight
+}
+
+func inUpdateStrategy(pd *appsv1alpha1.PodDecoration, lb map[string]string) bool {
+	if pd.Spec.UpdateStrategy.RollingUpdate == nil {
+		return true
+	}
+	if pd.Spec.UpdateStrategy.RollingUpdate.Selector != nil {
+		sel, _ := metav1.LabelSelectorAsSelector(pd.Spec.UpdateStrategy.RollingUpdate.Selector)
+		if sel.Matches(labels.Set(lb)) {
+			return true
+		}
+	}
+	return false
+}
+
+func BuildInfo(revisionMap map[string]*appsv1alpha1.PodDecoration) (info string) {
+	for k, v := range revisionMap {
+		if info == "" {
+			info = fmt.Sprintf("{%s: %s}", v.Name, k)
+		} else {
+			info = info + fmt.Sprintf(", {%s: %s}", v.Name, k)
+		}
+	}
+	return fmt.Sprintf("PodDecorations=[%s]", info)
 }

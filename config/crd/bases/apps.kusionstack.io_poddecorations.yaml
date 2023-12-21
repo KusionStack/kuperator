@@ -2336,7 +2336,7 @@ spec:
                   initContainers:
                     description: InitContainers is the init containers needs to be
                       attached to a pod. If there is a container with the same name,
-                      PodDecoration will override it entirely.
+                      PodDecoration will retain old Container.
                     items:
                       description: A single application container that you want to
                         run within a pod.
@@ -3782,7 +3782,9 @@ spec:
                       type: object
                     type: array
                   volumes:
-                    description: Volumes will be attached to a pod spec volume.
+                    description: Volumes will be attached to a pod spec volume. If
+                      there is a volume with the same name, new volume will replace
+                      it.
                     items:
                       description: Volume represents a named volume in a pod that
                         may be accessed by any container in the pod.

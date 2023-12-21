@@ -23,9 +23,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -154,7 +156,7 @@ func (r *ReconcilePodDecoration) Reconcile(ctx context.Context, request reconcil
 		UpdatedRevision:    updatedRevision.Name,
 		CollisionCount:     *collisionCount,
 	}
-	err = r.calculateStatus(ctx, instance, newStatus, affectedPods, affectedCollaSets, instance.Spec.DisablePodDetail)
+	err = r.calculateStatus(instance, newStatus, affectedPods, affectedCollaSets, instance.Spec.DisablePodDetail)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -162,17 +164,12 @@ func (r *ReconcilePodDecoration) Reconcile(ctx context.Context, request reconcil
 }
 
 func (r *ReconcilePodDecoration) calculateStatus(
-	ctx context.Context,
 	instance *appsv1alpha1.PodDecoration,
 	status *appsv1alpha1.PodDecorationStatus,
 	affectedPods map[string][]*corev1.Pod,
-	affectedCollaSets []*appsv1alpha1.CollaSet,
+	affectedCollaSets sets.String,
 	disablePodDetail bool) error {
 
-	heaviest, err := utilspoddecoration.GetHeaviestPDByGroup(ctx, r.Client, instance.Namespace, instance.Spec.InjectStrategy.Group)
-	if err != nil {
-		return err
-	}
 	hasEffectivePods := false
 	status.MatchedPods = 0
 	status.UpdatedPods = 0
@@ -180,16 +177,15 @@ func (r *ReconcilePodDecoration) calculateStatus(
 	status.UpdatedAvailablePods = 0
 	status.InjectedPods = 0
 	var details []appsv1alpha1.PodDecorationWorkloadDetail
-	for _, collaSet := range affectedCollaSets {
-		pods := affectedPods[collaSet.Name]
+	for collaSet := range affectedCollaSets {
+		pods := affectedPods[collaSet]
 		detail := appsv1alpha1.PodDecorationWorkloadDetail{
 			AffectedReplicas: int32(len(pods)),
-			CollaSet:         collaSet.Name,
+			CollaSet:         collaSet,
 		}
 		status.MatchedPods += int32(len(pods))
 		for _, pod := range pods {
-			currentRevision := utilspoddecoration.GetDecorationGroupRevisionInfo(pod).
-				GetGroupPDRevision(instance.Spec.InjectStrategy.Group, instance.Name)
+			currentRevision := utilspoddecoration.GetDecorationRevisionInfo(pod).GetRevision(instance.Name)
 			if currentRevision != nil {
 				hasEffectivePods = true
 				status.InjectedPods++
@@ -216,13 +212,31 @@ func (r *ReconcilePodDecoration) calculateStatus(
 		}
 		details = append(details, detail)
 	}
-	fullControlByOthPD := heaviest != nil && heaviest.Name != instance.Name && heaviest.Status.CurrentRevision != ""
-	status.IsEffective = BoolPointer(instance.DeletionTimestamp == nil && (!fullControlByOthPD || hasEffectivePods))
-	if status.UpdatedPods == status.MatchedPods {
+	status.IsEffective = BoolPointer(instance.DeletionTimestamp == nil || hasEffectivePods)
+	if status.CurrentRevision != status.UpdatedRevision &&
+		status.UpdatedPods == status.MatchedPods &&
+		r.allCollaSetsSatisfyReplicas(affectedCollaSets, instance.Namespace) {
 		status.CurrentRevision = status.UpdatedRevision
 	}
 	status.Details = details
 	return nil
+}
+
+func (r *ReconcilePodDecoration) allCollaSetsSatisfyReplicas(collaSets sets.String, ns string) bool {
+	collaSet := &appsv1alpha1.CollaSet{}
+	for name := range collaSets {
+		if err := r.Get(context.TODO(), types.NamespacedName{Namespace: ns, Name: name}, collaSet); err != nil {
+			if errors.IsNotFound(err) {
+				continue
+			}
+			return false
+		}
+		// Unreliable in rare cases.
+		if collaSet.Status.Replicas != *collaSet.Spec.Replicas {
+			return false
+		}
+	}
+	return true
 }
 
 func (r *ReconcilePodDecoration) updateStatus(
@@ -255,7 +269,7 @@ func (r *ReconcilePodDecoration) filterOutPodAndCollaSet(
 	ctx context.Context,
 	instance *appsv1alpha1.PodDecoration) (
 	affectedPods map[string][]*corev1.Pod,
-	affectedCollaSets []*appsv1alpha1.CollaSet, err error) {
+	affectedCollaSets sets.String, err error) {
 	var sel labels.Selector
 	podList := &corev1.PodList{}
 	if instance.Spec.Selector != nil {
@@ -268,10 +282,12 @@ func (r *ReconcilePodDecoration) filterOutPodAndCollaSet(
 	}); err != nil || len(podList.Items) == 0 {
 		return
 	}
+	affectedCollaSets = sets.NewString()
 	for i := 0; i < len(podList.Items); i++ {
 		ownerRef := metav1.GetControllerOf(&podList.Items[i])
 		if ownerRef != nil && ownerRef.Kind == "CollaSet" {
 			affectedPods[ownerRef.Name] = append(affectedPods[ownerRef.Name], &podList.Items[i])
+			affectedCollaSets.Insert(ownerRef.Name)
 		}
 	}
 	for key, pods := range affectedPods {
@@ -280,18 +296,6 @@ func (r *ReconcilePodDecoration) filterOutPodAndCollaSet(
 		})
 		affectedPods[key] = pods
 	}
-	collaSetList := &appsv1alpha1.CollaSetList{}
-	if err = r.List(ctx, collaSetList, &client.ListOptions{Namespace: instance.Namespace}); err != nil {
-		return
-	}
-	for i := range collaSetList.Items {
-		if sel == nil || sel.Matches(labels.Set(collaSetList.Items[i].Spec.Template.Labels)) {
-			affectedCollaSets = append(affectedCollaSets, &collaSetList.Items[i])
-		}
-	}
-	sort.Slice(affectedCollaSets, func(i, j int) bool {
-		return affectedCollaSets[i].Name < affectedCollaSets[j].Name
-	})
 	return
 }
 

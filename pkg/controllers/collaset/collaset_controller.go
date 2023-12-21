@@ -172,11 +172,11 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		UpdatedRevision: updatedRevision,
 		NewStatus:       newStatus,
 	}
-	resources.PodDecorations, resources.OldRevisionDecorations, err = utils.GetEffectiveDecorationsByCollaSet(ctx, r.Client, instance)
+	resources.PDGetter, err = utils.NewPodDecorationGetter(ctx, r.Client, instance.Namespace)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("fail to get effective pod decorations by CollaSet %s: %s", key, err)
 	}
-	for _, pd := range resources.PodDecorations {
+	for _, pd := range resources.PDGetter.GetLatestDecorations() {
 		if pd.Status.ObservedGeneration != pd.Generation {
 			logger.Info("wait for PodDecoration ObservedGeneration", "CollaSet", key, "PodDecoration", commonutils.ObjectKeyString(pd))
 			return ctrl.Result{}, nil

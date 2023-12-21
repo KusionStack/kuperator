@@ -203,23 +203,43 @@ func (r *RealSyncControl) Scale(
 
 			// scale out new Pods with updatedRevision
 			// TODO use cache
-			pod, err := collasetutils.NewPodFrom(cls, metav1.NewControllerRef(cls, appsv1alpha1.GroupVersion.WithKind("CollaSet")), revision)
+			pod, err := collasetutils.NewPodFrom(
+				cls,
+				metav1.NewControllerRef(cls, appsv1alpha1.GroupVersion.WithKind("CollaSet")),
+				revision,
+				func(in *corev1.Pod) (localErr error) {
+					in.Labels[appsv1alpha1.PodInstanceIDLabelKey] = fmt.Sprintf("%d", availableIDContext.ID)
+					revisionsInfo, ok := availableIDContext.Get(podcontext.PodDecorationRevisionKey)
+					var pds map[string]*appsv1alpha1.PodDecoration
+					if !ok {
+						// get default PodDecorations if no revision in context
+						pds, localErr = resources.PDGetter.GetLatestDecorationsByTargetLabel(ctx, in.Labels)
+						if localErr != nil {
+							return localErr
+						}
+					} else {
+						// upgrade by recreate pod case
+						infos, marshallErr := utilspoddecoration.UnmarshallFromString(revisionsInfo)
+						if marshallErr != nil {
+							return marshallErr
+						}
+						var revisions []string
+						for _, info := range infos {
+							revisions = append(revisions, info.Revision)
+						}
+						pds, localErr = resources.PDGetter.GetDecorationByRevisions(ctx, revisions...)
+						if localErr != nil {
+							return localErr
+						}
+					}
+					logger.Info("get pod effective decorations before create it", "EffectivePodDecorations", utilspoddecoration.BuildInfo(pds))
+					return utilspoddecoration.PatchListOfDecorations(in, pds)
+				},
+			)
 			if err != nil {
 				return fmt.Errorf("fail to new Pod from revision %s: %s", revision.Name, err)
 			}
 			newPod := pod.DeepCopy()
-			// allocate new Pod a instance ID
-			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = fmt.Sprintf("%d", availableIDContext.ID)
-
-			// get PodDecorations which selected newPod
-			podDecorations := utilspoddecoration.GetPodEffectiveDecorations(newPod, resources.PodDecorations, resources.OldRevisionDecorations)
-			// patch pod with PodDecorations
-			if patchErr := utilspoddecoration.PatchListOfDecorations(newPod, podDecorations); patchErr != nil {
-				msg := fmt.Sprintf("fail to patch pod %s by PodDecoration, %v", commonutils.ObjectKeyString(newPod), patchErr)
-				logger.Error(patchErr, msg)
-				r.recorder.Eventf(cls, corev1.EventTypeWarning, "PodDecorationPatch", msg)
-			}
-
 			logger.V(1).Info("try to create Pod with revision of collaSet", "revision", revision.Name)
 			if pod, err = r.podControl.CreatePod(newPod); err != nil {
 				return err
@@ -401,8 +421,10 @@ func (r *RealSyncControl) Update(
 	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
 	var recordedRequeueAfter *time.Duration
 	// 1. scan and analysis pods update info
-	podUpdateInfos := attachPodUpdateInfo(podWrappers, resources)
-
+	podUpdateInfos, err := attachPodUpdateInfo(ctx, podWrappers, resources)
+	if err != nil {
+		return false, nil, fmt.Errorf("fail to attach pod update info, %v", err)
+	}
 	// 2. decide Pod update candidates
 	podToUpdate := decidePodToUpdate(cls, podUpdateInfos)
 
@@ -464,7 +486,13 @@ func (r *RealSyncControl) Update(
 			needUpdateContext = true
 			ownedIDs[podInfo.ID].Put(podcontext.RevisionContextDataKey, resources.UpdatedRevision.Name)
 		}
-
+		if podInfo.PodDecorationChanged {
+			decorationStr := utilspoddecoration.GetDecorationInfoString(podInfo.UpdatedPodDecorations)
+			if val, ok := ownedIDs[podInfo.ID].Get(podcontext.PodDecorationRevisionKey); !ok || val != decorationStr {
+				needUpdateContext = true
+				ownedIDs[podInfo.ID].Put(podcontext.PodDecorationRevisionKey, decorationStr)
+			}
+		}
 		if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged {
 			continue
 		}
