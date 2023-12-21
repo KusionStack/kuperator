@@ -692,6 +692,10 @@ var _ = Describe("PodDecoration controller", func() {
 			return updatedCnt
 		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
 	})
+
+	It("test no group PodDecoration", func() {
+
+	})
 })
 
 func TestPodDecorationController(t *testing.T) {

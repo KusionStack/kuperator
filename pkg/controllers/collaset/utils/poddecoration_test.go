@@ -18,7 +18,6 @@ package utils
 
 import (
 	"context"
-	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -28,11 +27,6 @@ import (
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
-
-func TestPodDecorationUtils(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "CollaSetController Test Suite")
-}
 
 var _ = Describe("PodDecoration utils", func() {
 	It("Test PodDecorationGetter", func() {
