@@ -29,7 +29,9 @@ import (
 	"kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/poddeletion"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/operating/pkg/features"
 	"kusionstack.io/operating/pkg/utils"
+	"kusionstack.io/operating/pkg/utils/feature"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -45,7 +47,7 @@ func (gd *GraceDelete) Name() string {
 }
 
 func (gd *GraceDelete) Validating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) error {
-	if operation != admissionv1.Delete {
+	if !feature.DefaultFeatureGate.Enabled(features.GraceDeleteWebhook) || operation != admissionv1.Delete {
 		return nil
 	}
 

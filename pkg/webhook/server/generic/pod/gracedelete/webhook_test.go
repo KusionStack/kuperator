@@ -22,9 +22,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubectl/pkg/scheme"
 	"kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/poddeletion"
+	"kusionstack.io/operating/pkg/utils/feature"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -118,6 +120,7 @@ func TestGraceDelete(t *testing.T) {
 	}
 
 	gd := New()
+	runtime.Must(feature.DefaultMutableFeatureGate.Set("GraceDeleteWebhook=true"))
 	for _, v := range inputs {
 		client := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(&v.fakePod).Build()
 		err := gd.Validating(context.Background(), client, &v.oldPod, nil, v.reqOperation)
@@ -130,7 +133,7 @@ func TestGraceDelete(t *testing.T) {
 		if len(v.expectedLabels) != 0 {
 			pod := &corev1.Pod{}
 			client.Get(context.Background(), types.NamespacedName{Namespace: v.oldPod.Namespace, Name: v.oldPod.Name}, pod)
-			for k, _ := range v.expectedLabels {
+			for k := range v.expectedLabels {
 				_, exist := pod.Labels[k]
 				assert.True(t, exist)
 			}
