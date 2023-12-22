@@ -27,8 +27,10 @@ import (
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -88,7 +90,7 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	By("tearing down the test environment")
+	By("Tearing down the test environment")
 
 	cancel()
 
@@ -96,7 +98,7 @@ var _ = AfterSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 })
 
-var _ = Describe("podopslifecycle controller", func() {
+var _ = Describe("PodOpsLifecycle controller", func() {
 	var (
 		podSpec = corev1.PodSpec{
 			Containers: []corev1.Container{
@@ -111,6 +113,8 @@ var _ = Describe("podopslifecycle controller", func() {
 				},
 			},
 		}
+		name      = "test"
+		namespace = "default"
 		id        = "123"
 		timestamp = "1402144848"
 	)
@@ -118,12 +122,11 @@ var _ = Describe("podopslifecycle controller", func() {
 	AfterEach(func() {
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test",
-				Namespace: "default",
+				Name:      name,
+				Namespace: namespace,
 			},
 		}
-		err := mgr.GetClient().Delete(context.Background(), pod)
-		Expect(err).NotTo(HaveOccurred())
+		mgr.GetClient().Delete(context.Background(), pod)
 
 		for {
 			if len(request) == 0 {
@@ -133,11 +136,11 @@ var _ = Describe("podopslifecycle controller", func() {
 		}
 	})
 
-	It("update pod with stage pre-check", func() {
+	It("Create a pod controlled by kusionstack", func() {
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test",
-				Namespace: "default",
+				Name:      name,
+				Namespace: namespace,
 				Labels:    map[string]string{v1alpha1.ControlledByKusionStackLabelKey: "true"},
 			},
 			Spec: podSpec,
@@ -147,22 +150,44 @@ var _ = Describe("podopslifecycle controller", func() {
 
 		<-request
 
-		pod = &corev1.Pod{}
+		// Not found the pod
+		pod1 := &corev1.Pod{}
+		name1 := name + "1"
 		err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
-			Name:      "test",
-			Namespace: "default",
-		}, pod)
+			Name:      name1,
+			Namespace: namespace,
+		}, pod1)
+		Expect(errors.IsNotFound(err)).To(Equal(true))
+
+		_, err = podOpsLifecycle.Reconcile(context.Background(), reconcile.Request{NamespacedName: types.NamespacedName{Name: name1, Namespace: namespace}})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(pod.Status.Conditions).To(HaveLen(1))
-		Expect(string(pod.Status.Conditions[0].Type)).To(Equal(v1alpha1.ReadinessGatePodServiceReady))
-		Expect(pod.Status.Conditions[0].Status).To(Equal(corev1.ConditionTrue))
+
+		// Found the pod
+		Eventually(func() error {
+			pod = &corev1.Pod{}
+			err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
+				Name:      name,
+				Namespace: namespace,
+			}, pod)
+
+			if len(pod.Status.Conditions) != 1 {
+				return fmt.Errorf("expected 1 condition, got %d", len(pod.Status.Conditions))
+			}
+			if string(pod.Status.Conditions[0].Type) != v1alpha1.ReadinessGatePodServiceReady {
+				return fmt.Errorf("expected type %s, got %s", v1alpha1.ReadinessGatePodServiceReady, pod.Status.Conditions[0].Type)
+			}
+			if pod.Status.Conditions[0].Status != corev1.ConditionTrue {
+				return fmt.Errorf("expected status %s, got %s", corev1.ConditionFalse, pod.Status.Conditions[0].Status)
+			}
+			return nil
+		}, 3*time.Second, 200*time.Millisecond).Should(BeNil())
 	})
 
-	It("create pod with label prepare", func() {
+	It("Create pod with label preparing", func() {
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test",
-				Namespace: "default",
+				Name:      name,
+				Namespace: namespace,
 				Labels: map[string]string{
 					v1alpha1.ControlledByKusionStackLabelKey:                   "true",
 					fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, id): timestamp,
@@ -174,36 +199,36 @@ var _ = Describe("podopslifecycle controller", func() {
 		err := mgr.GetClient().Create(context.Background(), pod)
 		Expect(err).NotTo(HaveOccurred())
 
-		pod = &corev1.Pod{}
+		<-request
+
 		Eventually(func() error {
+			pod := &corev1.Pod{}
 			if err := mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
-				Name:      "test",
-				Namespace: "default",
+				Name:      name,
+				Namespace: namespace,
 			}, pod); err != nil {
 				return fmt.Errorf("fail to get pod: %s", err)
 			}
 
+			// Need set readiness gate to false
 			if len(pod.Status.Conditions) != 1 {
 				return fmt.Errorf("expected 1 condition, got %d", len(pod.Status.Conditions))
 			}
-
 			if string(pod.Status.Conditions[0].Type) != v1alpha1.ReadinessGatePodServiceReady {
 				return fmt.Errorf("expected type %s, got %s", v1alpha1.ReadinessGatePodServiceReady, pod.Status.Conditions[0].Type)
 			}
-
 			if pod.Status.Conditions[0].Status != corev1.ConditionFalse {
 				return fmt.Errorf("expected status %s, got %s", corev1.ConditionFalse, pod.Status.Conditions[0].Status)
 			}
-
 			return nil
-		}, 5*time.Second, 1*time.Second).Should(BeNil())
+		}, 3*time.Second, 200*time.Millisecond).Should(BeNil())
 	})
 
-	It("create pod with label complete", func() {
+	It("Create pod with label completing", func() {
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test",
-				Namespace: "default",
+				Name:      name,
+				Namespace: namespace,
 				Labels: map[string]string{
 					v1alpha1.ControlledByKusionStackLabelKey:                    "true",
 					fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):    timestamp,
@@ -217,36 +242,35 @@ var _ = Describe("podopslifecycle controller", func() {
 
 		<-request
 
-		pod = &corev1.Pod{}
 		Eventually(func() error {
+			pod := &corev1.Pod{}
 			if err := mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
-				Name:      "test",
-				Namespace: "default",
+				Name:      name,
+				Namespace: namespace,
 			}, pod); err != nil {
 				return fmt.Errorf("fail to get pod: %s", err)
 			}
 
+			// Need set readiness gate to true
 			if len(pod.Status.Conditions) != 1 {
 				return fmt.Errorf("expected 1 condition, got %d", len(pod.Status.Conditions))
 			}
-
 			if string(pod.Status.Conditions[0].Type) != v1alpha1.ReadinessGatePodServiceReady {
 				return fmt.Errorf("expected type %s, got %s", v1alpha1.ReadinessGatePodServiceReady, pod.Status.Conditions[0].Type)
 			}
-
 			if pod.Status.Conditions[0].Status != corev1.ConditionTrue {
 				return fmt.Errorf("expected status %s, got %s", corev1.ConditionTrue, pod.Status.Conditions[0].Status)
 			}
 
 			return nil
-		}, 5*time.Second, 1*time.Second).Should(BeNil())
+		}, 3*time.Second, 200*time.Millisecond).Should(BeNil())
 	})
 
-	It("update pod with label complete", func() {
+	It("Update pod with label compling", func() {
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test",
-				Namespace: "default",
+				Name:      name,
+				Namespace: namespace,
 				Labels:    map[string]string{v1alpha1.ControlledByKusionStackLabelKey: "true"},
 			},
 			Spec: podSpec,
@@ -256,44 +280,229 @@ var _ = Describe("podopslifecycle controller", func() {
 
 		<-request
 
-		pod = &corev1.Pod{}
-		err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
-			Name:      "test",
-			Namespace: "default",
-		}, pod)
-		Expect(err).NotTo(HaveOccurred())
-
-		pod.ObjectMeta.Labels = map[string]string{
-			v1alpha1.ControlledByKusionStackLabelKey:                    "true",
-			fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):    timestamp,
-			fmt.Sprintf("%s/%s", v1alpha1.PodCompletingLabelPrefix, id): timestamp,
-		}
-		err = mgr.GetClient().Update(context.Background(), pod)
-		Expect(err).NotTo(HaveOccurred())
-
-		pod = &corev1.Pod{}
 		Eventually(func() error {
-			if err := mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
-				Name:      "test",
-				Namespace: "default",
-			}, pod); err != nil {
-				return fmt.Errorf("fail to get pod: %s", err)
+			pod := &corev1.Pod{}
+			err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
+				Name:      name,
+				Namespace: namespace,
+			}, pod)
+			if err != nil {
+				return fmt.Errorf("fail to get pod: %v", err)
 			}
 
+			pod.ObjectMeta.Labels = map[string]string{
+				v1alpha1.ControlledByKusionStackLabelKey:                    "true",
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):    timestamp,
+				fmt.Sprintf("%s/%s", v1alpha1.PodCompletingLabelPrefix, id): timestamp,
+			}
+			return mgr.GetClient().Update(context.Background(), pod)
+		}, 3*time.Second, 200*time.Millisecond).Should(BeNil())
+
+		Eventually(func() error {
+			pod := &corev1.Pod{}
+			if err := mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
+				Name:      name,
+				Namespace: namespace,
+			}, pod); err != nil {
+				return fmt.Errorf("fail to get pod: %v", err)
+			}
+
+			// Need set readiness gate to true
 			if len(pod.Status.Conditions) != 1 {
 				return fmt.Errorf("expected 1 condition, got %d", len(pod.Status.Conditions))
 			}
-
 			if string(pod.Status.Conditions[0].Type) != v1alpha1.ReadinessGatePodServiceReady {
 				return fmt.Errorf("expected type %s, got %s", v1alpha1.ReadinessGatePodServiceReady, pod.Status.Conditions[0].Type)
 			}
-
 			if pod.Status.Conditions[0].Status != corev1.ConditionTrue {
 				return fmt.Errorf("expected status %s, got %s", corev1.ConditionTrue, pod.Status.Conditions[0].Status)
 			}
-
 			return nil
-		}, 5*time.Second, 1*time.Second).Should(BeNil())
+		}, 3*time.Second, 200*time.Millisecond).Should(BeNil())
+	})
+})
+
+var _ = Describe("Stage processing", func() {
+	var (
+		podSpec = corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "nginx",
+					Image: "nginx:latest",
+				},
+			},
+			ReadinessGates: []corev1.PodReadinessGate{
+				{
+					ConditionType: v1alpha1.ReadinessGatePodServiceReady,
+				},
+			},
+		}
+		name      = "test"
+		namespace = "default"
+	)
+
+	It("Process pre-check stage", func() {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+				Labels: map[string]string{
+					fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):     "1402144848",
+					fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "abc",
+
+					fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "456"):     "1402144849",
+					fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "456"): "def",
+				},
+			},
+			Spec: podSpec,
+		}
+
+		idToLabelsMap, _, err := PodIDAndTypesMap(pod)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(idToLabelsMap)).To(Equal(2))
+		fmt.Println(idToLabelsMap)
+
+		labels, err := podOpsLifecycle.preCheckStage(pod, idToLabelsMap)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(labels)).To(Equal(4))
+
+		for k, v := range idToLabelsMap {
+			key := fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, v[v1alpha1.PodOperationTypeLabelPrefix])
+			operationPermission, ok := labels[key]
+			Expect(ok).To(Equal(true))
+			Expect(operationPermission).NotTo(BeEmpty())
+
+			key = fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, k)
+			preChecked, ok := labels[key]
+			Expect(ok).To(Equal(true))
+			Expect(preChecked).NotTo(BeEmpty())
+		}
+	})
+
+	It("Process post-check stage", func() {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+				Labels: map[string]string{
+					fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "123"): "1402144848",
+
+					fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "456"): "1402144849",
+				},
+			},
+			Spec: podSpec,
+		}
+
+		idToLabelsMap, _, err := PodIDAndTypesMap(pod)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(idToLabelsMap)).To(Equal(2))
+		fmt.Println(idToLabelsMap)
+
+		labels, err := podOpsLifecycle.postCheckStage(pod, idToLabelsMap)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(labels)).To(Equal(2))
+
+		for k, _ := range idToLabelsMap {
+			key := fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, k)
+			preChecked, ok := labels[key]
+			Expect(ok).To(Equal(true))
+			Expect(preChecked).NotTo(BeEmpty())
+		}
+	})
+})
+
+var _ = Describe("Expected finalizer processng", func() {
+	var (
+		name      = "test"
+		namespace = "default"
+
+		podSpec = corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "nginx",
+					Image: "nginx:latest",
+				},
+			},
+			ReadinessGates: []corev1.PodReadinessGate{
+				{
+					ConditionType: v1alpha1.ReadinessGatePodServiceReady,
+				},
+			},
+		}
+		pod = &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+				Labels: map[string]string{
+					"app": name,
+				},
+			},
+			Spec: podSpec,
+		}
+	)
+
+	AfterEach(func() {
+		svc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+			},
+		}
+		mgr.GetClient().Delete(context.Background(), svc)
+	})
+
+	It("Available condition is not dirty", func() {
+		svc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+			},
+			Spec: corev1.ServiceSpec{
+				Selector: map[string]string{
+					"app": name,
+				},
+				Ports: []corev1.ServicePort{
+					{
+						Name: "http",
+						Port: 80,
+					},
+				},
+			},
+		}
+		err := mgr.GetClient().Create(context.Background(), svc)
+		Expect(err).NotTo(HaveOccurred())
+
+		key := fmt.Sprintf("%s/%s/%s", "Service", svc.GetNamespace(), svc.GetName())
+		isAvailableConditionDirty, err := podOpsLifecycle.isAvailableConditionDirty(pod, key)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(isAvailableConditionDirty).To(Equal(false))
+	})
+
+	It("Available condition is dirty", func() {
+		svc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+			},
+			Spec: corev1.ServiceSpec{
+				Selector: map[string]string{
+					"app1": name,
+				},
+				Ports: []corev1.ServicePort{
+					{
+						Name: "http",
+						Port: 80,
+					},
+				},
+			},
+		}
+		err := mgr.GetClient().Create(context.Background(), svc)
+		Expect(err).NotTo(HaveOccurred())
+
+		key := fmt.Sprintf("%s/%s/%s", "Service", svc.GetNamespace(), svc.GetName())
+		isAvailableConditionDirty, err := podOpsLifecycle.isAvailableConditionDirty(pod, key)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(isAvailableConditionDirty).To(Equal(true))
 	})
 })
 

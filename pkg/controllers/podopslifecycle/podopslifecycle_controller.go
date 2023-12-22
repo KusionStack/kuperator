@@ -125,6 +125,8 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 	if err != nil {
 		return reconcile.Result{}, err
 	}
+
+	// If all lifecycle is finished, or the is no lifecycle begined
 	if len(idToLabelsMap) == 0 {
 		updated, err := r.addServiceAvailable(pod)
 		if updated {
@@ -139,6 +141,7 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 		}
 	}
 
+	// Get the state of pod managed by TransitionRule
 	state, err := r.podTransitionRuleManager.GetState(ctx, r.Client, pod)
 	if err != nil {
 		logger.Error(err, "failed to get pod state")
@@ -164,8 +167,8 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 	}
 
 	expected := map[string]bool{
-		v1alpha1.PodPreparingLabelPrefix:  false, // set readiness gate to false, traffic off
-		v1alpha1.PodCompletingLabelPrefix: true,  // set readiness gate to true, traffic on
+		v1alpha1.PodPreparingLabelPrefix:  false, // Set readiness gate to false
+		v1alpha1.PodCompletingLabelPrefix: true,  // Set readiness gate to true
 	}
 	for _, labels := range idToLabelsMap {
 		for k, v := range expected {
@@ -175,7 +178,7 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 
 			updated, err := r.updateServiceReadiness(ctx, pod, v)
 			if err != nil {
-				return reconcile.Result{}, err // only need set once
+				return reconcile.Result{}, err // Only need set once
 			}
 			if updated {
 				r.Recorder.Eventf(pod, corev1.EventTypeNormal, "ReadinessGate", "Set service ready readiness gate to %v", v)
@@ -186,6 +189,7 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 	return reconcile.Result{}, nil
 }
 
+// addServiceAvailable try to add service available label to pod
 func (r *ReconcilePodOpsLifecycle) addServiceAvailable(pod *corev1.Pod) (bool, error) {
 	if pod.Labels == nil {
 		return false, nil
@@ -194,7 +198,8 @@ func (r *ReconcilePodOpsLifecycle) addServiceAvailable(pod *corev1.Pod) (bool, e
 		return false, nil
 	}
 
-	satisfied, notSatisfiedFinalizers, err := controllerutils.IsExpectedFinalizerSatisfied(pod) // whether all expected finalizers are satisfied
+	// Whether all expected finalizers are satisfied
+	satisfied, notSatisfiedFinalizers, err := controllerutils.IsExpectedFinalizerSatisfied(pod)
 	if err != nil {
 		return false, err
 	}
@@ -207,7 +212,7 @@ func (r *ReconcilePodOpsLifecycle) addServiceAvailable(pod *corev1.Pod) (bool, e
 		if !allDirty {
 			return false, nil
 		}
-		// all not satisfied expected finalizers are dirty, so actually the pod satisfied expected finalizer now
+		// All not satisfied finalizers are dirty, so actually the pod satisfied expected finalizers now
 	}
 
 	if !controllerutils.IsPodReady(pod) {
@@ -221,7 +226,7 @@ func (r *ReconcilePodOpsLifecycle) addServiceAvailable(pod *corev1.Pod) (bool, e
 }
 
 func (r *ReconcilePodOpsLifecycle) removeDirtyExpectedFinalizer(pod *corev1.Pod, notSatisfiedFinalizers map[string]string) (bool, error) {
-	var allDirty bool
+	var allDirty bool // Whether all not atisfied finalizers are dirty
 	dirtyExpectedFinalizer := make(map[string]string)
 
 	for expectedFlzKey, finalizer := range notSatisfiedFinalizers {
@@ -348,7 +353,7 @@ func (r *ReconcilePodOpsLifecycle) setServiceReadiness(pod *corev1.Pod, isReady 
 	if !isReady {
 		status = corev1.ConditionFalse
 	}
-	if index == -1 { // append readiness gate
+	if index == -1 { // Append readiness gate
 		pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{
 			Type:               v1alpha1.ReadinessGatePodServiceReady,
 			Status:             status,
@@ -362,7 +367,7 @@ func (r *ReconcilePodOpsLifecycle) setServiceReadiness(pod *corev1.Pod, isReady 
 		return false, ""
 	}
 
-	// update readiness gate
+	// Update readiness gate
 	pod.Status.Conditions[index].Status = status
 	pod.Status.Conditions[index].LastTransitionTime = metav1.Now()
 	pod.Status.Conditions[index].Message = "updated by PodOpsLifecycle"

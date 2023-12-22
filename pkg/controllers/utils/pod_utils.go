@@ -18,6 +18,7 @@ package utils
 
 import (
 	"encoding/json"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -114,6 +115,7 @@ func IsExpectedFinalizerSatisfied(pod *corev1.Pod) (bool, map[string]string, err
 			existFinalizers.Insert(finalizer)
 		}
 
+		// Check if all expected finalizers are satisfied
 		for expectedFlzKey, finalizer := range availableConditions.ExpectedFinalizers {
 			if !existFinalizers.Has(finalizer) {
 				satisfied = false

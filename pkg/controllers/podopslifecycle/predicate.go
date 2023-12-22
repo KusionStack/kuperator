@@ -24,7 +24,7 @@ import (
 type NeedOpsLifecycle func(oldPod, newPod *corev1.Pod) bool
 
 type PodPredicate struct {
-	NeedOpsLifecycle // check if pod need use lifecycle
+	NeedOpsLifecycle // Check if pod need be reconciled
 }
 
 func (pp *PodPredicate) Create(evt event.CreateEvent) bool {
