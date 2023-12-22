@@ -25,7 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/poddeletion"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
@@ -47,6 +47,8 @@ func (gd *GraceDelete) Name() string {
 }
 
 func (gd *GraceDelete) Validating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) error {
+	// GraceDeleteWebhook FeatureGate defaults to false
+	// Add '--feature-gates=GraceDeleteWebhook=true' to container args, to enable gracedelete webhook
 	if !feature.DefaultFeatureGate.Enabled(features.GraceDeleteWebhook) || operation != admissionv1.Delete {
 		return nil
 	}
@@ -58,7 +60,7 @@ func (gd *GraceDelete) Validating(ctx context.Context, c client.Client, oldPod, 
 			return err
 		}
 
-		klog.Info("pod is deleted")
+		klog.V(2).Info("pod is deleted")
 		return nil
 	}
 	if !utils.ControlledByKusionStack(pod) {
