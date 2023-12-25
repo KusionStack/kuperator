@@ -341,9 +341,6 @@ func equalStatus(updated *appsv1alpha1.PodTransitionRuleStatus, current *appsv1a
 		equality.Semantic.DeepEqual(updated.RuleStates, current.RuleStates) &&
 		updated.ObservedGeneration == current.ObservedGeneration
 	if !deepEqual {
-		fmt.Println("test: update pd status ")
-		fmt.Println(utils.DumpJSON(current))
-		fmt.Println(utils.DumpJSON(updated))
 		return utils.DumpJSON(updated) == utils.DumpJSON(current)
 	}
 	return deepEqual

@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
@@ -99,7 +98,6 @@ func (r *pollingRunner) worker(stop <-chan struct{}) {
 	}()
 	for {
 		id, shutdown := r.q.Get()
-		klog.Infof("test: get id %s, time %s", id, time.Now())
 		if shutdown {
 			return
 		}
