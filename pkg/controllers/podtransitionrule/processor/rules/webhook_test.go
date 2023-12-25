@@ -236,7 +236,7 @@ func TestWebhookPollFail(t *testing.T) {
 	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(0))
 	g.Expect(len(res.Rejected)).Should(gomega.BeEquivalentTo(3))
 
-	<-time.After(5 * time.Second)
+	<-time.After(6 * time.Second)
 	state = &appsv1alpha1.RuleState{Name: web.RuleName, WebhookStatus: res.RuleState.WebhookStatus}
 	pollRS.Status.RuleStates = []*appsv1alpha1.RuleState{state}
 	webhooks = GetWebhook(pollRS)
@@ -301,7 +301,7 @@ func TestWebhookPoll(t *testing.T) {
 	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(0))
 	g.Expect(len(res.Rejected)).Should(gomega.BeEquivalentTo(3))
 
-	<-time.After(5 * time.Second)
+	<-time.After(6 * time.Second)
 	state = &appsv1alpha1.RuleState{Name: web.RuleName, WebhookStatus: res.RuleState.WebhookStatus}
 	pollRS.Status.RuleStates = []*appsv1alpha1.RuleState{state}
 	webhooks = GetWebhook(pollRS.DeepCopy())

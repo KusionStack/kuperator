@@ -77,7 +77,7 @@ func (r *AvailableRuler) Filter(podTransitionRule *appsv1alpha1.PodTransitionRul
 	// filter unavailable pods
 	for podName := range effectiveTargets {
 		pod := targets[podName]
-		if utils.IsPodPassRule(pod, podTransitionRule, r.Name) {
+		if utils.IsPodPassRule(pod.Name, podTransitionRule, r.Name) {
 			allowUnavailable--
 			continue
 		}
@@ -94,7 +94,7 @@ func (r *AvailableRuler) Filter(podTransitionRule *appsv1alpha1.PodTransitionRul
 	// try approve available pod
 	for podName := range subjects {
 		pod := targets[podName]
-		if utils.IsPodPassRule(pod, podTransitionRule, r.Name) {
+		if utils.IsPodPassRule(pod.Name, podTransitionRule, r.Name) {
 			pass.Insert(pod.Name)
 			continue
 		}

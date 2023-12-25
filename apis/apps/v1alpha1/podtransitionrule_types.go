@@ -192,6 +192,10 @@ type WebhookStatus struct {
 type TaskInfo struct {
 	TaskId string `json:"taskId,omitempty"`
 
+	//Processing []string `json:"targets,omitempty"`
+
+	//Approved []string `json:"approved,omitempty"`
+
 	BeginTime *metav1.Time `json:"beginTime,omitempty"`
 
 	LastTime *metav1.Time `json:"lastTime,omitempty"`

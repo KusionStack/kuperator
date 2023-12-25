@@ -117,7 +117,7 @@ func (w *Webhook) buildRequest(pods sets.String) (*appsv1alpha1.WebhookRequest, 
 		for _, parameter := range w.Webhook.Parameters {
 			value, err := w.parseParameter(&parameter, w.targets[podName])
 			if err != nil {
-				return nil, fmt.Errorf("%s failed to parse parameter, %v", w.key(), err)
+				return nil, fmt.Errorf("%s failed to parse parameter, %v", w.Key, err)
 			}
 			parameters[parameter.Key] = value
 		}
