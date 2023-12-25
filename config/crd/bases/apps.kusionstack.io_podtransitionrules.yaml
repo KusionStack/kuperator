@@ -374,31 +374,15 @@ spec:
                       description: WebhookStatus is the webhook status representing
                         processing progress
                       properties:
-                        itemStatus:
-                          description: PodTransitionRulePodStatus is async request
-                            status representing the info of pods
-                          items:
-                            description: ItemStatus defines async request info of
-                              resources
-                            properties:
-                              name:
-                                description: Name representing the name of pod
-                                type: string
-                              taskId:
-                                description: TraceId representing poll request taskId
-                                type: string
-                              webhookChecked:
-                                description: WebhookChecked representing the pod has
-                                  pass check
-                                type: boolean
-                            required:
-                            - webhookChecked
-                            type: object
-                          type: array
-                        taskStates:
-                          description: TaskStates is a list of tracing info
+                        history:
+                          description: History records history taskStates which were
+                            finished or failed. Valid for 10 minutes
                           items:
                             properties:
+                              approved:
+                                items:
+                                  type: string
+                                type: array
                               beginTime:
                                 format: date-time
                                 type: string
@@ -407,6 +391,34 @@ spec:
                                 type: string
                               message:
                                 type: string
+                              processing:
+                                items:
+                                  type: string
+                                type: array
+                              taskId:
+                                type: string
+                            type: object
+                          type: array
+                        taskStates:
+                          description: TaskStates is a list of tracing info
+                          items:
+                            properties:
+                              approved:
+                                items:
+                                  type: string
+                                type: array
+                              beginTime:
+                                format: date-time
+                                type: string
+                              lastTime:
+                                format: date-time
+                                type: string
+                              message:
+                                type: string
+                              processing:
+                                items:
+                                  type: string
+                                type: array
                               taskId:
                                 type: string
                             type: object

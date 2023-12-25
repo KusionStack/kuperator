@@ -161,9 +161,10 @@ func (p *Processor) Process(targets map[string]*corev1.Pod) *ProcessResult {
 		}
 
 		processingPods = result.Passed.Union(skipPods)
-		if processingPods.Len() == 0 {
-			break
-		}
+		// do not break: ensure update status
+		//if processingPods.Len() == 0 {
+		//	break
+		//}
 	}
 
 	res := &ProcessResult{

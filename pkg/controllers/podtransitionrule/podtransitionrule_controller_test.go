@@ -581,7 +581,7 @@ func RunPollingServer() (chan<- struct{}, <-chan struct{}, map[string]time.Time,
 			names = append(names, resource.Name)
 		}
 		taskID := uuid.New().String()
-		fmt.Printf("handle pods %v\n, task %s", names, taskID)
+		fmt.Printf("handle pods %v\n, task %s\n", names, taskID)
 		taskMap[taskID] = names
 		taskStartTime[taskID] = time.Now()
 		webhookResp := &appsv1alpha1.WebhookResponse{

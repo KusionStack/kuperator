@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/utils"
 )
 
 var (
@@ -217,8 +218,7 @@ func TestWebhookPollFail(t *testing.T) {
 	g.Expect(len(webhooks)).Should(gomega.BeEquivalentTo(1))
 	web := webhooks[0]
 	res := web.Do(targets, subjects)
-	rj, _ := json.Marshal(res)
-	fmt.Printf("res: %s\n", string(rj))
+	fmt.Printf("res: %s\n", utils.DumpJSON(res))
 	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(0))
 	g.Expect(len(res.Rejected)).Should(gomega.BeEquivalentTo(3))
 	g.Expect(res.RuleState).ShouldNot(gomega.BeNil())
@@ -229,8 +229,7 @@ func TestWebhookPollFail(t *testing.T) {
 	webhooks = GetWebhook(pollRS)
 	web = webhooks[0]
 	res = web.Do(targets, subjects)
-	rj, _ = json.Marshal(res)
-	fmt.Printf("res: %s\n", string(rj))
+	fmt.Printf("res: %s\n", utils.DumpJSON(res))
 
 	// reject by interval
 	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(0))
@@ -242,9 +241,7 @@ func TestWebhookPollFail(t *testing.T) {
 	webhooks = GetWebhook(pollRS)
 	web = webhooks[0]
 	res = web.Do(targets, subjects)
-	rj, _ = json.Marshal(res)
-	fmt.Printf("res: %s\n", string(rj))
-	// pass one
+	fmt.Printf("res: %s\n", utils.DumpJSON(res))
 	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(2))
 	g.Expect(len(res.Rejected)).Should(gomega.BeEquivalentTo(1))
 
@@ -254,9 +251,7 @@ func TestWebhookPollFail(t *testing.T) {
 	webhooks = GetWebhook(pollRS)
 	web = webhooks[0]
 	res = web.Do(targets, subjects)
-	rj, _ = json.Marshal(res)
-	fmt.Printf("res: %s\n", string(rj))
-	// failed one
+	fmt.Printf("res: %s\n", utils.DumpJSON(res))
 	g.Expect(len(res.Rejected)).Should(gomega.BeEquivalentTo(1))
 	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(2))
 }
@@ -370,4 +365,9 @@ func (p *podTemplate) GetPod() *corev1.Pod {
 			Phase: p.Phase,
 		},
 	}
+}
+
+func printJson(obj any) {
+	byt, _ := json.MarshalIndent(obj, "", "  ")
+	fmt.Printf("%s\n", string(byt))
 }
