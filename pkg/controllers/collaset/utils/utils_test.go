@@ -17,13 +17,33 @@ limitations under the License.
 package utils
 
 import (
+	"fmt"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
 func TestUtils(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "CollaSets utils tests")
 }
+
+var _ = Describe("Condition tests", func() {
+	It("test AddOrUpdateCondition", func() {
+		status := &appsv1alpha1.CollaSetStatus{
+			Conditions: []appsv1alpha1.CollaSetCondition{
+				{
+					Type:   appsv1alpha1.CollaSetScale,
+					Status: corev1.ConditionTrue,
+				},
+			},
+		}
+		AddOrUpdateCondition(status, appsv1alpha1.CollaSetScale, fmt.Errorf("test err"), "", "")
+		AddOrUpdateCondition(status, appsv1alpha1.CollaSetUpdate, nil, "", "")
+		Expect(len(status.Conditions)).Should(Equal(2))
+	})
+})

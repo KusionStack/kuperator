@@ -18,6 +18,8 @@ package utils
 
 import (
 	"encoding/json"
+	"sort"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -110,5 +112,105 @@ var _ = Describe("Pod utils", func() {
 		pod, err := PatchToPod(currentRevisionPod, updateRevisionPod, currentPod)
 		Expect(err).Should(BeNil())
 		Expect(pod.Labels["foo"]).Should(Equal("bar-1"))
+	})
+	It("test ComparePod", func() {
+		pods := []*corev1.Pod{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo-6",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "x",
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+					Conditions: []corev1.PodCondition{
+						{
+							Type:               corev1.PodReady,
+							Status:             corev1.ConditionTrue,
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo-5",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "x",
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+					Conditions: []corev1.PodCondition{
+						{
+							Type:               corev1.PodReady,
+							Status:             corev1.ConditionTrue,
+							LastTransitionTime: metav1.NewTime(time.Now().Add(10 * time.Second)),
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo-4",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "x",
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							RestartCount: 2,
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo-3",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "x",
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							RestartCount: 3,
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo-2",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "x",
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodPending,
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo-1",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "",
+				},
+			},
+		}
+		sort.Slice(pods, func(i, j int) bool {
+			return ComparePod(pods[i], pods[j])
+		})
+		Expect(pods[0].Name).Should(Equal("foo-1"))
+		Expect(pods[1].Name).Should(Equal("foo-2"))
+		Expect(pods[2].Name).Should(Equal("foo-3"))
+		Expect(pods[3].Name).Should(Equal("foo-4"))
+		Expect(pods[4].Name).Should(Equal("foo-5"))
+		Expect(pods[5].Name).Should(Equal("foo-6"))
 	})
 })
