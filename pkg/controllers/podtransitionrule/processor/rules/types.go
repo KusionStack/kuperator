@@ -78,14 +78,6 @@ func reject(subjects, passed sets.String, rejects map[string]string, reason stri
 	}
 }
 
-//
-//type Response struct {
-//	Success      bool     `json:"success"`
-//	Message      string   `json:"message"`
-//	RetryByTrace bool     `json:"retryByTrace"`
-//	Passed       []string `json:"finishedNames,omitempty"`
-//}
-
 type HttpJob struct {
 	Url      string
 	CaBundle []byte

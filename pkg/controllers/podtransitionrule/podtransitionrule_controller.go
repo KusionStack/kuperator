@@ -301,15 +301,6 @@ func (r *PodTransitionRuleReconciler) updatePodTransitionRuleOnPod(ctx context.C
 	})
 }
 
-func (r *PodTransitionRuleReconciler) hasRunningPod(pods *corev1.PodList) bool {
-	for _, pod := range pods.Items {
-		if pod.DeletionTimestamp == nil {
-			return true
-		}
-	}
-	return false
-}
-
 func updateDetail(details map[string]*appsv1alpha1.PodTransitionDetail, passRules *processor.ProcessResult, stage string) {
 	for po, rules := range passRules.PassRules {
 		var rejectInfo *appsv1alpha1.RejectInfo
