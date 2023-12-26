@@ -121,6 +121,7 @@ func IsExpectedFinalizerSatisfied(pod *corev1.Pod) (bool, map[string]string, err
 			existFinalizers.Insert(finalizer)
 		}
 
+		// Check if all expected finalizers are satisfied
 		for expectedFlzKey, finalizer := range availableConditions.ExpectedFinalizers {
 			if !existFinalizers.Has(finalizer) {
 				satisfied = false
