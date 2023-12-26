@@ -24,36 +24,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
 var _ = Describe("PodDecoration utils", func() {
 	It("Test PodDecorationGetter", func() {
-		getter := &podDecorationGetter{
-			latestPodDecorationNames: sets.NewString("foo-1", "foo-2"),
-			revisions:                map[string]*appsv1alpha1.PodDecoration{},
-		}
-		getter.latestPodDecorations = []*appsv1alpha1.PodDecoration{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo-1",
-				},
-				Status: appsv1alpha1.PodDecorationStatus{
-					CurrentRevision: "foo-100",
-					UpdatedRevision: "foo-101",
-				},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo-2",
-				},
-				Status: appsv1alpha1.PodDecorationStatus{
-					CurrentRevision: "foo-200",
-					UpdatedRevision: "foo-201",
-				},
-			},
-		}
+		getterInterface, err := NewPodDecorationGetter(context.TODO(), &mockClient{}, "")
+		Expect(len(getterInterface.GetLatestDecorations())).Should(Equal(2))
+		getter := getterInterface.(*podDecorationGetter)
 		getter.revisions["foo-100"] = getter.latestPodDecorations[0]
 		getter.revisions["foo-101"] = getter.latestPodDecorations[0]
 		getter.revisions["foo-200"] = getter.latestPodDecorations[1]
@@ -70,5 +50,42 @@ var _ = Describe("PodDecoration utils", func() {
 		pds, err = getter.GetUpdatedDecorationsByOldPod(context.TODO(), pod)
 		Expect(err).Should(BeNil())
 		Expect(len(pds)).Should(Equal(0))
+		pds, err = getter.GetCurrentDecorationsOnPod(context.TODO(), pod)
+		Expect(err).Should(BeNil())
+		Expect(len(pds)).Should(Equal(2))
 	})
 })
+
+type mockClient struct {
+	client.Client
+}
+
+func (c *mockClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	tu := true
+	pds := list.(*appsv1alpha1.PodDecorationList)
+	*pds = appsv1alpha1.PodDecorationList{
+		Items: []appsv1alpha1.PodDecoration{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo-1",
+				},
+				Status: appsv1alpha1.PodDecorationStatus{
+					CurrentRevision: "foo-100",
+					UpdatedRevision: "foo-101",
+					IsEffective:     &tu,
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo-2",
+				},
+				Status: appsv1alpha1.PodDecorationStatus{
+					CurrentRevision: "foo-200",
+					UpdatedRevision: "foo-201",
+					IsEffective:     &tu,
+				},
+			},
+		},
+	}
+	return nil
+}
