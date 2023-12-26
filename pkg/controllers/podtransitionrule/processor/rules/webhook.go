@@ -144,9 +144,26 @@ func (w *Webhook) Do(targets map[string]*corev1.Pod, subjects sets.String) *Filt
 		// get latest polling result
 		pollingResult := PollingManager.GetResult(taskId)
 
+		// restart case
 		if pollingResult == nil {
-			// TODO: After restart...
-			panic("null polling result")
+			pollUrl, _ := w.getPollingUrl(taskId)
+			PollingManager.Add(
+				taskId,
+				pollUrl,
+				w.Webhook.ClientConfig.Poll.CABundle,
+				w.Key,
+				time.Duration(*w.Webhook.ClientConfig.Poll.TimeoutSeconds)*time.Second,
+				time.Duration(*w.Webhook.ClientConfig.Poll.IntervalSeconds)*time.Second,
+			)
+			rejectMsg := fmt.Sprintf(
+				"Task %s polling result not found, try polling again, %s",
+				w.Key,
+				taskId,
+			)
+			for po := range currentPods {
+				rejectedPods[po] = rejectMsg
+			}
+			continue
 		}
 
 		if pollingResult.ApproveAll {
@@ -270,7 +287,6 @@ func (w *Webhook) Do(targets map[string]*corev1.Pod, subjects sets.String) *Filt
 		// success, init poll task
 		// trigger reconcile by PollingManager listener
 		if taskId == "" {
-			// TODO: invalid taskID
 			klog.Warningf("%s handle invalid webhook response, empty taskId in polling response", w.Key)
 			for eft := range effectiveSubjects {
 				rejectedPods[eft] = fmt.Sprintf("Invalid empty taskID, request trace %s", selfTraceId)
