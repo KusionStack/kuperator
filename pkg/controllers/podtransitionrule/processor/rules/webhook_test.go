@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/utils"
 )
 
 var (
@@ -145,8 +146,7 @@ func TestWebhookAlwaysSuccess(t *testing.T) {
 	web := webhooks[0]
 	// 2 pass
 	res := web.Do(targets, subjects)
-	rj, _ := json.Marshal(res)
-	fmt.Printf("res: %s", string(rj))
+	fmt.Printf("res: %s", utils.DumpJSON(res))
 	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(2))
 }
 
@@ -167,8 +167,7 @@ func TestWebhookAlwaysFail(t *testing.T) {
 	g.Expect(len(webhooks)).Should(gomega.BeEquivalentTo(1))
 	web := webhooks[0]
 	res := web.Do(targets, subjects)
-	rj, _ := json.Marshal(res)
-	fmt.Printf("res: %s", string(rj))
+	fmt.Printf("res: %s", utils.DumpJSON(res))
 	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(0))
 	g.Expect(len(res.Rejected)).Should(gomega.BeEquivalentTo(1))
 }
@@ -190,8 +189,7 @@ func TestWebhookFailSub(t *testing.T) {
 	g.Expect(len(webhooks)).Should(gomega.BeEquivalentTo(1))
 	web := webhooks[0]
 	res := web.Do(targets, subjects)
-	rj, _ := json.Marshal(res)
-	fmt.Printf("res: %s", string(rj))
+	fmt.Printf("res: %s", utils.DumpJSON(res))
 	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(2))
 	g.Expect(len(res.Rejected)).Should(gomega.BeEquivalentTo(1))
 }
@@ -217,8 +215,7 @@ func TestWebhookPollFail(t *testing.T) {
 	g.Expect(len(webhooks)).Should(gomega.BeEquivalentTo(1))
 	web := webhooks[0]
 	res := web.Do(targets, subjects)
-	rj, _ := json.Marshal(res)
-	fmt.Printf("res: %s\n", string(rj))
+	fmt.Printf("res: %s\n", utils.DumpJSON(res))
 	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(0))
 	g.Expect(len(res.Rejected)).Should(gomega.BeEquivalentTo(3))
 	g.Expect(res.RuleState).ShouldNot(gomega.BeNil())
@@ -229,22 +226,19 @@ func TestWebhookPollFail(t *testing.T) {
 	webhooks = GetWebhook(pollRS)
 	web = webhooks[0]
 	res = web.Do(targets, subjects)
-	rj, _ = json.Marshal(res)
-	fmt.Printf("res: %s\n", string(rj))
+	fmt.Printf("res: %s\n", utils.DumpJSON(res))
 
 	// reject by interval
 	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(0))
 	g.Expect(len(res.Rejected)).Should(gomega.BeEquivalentTo(3))
 
-	<-time.After(5 * time.Second)
+	<-time.After(6 * time.Second)
 	state = &appsv1alpha1.RuleState{Name: web.RuleName, WebhookStatus: res.RuleState.WebhookStatus}
 	pollRS.Status.RuleStates = []*appsv1alpha1.RuleState{state}
 	webhooks = GetWebhook(pollRS)
 	web = webhooks[0]
 	res = web.Do(targets, subjects)
-	rj, _ = json.Marshal(res)
-	fmt.Printf("res: %s\n", string(rj))
-	// pass one
+	fmt.Printf("res: %s\n", utils.DumpJSON(res))
 	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(2))
 	g.Expect(len(res.Rejected)).Should(gomega.BeEquivalentTo(1))
 
@@ -254,9 +248,7 @@ func TestWebhookPollFail(t *testing.T) {
 	webhooks = GetWebhook(pollRS)
 	web = webhooks[0]
 	res = web.Do(targets, subjects)
-	rj, _ = json.Marshal(res)
-	fmt.Printf("res: %s\n", string(rj))
-	// failed one
+	fmt.Printf("res: %s\n", utils.DumpJSON(res))
 	g.Expect(len(res.Rejected)).Should(gomega.BeEquivalentTo(1))
 	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(2))
 }
@@ -282,8 +274,7 @@ func TestWebhookPoll(t *testing.T) {
 	g.Expect(len(webhooks)).Should(gomega.BeEquivalentTo(1))
 	web := webhooks[0]
 	res := web.Do(targets, subjects)
-	rj, _ := json.Marshal(res)
-	fmt.Printf("res: %s\n", string(rj))
+	fmt.Printf("res: %s", utils.DumpJSON(res))
 	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(0))
 	g.Expect(len(res.Rejected)).Should(gomega.BeEquivalentTo(3))
 	g.Expect(res.RuleState).ShouldNot(gomega.BeNil())
@@ -294,22 +285,19 @@ func TestWebhookPoll(t *testing.T) {
 	webhooks = GetWebhook(pollRS)
 	web = webhooks[0]
 	res = web.Do(targets, subjects)
-	rj, _ = json.Marshal(res)
-	fmt.Printf("res: %s\n", string(rj))
+	fmt.Printf("res: %s", utils.DumpJSON(res))
 
 	// reject by interval
 	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(0))
 	g.Expect(len(res.Rejected)).Should(gomega.BeEquivalentTo(3))
 
-	<-time.After(5 * time.Second)
+	<-time.After(6 * time.Second)
 	state = &appsv1alpha1.RuleState{Name: web.RuleName, WebhookStatus: res.RuleState.WebhookStatus}
 	pollRS.Status.RuleStates = []*appsv1alpha1.RuleState{state}
 	webhooks = GetWebhook(pollRS.DeepCopy())
 	web = webhooks[0]
 	res = web.Do(targets, subjects)
-	rj, _ = json.Marshal(res)
-	fmt.Printf("res: %s\n", string(rj))
-	// pass one
+	fmt.Printf("res: %s", utils.DumpJSON(res))
 	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(2))
 	g.Expect(len(res.Rejected)).Should(gomega.BeEquivalentTo(1))
 
@@ -319,11 +307,58 @@ func TestWebhookPoll(t *testing.T) {
 	webhooks = GetWebhook(pollRS.DeepCopy())
 	web = webhooks[0]
 	res = web.Do(targets, subjects)
-	rj, _ = json.Marshal(res)
-	fmt.Printf("res: %s\n", string(rj))
-	// pass one
+	fmt.Printf("res: %s", utils.DumpJSON(res))
 	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(3))
 	g.Expect(len(res.Rejected)).Should(gomega.BeEquivalentTo(0))
+}
+
+func TestWebhookPollError(t *testing.T) {
+	stopA, finishA := RunHttpServer(handleFirstPollSucc, "8888")
+	stopB, finishB := RunHttpServer(handleHttpError, "8889")
+	defer func() {
+		stopA <- struct{}{}
+		stopB <- struct{}{}
+		<-finishA
+		<-finishB
+	}()
+	targets := map[string]*corev1.Pod{
+		"test-pod-a": (&podTemplate{Name: "test-pod-a", Ip: "1.1.1.58"}).GetPod(),
+		"test-pod-b": (&podTemplate{Name: "test-pod-b", Ip: "1.1.1.59"}).GetPod(),
+		"test-pod-c": (&podTemplate{Name: "test-pod-c", Ip: "1.1.1.60"}).GetPod(),
+	}
+	subjects := sets.NewString("test-pod-a", "test-pod-b", "test-pod-c")
+	g := gomega.NewGomegaWithT(t)
+	pollRS := poRS.DeepCopy()
+	webhooks := GetWebhook(pollRS)
+	g.Expect(len(webhooks)).Should(gomega.BeEquivalentTo(1))
+	web := webhooks[0]
+	res := web.Do(targets, subjects)
+	fmt.Printf("res: %s", utils.DumpJSON(res))
+	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(0))
+	g.Expect(len(res.Rejected)).Should(gomega.BeEquivalentTo(3))
+	g.Expect(res.RuleState).ShouldNot(gomega.BeNil())
+
+	state := &appsv1alpha1.RuleState{Name: web.RuleName, WebhookStatus: res.RuleState.WebhookStatus}
+	pollRS.Status.RuleStates = []*appsv1alpha1.RuleState{state}
+
+	webhooks = GetWebhook(pollRS)
+	web = webhooks[0]
+	res = web.Do(targets, subjects)
+	fmt.Printf("res: %s", utils.DumpJSON(res))
+
+	// reject by error
+	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(0))
+	g.Expect(len(res.Rejected)).Should(gomega.BeEquivalentTo(3))
+
+	<-time.After(6 * time.Second)
+	state = &appsv1alpha1.RuleState{Name: web.RuleName, WebhookStatus: res.RuleState.WebhookStatus}
+	pollRS.Status.RuleStates = []*appsv1alpha1.RuleState{state}
+	webhooks = GetWebhook(pollRS.DeepCopy())
+	web = webhooks[0]
+	res = web.Do(targets, subjects)
+	fmt.Printf("res: %s", utils.DumpJSON(res))
+	g.Expect(res.Passed.Len()).Should(gomega.BeEquivalentTo(0))
+	g.Expect(len(res.Rejected)).Should(gomega.BeEquivalentTo(3))
 }
 
 type podTemplate struct {
@@ -370,4 +405,9 @@ func (p *podTemplate) GetPod() *corev1.Pod {
 			Phase: p.Phase,
 		},
 	}
+}
+
+func printJson(obj any) {
+	byt, _ := json.MarshalIndent(obj, "", "  ")
+	fmt.Printf("%s\n", string(byt))
 }

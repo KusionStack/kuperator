@@ -78,14 +78,6 @@ func reject(subjects, passed sets.String, rejects map[string]string, reason stri
 	}
 }
 
-//
-//type Response struct {
-//	Success      bool     `json:"success"`
-//	Message      string   `json:"message"`
-//	RetryByTrace bool     `json:"retryByTrace"`
-//	Passed       []string `json:"finishedNames,omitempty"`
-//}
-
 type HttpJob struct {
 	Url      string
 	CaBundle []byte
@@ -99,7 +91,7 @@ type HttpJob struct {
 	Action string
 }
 
-func (w *Webhook) buildRequest(pods sets.String) (*appsv1alpha1.WebhookRequest, error) {
+func (w *Webhook) buildRequest(pods sets.String, targets map[string]*corev1.Pod) (*appsv1alpha1.WebhookRequest, error) {
 
 	req := &appsv1alpha1.WebhookRequest{
 		RuleName: w.RuleName,
@@ -115,9 +107,9 @@ func (w *Webhook) buildRequest(pods sets.String) (*appsv1alpha1.WebhookRequest, 
 		}
 		parameters := map[string]string{}
 		for _, parameter := range w.Webhook.Parameters {
-			value, err := w.parseParameter(&parameter, w.targets[podName])
+			value, err := w.parseParameter(&parameter, targets[podName])
 			if err != nil {
-				return nil, fmt.Errorf("%s failed to parse parameter, %v", w.key(), err)
+				return nil, fmt.Errorf("%s failed to parse parameter, %v", w.Key, err)
 			}
 			parameters[parameter.Key] = value
 		}

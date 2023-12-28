@@ -17,24 +17,23 @@
 package utils
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
-func IsPodPassRule(po *corev1.Pod, podtransitionrule *appsv1alpha1.PodTransitionRule, rule string) bool {
-	passedRules := GetPodPassedRules(po, podtransitionrule)
+func IsPodPassRule(podName string, podtransitionrule *appsv1alpha1.PodTransitionRule, rule string) bool {
+	passedRules := GetPodPassedRules(podName, podtransitionrule)
 	return passedRules.Has(rule)
 }
 
-func GetPodPassedRules(po *corev1.Pod, podtransitionrule *appsv1alpha1.PodTransitionRule) (rules sets.String) {
+func GetPodPassedRules(podName string, podtransitionrule *appsv1alpha1.PodTransitionRule) (rules sets.String) {
 	rules = sets.NewString()
 	if podtransitionrule.Status.Details == nil {
 		return rules
 	}
 	for _, detail := range podtransitionrule.Status.Details {
-		if detail.Name != po.Name {
+		if detail.Name != podName {
 			continue
 		}
 		rules.Insert(detail.PassedRules...)

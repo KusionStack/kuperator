@@ -31,11 +31,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	processorrules "kusionstack.io/operating/pkg/controllers/podtransitionrule/processor/rules"
 	commonutils "kusionstack.io/operating/pkg/utils"
 )
 
 var _ inject.Client = &EventHandler{}
 var _ inject.Logger = &EventHandler{}
+
+func NewWebhookGenericEventChannel() <-chan event.GenericEvent {
+	webhookTriggerChannel := make(chan event.GenericEvent, 1<<10)
+	processorrules.PollingManager.AddListener(webhookTriggerChannel)
+	return webhookTriggerChannel
+}
 
 type EventHandler struct {
 	// client and logger will be injected

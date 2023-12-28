@@ -161,9 +161,10 @@ func (p *Processor) Process(targets map[string]*corev1.Pod) *ProcessResult {
 		}
 
 		processingPods = result.Passed.Union(skipPods)
-		if processingPods.Len() == 0 {
-			break
-		}
+		// do not break: ensure update status
+		//if processingPods.Len() == 0 {
+		//	break
+		//}
 	}
 
 	res := &ProcessResult{
@@ -173,7 +174,7 @@ func (p *Processor) Process(targets map[string]*corev1.Pod) *ProcessResult {
 		RuleStates: ruleStates,
 	}
 
-	if minInterval != time.Duration(math.MaxInt32) {
+	if minInterval != time.Duration(math.MaxInt32)*time.Second {
 		res.Interval = &minInterval
 	}
 	return res

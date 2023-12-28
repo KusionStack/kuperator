@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -81,6 +82,10 @@ func addToMgr(mgr manager.Manager, r reconcile.Reconciler) (controller.Controlle
 		return c, err
 	}
 
+	err = c.Watch(&source.Channel{Source: NewWebhookGenericEventChannel()}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return c, err
+	}
 	return c, nil
 }
 
@@ -295,15 +300,6 @@ func (r *PodTransitionRuleReconciler) updatePodTransitionRuleOnPod(ctx context.C
 	})
 }
 
-func (r *PodTransitionRuleReconciler) hasRunningPod(pods *corev1.PodList) bool {
-	for _, pod := range pods.Items {
-		if pod.DeletionTimestamp == nil {
-			return true
-		}
-	}
-	return false
-}
-
 func updateDetail(details map[string]*appsv1alpha1.PodTransitionDetail, passRules *processor.ProcessResult, stage string) {
 	for po, rules := range passRules.PassRules {
 		var rejectInfo *appsv1alpha1.RejectInfo
@@ -330,8 +326,12 @@ func updateDetail(details map[string]*appsv1alpha1.PodTransitionDetail, passRule
 }
 
 func equalStatus(updated *appsv1alpha1.PodTransitionRuleStatus, current *appsv1alpha1.PodTransitionRuleStatus) bool {
-	return equality.Semantic.DeepEqual(updated.Targets, current.Targets) &&
+	deepEqual := equality.Semantic.DeepEqual(updated.Targets, current.Targets) &&
 		equality.Semantic.DeepEqual(updated.Details, current.Details) &&
 		equality.Semantic.DeepEqual(updated.RuleStates, current.RuleStates) &&
 		updated.ObservedGeneration == current.ObservedGeneration
+	if !deepEqual {
+		return utils.DumpJSON(updated) == utils.DumpJSON(current)
+	}
+	return deepEqual
 }

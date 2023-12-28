@@ -67,7 +67,7 @@ func RunHttpServer(f func(http.ResponseWriter, *http.Request), port string) (cha
 }
 
 func handleHttpAlwaysSuccess(resp http.ResponseWriter, req *http.Request) {
-	fmt.Println(req.URL)
+	fmt.Printf("handleHttpAlwaysSuccess, %s\n", req.URL)
 	all, err := io.ReadAll(req.Body)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("read body err: %s", err))
@@ -89,7 +89,7 @@ func handleHttpAlwaysSuccess(resp http.ResponseWriter, req *http.Request) {
 }
 
 func handleHttpAlwaysFalse(resp http.ResponseWriter, req *http.Request) {
-	fmt.Println(req.URL)
+	fmt.Printf("handleHttpAlwaysFalse, %s\n", req.URL)
 	all, err := io.ReadAll(req.Body)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("read body err: %s", err))
@@ -110,7 +110,7 @@ func handleHttpAlwaysFalse(resp http.ResponseWriter, req *http.Request) {
 }
 
 func handleHttpAlwaysSomeSucc(resp http.ResponseWriter, req *http.Request) {
-	fmt.Println(req.URL)
+	fmt.Printf("handleHttpAlwaysSomeSucc, %s\n", req.URL)
 	all, err := io.ReadAll(req.Body)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("read body err: %s", err))
@@ -162,7 +162,7 @@ func (s *setsTimer) getNow() (sets.String, bool) {
 }
 
 func handleFirstPollSucc(resp http.ResponseWriter, req *http.Request) {
-	fmt.Println(req.URL)
+	fmt.Printf("handleFirstPollSucc, %s\n", req.URL)
 	webReq := &appsv1alpha1.WebhookRequest{}
 	all, err := io.ReadAll(req.Body)
 	if err != nil {
@@ -188,7 +188,7 @@ func handleFirstPollSucc(resp http.ResponseWriter, req *http.Request) {
 }
 
 func handleHttpWithTaskIdSucc(resp http.ResponseWriter, req *http.Request) {
-	fmt.Println(req.URL)
+	fmt.Printf("handleHttpWithTaskIdSucc, %s\n", req.URL)
 	taskId := req.URL.Query().Get("trace-id")
 
 	col, ok := traceCache[taskId]
@@ -216,7 +216,7 @@ func handleHttpWithTaskIdSucc(resp http.ResponseWriter, req *http.Request) {
 }
 
 func handleHttpWithTaskIdFail(resp http.ResponseWriter, req *http.Request) {
-	fmt.Println(req.URL)
+	fmt.Printf("handleHttpWithTaskIdFail, %s\n", req.URL)
 	taskId := req.URL.Query().Get("trace-id")
 
 	col, ok := traceCache[taskId]
@@ -229,6 +229,7 @@ func handleHttpWithTaskIdFail(resp http.ResponseWriter, req *http.Request) {
 		webhookResp = &appsv1alpha1.PollResponse{
 			Success: false,
 			Message: "fail",
+			Stop:    true,
 		}
 	} else {
 		webhookResp = &appsv1alpha1.PollResponse{
@@ -240,6 +241,11 @@ func handleHttpWithTaskIdFail(resp http.ResponseWriter, req *http.Request) {
 	}
 	byt, _ := json.Marshal(webhookResp)
 	resp.Write(byt)
+}
+
+func handleHttpError(resp http.ResponseWriter, req *http.Request) {
+	fmt.Printf("handleHttpError, %s\n", req.URL)
+	http.Error(resp, fmt.Sprintf("test http error case"), http.StatusInternalServerError)
 }
 
 func getPods(req *appsv1alpha1.WebhookRequest) sets.String {

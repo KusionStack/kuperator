@@ -182,33 +182,26 @@ type RuleState struct {
 
 // WebhookStatus defines the webhook processing status
 type WebhookStatus struct {
-	// PodTransitionRulePodStatus is async request status representing the info of pods
-	ItemStatus []*ItemStatus `json:"itemStatus,omitempty"`
 
 	// TaskStates is a list of tracing info
 	TaskStates []TaskInfo `json:"taskStates,omitempty"`
+
+	// History records history taskStates which were finished or failed. Valid for 10 minutes
+	History []TaskInfo `json:"history,omitempty"`
 }
 
 type TaskInfo struct {
 	TaskId string `json:"taskId,omitempty"`
+
+	Processing []string `json:"processing,omitempty"`
+
+	Approved []string `json:"approved,omitempty"`
 
 	BeginTime *metav1.Time `json:"beginTime,omitempty"`
 
 	LastTime *metav1.Time `json:"lastTime,omitempty"`
 
 	Message string `json:"message,omitempty"`
-}
-
-// ItemStatus defines async request info of resources
-type ItemStatus struct {
-	// Name representing the name of pod
-	Name string `json:"name,omitempty"`
-
-	// WebhookChecked representing the pod has pass check
-	WebhookChecked bool `json:"webhookChecked"`
-
-	// TraceId representing poll request taskId
-	TaskId string `json:"taskId,omitempty"`
 }
 
 type PodTransitionDetail struct {
@@ -231,7 +224,7 @@ type RejectInfo struct {
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:shortName=rs
+// +kubebuilder:resource:shortName=ptr
 
 // PodTransitionRule is the Schema for the podtransitionrules API
 type PodTransitionRule struct {
