@@ -343,6 +343,10 @@ func extractAvailableContexts(diff int, ownedIDs map[int]*appsv1alpha1.ContextDe
 
 		availableContexts[idx] = ownedIDs[id]
 		idx++
+
+		if idx == diff {
+			break
+		}
 	}
 
 	return availableContexts
