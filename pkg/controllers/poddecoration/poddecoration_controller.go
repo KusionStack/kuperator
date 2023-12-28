@@ -201,8 +201,8 @@ func (r *ReconcilePodDecoration) calculateStatus(
 			}
 			if !disablePodDetail {
 				podInfo := appsv1alpha1.PodDecorationPodInfo{
-					Name:          pod.Name,
-					IsNotInjected: currentRevision == nil,
+					Name:    pod.Name,
+					Escaped: currentRevision == nil,
 				}
 				if currentRevision != nil {
 					podInfo.Revision = *currentRevision

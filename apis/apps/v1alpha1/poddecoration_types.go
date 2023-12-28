@@ -246,9 +246,9 @@ type PodDecorationWorkloadDetail struct {
 }
 
 type PodDecorationPodInfo struct {
-	Name          string `json:"name,omitempty"`
-	Revision      string `json:"revision,omitempty"`
-	IsNotInjected bool   `json:"isNotInjected,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Revision string `json:"revision,omitempty"`
+	Escaped  bool   `json:"escaped,omitempty"`
 }
 
 type PodDecorationCondition struct {
@@ -276,12 +276,11 @@ type PodDecorationCondition struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:shortName=pd
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="DESIRED",type="integer",JSONPath=".spec.replicas",description="The desired number of pods."
-// +kubebuilder:printcolumn:name="CURRENT",type="integer",JSONPath=".status.replicas",description="The number of currently all pods."
-// +kubebuilder:printcolumn:name="AVAILABLE",type="integer",JSONPath=".status.availableReplicas",description="The number of pods available."
-// +kubebuilder:printcolumn:name="UPDATED",type="integer",JSONPath=".status.updatedReplicas",description="The number of pods updated."
-// +kubebuilder:printcolumn:name="UPDATED_READY",type="integer",JSONPath=".status.updatedReadyReplicas",description="The number of pods ready."
-// +kubebuilder:printcolumn:name="UPDATED_AVAILABLE",type="integer",JSONPath=".status.updatedAvailableReplicas",description="The number of pods updated available."
+// +kubebuilder:printcolumn:name="EFFECTIVE",type="boolean",JSONPath=".status.isEffective",description="The number of pods updated."
+// +kubebuilder:printcolumn:name="MATCHED",type="integer",JSONPath=".status.matchedPods",description="The number of selected pods."
+// +kubebuilder:printcolumn:name="INJECTED",type="integer",JSONPath=".status.injectedPods",description="The number of injected pods."
+// +kubebuilder:printcolumn:name="UPDATED",type="integer",JSONPath=".status.updatedPods",description="The number of updated pods."
+// +kubebuilder:printcolumn:name="UPDATED_READY",type="integer",JSONPath=".status.updatedReadyPods",description="The number of pods ready."
 // +kubebuilder:printcolumn:name="CURRENT_REVISION",type="string",JSONPath=".status.currentRevision",description="The current revision."
 // +kubebuilder:printcolumn:name="UPDATED_REVISION",type="string",JSONPath=".status.updatedRevision",description="The updated revision."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"

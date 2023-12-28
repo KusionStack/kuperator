@@ -18,29 +18,25 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: The desired number of pods.
-      jsonPath: .spec.replicas
-      name: DESIRED
-      type: integer
-    - description: The number of currently all pods.
-      jsonPath: .status.replicas
-      name: CURRENT
-      type: integer
-    - description: The number of pods available.
-      jsonPath: .status.availableReplicas
-      name: AVAILABLE
-      type: integer
     - description: The number of pods updated.
-      jsonPath: .status.updatedReplicas
+      jsonPath: .status.isEffective
+      name: EFFECTIVE
+      type: boolean
+    - description: The number of selected pods.
+      jsonPath: .status.matchedPods
+      name: MATCHED
+      type: integer
+    - description: The number of injected pods.
+      jsonPath: .status.injectedPods
+      name: INJECTED
+      type: integer
+    - description: The number of updated pods.
+      jsonPath: .status.updatedPods
       name: UPDATED
       type: integer
     - description: The number of pods ready.
-      jsonPath: .status.updatedReadyReplicas
+      jsonPath: .status.updatedReadyPods
       name: UPDATED_READY
-      type: integer
-    - description: The number of pods updated available.
-      jsonPath: .status.updatedAvailableReplicas
-      name: UPDATED_AVAILABLE
       type: integer
     - description: The current revision.
       jsonPath: .status.currentRevision
@@ -5425,7 +5421,7 @@ spec:
                     pods:
                       items:
                         properties:
-                          isNotInjected:
+                          escaped:
                             type: boolean
                           name:
                             type: string
