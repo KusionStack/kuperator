@@ -69,7 +69,7 @@ func GetPodInstanceID(pod *corev1.Pod) (int, error) {
 	return int(id), nil
 }
 
-func NewPodFrom(owner metav1.Object, ownerRef *metav1.OwnerReference, revision *appsv1.ControllerRevision) (*corev1.Pod, error) {
+func NewPodFrom(owner metav1.Object, ownerRef *metav1.OwnerReference, revision *appsv1.ControllerRevision, updateFn ...func(*corev1.Pod) error) (*corev1.Pod, error) {
 	pod, err := GetPodFromRevision(revision)
 	if err != nil {
 		return pod, err
@@ -82,12 +82,17 @@ func NewPodFrom(owner metav1.Object, ownerRef *metav1.OwnerReference, revision *
 	pod.Labels[appsv1.ControllerRevisionHashLabelKey] = revision.Name
 
 	utils.ControllByKusionStack(pod)
+	for _, fn := range updateFn {
+		if err = fn(pod); err != nil {
+			return pod, err
+		}
+	}
 	return pod, nil
 }
 
 func GetPodRevisionPatch(revision *appsv1.ControllerRevision) ([]byte, error) {
 	var raw map[string]interface{}
-	if err := json.Unmarshal([]byte(revision.Data.Raw), &raw); err != nil {
+	if err := json.Unmarshal(revision.Data.Raw, &raw); err != nil {
 		return nil, err
 	}
 
@@ -115,7 +120,7 @@ func ApplyPatchFromRevision(pod *corev1.Pod, revision *appsv1.ControllerRevision
 	return clone, nil
 }
 
-// PatchToPod Use three way merge to get a updated pod.
+// PatchToPod Use three-way merge to get a updated pod.
 func PatchToPod(currentRevisionPod, updateRevisionPod, currentPod *corev1.Pod) (*corev1.Pod, error) {
 	currentRevisionPodBytes, err := json.Marshal(currentRevisionPod)
 	if err != nil {

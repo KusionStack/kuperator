@@ -14,21 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package controllers
 
-// well known readiness gate
-const (
-	ReadinessGatePodServiceReady = "pod.kusionstack.io/service-ready"
+import (
+	"fmt"
+	"testing"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
-// well known finalizer
-const (
-	PodOperationProtectionFinalizerPrefix = "prot.podopslifecycle.kusionstack.io"
-	ProtectFinalizer                      = "finalizer.operating.kusionstack.io/protected"
-)
+func TestControllers(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Controllers Tests")
+}
 
-// well known variables
-const (
-	PodOpsLifecyclePreCheckStage  = "PreCheck"
-	PodOpsLifecyclePostCheckStage = "PostCheck"
-)
+var _ = Describe("test controllers", func() {
+	Describe("other controller tests", func() {
+		It("test case a", func() {
+			fmt.Println("case a tests")
+		})
+		AfterEach(func() {
+
+		})
+	})
+})

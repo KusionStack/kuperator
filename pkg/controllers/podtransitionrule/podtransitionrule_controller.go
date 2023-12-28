@@ -48,9 +48,8 @@ import (
 )
 
 const (
-	controllerName   = "podtransitionrule-controller"
-	resourceName     = "PodTransitionRule"
-	cleanUpFinalizer = "podtransitionrule.kusionstack.io/need-clean-up"
+	controllerName = "podtransitionrule-controller"
+	resourceName   = "PodTransitionRule"
 )
 
 // NewReconciler returns a new reconcile.Reconciler
@@ -125,12 +124,12 @@ func (r *PodTransitionRuleReconciler) Reconcile(ctx context.Context, request rec
 		if err := r.cleanUpPodTransitionRulePods(ctx, podTransitionRule); err != nil {
 			return reconcile.Result{}, err
 		}
-		if !controllerutil.ContainsFinalizer(podTransitionRule, cleanUpFinalizer) {
+		if !controllerutil.ContainsFinalizer(podTransitionRule, appsv1alpha1.ProtectFinalizer) {
 			return reconcile.Result{}, nil
 		}
-		return reconcile.Result{}, controllerutils.RemoveFinalizer(ctx, r.Client, podTransitionRule, cleanUpFinalizer)
-	} else if !controllerutil.ContainsFinalizer(podTransitionRule, cleanUpFinalizer) {
-		if err := controllerutils.AddFinalizer(ctx, r.Client, podTransitionRule, cleanUpFinalizer); err != nil {
+		return reconcile.Result{}, controllerutils.RemoveFinalizer(ctx, r.Client, podTransitionRule, appsv1alpha1.ProtectFinalizer)
+	} else if !controllerutil.ContainsFinalizer(podTransitionRule, appsv1alpha1.ProtectFinalizer) {
+		if err := controllerutils.AddFinalizer(ctx, r.Client, podTransitionRule, appsv1alpha1.ProtectFinalizer); err != nil {
 			return result, fmt.Errorf("fail to add finalizer on PodTransitionRule %s: %s", request, err)
 		}
 	}

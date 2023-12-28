@@ -17,11 +17,11 @@ limitations under the License.
 package synccontrol
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -32,10 +32,10 @@ import (
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontext"
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
-	"kusionstack.io/operating/pkg/controllers/collaset/utils"
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
+	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 	commonutils "kusionstack.io/operating/pkg/utils"
 )
@@ -45,12 +45,30 @@ const (
 )
 
 type Interface interface {
-	SyncPods(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, newStatus *appsv1alpha1.CollaSetStatus) (bool, []*collasetutils.PodWrapper, map[int]*appsv1alpha1.ContextDetail, error)
-	Scale(instance *appsv1alpha1.CollaSet, filteredPods []*collasetutils.PodWrapper, revisions []*appsv1.ControllerRevision, updatedRevision *appsv1.ControllerRevision, ownedIDs map[int]*appsv1alpha1.ContextDetail, newStatus *appsv1alpha1.CollaSetStatus) (bool, time.Duration, error)
-	Update(instance *appsv1alpha1.CollaSet, filteredPods []*collasetutils.PodWrapper, revisions []*appsv1.ControllerRevision, updatedRevision *appsv1.ControllerRevision, ownedIDs map[int]*appsv1alpha1.ContextDetail, newStatus *appsv1alpha1.CollaSetStatus) (bool, time.Duration, error)
+	SyncPods(
+		ctx context.Context,
+		instance *appsv1alpha1.CollaSet,
+		resources *collasetutils.RelatedResources,
+	) (bool, []*collasetutils.PodWrapper, map[int]*appsv1alpha1.ContextDetail, error)
+
+	Scale(
+		ctx context.Context,
+		instance *appsv1alpha1.CollaSet,
+		resources *collasetutils.RelatedResources,
+		filteredPods []*collasetutils.PodWrapper,
+		ownedIDs map[int]*appsv1alpha1.ContextDetail,
+	) (bool, *time.Duration, error)
+
+	Update(
+		ctx context.Context,
+		instance *appsv1alpha1.CollaSet,
+		resources *collasetutils.RelatedResources,
+		filteredPods []*collasetutils.PodWrapper,
+		ownedIDs map[int]*appsv1alpha1.ContextDetail,
+	) (bool, *time.Duration, error)
 }
 
-func NewRealSyncControl(client client.Client, logger logr.Logger, podControl podcontrol.Interface, recorder record.EventRecorder) *RealSyncControl {
+func NewRealSyncControl(client client.Client, logger logr.Logger, podControl podcontrol.Interface, recorder record.EventRecorder) Interface {
 	return &RealSyncControl{
 		client:     client,
 		logger:     logger,
@@ -58,6 +76,8 @@ func NewRealSyncControl(client client.Client, logger logr.Logger, podControl pod
 		recorder:   recorder,
 	}
 }
+
+var _ Interface = &RealSyncControl{}
 
 type RealSyncControl struct {
 	client     client.Client
@@ -67,17 +87,23 @@ type RealSyncControl struct {
 }
 
 // SyncPods is used to reclaim Pod instance ID
-func (sc *RealSyncControl) SyncPods(instance *appsv1alpha1.CollaSet, updatedRevision *appsv1.ControllerRevision, _ *appsv1alpha1.CollaSetStatus) (bool, []*collasetutils.PodWrapper, map[int]*appsv1alpha1.ContextDetail, error) {
-	logger := sc.logger.WithValues("collaset", commonutils.ObjectKeyString(instance))
-	filteredPods, err := sc.podControl.GetFilteredPods(instance.Spec.Selector, instance)
+func (r *RealSyncControl) SyncPods(
+	ctx context.Context,
+	instance *appsv1alpha1.CollaSet,
+	resources *collasetutils.RelatedResources,
+) (
+	bool, []*collasetutils.PodWrapper, map[int]*appsv1alpha1.ContextDetail, error) {
+
+	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(instance))
+	filteredPods, err := r.podControl.GetFilteredPods(instance.Spec.Selector, instance)
 	if err != nil {
 		return false, nil, nil, fmt.Errorf("fail to get filtered Pods: %s", err)
 	}
 
 	// get owned IDs
 	var ownedIDs map[int]*appsv1alpha1.ContextDetail
-	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		ownedIDs, err = podcontext.AllocateID(sc.client, instance, updatedRevision.Name, int(realValue(instance.Spec.Replicas)))
+	if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		ownedIDs, err = podcontext.AllocateID(r.client, instance, resources.UpdatedRevision.Name, int(realValue(instance.Spec.Replicas)))
 		return err
 	}); err != nil {
 		return false, nil, ownedIDs, fmt.Errorf("fail to allocate %d IDs using context when sync Pods: %s", instance.Spec.Replicas, err)
@@ -133,7 +159,7 @@ func (sc *RealSyncControl) SyncPods(instance *appsv1alpha1.CollaSet, updatedRevi
 	if needUpdateContext {
 		logger.V(1).Info("try to update ResourceContext for CollaSet when sync")
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			return podcontext.UpdateToPodContext(sc.client, instance, ownedIDs)
+			return podcontext.UpdateToPodContext(r.client, instance, ownedIDs)
 		}); err != nil {
 			return false, nil, ownedIDs, fmt.Errorf("fail to update ResourceContext when reclaiming IDs: %s", err)
 		}
@@ -142,9 +168,16 @@ func (sc *RealSyncControl) SyncPods(instance *appsv1alpha1.CollaSet, updatedRevi
 	return false, podWrappers, ownedIDs, nil
 }
 
-func (sc *RealSyncControl) Scale(cls *appsv1alpha1.CollaSet, podWrappers []*collasetutils.PodWrapper, revisions []*appsv1.ControllerRevision, updatedRevision *appsv1.ControllerRevision, ownedIDs map[int]*appsv1alpha1.ContextDetail, newStatus *appsv1alpha1.CollaSetStatus) (bool, time.Duration, error) {
-	logger := sc.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
-	var recordedRequeueAfter time.Duration
+func (r *RealSyncControl) Scale(
+	ctx context.Context,
+	cls *appsv1alpha1.CollaSet,
+	resources *collasetutils.RelatedResources,
+	podWrappers []*collasetutils.PodWrapper,
+	ownedIDs map[int]*appsv1alpha1.ContextDetail,
+) (bool, *time.Duration, error) {
+
+	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
+	var recordedRequeueAfter *time.Duration
 
 	diff := int(realValue(cls.Spec.Replicas)) - len(podWrappers)
 	scaling := false
@@ -158,11 +191,11 @@ func (sc *RealSyncControl) Scale(cls *appsv1alpha1.CollaSet, podWrappers []*coll
 		succCount, err := controllerutils.SlowStartBatch(diff, controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) error {
 			availableIDContext := availableContext[idx]
 			// use revision recorded in Context
-			revision := updatedRevision
+			revision := resources.UpdatedRevision
 			if revisionName, exist := availableIDContext.Data[podcontext.RevisionContextDataKey]; exist && revisionName != "" {
-				for i := range revisions {
-					if revisions[i].Name == revisionName {
-						revision = revisions[i]
+				for i := range resources.Revisions {
+					if resources.Revisions[i].Name == revisionName {
+						revision = resources.Revisions[i]
 						break
 					}
 				}
@@ -170,16 +203,45 @@ func (sc *RealSyncControl) Scale(cls *appsv1alpha1.CollaSet, podWrappers []*coll
 
 			// scale out new Pods with updatedRevision
 			// TODO use cache
-			pod, err := collasetutils.NewPodFrom(cls, metav1.NewControllerRef(cls, appsv1alpha1.GroupVersion.WithKind("CollaSet")), revision)
+			pod, err := collasetutils.NewPodFrom(
+				cls,
+				metav1.NewControllerRef(cls, appsv1alpha1.GroupVersion.WithKind("CollaSet")),
+				revision,
+				func(in *corev1.Pod) (localErr error) {
+					in.Labels[appsv1alpha1.PodInstanceIDLabelKey] = fmt.Sprintf("%d", availableIDContext.ID)
+					revisionsInfo, ok := availableIDContext.Get(podcontext.PodDecorationRevisionKey)
+					var pds map[string]*appsv1alpha1.PodDecoration
+					if !ok {
+						// get default PodDecorations if no revision in context
+						pds, localErr = resources.PDGetter.GetLatestDecorationsByTargetLabel(ctx, in.Labels)
+						if localErr != nil {
+							return localErr
+						}
+					} else {
+						// upgrade by recreate pod case
+						infos, marshallErr := utilspoddecoration.UnmarshallFromString(revisionsInfo)
+						if marshallErr != nil {
+							return marshallErr
+						}
+						var revisions []string
+						for _, info := range infos {
+							revisions = append(revisions, info.Revision)
+						}
+						pds, localErr = resources.PDGetter.GetDecorationByRevisions(ctx, revisions...)
+						if localErr != nil {
+							return localErr
+						}
+					}
+					logger.Info("get pod effective decorations before create it", "EffectivePodDecorations", utilspoddecoration.BuildInfo(pds))
+					return utilspoddecoration.PatchListOfDecorations(in, pds)
+				},
+			)
 			if err != nil {
 				return fmt.Errorf("fail to new Pod from revision %s: %s", revision.Name, err)
 			}
 			newPod := pod.DeepCopy()
-			// allocate new Pod a instance ID
-			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = fmt.Sprintf("%d", availableIDContext.ID)
-
 			logger.V(1).Info("try to create Pod with revision of collaSet", "revision", revision.Name)
-			if pod, err = sc.podControl.CreatePod(newPod); err != nil {
+			if pod, err = r.podControl.CreatePod(newPod); err != nil {
 				return err
 			}
 
@@ -187,12 +249,12 @@ func (sc *RealSyncControl) Scale(cls *appsv1alpha1.CollaSet, podWrappers []*coll
 			return collasetutils.ActiveExpectations.ExpectCreate(cls, expectations.Pod, pod.Name)
 		})
 
-		sc.recorder.Eventf(cls, corev1.EventTypeNormal, "ScaleOut", "scale out %d Pod(s)", succCount)
+		r.recorder.Eventf(cls, corev1.EventTypeNormal, "ScaleOut", "scale out %d Pod(s)", succCount)
 		if err != nil {
-			collasetutils.AddOrUpdateCondition(newStatus, appsv1alpha1.CollaSetScale, err, "ScaleOutFailed", err.Error())
+			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, err, "ScaleOutFailed", err.Error())
 			return succCount > 0, recordedRequeueAfter, err
 		}
-		collasetutils.AddOrUpdateCondition(newStatus, appsv1alpha1.CollaSetScale, nil, "ScaleOut", "")
+		collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleOut", "")
 
 		return succCount > 0, recordedRequeueAfter, err
 	} else if diff < 0 {
@@ -213,10 +275,10 @@ func (sc *RealSyncControl) Scale(cls *appsv1alpha1.CollaSet, podWrappers []*coll
 
 			// trigger PodOpsLifecycle with scaleIn OperationType
 			logger.V(1).Info("try to begin PodOpsLifecycle for scaling in Pod in CollaSet", "pod", commonutils.ObjectKeyString(pod))
-			if updated, err := podopslifecycle.Begin(sc.client, collasetutils.ScaleInOpsLifecycleAdapter, pod.Pod); err != nil {
+			if updated, err := podopslifecycle.Begin(r.client, collasetutils.ScaleInOpsLifecycleAdapter, pod.Pod); err != nil {
 				return fmt.Errorf("fail to begin PodOpsLifecycle for Scaling in Pod %s/%s: %s", pod.Namespace, pod.Name, err)
 			} else if updated {
-				sc.recorder.Eventf(pod.Pod, corev1.EventTypeNormal, "BeginScaleInLifecycle", "succeed to begin PodOpsLifecycle for scaling in")
+				r.recorder.Eventf(pod.Pod, corev1.EventTypeNormal, "BeginScaleInLifecycle", "succeed to begin PodOpsLifecycle for scaling in")
 				// add an expectation for this pod creation, before next reconciling
 				if err := collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.Pod, pod.Name, pod.ResourceVersion); err != nil {
 					return err
@@ -228,23 +290,23 @@ func (sc *RealSyncControl) Scale(cls *appsv1alpha1.CollaSet, podWrappers []*coll
 		scaling = succCount != 0
 
 		if err != nil {
-			collasetutils.AddOrUpdateCondition(newStatus, appsv1alpha1.CollaSetScale, err, "ScaleInFailed", err.Error())
+			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, err, "ScaleInFailed", err.Error())
 			return scaling, recordedRequeueAfter, err
 		} else {
-			collasetutils.AddOrUpdateCondition(newStatus, appsv1alpha1.CollaSetScale, nil, "ScaleIn", "")
+			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleIn", "")
 		}
 
 		needUpdateContext := false
 		for i, podWrapper := range podsToScaleIn {
 			requeueAfter, allowed := podopslifecycle.AllowOps(collasetutils.ScaleInOpsLifecycleAdapter, realValue(cls.Spec.ScaleStrategy.OperationDelaySeconds), podWrapper.Pod)
 			if !allowed && podWrapper.DeletionTimestamp == nil {
-				sc.recorder.Eventf(podWrapper.Pod, corev1.EventTypeNormal, "PodScaleInLifecycle", "Pod is not allowed to scale in")
+				r.recorder.Eventf(podWrapper.Pod, corev1.EventTypeNormal, "PodScaleInLifecycle", "Pod is not allowed to scale in")
 				continue
 			}
 
-			if requeueAfter > 0 {
-				sc.recorder.Eventf(podWrapper.Pod, corev1.EventTypeNormal, "PodScaleInLifecycle", "delay Pod scale in for %d seconds", requeueAfter.Seconds())
-				if recordedRequeueAfter == 0 || requeueAfter < recordedRequeueAfter {
+			if requeueAfter != nil {
+				r.recorder.Eventf(podWrapper.Pod, corev1.EventTypeNormal, "PodScaleInLifecycle", "delay Pod scale in for %d seconds", requeueAfter.Seconds())
+				if recordedRequeueAfter == nil || *requeueAfter < *recordedRequeueAfter {
 					recordedRequeueAfter = requeueAfter
 				}
 
@@ -268,14 +330,14 @@ func (sc *RealSyncControl) Scale(cls *appsv1alpha1.CollaSet, podWrappers []*coll
 		if needUpdateContext {
 			logger.V(1).Info("try to update ResourceContext for CollaSet when scaling in Pod")
 			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				return podcontext.UpdateToPodContext(sc.client, cls, ownedIDs)
+				return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
 			})
 
 			if err != nil {
-				collasetutils.AddOrUpdateCondition(newStatus, appsv1alpha1.CollaSetScale, err, "ScaleInFailed", fmt.Sprintf("failed to update Context for scaling in: %s", err))
+				collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, err, "ScaleInFailed", fmt.Sprintf("failed to update Context for scaling in: %s", err))
 				return scaling, recordedRequeueAfter, err
 			} else {
-				collasetutils.AddOrUpdateCondition(newStatus, appsv1alpha1.CollaSetScale, nil, "ScaleIn", "")
+				collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleIn", "")
 			}
 		}
 
@@ -283,11 +345,11 @@ func (sc *RealSyncControl) Scale(cls *appsv1alpha1.CollaSet, podWrappers []*coll
 		succCount, err = controllerutils.SlowStartBatch(len(podCh), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 			pod := <-podCh
 			logger.V(1).Info("try to scale in Pod", "pod", commonutils.ObjectKeyString(pod))
-			if err := sc.podControl.DeletePod(pod.Pod); err != nil {
+			if err := r.podControl.DeletePod(pod.Pod); err != nil {
 				return fmt.Errorf("fail to delete Pod %s/%s when scaling in: %s", pod.Namespace, pod.Name, err)
 			}
 
-			sc.recorder.Eventf(cls, corev1.EventTypeNormal, "PodDeleted", "succeed to scale in Pod %s/%s", pod.Namespace, pod.Name)
+			r.recorder.Eventf(cls, corev1.EventTypeNormal, "PodDeleted", "succeed to scale in Pod %s/%s", pod.Namespace, pod.Name)
 			if err := collasetutils.ActiveExpectations.ExpectDelete(cls, expectations.Pod, pod.Name); err != nil {
 				return err
 			}
@@ -299,13 +361,13 @@ func (sc *RealSyncControl) Scale(cls *appsv1alpha1.CollaSet, podWrappers []*coll
 		scaling := scaling || succCount > 0
 
 		if succCount > 0 {
-			sc.recorder.Eventf(cls, corev1.EventTypeNormal, "ScaleIn", "scale in %d Pod(s)", succCount)
+			r.recorder.Eventf(cls, corev1.EventTypeNormal, "ScaleIn", "scale in %d Pod(s)", succCount)
 		}
 		if err != nil {
-			collasetutils.AddOrUpdateCondition(newStatus, appsv1alpha1.CollaSetScale, err, "ScaleInFailed", fmt.Sprintf("fail to delete Pod for scaling in: %s", err))
+			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, err, "ScaleInFailed", fmt.Sprintf("fail to delete Pod for scaling in: %s", err))
 			return scaling, recordedRequeueAfter, err
 		} else {
-			collasetutils.AddOrUpdateCondition(newStatus, appsv1alpha1.CollaSetScale, nil, "ScaleIn", "")
+			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleIn", "")
 		}
 
 		return scaling, recordedRequeueAfter, err
@@ -323,7 +385,7 @@ func (sc *RealSyncControl) Scale(cls *appsv1alpha1.CollaSet, podWrappers []*coll
 	if needUpdatePodContext {
 		logger.V(1).Info("try to update ResourceContext for CollaSet after scaling")
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			return podcontext.UpdateToPodContext(sc.client, cls, ownedIDs)
+			return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
 		}); err != nil {
 			return scaling, recordedRequeueAfter, fmt.Errorf("fail to reset ResourceContext: %s", err)
 		}
@@ -348,37 +410,43 @@ func extractAvailableContexts(diff int, ownedIDs map[int]*appsv1alpha1.ContextDe
 	return availableContexts
 }
 
-func (sc *RealSyncControl) Update(cls *appsv1alpha1.CollaSet, podWrapers []*collasetutils.PodWrapper, revisions []*appsv1.ControllerRevision, updatedRevision *appsv1.ControllerRevision, ownedIDs map[int]*appsv1alpha1.ContextDetail, newStatus *appsv1alpha1.CollaSetStatus) (bool, time.Duration, error) {
-	logger := sc.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
-	var recordedRequeueAfter time.Duration
-	// 1. scan and analysis pods update info
-	podUpdateInfos := attachPodUpdateInfo(podWrapers, revisions, updatedRevision)
+func (r *RealSyncControl) Update(
+	ctx context.Context,
+	cls *appsv1alpha1.CollaSet,
+	resources *collasetutils.RelatedResources,
+	podWrappers []*collasetutils.PodWrapper,
+	ownedIDs map[int]*appsv1alpha1.ContextDetail,
+) (bool, *time.Duration, error) {
 
+	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
+	var recordedRequeueAfter *time.Duration
+	// 1. scan and analysis pods update info
+	podUpdateInfos, err := attachPodUpdateInfo(ctx, podWrappers, resources)
+	if err != nil {
+		return false, nil, fmt.Errorf("fail to attach pod update info, %v", err)
+	}
 	// 2. decide Pod update candidates
 	podToUpdate := decidePodToUpdate(cls, podUpdateInfos)
 
 	// 3. prepare Pods to begin PodOpsLifecycle
 	podCh := make(chan *PodUpdateInfo, len(podToUpdate))
-	for _, podInfo := range podToUpdate {
-		if podInfo.IsUpdatedRevision {
+	for i, podInfo := range podToUpdate {
+		if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged {
 			continue
 		}
-
-		if podopslifecycle.IsDuringOps(utils.UpdateOpsLifecycleAdapter, podInfo) {
+		if podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, podInfo) {
 			continue
 		}
-
-		podCh <- podInfo
+		podCh <- podToUpdate[i]
 	}
 
 	// 4. begin podOpsLifecycle parallel
-	updater := newPodUpdater(cls)
 	updating := false
 	succCount, err := controllerutils.SlowStartBatch(len(podCh), controllerutils.SlowStartInitialBatchSize, false, func(_ int, err error) error {
 		podInfo := <-podCh
 
 		logger.V(1).Info("try to begin PodOpsLifecycle for updating Pod of CollaSet", "pod", commonutils.ObjectKeyString(podInfo.Pod))
-		if updated, err := podopslifecycle.Begin(sc.client, utils.UpdateOpsLifecycleAdapter, podInfo.Pod); err != nil {
+		if updated, err := podopslifecycle.Begin(r.client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod); err != nil {
 			return fmt.Errorf("fail to begin PodOpsLifecycle for updating Pod %s/%s: %s", podInfo.Namespace, podInfo.Name, err)
 		} else if updated {
 			// add an expectation for this pod update, before next reconciling
@@ -392,38 +460,42 @@ func (sc *RealSyncControl) Update(cls *appsv1alpha1.CollaSet, podWrapers []*coll
 
 	updating = updating || succCount > 0
 	if err != nil {
-		collasetutils.AddOrUpdateCondition(newStatus, appsv1alpha1.CollaSetUpdate, err, "UpdateFailed", err.Error())
-		return updating, recordedRequeueAfter, err
+		collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetUpdate, err, "UpdateFailed", err.Error())
+		return updating, nil, err
 	} else {
-		collasetutils.AddOrUpdateCondition(newStatus, appsv1alpha1.CollaSetUpdate, nil, "Updated", "")
+		collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetUpdate, nil, "Updated", "")
 	}
 
 	needUpdateContext := false
 	for i := range podToUpdate {
 		podInfo := podToUpdate[i]
-		requeueAfter, allowed := podopslifecycle.AllowOps(utils.UpdateOpsLifecycleAdapter, realValue(cls.Spec.UpdateStrategy.OperationDelaySeconds), podInfo)
+		requeueAfter, allowed := podopslifecycle.AllowOps(collasetutils.UpdateOpsLifecycleAdapter, realValue(cls.Spec.UpdateStrategy.OperationDelaySeconds), podInfo.Pod)
 		if !allowed {
-			sc.recorder.Eventf(podInfo, corev1.EventTypeNormal, "PodUpdateLifecycle", "Pod is not allowed to update")
+			r.recorder.Eventf(podInfo, corev1.EventTypeNormal, "PodUpdateLifecycle", "Pod %s is not allowed to update", commonutils.ObjectKeyString(podInfo.Pod))
 			continue
 		}
-
-		if requeueAfter > 0 {
-			sc.recorder.Eventf(podInfo, corev1.EventTypeNormal, "PodUpdateLifecycle", "delay Pod update for %d seconds", requeueAfter.Seconds())
-			if recordedRequeueAfter == 0 || requeueAfter < recordedRequeueAfter {
+		if requeueAfter != nil {
+			r.recorder.Eventf(podInfo, corev1.EventTypeNormal, "PodUpdateLifecycle", "delay Pod update for %d seconds", requeueAfter.Seconds())
+			if recordedRequeueAfter == nil || *requeueAfter < *recordedRequeueAfter {
 				recordedRequeueAfter = requeueAfter
 			}
 			continue
 		}
 
-		if !ownedIDs[podInfo.ID].Contains(podcontext.RevisionContextDataKey, updatedRevision.Name) {
+		if !ownedIDs[podInfo.ID].Contains(podcontext.RevisionContextDataKey, resources.UpdatedRevision.Name) {
 			needUpdateContext = true
-			ownedIDs[podInfo.ID].Put(podcontext.RevisionContextDataKey, updatedRevision.Name)
+			ownedIDs[podInfo.ID].Put(podcontext.RevisionContextDataKey, resources.UpdatedRevision.Name)
 		}
-
-		if podInfo.IsUpdatedRevision {
+		if podInfo.PodDecorationChanged {
+			decorationStr := utilspoddecoration.GetDecorationInfoString(podInfo.UpdatedPodDecorations)
+			if val, ok := ownedIDs[podInfo.ID].Get(podcontext.PodDecorationRevisionKey); !ok || val != decorationStr {
+				needUpdateContext = true
+				ownedIDs[podInfo.ID].Put(podcontext.PodDecorationRevisionKey, decorationStr)
+			}
+		}
+		if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged {
 			continue
 		}
-
 		// if Pod has not been updated, update it.
 		podCh <- podToUpdate[i]
 	}
@@ -432,23 +504,26 @@ func (sc *RealSyncControl) Update(cls *appsv1alpha1.CollaSet, podWrapers []*coll
 	if needUpdateContext {
 		logger.V(1).Info("try to update ResourceContext for CollaSet")
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			return podcontext.UpdateToPodContext(sc.client, cls, ownedIDs)
+			return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
 		})
 
 		if err != nil {
-			collasetutils.AddOrUpdateCondition(newStatus, appsv1alpha1.CollaSetScale, err, "UpdateFailed", fmt.Sprintf("fail to update Context for updating: %s", err))
+			collasetutils.AddOrUpdateCondition(resources.NewStatus,
+				appsv1alpha1.CollaSetScale, err, "UpdateFailed",
+				fmt.Sprintf("fail to update Context for updating: %s", err))
 			return updating, recordedRequeueAfter, err
 		} else {
-			collasetutils.AddOrUpdateCondition(newStatus, appsv1alpha1.CollaSetScale, nil, "UpdateFailed", "")
+			collasetutils.AddOrUpdateCondition(resources.NewStatus,
+				appsv1alpha1.CollaSetScale, nil, "UpdateFailed", "")
 		}
 	}
 
 	// 6. update Pod
+	updater := newPodUpdater(ctx, r.client, cls)
 	succCount, err = controllerutils.SlowStartBatch(len(podCh), controllerutils.SlowStartInitialBatchSize, false, func(_ int, _ error) error {
 		podInfo := <-podCh
-
 		// analyse Pod to get update information
-		inPlaceSupport, onlyMetadataChanged, updatedPod, err := updater.AnalyseAndGetUpdatedPod(cls, updatedRevision, podInfo)
+		inPlaceSupport, onlyMetadataChanged, updatedPod, err := updater.AnalyseAndGetUpdatedPod(resources.UpdatedRevision, podInfo)
 		if err != nil {
 			return fmt.Errorf("fail to analyse pod %s/%s in-place update support: %s", podInfo.Namespace, podInfo.Name, err)
 		}
@@ -456,27 +531,39 @@ func (sc *RealSyncControl) Update(cls *appsv1alpha1.CollaSet, podWrapers []*coll
 		logger.V(1).Info("before pod update operation",
 			"pod", commonutils.ObjectKeyString(podInfo.Pod),
 			"revision.from", podInfo.CurrentRevision.Name,
-			"revision.to", updatedRevision.Name,
+			"revision.to", resources.UpdatedRevision.Name,
 			"inPlaceUpdate", inPlaceSupport,
 			"onlyMetadataChanged", onlyMetadataChanged,
 		)
 		if onlyMetadataChanged || inPlaceSupport {
 			// 6.1 if pod template changes only include metadata or support in-place update, just apply these changes to pod directly
-			if err = sc.podControl.UpdatePod(updatedPod); err != nil {
+			if err = r.podControl.UpdatePod(updatedPod); err != nil {
 				return fmt.Errorf("fail to update Pod %s/%s when updating by in-place: %s", podInfo.Namespace, podInfo.Name, err)
 			} else {
 				podInfo.Pod = updatedPod
-				sc.recorder.Eventf(podInfo.Pod, corev1.EventTypeNormal, "UpdatePod", "succeed to update Pod %s/%s to from revision %s to revision %s by in-place", podInfo.Namespace, podInfo.Name, podInfo.CurrentRevision.Name, updatedRevision.Name)
+				r.recorder.Eventf(podInfo.Pod,
+					corev1.EventTypeNormal,
+					"UpdatePod",
+					"succeed to update Pod %s/%s to from revision %s to revision %s by in-place",
+					podInfo.Namespace, podInfo.Name,
+					podInfo.CurrentRevision.Name,
+					resources.UpdatedRevision.Name)
 				if err := collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.Pod, podInfo.Name, updatedPod.ResourceVersion); err != nil {
 					return err
 				}
 			}
 		} else {
 			// 6.2 if pod has changes not in-place supported, recreate it
-			if err = sc.podControl.DeletePod(podInfo.Pod); err != nil {
+			if err = r.podControl.DeletePod(podInfo.Pod); err != nil {
 				return fmt.Errorf("fail to delete Pod %s/%s when updating by recreate: %s", podInfo.Namespace, podInfo.Name, err)
 			} else {
-				sc.recorder.Eventf(podInfo.Pod, corev1.EventTypeNormal, "UpdatePod", "succeed to update Pod %s/%s to from revision %s to revision %s by recreate", podInfo.Namespace, podInfo.Name, podInfo.CurrentRevision.Name, updatedRevision.Name)
+				r.recorder.Eventf(podInfo.Pod,
+					corev1.EventTypeNormal,
+					"UpdatePod",
+					"succeed to update Pod %s/%s to from revision %s to revision %s by recreate",
+					podInfo.Namespace,
+					podInfo.Name,
+					podInfo.CurrentRevision.Name, resources.UpdatedRevision.Name)
 				if err := collasetutils.ActiveExpectations.ExpectDelete(cls, expectations.Pod, podInfo.Name); err != nil {
 					return err
 				}
@@ -488,10 +575,10 @@ func (sc *RealSyncControl) Update(cls *appsv1alpha1.CollaSet, podWrapers []*coll
 
 	updating = updating || succCount > 0
 	if err != nil {
-		collasetutils.AddOrUpdateCondition(newStatus, appsv1alpha1.CollaSetUpdate, err, "UpdateFailed", err.Error())
+		collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetUpdate, err, "UpdateFailed", err.Error())
 		return updating, recordedRequeueAfter, err
 	} else {
-		collasetutils.AddOrUpdateCondition(newStatus, appsv1alpha1.CollaSetUpdate, nil, "Updated", "")
+		collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetUpdate, nil, "Updated", "")
 	}
 
 	// try to finish all Pods'PodOpsLifecycle if its update is finished.
@@ -510,17 +597,23 @@ func (sc *RealSyncControl) Update(cls *appsv1alpha1.CollaSet, podWrapers []*coll
 
 		if finished {
 			logger.V(1).Info("try to finish update PodOpsLifecycle for Pod", "pod", commonutils.ObjectKeyString(podInfo.Pod))
-			if updated, err := podopslifecycle.Finish(sc.client, utils.UpdateOpsLifecycleAdapter, podInfo.Pod); err != nil {
+			if updated, err := podopslifecycle.Finish(r.client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod); err != nil {
 				return fmt.Errorf("failed to finish PodOpsLifecycle for updating Pod %s/%s: %s", podInfo.Namespace, podInfo.Name, err)
 			} else if updated {
 				// add an expectation for this pod update, before next reconciling
 				if err := collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.Pod, podInfo.Name, podInfo.ResourceVersion); err != nil {
 					return err
 				}
-				sc.recorder.Eventf(podInfo.Pod, corev1.EventTypeNormal, "UpdateReady", "pod %s/%s update finished", podInfo.Namespace, podInfo.Name)
+				r.recorder.Eventf(podInfo.Pod,
+					corev1.EventTypeNormal,
+					"UpdateReady", "pod %s/%s update finished", podInfo.Namespace, podInfo.Name)
 			}
 		} else {
-			sc.recorder.Eventf(podInfo.Pod, corev1.EventTypeNormal, "WaitingUpdateReady", "waiting for pod %s/%s to update finished: %s", podInfo.Namespace, podInfo.Name, msg)
+			r.recorder.Eventf(podInfo.Pod,
+				corev1.EventTypeNormal,
+				"WaitingUpdateReady",
+				"waiting for pod %s/%s to update finished: %s",
+				podInfo.Namespace, podInfo.Name, msg)
 		}
 
 		return nil

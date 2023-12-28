@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/pflag"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -44,13 +43,11 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
+	scheme   = clientgoscheme.Scheme
 	setupLog = ctrl.Log.WithName("setup")
 )
 
 func init() {
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }

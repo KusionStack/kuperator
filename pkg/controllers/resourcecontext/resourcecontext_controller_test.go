@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/kubernetes/scheme"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -333,16 +334,16 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(config).NotTo(BeNil())
 
-	mgr, err = manager.New(config, manager.Options{
-		MetricsBindAddress: "0",
-		NewCache:           inject.NewCacheWithFieldIndex,
-	})
-	Expect(err).NotTo(HaveOccurred())
-
-	scheme := mgr.GetScheme()
+	scheme := scheme.Scheme
 	err = appsv1.SchemeBuilder.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 	err = apis.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+	mgr, err = manager.New(config, manager.Options{
+		MetricsBindAddress: "0",
+		NewCache:           inject.NewCacheWithFieldIndex,
+		Scheme:             scheme,
+	})
 	Expect(err).NotTo(HaveOccurred())
 
 	c = mgr.GetClient()

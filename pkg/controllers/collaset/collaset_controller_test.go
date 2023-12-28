@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -42,7 +43,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"kusionstack.io/operating/apis"
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset/synccontrol"
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
@@ -715,17 +715,14 @@ var _ = BeforeSuite(func() {
 	config, err := env.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(config).NotTo(BeNil())
-
+	sch := scheme.Scheme
+	Expect(appsv1.SchemeBuilder.AddToScheme(sch)).NotTo(HaveOccurred())
+	Expect(appsv1alpha1.SchemeBuilder.AddToScheme(sch)).NotTo(HaveOccurred())
 	mgr, err = manager.New(config, manager.Options{
 		MetricsBindAddress: "0",
 		NewCache:           inject.NewCacheWithFieldIndex,
+		Scheme:             sch,
 	})
-	Expect(err).NotTo(HaveOccurred())
-
-	scheme := mgr.GetScheme()
-	err = appsv1.SchemeBuilder.AddToScheme(scheme)
-	Expect(err).NotTo(HaveOccurred())
-	err = apis.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	c = mgr.GetClient()

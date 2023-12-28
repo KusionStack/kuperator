@@ -74,6 +74,15 @@ func (cd *ContextDetail) Put(key, value string) {
 	cd.Data[key] = value
 }
 
+// Get is used to get the specified key from Data.
+func (cd *ContextDetail) Get(key string) (string, bool) {
+	if cd.Data == nil {
+		return "", false
+	}
+	val, ok := cd.Data[key]
+	return val, ok
+}
+
 // Remove is used to remove the specified key from Data .
 func (cd *ContextDetail) Remove(key string) {
 	if cd.Data == nil {
