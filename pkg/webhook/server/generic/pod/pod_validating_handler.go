@@ -46,19 +46,17 @@ func NewValidatingHandler() *ValidatingHandler {
 }
 
 func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
-	if req.Operation == admissionv1.Delete {
-		return admission.Allowed("pod is allowed by opslifecycle")
-	}
-
 	logger := h.Logger.WithValues(
 		"op", req.Operation,
 		"pod", commonutils.AdmissionRequestObjectKeyString(req),
 	)
 
 	pod := &corev1.Pod{}
-	if err := h.Decoder.Decode(req, pod); err != nil {
-		s, _ := json.Marshal(req)
-		return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to decode old object from request %s: %s", s, err))
+	if req.Operation != admissionv1.Delete {
+		if err := h.Decoder.Decode(req, pod); err != nil {
+			s, _ := json.Marshal(req)
+			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to decode old object from request %s: %s", s, err))
+		}
 	}
 
 	var oldPod *corev1.Pod
