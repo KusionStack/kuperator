@@ -5,6 +5,7 @@ resources:
 - bases/apps.kusionstack.io_podtransitionrules.yaml
 - bases/apps.kusionstack.io_collasets.yaml
 - bases/apps.kusionstack.io_resourcecontexts.yaml
+- bases/apps.kusionstack.io_poddecorations.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
