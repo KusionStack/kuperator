@@ -146,6 +146,9 @@ func decidePodToUpdateByPartition(cls *appsv1alpha1.CollaSet, podInfos []*PodUpd
 	sort.Sort(ordered)
 
 	partition := int(*cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition)
+	if partition >= len(podInfos) {
+		return podInfos
+	}
 	podToUpdate = podInfos[:partition]
 	for i := partition; i < len(podInfos); i++ {
 		if podInfos[i].PodDecorationChanged {
