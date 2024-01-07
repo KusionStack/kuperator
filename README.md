@@ -4,6 +4,7 @@
 [![Operating](https://github.com/KusionStack/operating/actions/workflows/release.yaml/badge.svg)](https://github.com/KusionStack/operating/actions/workflows/release.yaml)
 [![GitHub release](https://img.shields.io/github/release/KusionStack/operating.svg)](https://github.com/KusionStack/operating/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/KusionStack/operating)](https://goreportcard.com/report/github.com/KusionStack/operating)
+[![codecov](https://codecov.io/gh/KusionStack/operating/graph/badge.svg?token=CEQX77G7UH)](https://codecov.io/gh/KusionStack/operating)
 
 KusionStack Operating ([official site](https://kusionstack.io/docs/operating/introduction/)) provides a set of workloads and operators
 built on Kubernetes Custom Resource Definitions (CRDs), with a primary aim of bridging the gap 
@@ -22,6 +23,8 @@ extends native Pod lifecycle with more phase, like `PreCheck`, `Preparing`, `Pos
 * Advanced workloads
 
 [**CollaSet**](https://kusionstack.io/docs/operating/manuals/collaset) designed to manage Pods with respect to PodOpsLifecycle.
+
+[**PodDecoration**](https://kusionstack.io/docs/operating/manuals/poddecoration) provides secondary grouping and operational capabilities for Pods.
 
 * Streamlined pod operation
 
