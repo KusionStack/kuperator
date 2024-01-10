@@ -23,10 +23,10 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog/v2"
+	"k8s.io/client-go/util/retry"
 	"kusionstack.io/operating/apis/apps/v1alpha1"
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/poddeletion"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/operating/pkg/features"
@@ -49,42 +49,44 @@ func (gd *GraceDelete) Name() string {
 func (gd *GraceDelete) Validating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) error {
 	// GraceDeleteWebhook FeatureGate defaults to false
 	// Add '--feature-gates=GraceDeleteWebhook=true' to container args, to enable gracedelete webhook
-	if !feature.DefaultFeatureGate.Enabled(features.GraceDeleteWebhook) || operation != admissionv1.Delete {
+	if !feature.DefaultFeatureGate.Enabled(features.GraceDeleteWebhook) || operation != admissionv1.Delete || !utils.ControlledByKusionStack(oldPod) {
 		return nil
 	}
 
-	pod := &corev1.Pod{}
-	if err := c.Get(ctx, types.NamespacedName{Namespace: oldPod.Namespace, Name: oldPod.Name}, pod); err != nil {
-		if !errors.IsNotFound(err) {
-			klog.Error(err, "failed to find pod")
+	// if pod is allowed to delete
+	if _, allowed := podopslifecycle.AllowOps(poddeletion.OpsLifecycleAdapter, 0, oldPod); allowed {
+		return nil
+	}
+
+	// label pod to trigger poddeletion_controller reconcile
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		newPod := &corev1.Pod{}
+		err := c.Get(ctx, types.NamespacedName{Namespace: oldPod.Namespace, Name: oldPod.Name}, newPod)
+		if err != nil {
 			return err
 		}
+		if newPod.Labels == nil {
+			newPod.Labels = map[string]string{}
+		}
+		if newPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] == "true" {
+			return nil
+		}
+		newPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] = "true"
 
-		klog.V(2).Info("pod is deleted")
-		return nil
-	}
-	if !utils.ControlledByKusionStack(pod) {
-		return nil
+		return c.Update(ctx, newPod)
+	})
+
+	if err != nil {
+		return err
 	}
 
-	// if Pod is not begin a deletion PodOpsLifecycle, trigger it
-	if !podopslifecycle.IsDuringOps(poddeletion.OpsLifecycleAdapter, pod) {
-		if _, err := podopslifecycle.Begin(c, poddeletion.OpsLifecycleAdapter, pod); err != nil {
-			return fmt.Errorf("fail to begin PodOpsLifecycle to delete Pod %s: %s", pod.Name, err)
+	var finalizers []string
+	for _, f := range oldPod.Finalizers {
+		if strings.HasPrefix(f, v1alpha1.PodOperationProtectionFinalizerPrefix) {
+			finalizers = append(finalizers, f)
 		}
 	}
-
-	// if Pod is allow to operate, delete it
-	if _, allowed := podopslifecycle.AllowOps(poddeletion.OpsLifecycleAdapter, 0, pod); !allowed {
-		var finalizers []string
-		for _, f := range pod.Finalizers {
-			if strings.HasPrefix(f, v1alpha1.PodOperationProtectionFinalizerPrefix) {
-				finalizers = append(finalizers, f)
-			}
-		}
-		return fmt.Errorf("podOpsLifecycle denied delete request, since related resources and finalizers have not been processed. Waiting for removing finalizers: %v", finalizers)
-	}
-	return nil
+	return fmt.Errorf("podOpsLifecycle denied delete request, since related resources and finalizers have not been processed. Waiting for removing finalizers: %v", finalizers)
 }
 
 func (gd *GraceDelete) Mutating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) error {
