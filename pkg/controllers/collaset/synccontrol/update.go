@@ -53,6 +53,16 @@ type PodUpdateInfo struct {
 
 	// indicates the PodOpsLifecycle is started.
 	isDuringOps bool
+
+	// for replace update
+	// judge pod in replace updating
+	isInReplacing bool
+
+	// replace new created pod
+	replacePairNewPodInfo *PodUpdateInfo
+
+	// replace origin pod
+	replacePairOriginPodName string
 }
 
 func attachPodUpdateInfo(ctx context.Context, pods []*collasetutils.PodWrapper, resource *collasetutils.RelatedResources) ([]*PodUpdateInfo, error) {
@@ -112,6 +122,23 @@ func attachPodUpdateInfo(ctx context.Context, pods []*collasetutils.PodWrapper, 
 		podUpdateInfoList[i] = updateInfo
 	}
 
+	// attach replace info
+	var podUpdateInfoMap = make(map[string]*PodUpdateInfo)
+	for _, podUpdateInfo := range podUpdateInfoList {
+		podUpdateInfoMap[podUpdateInfo.Name] = podUpdateInfo
+	}
+	replacePodMap := classifyPodReplacingMapping(pods)
+	for originPodName, replacePairNewPod := range replacePodMap {
+		originPodInfo := podUpdateInfoMap[originPodName]
+		if replacePairNewPod != nil {
+			originPodInfo.isInReplacing = true
+			replacePairNewPodInfo := podUpdateInfoMap[replacePairNewPod.Name]
+			replacePairNewPodInfo.isInReplacing = true
+			replacePairNewPodInfo.replacePairOriginPodName = originPodName
+			originPodInfo.replacePairNewPodInfo = replacePairNewPodInfo
+		}
+	}
+
 	return podUpdateInfoList, nil
 }
 
@@ -126,10 +153,23 @@ func decidePodToUpdate(cls *appsv1alpha1.CollaSet, podInfos []*PodUpdateInfo) []
 func decidePodToUpdateByLabel(_ *appsv1alpha1.CollaSet, podInfos []*PodUpdateInfo) (podToUpdate []*PodUpdateInfo) {
 	for i := range podInfos {
 		if _, exist := podInfos[i].Labels[appsv1alpha1.CollaSetUpdateIndicateLabelKey]; exist {
+			// filter pod which is in replace update and is the new created pod
+			if podInfos[i].isInReplacing && podInfos[i].replacePairOriginPodName != "" {
+				continue
+			}
+			podToUpdate = append(podToUpdate, podInfos[i])
+			continue
+		}
+
+		// already in replace update.
+		if podInfos[i].isInReplacing && podInfos[i].replacePairNewPodInfo != nil {
 			podToUpdate = append(podToUpdate, podInfos[i])
 			continue
 		}
 		if podInfos[i].PodDecorationChanged {
+			if podInfos[i].isInReplacing && podInfos[i].replacePairOriginPodName != "" {
+				continue
+			}
 			podToUpdate = append(podToUpdate, podInfos[i])
 		}
 	}
@@ -137,25 +177,37 @@ func decidePodToUpdateByLabel(_ *appsv1alpha1.CollaSet, podInfos []*PodUpdateInf
 }
 
 func decidePodToUpdateByPartition(cls *appsv1alpha1.CollaSet, podInfos []*PodUpdateInfo) (podToUpdate []*PodUpdateInfo) {
+	filteredPodInfos := filterReplacingNewCreatedPod(podInfos)
 	if cls.Spec.UpdateStrategy.RollingUpdate == nil ||
 		cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition == nil {
-		return podInfos
+		return filteredPodInfos
 	}
-
-	ordered := orderByDefault(podInfos)
+	ordered := orderByDefault(filteredPodInfos)
 	sort.Sort(ordered)
 
 	partition := int(*cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition)
-	if partition >= len(podInfos) {
-		return podInfos
+	if partition >= len(filteredPodInfos) {
+		return filteredPodInfos
 	}
-	podToUpdate = podInfos[:partition]
-	for i := partition; i < len(podInfos); i++ {
+	podToUpdate = filteredPodInfos[:partition]
+	for i := partition; i < len(filteredPodInfos); i++ {
 		if podInfos[i].PodDecorationChanged {
 			podToUpdate = append(podToUpdate, podInfos[i])
 		}
 	}
 	return podToUpdate
+}
+
+// filter these pods in replacing and is new created pod
+func filterReplacingNewCreatedPod(podInfos []*PodUpdateInfo) (filteredPodInfos []*PodUpdateInfo) {
+	for _, podInfo := range podInfos {
+		if podInfo.isInReplacing && podInfo.replacePairOriginPodName != "" {
+			continue
+		}
+
+		filteredPodInfos = append(filteredPodInfos, podInfo)
+	}
+	return filteredPodInfos
 }
 
 type orderByDefault []*PodUpdateInfo
@@ -199,6 +251,8 @@ func newPodUpdater(ctx context.Context, client client.Client, cls *appsv1alpha1.
 		// In case of using native K8s, Pod is only allowed to update with container image, so InPlaceOnly policy is
 		// implemented with InPlaceIfPossible policy as default for compatibility.
 		return &inPlaceIfPossibleUpdater{collaSet: cls, ctx: ctx, Client: client}
+	case appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType:
+		return &replaceUpdatePodUpdater{collaSet: cls, ctx: ctx, Client: client}
 	default:
 		return &inPlaceIfPossibleUpdater{collaSet: cls, ctx: ctx, Client: client}
 	}
@@ -296,7 +350,7 @@ func (u *inPlaceIfPossibleUpdater) AnalyseAndGetUpdatedPod(
 	return
 }
 
-func (u *inPlaceIfPossibleUpdater) diffPod(currentPod, updatedPod *corev1.Pod) (inPlaceSetUpdateSupport bool, onlyMetadataChanged bool) {
+func (u inPlaceIfPossibleUpdater) diffPod(currentPod, updatedPod *corev1.Pod) (inPlaceSetUpdateSupport bool, onlyMetadataChanged bool) {
 	if len(currentPod.Spec.Containers) != len(updatedPod.Spec.Containers) {
 		return false, false
 	}
@@ -415,4 +469,61 @@ func (u *recreatePodUpdater) AnalyseAndGetUpdatedPod(_ *appsv1.ControllerRevisio
 func (u *recreatePodUpdater) GetPodUpdateFinishStatus(podInfo *PodUpdateInfo) (finished bool, msg string, err error) {
 	// Recreate policy alway treat Pod as update finished
 	return podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged, "", nil
+}
+
+type replaceUpdatePodUpdater struct {
+	collaSet *appsv1alpha1.CollaSet
+	ctx      context.Context
+	client.Client
+}
+
+func (u *replaceUpdatePodUpdater) AnalyseAndGetUpdatedPod(updatedRevision *appsv1.ControllerRevision, podUpdateInfo *PodUpdateInfo) (inPlaceUpdateSupport bool, onlyMetadataChanged bool, updatedPod *corev1.Pod, err error) {
+	// when replaceUpdate, inPlaceUpdateSupport and onlyMetadataChanged always false
+
+	// 1. judge replace pair new pod is updated revision, if not, delete.
+	if podUpdateInfo.replacePairNewPodInfo != nil {
+		newPodRevision, exist := podUpdateInfo.replacePairNewPodInfo.Pod.Labels[appsv1.ControllerRevisionHashLabelKey]
+		if exist && newPodRevision == updatedRevision.Name {
+			return
+		}
+		u.Delete(u.ctx, podUpdateInfo.replacePairNewPodInfo.Pod)
+	}
+
+	// 2. build new pod by updatedRevision
+	ownerRef := metav1.NewControllerRef(u.collaSet, appsv1alpha1.GroupVersion.WithKind("CollaSet"))
+	updatedPod, err = collasetutils.NewPodFrom(u.collaSet, ownerRef, updatedRevision, func(in *corev1.Pod) error {
+		return utilspoddecoration.PatchListOfDecorations(in, podUpdateInfo.UpdatedPodDecorations)
+	})
+	if err != nil {
+		err = fmt.Errorf("fail to build Pod from current revision %s: %v", podUpdateInfo.CurrentRevision.Name, err)
+	}
+	return
+}
+
+func (u *replaceUpdatePodUpdater) GetPodUpdateFinishStatus(podUpdateInfo *PodUpdateInfo) (finished bool, msg string, err error) {
+	replaceNewPodInfo := podUpdateInfo.replacePairNewPodInfo
+	if replaceNewPodInfo == nil {
+		return isPodUpdatedServiceAvailable(podUpdateInfo)
+	}
+
+	return isPodUpdatedServiceAvailable(replaceNewPodInfo)
+}
+
+func isPodUpdatedServiceAvailable(podInfo *PodUpdateInfo) (finished bool, msg string, err error) {
+	if !podInfo.IsUpdatedRevision || podInfo.PodDecorationChanged {
+		return false, "not updated revision", nil
+	}
+
+	if podInfo.Labels == nil {
+		return false, "no labels on pod", nil
+	}
+	if podInfo.isInReplacing && podInfo.replacePairNewPodInfo != nil {
+		return false, "replace origin pod", nil
+	}
+
+	if _, serviceAvailable := podInfo.Labels[appsv1alpha1.PodServiceAvailableLabel]; serviceAvailable {
+		return true, "", nil
+	}
+
+	return false, "pod not service available", nil
 }

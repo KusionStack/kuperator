@@ -39,6 +39,10 @@ const (
 	PodDeletionIndicationLabelKey = "podopslifecycle.kusionstack.io/to-delete"         // users can use this label to indicate a pod to delete
 
 	PodInstanceIDLabelKey = "collaset.kusionstack.io/instance-id" // used to attach Pod instance ID on Pod
+
+	PodReplacePairOriginName = "collaset.kusionstack.io/replace-pair-origin-name" // used to indicate the original Pod name for replacement.
+
+	PodReplacePairNewName = "collaset.kusionstack.io/replace-pair-new-name" // used to indicate the new created Pod name for replacement.
 )
 
 const (

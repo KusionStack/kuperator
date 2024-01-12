@@ -23,13 +23,35 @@ import (
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 )
 
-func getPodsToDelete(filteredPods []*collasetutils.PodWrapper, diff int) []*collasetutils.PodWrapper {
-	sort.Sort(ActivePodsForDeletion(filteredPods))
-	start := len(filteredPods) - diff
+func getPodsToDelete(filteredPods []*collasetutils.PodWrapper, replaceMapping map[string]*collasetutils.PodWrapper, diff int) []*collasetutils.PodWrapper {
+	targetsPods := getTargetsDeletePods(filteredPods, replaceMapping)
+	sort.Sort(ActivePodsForDeletion(targetsPods))
+	start := len(targetsPods) - diff
 	if start < 0 {
 		start = 0
 	}
-	return filteredPods[start:]
+	needDeletePods := targetsPods[start:]
+	for _, pod := range needDeletePods {
+		if replacePairPod, exist := replaceMapping[pod.Name]; exist && replacePairPod != nil {
+			needDeletePods = append(needDeletePods, replacePairPod)
+		}
+	}
+
+	return needDeletePods
+}
+
+// when sort pods to choose delete, only sort pods without replacement or these replace origin pods
+func getTargetsDeletePods(filteredPods []*collasetutils.PodWrapper, replaceMapping map[string]*collasetutils.PodWrapper) []*collasetutils.PodWrapper {
+	targetPods := make([]*collasetutils.PodWrapper, len(replaceMapping))
+	index := 0
+	for _, pod := range filteredPods {
+		if _, exist := replaceMapping[pod.Name]; exist {
+			targetPods[index] = pod
+			index++
+		}
+	}
+
+	return targetPods
 }
 
 type ActivePodsForDeletion []*collasetutils.PodWrapper

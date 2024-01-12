@@ -174,7 +174,7 @@ func TestRevisionCleanUp(t *testing.T) {
 		selector:        selector,
 		selectedLabels:  selectedLabels,
 		collisionCount:  0,
-		historyLimit:    0, // we at lease reserve 2 extra controller revisions
+		historyLimit:    0, // we at lease reserve 3 extra controller revisions
 		currentRevision: "test",
 		inUsed:          true,
 	}
@@ -196,7 +196,7 @@ func TestRevisionCleanUp(t *testing.T) {
 
 	adapter.inUsed = false
 	revisionManager.ConstructRevisions(deploy, false)
-	waitingCacheUpdate(deploy.Namespace, 2)
+	waitingCacheUpdate(deploy.Namespace, 3)
 }
 
 func TestRevisionCreation(t *testing.T) {
