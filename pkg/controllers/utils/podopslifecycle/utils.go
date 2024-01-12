@@ -143,9 +143,6 @@ func Finish(c client.Client, adapter LifecycleAdapter, obj client.Object) (updat
 }
 
 func checkOperatingID(adapter LifecycleAdapter, obj client.Object) (val string, ok bool) {
-	if obj == nil {
-		return "", false
-	}
 	labelID := fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, adapter.GetID())
 	_, ok = obj.GetLabels()[labelID]
 	return adapter.GetID(), ok

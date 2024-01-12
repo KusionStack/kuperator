@@ -22,6 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
@@ -389,6 +390,52 @@ func TestValidatingCollaSet(t *testing.T) {
 					},
 					ScaleStrategy: appsv1alpha1.ScaleStrategy{
 						Context: "context-old",
+					},
+				},
+			},
+		},
+		"replaceUpdateWithPvc": {
+			messageKeyWords: "updateStrategy.podUpdatePolicy ReplaceUpdate is not supported to claim Spec.VolumeClaimTemplates",
+			cls: &appsv1alpha1.CollaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: appsv1alpha1.CollaSetSpec{
+					Replicas: int32Pointer(1),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "foo",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "foo",
+									Image: "image:v1",
+								},
+							},
+						},
+					},
+					UpdateStrategy: appsv1alpha1.UpdateStrategy{
+						PodUpdatePolicy: appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType,
+						RollingUpdate: &appsv1alpha1.RollingUpdateCollaSetStrategy{
+							ByPartition: &appsv1alpha1.ByPartition{
+								Partition: int32Pointer(-1),
+							},
+						},
+					},
+					VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "data",
+							},
+						},
 					},
 				},
 			},

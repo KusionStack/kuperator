@@ -188,10 +188,8 @@ func (rm *RevisionManager) ConstructRevisions(set client.Object, dryRun bool) (*
 func (rm *RevisionManager) cleanExpiredRevision(set metav1.Object, sortedRevisions *[]*apps.ControllerRevision) (*[]*apps.ControllerRevision, error) {
 	limit := int(rm.ownerGetter.GetHistoryLimit(set))
 
-	// for the case: resubmit a new revision when release failed.
-	// it is necessary to retain the current version, the first failed release version, and the newly released version.
-	// so, reserve 3 extra unused revisions for diagnose
-	exceedNum := len(*sortedRevisions) - limit - 3
+	// reserve 2 extra unused revisions for diagnose
+	exceedNum := len(*sortedRevisions) - limit - 2
 	if exceedNum <= 0 {
 		return sortedRevisions, nil
 	}
