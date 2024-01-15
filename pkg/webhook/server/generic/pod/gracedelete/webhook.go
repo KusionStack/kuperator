@@ -19,7 +19,9 @@ package gracedelete
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -68,10 +70,10 @@ func (gd *GraceDelete) Validating(ctx context.Context, c client.Client, oldPod, 
 		if newPod.Labels == nil {
 			newPod.Labels = map[string]string{}
 		}
-		if newPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] == "true" {
+		if _, ok := newPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; ok {
 			return nil
 		}
-		newPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] = "true"
+		newPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] = strconv.FormatInt(time.Now().Unix(), 10)
 
 		return c.Update(ctx, newPod)
 	})

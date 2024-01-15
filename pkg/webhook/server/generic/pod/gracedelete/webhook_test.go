@@ -63,16 +63,46 @@ func TestGraceDelete(t *testing.T) {
 			oldPod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					Name:      "test2",
+					Name:      "test1",
+					Labels: map[string]string{
+						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
+					},
 				},
 			},
+			keyWords:     "not found",
 			reqOperation: admissionv1.Delete,
 		},
 		{
 			fakePod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					Name:      "test",
+					Name:      "test2",
+					Labels: map[string]string{
+						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
+						"operating.podopslifecycle.kusionstack.io/pod-delete": "1704865098763959176",
+					},
+				},
+			},
+			oldPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test2",
+					Labels: map[string]string{
+						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
+					},
+				},
+			},
+			expectedLabels: map[string]string{
+				appsv1alpha1.PodDeletionIndicationLabelKey: "true",
+			},
+			keyWords:     "podOpsLifecycle denied",
+			reqOperation: admissionv1.Delete,
+		},
+		{
+			fakePod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test2",
 					Labels: map[string]string{
 						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
 					},
@@ -81,10 +111,11 @@ func TestGraceDelete(t *testing.T) {
 			oldPod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					Name:      "test",
+					Name:      "test2",
 					Labels: map[string]string{
 						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
 					},
+					Finalizers: []string{"prot.podopslifecycle.kusionstack.io/finalizer1,prot.podopslifecycle.kusionstack.io/finalizer2"},
 				},
 			},
 			expectedLabels: map[string]string{
@@ -98,11 +129,11 @@ func TestGraceDelete(t *testing.T) {
 			oldPod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					Name:      "test",
+					Name:      "test3",
 					Labels: map[string]string{
 						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey):      "true",
 						"operating.podopslifecycle.kusionstack.io/pod-delete":      "1704865098763959176",
-						"operation-type.podopslifecycle.kusionstack.io/pod-delete": "delete",
+						"operation-type.podopslifecycle.kusionstack.io/pod-delete": "1704865098763959336",
 						"operate.podopslifecycle.kusionstack.io/pod-delete":        "1704865212856080006",
 					},
 				},
