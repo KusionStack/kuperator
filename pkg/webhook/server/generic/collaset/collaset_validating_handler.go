@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	k8scorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"kusionstack.io/operating/pkg/webhook/server/generic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -38,6 +39,10 @@ import (
 	"kusionstack.io/operating/pkg/utils/mixin"
 	"kusionstack.io/operating/pkg/webhook/server/generic/utils"
 )
+
+func init() {
+	generic.ValidatingTypeHandlerMap["CollaSet"] = NewValidatingHandler()
+}
 
 type ValidatingHandler struct {
 	*mixin.WebhookHandlerMixin

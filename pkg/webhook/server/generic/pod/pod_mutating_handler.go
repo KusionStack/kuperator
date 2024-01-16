@@ -77,7 +77,7 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 		}
 	}
 
-	for _, webhook := range webhooks {
+	for _, webhook := range Webhooks {
 		// mutating on new pod
 		if err = webhook.Mutating(ctx, h.Client, oldPod, pod, req.Operation); err != nil {
 			logger.Error(err, "failed to mutate pod")

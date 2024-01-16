@@ -22,11 +22,18 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
+	"kusionstack.io/operating/pkg/webhook/server/generic/pod"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/webhook/server/generic/pod/resourceconsist/webhookAdapters"
 )
+
+func init() {
+	for _, podResourceConsistWebhook := range PodResourceConsistWebhooks {
+		pod.Webhooks = append(pod.Webhooks, podResourceConsistWebhook)
+	}
+}
 
 var PodResourceConsistWebhooks []*PodResourceConsistWebhook
 

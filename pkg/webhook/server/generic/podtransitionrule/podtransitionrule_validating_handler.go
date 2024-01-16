@@ -30,6 +30,7 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"kusionstack.io/operating/pkg/webhook/server/generic"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -37,6 +38,10 @@ import (
 	commonutils "kusionstack.io/operating/pkg/utils"
 	"kusionstack.io/operating/pkg/utils/mixin"
 )
+
+func init() {
+	generic.ValidatingTypeHandlerMap["PodTransitionRule"] = NewValidatingHandler()
+}
 
 var _ inject.Client = &ValidatingHandler{}
 var _ admission.DecoderInjector = &ValidatingHandler{}

@@ -32,8 +32,13 @@ import (
 	"kusionstack.io/operating/pkg/features"
 	"kusionstack.io/operating/pkg/utils"
 	"kusionstack.io/operating/pkg/utils/feature"
+	"kusionstack.io/operating/pkg/webhook/server/generic/pod"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+func init() {
+	pod.Webhooks = append(pod.Webhooks, New())
+}
 
 type GraceDelete struct {
 }

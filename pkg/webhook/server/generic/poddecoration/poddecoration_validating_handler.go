@@ -30,12 +30,17 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	k8scorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"kusionstack.io/operating/pkg/webhook/server/generic"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/utils/mixin"
 )
+
+func init() {
+	generic.ValidatingTypeHandlerMap["PodDecoration"] = NewValidatingHandler()
+}
 
 var _ inject.Client = &ValidatingHandler{}
 var _ admission.DecoderInjector = &ValidatingHandler{}

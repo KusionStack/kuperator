@@ -23,6 +23,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"kusionstack.io/operating/pkg/webhook/server/generic/pod"
 
 	"kusionstack.io/operating/apis/apps/v1alpha1"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
@@ -48,6 +49,10 @@ var (
 		v1alpha1.PodOperationPermissionLabelPrefix: v1alpha1.PodPreCheckedLabelPrefix,
 	}
 )
+
+func init() {
+	pod.Webhooks = append(pod.Webhooks, New())
+}
 
 type ReadyToUpgrade func(pod *corev1.Pod) (bool, []string)
 type TimeLabelValue func() string
