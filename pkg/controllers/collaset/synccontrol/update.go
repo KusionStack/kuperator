@@ -21,11 +21,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -486,7 +488,12 @@ func (u *replaceUpdatePodUpdater) AnalyseAndGetUpdatedPod(updatedRevision *appsv
 		if exist && newPodRevision == updatedRevision.Name {
 			return
 		}
-		u.Delete(u.ctx, podUpdateInfo.replacePairNewPodInfo.Pod)
+		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%d"}}}`, appsv1alpha1.PodDeletionIndicationLabelKey, time.Now().UnixNano())))
+		if err = u.Patch(u.ctx, podUpdateInfo.replacePairNewPodInfo.Pod, patch); err != nil {
+			err = fmt.Errorf("failed to delete replace pair new pod %s/%s %s",
+				podUpdateInfo.replacePairNewPodInfo.Namespace, podUpdateInfo.replacePairNewPodInfo.Name, err)
+			return
+		}
 	}
 
 	// 2. build new pod by updatedRevision
