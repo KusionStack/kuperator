@@ -17,10 +17,16 @@ limitations under the License.
 package alibaba_cloud_slb
 
 import (
+	"kusionstack.io/operating/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"kusionstack.io/resourceconsist/pkg/adapters"
 )
+
+func init() {
+	// AddToManagerFuncs is a list of functions to create webhook servers and add them to a manager.
+	webhook.AddToManagerFuncs = append(webhook.AddToManagerFuncs, Add)
+}
 
 func Add(mgr manager.Manager) error {
 	return adapters.AddBuiltinWebhookAdaptersToMgr(mgr, []adapters.AdapterName{adapters.AdapterAlibabaCloudSlb})

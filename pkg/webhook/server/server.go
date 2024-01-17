@@ -19,11 +19,17 @@ package server
 import (
 	"strings"
 
+	kusionwebhook "kusionstack.io/operating/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"kusionstack.io/operating/pkg/webhook/server/generic"
 )
+
+func init() {
+	// AddToManagerFuncs is a list of functions to create webhook servers and add them to a manager.
+	kusionwebhook.AddToManagerFuncs = append(kusionwebhook.AddToManagerFuncs, Add)
+}
 
 // Add adds itself to the manager
 func Add(mgr manager.Manager) error {
