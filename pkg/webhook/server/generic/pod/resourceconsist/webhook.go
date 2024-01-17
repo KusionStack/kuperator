@@ -31,7 +31,7 @@ import (
 
 func init() {
 	for _, podResourceConsistWebhook := range PodResourceConsistWebhooks {
-		pod.Webhooks = append(pod.Webhooks, podResourceConsistWebhook)
+		pod.RegisterAdmissionWebhook(podResourceConsistWebhook)
 	}
 }
 

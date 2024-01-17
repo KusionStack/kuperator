@@ -30,4 +30,12 @@ type AdmissionWebhook interface {
 	Validating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) error
 }
 
-var Webhooks []AdmissionWebhook
+var webhooks []AdmissionWebhook
+
+func RegisterAdmissionWebhook(webhook AdmissionWebhook) {
+	webhooks = append(webhooks, webhook)
+}
+
+func ListAdmissionWebhooks() []AdmissionWebhook {
+	return webhooks
+}

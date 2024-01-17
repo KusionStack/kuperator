@@ -51,7 +51,7 @@ var (
 )
 
 func init() {
-	pod.Webhooks = append(pod.Webhooks, New())
+	pod.RegisterAdmissionWebhook(New())
 }
 
 type ReadyToUpgrade func(pod *corev1.Pod) (bool, []string)

@@ -37,7 +37,7 @@ import (
 )
 
 func init() {
-	pod.Webhooks = append(pod.Webhooks, New())
+	pod.RegisterAdmissionWebhook(New())
 }
 
 type GraceDelete struct {
