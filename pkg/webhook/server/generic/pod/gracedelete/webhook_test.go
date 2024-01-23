@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubectl/pkg/scheme"
 	"kusionstack.io/operating/apis/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/poddeletion"
 	"kusionstack.io/operating/pkg/utils/feature"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -33,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
 func TestGraceDelete(t *testing.T) {
@@ -63,33 +63,37 @@ func TestGraceDelete(t *testing.T) {
 			oldPod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					Name:      "test2",
+					Name:      "test1",
+					Labels: map[string]string{
+						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
+					},
 				},
 			},
+			keyWords:     "not found",
 			reqOperation: admissionv1.Delete,
 		},
 		{
 			fakePod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					Name:      "test",
+					Name:      "test2",
 					Labels: map[string]string{
 						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
+						"operating.podopslifecycle.kusionstack.io/pod-delete": "1704865098763959176",
 					},
 				},
 			},
 			oldPod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					Name:      "test",
+					Name:      "test2",
 					Labels: map[string]string{
 						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
 					},
 				},
 			},
 			expectedLabels: map[string]string{
-				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID()):     "testvalue",
-				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID()): "testvalue",
+				appsv1alpha1.PodDeletionIndicationLabelKey: "true",
 			},
 			keyWords:     "podOpsLifecycle denied",
 			reqOperation: admissionv1.Delete,
@@ -98,20 +102,39 @@ func TestGraceDelete(t *testing.T) {
 			fakePod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					Name:      "test",
+					Name:      "test2",
 					Labels: map[string]string{
-						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey):                                         "true",
-						fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID()): "true",
+						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
 					},
 				},
 			},
 			oldPod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					Name:      "test",
+					Name:      "test2",
 					Labels: map[string]string{
-						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey):                                         "true",
-						fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID()): "true",
+						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
+					},
+					Finalizers: []string{"prot.podopslifecycle.kusionstack.io/finalizer1,prot.podopslifecycle.kusionstack.io/finalizer2"},
+				},
+			},
+			expectedLabels: map[string]string{
+				appsv1alpha1.PodDeletionIndicationLabelKey: "true",
+			},
+			keyWords:     "podOpsLifecycle denied",
+			reqOperation: admissionv1.Delete,
+		},
+		{
+			fakePod: corev1.Pod{},
+			oldPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test3",
+					Labels: map[string]string{
+						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey):      "true",
+						"operating.podopslifecycle.kusionstack.io/pod-delete":      "1704865098763959176",
+						"operation-type.podopslifecycle.kusionstack.io/pod-delete": "1704865098763959336",
+						"operate.podopslifecycle.kusionstack.io/pod-delete":        "1704865212856080006",
 					},
 				},
 			},
