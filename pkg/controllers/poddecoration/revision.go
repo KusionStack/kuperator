@@ -80,6 +80,7 @@ func (roa *revisionOwnerAdapter) GetCurrentRevision(obj metav1.Object) string {
 	return ips.Status.CurrentRevision
 }
 
-func (roa *revisionOwnerAdapter) IsInUsed(_ metav1.Object, _ string) bool {
-	return false
+func (roa *revisionOwnerAdapter) IsInUsed(obj metav1.Object, revision string) bool {
+	ips, _ := obj.(*appsalphav1.PodDecoration)
+	return ips.Status.CurrentRevision == revision || ips.Status.UpdatedRevision == revision
 }
