@@ -68,6 +68,9 @@ func TestGraceDelete(t *testing.T) {
 						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
 					},
 				},
+				Spec: corev1.PodSpec{
+					ReadinessGates: []corev1.PodReadinessGate{{ConditionType: v1alpha1.ReadinessGatePodServiceReady}},
+				},
 			},
 			keyWords:     "not found",
 			reqOperation: admissionv1.Delete,
@@ -90,6 +93,9 @@ func TestGraceDelete(t *testing.T) {
 					Labels: map[string]string{
 						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
 					},
+				},
+				Spec: corev1.PodSpec{
+					ReadinessGates: []corev1.PodReadinessGate{{ConditionType: v1alpha1.ReadinessGatePodServiceReady}},
 				},
 			},
 			expectedLabels: map[string]string{
@@ -117,6 +123,9 @@ func TestGraceDelete(t *testing.T) {
 					},
 					Finalizers: []string{"prot.podopslifecycle.kusionstack.io/finalizer1,prot.podopslifecycle.kusionstack.io/finalizer2"},
 				},
+				Spec: corev1.PodSpec{
+					ReadinessGates: []corev1.PodReadinessGate{{ConditionType: v1alpha1.ReadinessGatePodServiceReady}},
+				},
 			},
 			expectedLabels: map[string]string{
 				appsv1alpha1.PodDeletionIndicationLabelKey: "true",
@@ -137,7 +146,11 @@ func TestGraceDelete(t *testing.T) {
 						"operate.podopslifecycle.kusionstack.io/pod-delete":        "1704865212856080006",
 					},
 				},
+				Spec: corev1.PodSpec{
+					ReadinessGates: []corev1.PodReadinessGate{{ConditionType: v1alpha1.ReadinessGatePodServiceReady}},
+				},
 			},
+
 			reqOperation: admissionv1.Delete,
 		},
 	}
