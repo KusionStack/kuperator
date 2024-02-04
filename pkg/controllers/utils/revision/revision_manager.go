@@ -194,12 +194,10 @@ func (rm *RevisionManager) cleanExpiredRevision(set metav1.Object, sortedRevisio
 		return sortedRevisions, nil
 	}
 
+	var cleanedRevisions []*apps.ControllerRevision
 	for _, revision := range *sortedRevisions {
-		if exceedNum == 0 {
-			break
-		}
-
-		if rm.ownerGetter.IsInUsed(set, revision.Name) {
+		if exceedNum == 0 || rm.ownerGetter.IsInUsed(set, revision.Name) {
+			cleanedRevisions = append(cleanedRevisions, revision)
 			continue
 		}
 
@@ -209,7 +207,6 @@ func (rm *RevisionManager) cleanExpiredRevision(set metav1.Object, sortedRevisio
 
 		exceedNum--
 	}
-	cleanedRevisions := (*sortedRevisions)[exceedNum:]
 
 	return &cleanedRevisions, nil
 }
