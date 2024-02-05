@@ -63,6 +63,24 @@ func TestGraceDelete(t *testing.T) {
 			oldPod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
+					Name:      "test",
+					Labels: map[string]string{
+						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
+					},
+				},
+			},
+			reqOperation: admissionv1.Delete,
+		},
+		{
+			fakePod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test",
+				},
+			},
+			oldPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
 					Name:      "test1",
 					Labels: map[string]string{
 						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
