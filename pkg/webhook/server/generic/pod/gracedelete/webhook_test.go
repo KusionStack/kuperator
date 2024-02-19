@@ -63,10 +63,31 @@ func TestGraceDelete(t *testing.T) {
 			oldPod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
+					Name:      "test",
+					Labels: map[string]string{
+						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
+					},
+				},
+			},
+			reqOperation: admissionv1.Delete,
+		},
+		{
+			fakePod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test",
+				},
+			},
+			oldPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
 					Name:      "test1",
 					Labels: map[string]string{
 						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
 					},
+				},
+				Spec: corev1.PodSpec{
+					ReadinessGates: []corev1.PodReadinessGate{{ConditionType: v1alpha1.ReadinessGatePodServiceReady}},
 				},
 			},
 			keyWords:     "not found",
@@ -90,6 +111,9 @@ func TestGraceDelete(t *testing.T) {
 					Labels: map[string]string{
 						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey): "true",
 					},
+				},
+				Spec: corev1.PodSpec{
+					ReadinessGates: []corev1.PodReadinessGate{{ConditionType: v1alpha1.ReadinessGatePodServiceReady}},
 				},
 			},
 			expectedLabels: map[string]string{
@@ -117,6 +141,9 @@ func TestGraceDelete(t *testing.T) {
 					},
 					Finalizers: []string{"prot.podopslifecycle.kusionstack.io/finalizer1,prot.podopslifecycle.kusionstack.io/finalizer2"},
 				},
+				Spec: corev1.PodSpec{
+					ReadinessGates: []corev1.PodReadinessGate{{ConditionType: v1alpha1.ReadinessGatePodServiceReady}},
+				},
 			},
 			expectedLabels: map[string]string{
 				appsv1alpha1.PodDeletionIndicationLabelKey: "true",
@@ -137,7 +164,11 @@ func TestGraceDelete(t *testing.T) {
 						"operate.podopslifecycle.kusionstack.io/pod-delete":        "1704865212856080006",
 					},
 				},
+				Spec: corev1.PodSpec{
+					ReadinessGates: []corev1.PodReadinessGate{{ConditionType: v1alpha1.ReadinessGatePodServiceReady}},
+				},
 			},
+
 			reqOperation: admissionv1.Delete,
 		},
 	}

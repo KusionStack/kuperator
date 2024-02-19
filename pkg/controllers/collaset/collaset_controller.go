@@ -70,7 +70,7 @@ func NewReconciler(mgr ctrl.Manager) reconcile.Reconciler {
 
 	return &CollaSetReconciler{
 		ReconcilerMixin: mixin,
-		revisionManager: revision.NewRevisionManager(mixin.Client, mixin.Scheme, &revisionOwnerAdapter{}),
+		revisionManager: revision.NewRevisionManager(mixin.Client, mixin.Scheme, NewRevisionOwnerAdapter(podcontrol.NewRealPodControl(mixin.Client, mixin.Scheme))),
 		syncControl:     synccontrol.NewRealSyncControl(mixin.Client, mixin.Logger, podcontrol.NewRealPodControl(mixin.Client, mixin.Scheme), mixin.Recorder),
 	}
 }

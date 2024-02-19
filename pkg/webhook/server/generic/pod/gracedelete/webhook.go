@@ -55,6 +55,20 @@ func (gd *GraceDelete) Validating(ctx context.Context, c client.Client, oldPod, 
 		return nil
 	}
 
+	// if has no service-ready ReadinessGate, skip gracedelete
+	hasReadinessGate := false
+	if oldPod.Spec.ReadinessGates != nil {
+		for _, readinessGate := range oldPod.Spec.ReadinessGates {
+			if readinessGate.ConditionType == v1alpha1.ReadinessGatePodServiceReady {
+				hasReadinessGate = true
+				break
+			}
+		}
+	}
+	if !hasReadinessGate {
+		return nil
+	}
+
 	// if pod is allowed to delete
 	if _, allowed := podopslifecycle.AllowOps(poddeletion.OpsLifecycleAdapter, 0, oldPod); allowed {
 		return nil

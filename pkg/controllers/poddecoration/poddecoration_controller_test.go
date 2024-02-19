@@ -506,7 +506,7 @@ var _ = Describe("PodDecoration controller", func() {
 		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
 		// annotation cleared
 		for _, po := range podList.Items {
-			Expect(po.Annotations[appsv1alpha1.AnnotationResourceDecorationRevision]).Should(BeEquivalentTo("[]"))
+			Expect(po.Annotations[appsv1alpha1.AnnotationPodDecorationRevision]).Should(BeEquivalentTo("[]"))
 		}
 		Eventually(func() error {
 			return c.Get(ctx, types.NamespacedName{Name: podDecoration.Name, Namespace: testcase}, podDecoration)
