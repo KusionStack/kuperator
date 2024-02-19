@@ -415,7 +415,7 @@ func classifyPodReplacingMapping(podWrappers []*collasetutils.PodWrapper) map[st
 			continue
 		}
 
-		if podWrapper.Labels != nil && podWrapper.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] != "" {
+		if _, exist := podWrapper.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; exist {
 			replacePodMapping[name] = nil
 			continue
 		}
