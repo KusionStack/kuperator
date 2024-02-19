@@ -134,6 +134,8 @@ func attachPodUpdateInfo(ctx context.Context, pods []*collasetutils.PodWrapper, 
 		originPodInfo := podUpdateInfoMap[originPodName]
 		if replacePairNewPod != nil {
 			originPodInfo.isInReplacing = true
+			// replace origin pod not go through lifecycle, mark  during ops manual
+			originPodInfo.isDuringOps = true
 			replacePairNewPodInfo := podUpdateInfoMap[replacePairNewPod.Name]
 			replacePairNewPodInfo.isInReplacing = true
 			replacePairNewPodInfo.replacePairOriginPodName = originPodName
