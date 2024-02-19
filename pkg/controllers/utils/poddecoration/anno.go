@@ -55,7 +55,7 @@ func GetDecorationRevisionInfo(pod *corev1.Pod) (info DecorationRevisionInfo) {
 	if pod.Annotations == nil {
 		return
 	}
-	val, ok := pod.Annotations[appsv1alpha1.AnnotationResourceDecorationRevision]
+	val, ok := pod.Annotations[appsv1alpha1.AnnotationPodDecorationRevision]
 	if !ok {
 		return
 	}
@@ -69,7 +69,7 @@ func setDecorationInfo(pod *corev1.Pod, podDecorations map[string]*appsv1alpha1.
 	if pod.Annotations == nil {
 		pod.Annotations = map[string]string{}
 	}
-	pod.Annotations[appsv1alpha1.AnnotationResourceDecorationRevision] = GetDecorationInfoString(podDecorations)
+	pod.Annotations[appsv1alpha1.AnnotationPodDecorationRevision] = GetDecorationInfoString(podDecorations)
 }
 
 func GetDecorationInfoString(podDecorations map[string]*appsv1alpha1.PodDecoration) string {
