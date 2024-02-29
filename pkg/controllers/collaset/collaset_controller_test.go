@@ -177,6 +177,23 @@ var _ = Describe("collaset controller", func() {
 			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 			return expectedStatusReplicas(c, cs, 0, 0, 0, 1, 1, 0, 0, 0)
 		}, 5*time.Second, 1*time.Second).Should(BeNil())
+
+		// scale in pods with delay seconds
+		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+			cls.Spec.Replicas = int32Pointer(0)
+			cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
+			return true
+		}))
+
+		Eventually(func() error {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			if len(podList.Items) != 0 {
+				return fmt.Errorf("expected 0 pods, got %d", len(podList.Items))
+			}
+
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 0, 0, 0, 0, 0)
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
 	})
 
 	It("update reconcile", func() {
