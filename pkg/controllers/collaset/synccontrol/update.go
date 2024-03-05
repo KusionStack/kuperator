@@ -496,16 +496,19 @@ func (u *replaceUpdatePodUpdater) AnalyseAndGetUpdatedPod(updatedRevision *appsv
 				podUpdateInfo.replacePairNewPodInfo.Namespace, podUpdateInfo.replacePairNewPodInfo.Name, err)
 			return
 		}
+		return
 	}
 
-	// 2. build new pod by updatedRevision
-	ownerRef := metav1.NewControllerRef(u.collaSet, appsv1alpha1.GroupVersion.WithKind("CollaSet"))
-	updatedPod, err = collasetutils.NewPodFrom(u.collaSet, ownerRef, updatedRevision, func(in *corev1.Pod) error {
-		return utilspoddecoration.PatchListOfDecorations(in, podUpdateInfo.UpdatedPodDecorations)
-	})
-	if err != nil {
-		err = fmt.Errorf("fail to build Pod from current revision %s: %v", podUpdateInfo.CurrentRevision.Name, err)
+	if _, exist := podUpdateInfo.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist {
+		// need replace pod, label pod with replace-indicate
+		now := time.Now().UnixNano()
+		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v", "%s": "%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, now, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey, true)))
+		if err = u.Patch(u.ctx, podUpdateInfo.Pod, patch); err != nil {
+			err = fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %s", podUpdateInfo.Namespace, podUpdateInfo.Name, err)
+			return
+		}
 	}
+
 	return
 }
 
