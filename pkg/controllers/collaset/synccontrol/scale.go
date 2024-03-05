@@ -66,11 +66,11 @@ func (s ActivePodsForDeletion) Less(i, j int) bool {
 	rDuringScaleIn := podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, r)
 
 	if lDuringScaleIn && !rDuringScaleIn {
-		return true
+		return false
 	}
 
 	if !lDuringScaleIn && rDuringScaleIn {
-		return false
+		return true
 	}
 
 	return collasetutils.ComparePod(l.Pod, r.Pod)
