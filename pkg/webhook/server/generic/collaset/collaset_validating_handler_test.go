@@ -192,7 +192,7 @@ func TestValidatingCollaSet(t *testing.T) {
 			},
 		},
 		"invalid-update-policy": {
-			messageKeyWords: "supported values: \"ReCreate\", \"InPlaceIfPossible\", \"InPlaceOnly\"",
+			messageKeyWords: "supported values: \"ReCreate\", \"InPlaceIfPossible\", \"InPlaceOnly\", \"ReplaceUpdate\"",
 			cls: &appsv1alpha1.CollaSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
