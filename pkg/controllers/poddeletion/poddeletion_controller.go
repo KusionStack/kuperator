@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"kusionstack.io/operating/apis/apps/v1alpha1"
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset/pvccontrol"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
@@ -123,14 +124,16 @@ func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 	}
 
-	// if Pod is allow to operate, delete it
+	// if Pod is allowed to operate, delete it
 	if _, allowed := podopslifecycle.AllowOps(OpsLifecycleAdapter, 0, instance); allowed {
 		logger.Info("try to delete Pod with deletion indication")
 		if err := r.Client.Delete(context.TODO(), instance); err != nil {
 			return ctrl.Result{}, fmt.Errorf("fail to delete Pod %s with deletion indication: %s", req, err)
 		} else {
+			r.Recorder.Event(instance, corev1.EventTypeNormal, v1alpha1.PodDeletionEvent, "Deleted pod")
+
 			if err := activeExpectations.ExpectDelete(instance, expectations.Pod, instance.Name); err != nil {
-				return ctrl.Result{}, fmt.Errorf("fail to expect Pod  %s deleted: %s", req, err)
+				return ctrl.Result{}, fmt.Errorf("fail to expect Pod %s to be deleted: %s", req, err)
 			}
 		}
 		// if this pod in replaced update, delete pvcs
