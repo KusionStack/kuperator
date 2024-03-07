@@ -38,7 +38,7 @@ var _ = Describe("PodDecoration utils", func() {
 		getter.revisions["foo-101"] = getter.latestPodDecorations[0]
 		getter.revisions["foo-200"] = getter.latestPodDecorations[1]
 		getter.revisions["foo-201"] = getter.latestPodDecorations[1]
-		pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{appsv1alpha1.AnnotationResourceDecorationRevision: "[{\"name\":\"foo-1\",\"revision\":\"foo-100\"},{\"name\":\"foo-2\",\"revision\":\"foo-200\"}]"}}}
+		pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{appsv1alpha1.AnnotationPodDecorationRevision: "[{\"name\":\"foo-1\",\"revision\":\"foo-100\"},{\"name\":\"foo-2\",\"revision\":\"foo-200\"}]"}}}
 		pds, err := getter.GetUpdatedDecorationsByOldPod(context.TODO(), pod)
 		Expect(err).Should(BeNil())
 		Expect(len(pds)).Should(Equal(2))
@@ -46,7 +46,7 @@ var _ = Describe("PodDecoration utils", func() {
 		Expect(pds["foo-201"]).ShouldNot(BeNil())
 		getter.latestPodDecorationNames = sets.NewString()
 		getter.latestPodDecorations = []*appsv1alpha1.PodDecoration{}
-		pod.Annotations[appsv1alpha1.AnnotationResourceDecorationRevision] = "[{\"name\":\"foo-1\",\"revision\":\"foo-101\"},{\"name\":\"foo-2\",\"revision\":\"foo-201\"}]"
+		pod.Annotations[appsv1alpha1.AnnotationPodDecorationRevision] = "[{\"name\":\"foo-1\",\"revision\":\"foo-101\"},{\"name\":\"foo-2\",\"revision\":\"foo-201\"}]"
 		pds, err = getter.GetUpdatedDecorationsByOldPod(context.TODO(), pod)
 		Expect(err).Should(BeNil())
 		Expect(len(pds)).Should(Equal(0))
