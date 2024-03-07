@@ -19,6 +19,7 @@ package collaset
 import (
 	"context"
 	"fmt"
+	"kusionstack.io/operating/pkg/controllers/collaset/pvccontrol"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -71,7 +72,7 @@ func NewReconciler(mgr ctrl.Manager) reconcile.Reconciler {
 	return &CollaSetReconciler{
 		ReconcilerMixin: mixin,
 		revisionManager: revision.NewRevisionManager(mixin.Client, mixin.Scheme, NewRevisionOwnerAdapter(podcontrol.NewRealPodControl(mixin.Client, mixin.Scheme))),
-		syncControl:     synccontrol.NewRealSyncControl(mixin.Client, mixin.Logger, podcontrol.NewRealPodControl(mixin.Client, mixin.Scheme), mixin.Recorder),
+		syncControl:     synccontrol.NewRealSyncControl(mixin.Client, mixin.Logger, podcontrol.NewRealPodControl(mixin.Client, mixin.Scheme), pvccontrol.NewRealPvcControl(mixin.Client, mixin.Scheme), mixin.Recorder),
 	}
 }
 
@@ -95,6 +96,14 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	err = c.Watch(&source.Kind{Type: &corev1.PersistentVolumeClaim{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &appsv1alpha1.CollaSet{},
+	})
+	if err != nil {
+		return err
+	}
+
 	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &appsv1alpha1.CollaSet{},
@@ -112,6 +121,7 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 // +kubebuilder:rbac:groups=apps.kusionstack.io,resources=resourcecontexts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kusionstack.io,resources=resourcecontexts/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kusionstack.io,resources=resourcecontexts/finalizers,verbs=update
+// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=controllerrevisions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch

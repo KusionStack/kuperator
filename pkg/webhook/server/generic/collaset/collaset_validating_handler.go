@@ -19,6 +19,7 @@ package collaset
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"net/http"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -26,17 +27,15 @@ import (
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/apis/core"
 	k8scorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	commonutils "kusionstack.io/operating/pkg/utils"
 	"kusionstack.io/operating/pkg/utils/mixin"
 	"kusionstack.io/operating/pkg/webhook/server/generic/utils"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 type ValidatingHandler struct {
@@ -161,6 +160,17 @@ func (h *ValidatingHandler) validatePodTemplateSpec(cls *appsv1alpha1.CollaSet, 
 		return append(allErrs, field.Invalid(fSpec.Child("template"), cls.Spec.Template, fmt.Sprintf("fail to convert to core PodTemplateSpec: %s", err)))
 	}
 
+	for _, pvc := range cls.Spec.VolumeClaimTemplates {
+		podTemplateSpec.Spec.Volumes = append(podTemplateSpec.Spec.Volumes, core.Volume{
+			Name: pvc.Name,
+			VolumeSource: core.VolumeSource{
+				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvc.Name,
+					ReadOnly:  false,
+				},
+			},
+		})
+	}
 	return corevalidation.ValidatePodTemplateSpec(podTemplateSpec, fSpec, utils.PodValidationOptions)
 }
 
