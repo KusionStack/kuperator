@@ -140,6 +140,13 @@ func attachPodUpdateInfo(ctx context.Context, pods []*collasetutils.PodWrapper, 
 			replacePairNewPodInfo.isInReplacing = true
 			replacePairNewPodInfo.replacePairOriginPodName = originPodName
 			originPodInfo.replacePairNewPodInfo = replacePairNewPodInfo
+		} else {
+			_, replaceIndicated := originPodInfo.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
+			_, replaceByReplaceUpdate := originPodInfo.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
+			if replaceIndicated && replaceByReplaceUpdate {
+				originPodInfo.isInReplacing = true
+				originPodInfo.isDuringOps = true
+			}
 		}
 	}
 

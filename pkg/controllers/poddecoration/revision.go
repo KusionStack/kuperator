@@ -80,6 +80,6 @@ func (roa *revisionOwnerAdapter) GetCurrentRevision(obj metav1.Object) string {
 	return ips.Status.CurrentRevision
 }
 
-func (roa *revisionOwnerAdapter) IsInUsed(obj metav1.Object, revision string) bool {
+func (roa *revisionOwnerAdapter) IsInUsed(_ metav1.Object, _ string) bool {
 	return false
 }

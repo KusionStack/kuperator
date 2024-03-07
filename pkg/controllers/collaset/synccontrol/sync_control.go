@@ -18,6 +18,7 @@ package synccontrol
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -103,28 +104,15 @@ func (r *RealSyncControl) SyncPods(
 		return false, nil, nil, fmt.Errorf("fail to get filtered Pods: %s", err)
 	}
 
-	needReplaceOriginPods, needCleanOriginLabelPods, needCleanPairNewLabelPods := getIndicateReplacePods(filteredPods)
-	if len(needCleanOriginLabelPods) > 0 {
-		_, err := controllerutils.SlowStartBatch(len(needCleanOriginLabelPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
-			pod := needCleanOriginLabelPods[i]
-			deletePatchStr := []byte(fmt.Sprintf(`[{"op": "remove", "path": "/metadata/labels/%s"}]`, strings.ReplaceAll(appsv1alpha1.PodReplacePairOriginName, "/", "~1")))
-			if err = r.podControl.PatchPod(pod, client.RawPatch(types.JSONPatchType, deletePatchStr)); err != nil {
-				return fmt.Errorf("failed to remove replace pair origin name label %s/%s: %s", pod.Namespace, pod.Name, err)
-			}
-			return nil
-		})
-		if err != nil {
-			r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "clean pods replace pair origin name label with error: %s", err.Error())
-		}
-	}
-
-	if len(needCleanPairNewLabelPods) > 0 {
-		_, err := controllerutils.SlowStartBatch(len(needCleanPairNewLabelPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
-			pod := needCleanPairNewLabelPods[i]
-			deletePatchStr := []byte(fmt.Sprintf(`[{"op": "remove", "path": "/metadata/labels/%s"},{"op": "remove", "path": "/metadata/labels/%s"}]`, strings.ReplaceAll(appsv1alpha1.PodReplacePairNewId, "/", "~1"),
-				strings.ReplaceAll(appsv1alpha1.PodReplaceByReplaceUpdateLabelKey, "/", "~1")))
-			if err = r.podControl.PatchPod(pod, client.RawPatch(types.JSONPatchType, deletePatchStr)); err != nil {
-				return fmt.Errorf("failed to remove replace pair new id label %s/%s: %s", pod.Namespace, pod.Name, err)
+	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(filteredPods, instance)
+	if len(needDeletePods) > 0 {
+		_, err := controllerutils.SlowStartBatch(len(needDeletePods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+			pod := needDeletePods[i]
+			if _, exist := pod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; !exist {
+				patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%d"}}}`, appsv1alpha1.PodDeletionIndicationLabelKey, time.Now().UnixNano())))
+				if err = r.podControl.PatchPod(pod, patch); err != nil {
+					return fmt.Errorf("failed to delete pod when syncPods %s/%s %s", pod.Namespace, pod.Name, err)
+				}
 			}
 			return nil
 		})
@@ -133,10 +121,38 @@ func (r *RealSyncControl) SyncPods(
 		}
 	}
 
+	if len(needCleanLabelPods) > 0 {
+		_, err := controllerutils.SlowStartBatch(len(needCleanLabelPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+			pod := needCleanLabelPods[i]
+			needCleanLabels := podsNeedCleanLabels[i]
+			var deletePatch []map[string]string
+			for _, labelKey := range needCleanLabels {
+				patchOperation := map[string]string{
+					"op":   "remove",
+					"path": fmt.Sprintf("/metadata/labels/%s", strings.ReplaceAll(labelKey, "/", "~1")),
+				}
+				deletePatch = append(deletePatch, patchOperation)
+			}
+			// 将 patch 操作转换为 JSON 字符串
+			patchBytes, err := json.Marshal(deletePatch)
+			if err != nil {
+				return err
+			}
+			if err = r.podControl.PatchPod(pod, client.RawPatch(types.JSONPatchType, patchBytes)); err != nil {
+				return fmt.Errorf("failed to remove replace pair label %s/%s: %s", pod.Namespace, pod.Name, err)
+			}
+			return nil
+		})
+		if err != nil {
+			r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "clean pods replace pair origin name label with error: %s", err.Error())
+		}
+	}
+
 	// get owned IDs
 	var ownedIDs map[int]*appsv1alpha1.ContextDetail
 	if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		ownedIDs, err = podcontext.AllocateID(r.client, instance, resources.UpdatedRevision.Name, int(realValue(instance.Spec.Replicas))+len(needReplaceOriginPods))
+		needAllocateReplicas := maxInt(len(filteredPods), int(realValue(instance.Spec.Replicas))) + len(needReplaceOriginPods)
+		ownedIDs, err = podcontext.AllocateID(r.client, instance, resources.UpdatedRevision.Name, needAllocateReplicas)
 		return err
 	}); err != nil {
 		return false, nil, ownedIDs, fmt.Errorf("fail to allocate %d IDs using context when sync Pods: %s", instance.Spec.Replicas, err)
@@ -187,7 +203,7 @@ func (r *RealSyncControl) SyncPods(
 	}
 	// 4. create new pods for need replace pods
 	if len(needReplaceOriginPods) > 0 {
-		availableContext := extractAvailableContexts(len(needReplaceOriginPods), ownedIDs, currentIDs)
+		availableContexts := extractAvailableContexts(len(needReplaceOriginPods), ownedIDs, currentIDs)
 		successCount, err := controllerutils.SlowStartBatch(len(needReplaceOriginPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 			originPod := needReplaceOriginPods[i]
 			ownerRef := metav1.NewControllerRef(instance, instance.GroupVersionKind())
@@ -197,14 +213,16 @@ func (r *RealSyncControl) SyncPods(
 				return err
 			}
 			// always replace by update revision.
-			needCreatePod, err := collasetutils.NewPodFrom(instance, ownerRef, replaceRevision, func(in *corev1.Pod) error {
+			newPod, err := collasetutils.NewPodFrom(instance, ownerRef, replaceRevision, func(in *corev1.Pod) error {
 				return utilspoddecoration.PatchListOfDecorations(in, updatedPDs)
 			})
+			if err != nil {
+				return err
+			}
 			// add instance id and replace pair label
-			instanceId := fmt.Sprintf("%d", availableContext[i].ID)
-			needCreatePod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
-			needCreatePod.Labels[appsv1alpha1.PodReplacePairOriginName] = originPod.GetName()
-			newPod := needCreatePod.DeepCopy()
+			instanceId := fmt.Sprintf("%d", availableContexts[i].ID)
+			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
+			newPod.Labels[appsv1alpha1.PodReplacePairOriginName] = originPod.GetName()
 			if newCreatedPod, err := r.podControl.CreatePod(newPod); err == nil {
 				r.recorder.Eventf(originPod,
 					corev1.EventTypeNormal,
@@ -260,7 +278,7 @@ func (r *RealSyncControl) SyncPods(
 }
 
 func getReplaceRevision(originPod *corev1.Pod, resources *collasetutils.RelatedResources) *appsv1.ControllerRevision {
-	if value, exist := originPod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]; exist && value == "true" {
+	if _, exist := originPod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]; exist {
 		return resources.UpdatedRevision
 	}
 	podCurrentRevisionName, exist := originPod.Labels[appsv1.ControllerRevisionHashLabelKey]
@@ -277,7 +295,7 @@ func getReplaceRevision(originPod *corev1.Pod, resources *collasetutils.RelatedR
 	return resources.CurrentRevision
 }
 
-func getIndicateReplacePods(pods []*corev1.Pod) ([]*corev1.Pod, []*corev1.Pod, []*corev1.Pod) {
+func dealReplacePods(pods []*corev1.Pod, instance *appsv1alpha1.CollaSet) (needReplacePods []*corev1.Pod, needCleanLabelPods []*corev1.Pod, podNeedCleanLabels [][]string, needDeletePods []*corev1.Pod) {
 	var podInstanceIdMap = make(map[string]*corev1.Pod)
 	var podNameMap = make(map[string]*corev1.Pod)
 	for _, pod := range pods {
@@ -287,7 +305,7 @@ func getIndicateReplacePods(pods []*corev1.Pod) ([]*corev1.Pod, []*corev1.Pod, [
 		podNameMap[pod.Name] = pod
 	}
 
-	var needReplacePods []*corev1.Pod
+	// deal need replace pods
 	for _, pod := range pods {
 		// no replace indication label
 		if _, exist := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist {
@@ -310,26 +328,39 @@ func getIndicateReplacePods(pods []*corev1.Pod) ([]*corev1.Pod, []*corev1.Pod, [
 
 		needReplacePods = append(needReplacePods, pod)
 	}
-
-	var needCleanReplacePairOriginLabelPods []*corev1.Pod
-	var needCleanReplacePairNewLabelPods []*corev1.Pod
+	isReplaceUpdate := instance.Spec.UpdateStrategy.PodUpdatePolicy == appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType
+	// deal pods need to delete when pod update strategy is not replace update
 
 	for _, pod := range pods {
+		_, inReplace := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
+		_, replaceByUpdate := pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
+		var needCleanLabels []string
+		if inReplace && replaceByUpdate && !isReplaceUpdate {
+			needCleanLabels = []string{appsv1alpha1.PodReplaceIndicationLabelKey, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey}
+		}
+
 		// pod is replace new created pod, skip replace
 		if originPodName, exist := pod.Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
 			if _, exist := podNameMap[originPodName]; !exist {
-				needCleanReplacePairOriginLabelPods = append(needCleanReplacePairOriginLabelPods, pod)
+				needCleanLabels = append(needCleanLabels, appsv1alpha1.PodReplacePairOriginName)
 			}
 		}
 
 		if newPairPodId, exist := pod.Labels[appsv1alpha1.PodReplacePairNewId]; exist {
-			if _, exist := podInstanceIdMap[newPairPodId]; !exist {
-				needCleanReplacePairNewLabelPods = append(needCleanReplacePairNewLabelPods, pod)
+			if newPod, exist := podInstanceIdMap[newPairPodId]; !exist {
+				needCleanLabels = append(needCleanLabels, appsv1alpha1.PodReplacePairNewId)
+			} else if replaceByUpdate && !isReplaceUpdate {
+				needDeletePods = append(needDeletePods, newPod)
 			}
 		}
 
+		if len(needCleanLabels) > 0 {
+			needCleanLabelPods = append(needCleanLabelPods, pod)
+			podNeedCleanLabels = append(podNeedCleanLabels, needCleanLabels)
+		}
 	}
-	return needReplacePods, needCleanReplacePairOriginLabelPods, needCleanReplacePairNewLabelPods
+
+	return
 }
 
 func (r *RealSyncControl) Scale(
@@ -606,6 +637,9 @@ func extractAvailableContexts(diff int, ownedIDs map[int]*appsv1alpha1.ContextDe
 
 		availableContexts[idx] = ownedIDs[id]
 		idx++
+		if idx == diff {
+			break
+		}
 	}
 
 	return availableContexts
@@ -814,22 +848,13 @@ func (r *RealSyncControl) Update(
 		if finished {
 			if podInfo.isInReplacing {
 				replacePairNewPodInfo := podInfo.replacePairNewPodInfo
-				patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%d"}}}`, appsv1alpha1.PodDeletionIndicationLabelKey, time.Now().UnixNano())))
-				if err = r.podControl.PatchPod(podInfo.Pod, patch); err != nil {
-					return fmt.Errorf("failed to delete replace pair origin pod %s/%s %s", podInfo.Namespace, podInfo.replacePairNewPodInfo.Name, err)
-				}
-
-				logger.V(1).Info("try to finish update PodOpsLifecycle for Pod", "pod", commonutils.ObjectKeyString(podInfo.Pod))
-				if updated, err := podopslifecycle.Finish(r.client, collasetutils.UpdateOpsLifecycleAdapter, replacePairNewPodInfo.Pod); err != nil {
-					return fmt.Errorf("failed to finish PodOpsLifecycle for updating Pod %s/%s: %s", replacePairNewPodInfo.Namespace, replacePairNewPodInfo.Name, err)
-				} else if updated {
-					// add an expectation for this pod update, before next reconciling
-					if err := collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.Pod, replacePairNewPodInfo.Name, replacePairNewPodInfo.ResourceVersion); err != nil {
-						return err
+				if replacePairNewPodInfo != nil {
+					if _, exist := replacePairNewPodInfo.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; !exist {
+						patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%d"}}}`, appsv1alpha1.PodDeletionIndicationLabelKey, time.Now().UnixNano())))
+						if err = r.podControl.PatchPod(podInfo.Pod, patch); err != nil {
+							return fmt.Errorf("failed to delete replace pair origin pod %s/%s %s", podInfo.Namespace, podInfo.replacePairNewPodInfo.Name, err)
+						}
 					}
-					r.recorder.Eventf(replacePairNewPodInfo.Pod,
-						corev1.EventTypeNormal,
-						"UpdateReady", "pod %s/%s update finished", replacePairNewPodInfo.Namespace, replacePairNewPodInfo.Name)
 				}
 			} else {
 				logger.V(1).Info("try to finish update PodOpsLifecycle for Pod", "pod", commonutils.ObjectKeyString(podInfo.Pod))
@@ -865,4 +890,11 @@ func realValue(val *int32) int32 {
 	}
 
 	return *val
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
