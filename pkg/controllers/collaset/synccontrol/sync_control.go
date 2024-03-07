@@ -133,7 +133,7 @@ func (r *RealSyncControl) SyncPods(
 				}
 				deletePatch = append(deletePatch, patchOperation)
 			}
-			// 将 patch 操作转换为 JSON 字符串
+			// patch to bytes
 			patchBytes, err := json.Marshal(deletePatch)
 			if err != nil {
 				return err
