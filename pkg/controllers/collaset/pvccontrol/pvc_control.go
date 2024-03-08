@@ -18,22 +18,25 @@ package pvccontrol
 
 import (
 	"context"
+	"fmt"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/fields"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
-	"kusionstack.io/operating/pkg/utils/inject"
+	refmanagerutil "kusionstack.io/operating/pkg/controllers/utils/refmanager"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Interface interface {
-	GetFilteredPVCs(client.Object) ([]*corev1.PersistentVolumeClaim, error)
+	GetFilteredPVCs(*appsv1alpha1.CollaSet) ([]*corev1.PersistentVolumeClaim, error)
 	CreatePodPvcs(*appsv1alpha1.CollaSet, *corev1.Pod, []*corev1.PersistentVolumeClaim) error
 	DeletePodPvcs(*appsv1alpha1.CollaSet, *corev1.Pod, []*corev1.PersistentVolumeClaim) error
 	DeletePodUnusedPvcs(*appsv1alpha1.CollaSet, *corev1.Pod, []*corev1.PersistentVolumeClaim) error
+	SetPvcsOwnerRef(*appsv1alpha1.CollaSet, []*corev1.PersistentVolumeClaim) ([]*corev1.PersistentVolumeClaim, error)
+	ReleasePvcsOwnerRef(*appsv1alpha1.CollaSet, []*corev1.PersistentVolumeClaim) ([]*corev1.PersistentVolumeClaim, error)
 }
 
 type RealPvcControl struct {
@@ -48,16 +51,24 @@ func NewRealPvcControl(client client.Client, scheme *runtime.Scheme) Interface {
 	}
 }
 
-// GetFilteredPVCs returns pvcs owned by collaset
-func (pc *RealPvcControl) GetFilteredPVCs(owner client.Object) ([]*corev1.PersistentVolumeClaim, error) {
+// GetFilteredPVCs returns pvcs match collaset label selector
+func (pc *RealPvcControl) GetFilteredPVCs(cls *appsv1alpha1.CollaSet) ([]*corev1.PersistentVolumeClaim, error) {
+	var filteredPVCs []*corev1.PersistentVolumeClaim
+	ownerSelector := cls.Spec.Selector.DeepCopy()
+
+	if ownerSelector.MatchLabels == nil {
+		return filteredPVCs, nil
+	}
+	selector, err := metav1.LabelSelectorAsSelector(ownerSelector)
+	if err != nil {
+		return filteredPVCs, err
+	}
 	pvcList := &corev1.PersistentVolumeClaimList{}
-	err := pc.client.List(context.TODO(), pvcList, &client.ListOptions{Namespace: owner.GetNamespace(),
-		FieldSelector: fields.OneTermEqualSelector(inject.FieldIndexOwnerRefUID, string(owner.GetUID()))})
+	err = pc.client.List(context.TODO(), pvcList, &client.ListOptions{Namespace: cls.Namespace, LabelSelector: selector})
 	if err != nil {
 		return nil, err
 	}
 
-	var filteredPVCs []*corev1.PersistentVolumeClaim
 	for i := range pvcList.Items {
 		pvc := &pvcList.Items[i]
 		if pvc.DeletionTimestamp == nil {
@@ -65,7 +76,11 @@ func (pc *RealPvcControl) GetFilteredPVCs(owner client.Object) ([]*corev1.Persis
 		}
 	}
 
-	return filteredPVCs, nil
+	// if retain pvcs when collaset is deleted, do not claim pvcs
+	if collasetutils.PvcPolicyWhenDelete(cls) == appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType {
+		return pc.ReleasePvcsOwnerRef(cls, filteredPVCs)
+	}
+	return pc.SetPvcsOwnerRef(cls, filteredPVCs)
 }
 
 // CreatePodPvcs create pvcs for the pod across collaset pvc
@@ -77,14 +92,15 @@ func (pc *RealPvcControl) CreatePodPvcs(cls *appsv1alpha1.CollaSet, pod *corev1.
 	}
 
 	// provision pvcs related to pod using pvc template
-	pvcs, err := collasetutils.ProvisionUpdatedPvc(pc.client, cls, id, existingPvcs)
+	pvcsMap, err := collasetutils.ProvisionUpdatedPvc(pc.client, cls, id, existingPvcs)
 	if err != nil {
 		return err
 	}
 
+	newVolumes := make([]corev1.Volume, 0, len(*pvcsMap))
+	pvcList := make([]*corev1.PersistentVolumeClaim, 0, len(*pvcsMap))
 	// mount updated pvcs to pod.spec.volumes
-	newVolumes := make([]corev1.Volume, 0, len(*pvcs))
-	for name, pvc := range *pvcs {
+	for name, pvc := range *pvcsMap {
 		volume := corev1.Volume{
 			Name: name,
 			VolumeSource: corev1.VolumeSource{
@@ -95,22 +111,31 @@ func (pc *RealPvcControl) CreatePodPvcs(cls *appsv1alpha1.CollaSet, pod *corev1.
 			},
 		}
 		newVolumes = append(newVolumes, volume)
+		pvcList = append(pvcList, pvc)
 	}
 
 	currentVolumes := pod.Spec.Volumes
 	for i := range currentVolumes {
 		currentVolume := currentVolumes[i]
-		if _, ok := (*pvcs)[currentVolume.Name]; !ok {
+		if _, ok := (*pvcsMap)[currentVolume.Name]; !ok {
 			newVolumes = append(newVolumes, currentVolume)
 		}
 	}
 	pod.Spec.Volumes = newVolumes
 
-	return nil
+	// if retain pvcs when collaset is deleted, do not claim pvcs
+	if collasetutils.PvcPolicyWhenDelete(cls) == appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType {
+		return nil
+	}
+	_, err = pc.SetPvcsOwnerRef(cls, pvcList)
+	return err
 }
 
 // DeletePodPvcs delete pvcs related to pod refer instance id
 func (pc *RealPvcControl) DeletePodPvcs(cls *appsv1alpha1.CollaSet, pod *corev1.Pod, pvcs []*corev1.PersistentVolumeClaim) error {
+	if collasetutils.PvcPolicyWhenScaled(cls) == appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType {
+		return nil
+	}
 	for _, pvc := range pvcs {
 		if pvc.Labels == nil || pod.Labels == nil {
 			continue
@@ -155,6 +180,52 @@ func (pc *RealPvcControl) DeletePodUnusedPvcs(cls *appsv1alpha1.CollaSet, pod *c
 		return err
 	}
 	return nil
+}
+
+func (pc *RealPvcControl) SetPvcsOwnerRef(cls *appsv1alpha1.CollaSet, pvcs []*corev1.PersistentVolumeClaim) ([]*corev1.PersistentVolumeClaim, error) {
+	claimPvcs := make([]*corev1.PersistentVolumeClaim, len(pvcs))
+	ownerSelector := cls.Spec.Selector.DeepCopy()
+	if ownerSelector.MatchLabels == nil {
+		return claimPvcs, nil
+	}
+	cm, err := refmanagerutil.NewRefManager(pc.client, ownerSelector, cls, pc.scheme)
+	if err != nil {
+		return claimPvcs, fmt.Errorf("fail to create ref manager: %s", err)
+	}
+
+	var candidates = make([]client.Object, len(pvcs))
+	for i, pvc := range pvcs {
+		candidates[i] = pvc
+	}
+	claims, err := cm.ClaimOwned(candidates)
+	if err != nil {
+		return claimPvcs, err
+	}
+	for i, mt := range claims {
+		claimPvcs[i] = mt.(*corev1.PersistentVolumeClaim)
+	}
+
+	return claimPvcs, nil
+}
+
+func (pc *RealPvcControl) ReleasePvcsOwnerRef(cls *appsv1alpha1.CollaSet, pvcs []*corev1.PersistentVolumeClaim) ([]*corev1.PersistentVolumeClaim, error) {
+	ownerSelector := cls.Spec.Selector.DeepCopy()
+	if ownerSelector.MatchLabels == nil {
+		return pvcs, nil
+	}
+
+	cm, err := refmanagerutil.NewRefManager(pc.client, ownerSelector, cls, pc.scheme)
+	if err != nil {
+		return pvcs, fmt.Errorf("fail to create ref manager: %s", err)
+	}
+
+	for _, pvc := range pvcs {
+		if err = cm.Release(pvc); err != nil {
+			return pvcs, err
+		}
+	}
+
+	return pvcs, nil
 }
 
 func deleteUnMatchedPvcs(c client.Client, cls *appsv1alpha1.CollaSet, oldPvcs *map[string]*corev1.PersistentVolumeClaim) error {

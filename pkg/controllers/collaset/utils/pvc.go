@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"hash/fnv"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
@@ -85,7 +84,6 @@ func BuildPvcWithHash(cls *appsv1alpha1.CollaSet, pvcTmp *corev1.PersistentVolum
 	}
 	claim.Labels[appsv1alpha1.PvcTemplateHashLabelKey] = hash
 	claim.Labels[appsv1alpha1.PodInstanceIDLabelKey] = id
-	claim.OwnerReferences = append(claim.OwnerReferences, *metav1.NewControllerRef(cls, appsv1alpha1.GroupVersion.WithKind("CollaSet")))
 	return claim, nil
 }
 
@@ -126,7 +124,6 @@ func ClassifyPodPvcs(cls *appsv1alpha1.CollaSet, id string, existingPvcs []*core
 		// filter out the old pvcs
 		if newTmpHash[pvcTmpName] == hash {
 			newPvcs[pvcTmpName] = pvc
-
 		} else {
 			oldPvcs[pvcTmpName] = pvc
 		}
@@ -219,4 +216,26 @@ func GetPvcTmpHash(pvcTmps []corev1.PersistentVolumeClaim) (map[string]string, e
 		pvcHashMapping[pvcTmp.Name] = hash
 	}
 	return pvcHashMapping, nil
+}
+
+func PvcPolicyWhenScaled(cls *appsv1alpha1.CollaSet) appsv1alpha1.PersistentVolumeClaimRetentionPolicyType {
+	if cls.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy == nil {
+		return appsv1alpha1.DeletePersistentVolumeClaimRetentionPolicyType
+	}
+
+	if cls.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy.WhenScaled == "" {
+		return appsv1alpha1.DeletePersistentVolumeClaimRetentionPolicyType
+	}
+	return cls.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy.WhenScaled
+}
+
+func PvcPolicyWhenDelete(cls *appsv1alpha1.CollaSet) appsv1alpha1.PersistentVolumeClaimRetentionPolicyType {
+	if cls.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy == nil {
+		return appsv1alpha1.DeletePersistentVolumeClaimRetentionPolicyType
+	}
+
+	if cls.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy.WhenDeleted == "" {
+		return appsv1alpha1.DeletePersistentVolumeClaimRetentionPolicyType
+	}
+	return cls.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy.WhenDeleted
 }
