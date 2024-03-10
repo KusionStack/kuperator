@@ -29,6 +29,8 @@ import (
 	"strings"
 )
 
+// ProvisionUpdatedPvc 1. create pvc for the pod using current
+// pvc template; 2. if pvc exists, not create again, reuse it
 func ProvisionUpdatedPvc(c client.Client, cls *appsv1alpha1.CollaSet, id string, existingPvcs []*corev1.PersistentVolumeClaim) (*map[string]*corev1.PersistentVolumeClaim, error) {
 	updatedPvcs, _, err := ClassifyPodPvcs(cls, id, existingPvcs)
 	if err != nil {
@@ -39,32 +41,28 @@ func ProvisionUpdatedPvc(c client.Client, cls *appsv1alpha1.CollaSet, id string,
 			continue
 		}
 
-		claim, err := CreatePvcWithHash(c, cls, &pvcTmp, id)
+		claim, err := BuildPvcWithHash(cls, &pvcTmp, id)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := c.Create(context.TODO(), claim); err != nil {
+			return nil, fmt.Errorf("fail to create pvc for id %s: %s", id, err)
+		} else {
+			if err = ActiveExpectations.ExpectCreate(cls, expectations.Pvc, claim.Name); err != nil {
+				return nil, err
+			}
+		}
+
 		if err != nil {
 			return nil, err
 		}
 		(*updatedPvcs)[pvcTmp.Name] = claim
 	}
-
 	return updatedPvcs, nil
 }
 
-func CreatePvcWithHash(c client.Client, cls *appsv1alpha1.CollaSet, pvcTmp *corev1.PersistentVolumeClaim, id string) (*corev1.PersistentVolumeClaim, error) {
-	claim, err := BuildPvcWithHash(cls, pvcTmp, id)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := c.Create(context.TODO(), claim); err != nil {
-		return nil, fmt.Errorf("fail to create pvc for id %s: %s", id, err)
-	} else {
-		if err = ActiveExpectations.ExpectCreate(cls, expectations.Pvc, claim.Name); err != nil {
-			return nil, err
-		}
-	}
-	return claim, nil
-}
-
+// BuildPvcWithHash return a pvc labeled with a hash value
 func BuildPvcWithHash(cls *appsv1alpha1.CollaSet, pvcTmp *corev1.PersistentVolumeClaim, id string) (*corev1.PersistentVolumeClaim, error) {
 	claim := pvcTmp.DeepCopy()
 	claim.Name = ""
@@ -88,11 +86,11 @@ func BuildPvcWithHash(cls *appsv1alpha1.CollaSet, pvcTmp *corev1.PersistentVolum
 }
 
 // ClassifyPodPvcs classify pvcs into old and new pvcs
-// by comparing to the hash of pvc template
+// by comparing to the hash of current pvc template
 func ClassifyPodPvcs(cls *appsv1alpha1.CollaSet, id string, existingPvcs []*corev1.PersistentVolumeClaim) (*map[string]*corev1.PersistentVolumeClaim, *map[string]*corev1.PersistentVolumeClaim, error) {
 	newPvcs := map[string]*corev1.PersistentVolumeClaim{}
 	oldPvcs := map[string]*corev1.PersistentVolumeClaim{}
-	newTmpHash, err := GetPvcTmpHash(cls.Spec.VolumeClaimTemplates)
+	newTmpHash, err := PvcTmpHashMapping(cls.Spec.VolumeClaimTemplates)
 	if err != nil {
 		return &newPvcs, &oldPvcs, err
 	}
@@ -132,11 +130,11 @@ func ClassifyPodPvcs(cls *appsv1alpha1.CollaSet, id string, existingPvcs []*core
 	return &newPvcs, &oldPvcs, nil
 }
 
-// IsPodPvcTmpChanged check whether pvc templates being modified,
-// not aware of add or delete on pvc templates
+// IsPodPvcTmpChanged check whether pvc template
+// being modified, not aware of added or deleted
 func IsPodPvcTmpChanged(cls *appsv1alpha1.CollaSet, pod *corev1.Pod, existingPvcs []*corev1.PersistentVolumeClaim) (bool, error) {
 	// get pvc template hash values
-	newHashMapping, err := GetPvcTmpHash(cls.Spec.VolumeClaimTemplates)
+	newHashMapping, err := PvcTmpHashMapping(cls.Spec.VolumeClaimTemplates)
 	if err != nil {
 		return false, err
 	}
@@ -206,7 +204,7 @@ func PvcTmpHash(pvc *corev1.PersistentVolumeClaim) (string, error) {
 	return rand.SafeEncodeString(fmt.Sprint(hf.Sum32())), nil
 }
 
-func GetPvcTmpHash(pvcTmps []corev1.PersistentVolumeClaim) (map[string]string, error) {
+func PvcTmpHashMapping(pvcTmps []corev1.PersistentVolumeClaim) (map[string]string, error) {
 	pvcHashMapping := map[string]string{}
 	for _, pvcTmp := range pvcTmps {
 		hash, err := PvcTmpHash(&pvcTmp)

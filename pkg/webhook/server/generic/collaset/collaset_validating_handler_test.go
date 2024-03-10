@@ -17,6 +17,7 @@ limitations under the License.
 package collaset
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	"strings"
 	"testing"
 
@@ -58,6 +59,21 @@ func TestValidatingCollaSet(t *testing.T) {
 									Name:  "foo",
 									Image: "image:v1",
 								},
+							},
+						},
+					},
+					VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "pvc",
+							},
+							Spec: corev1.PersistentVolumeClaimSpec{
+								Resources: corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										"storage": resource.MustParse("100m"),
+									},
+								},
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 							},
 						},
 					},

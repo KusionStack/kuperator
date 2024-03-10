@@ -107,9 +107,18 @@ func (r *RealSyncControl) SyncPods(
 		return false, nil, nil, fmt.Errorf("fail to get filtered Pods: %s", err)
 	}
 
-	// get owned and active pvcs
+	// list pvcs using selector
 	if resources.ExistingPvcs, err = r.pvcControl.GetFilteredPVCs(instance); err != nil {
 		return false, nil, nil, fmt.Errorf("fail to get filtered PVCs: %s", err)
+	}
+	// release/set ownerRef refer to retention policy
+	if collasetutils.PvcPolicyWhenDelete(instance) == appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType {
+		resources.ExistingPvcs, err = r.pvcControl.ReleasePvcsOwnerRef(instance, resources.ExistingPvcs)
+	} else {
+		resources.ExistingPvcs, err = r.pvcControl.SetPvcsOwnerRef(instance, resources.ExistingPvcs)
+	}
+	if err != nil {
+		return false, nil, nil, err
 	}
 
 	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(filteredPods, instance)
