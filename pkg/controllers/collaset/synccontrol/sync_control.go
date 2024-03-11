@@ -663,7 +663,9 @@ func (r *RealSyncControl) Update(
 	// 2. decide Pod update candidates
 	podToUpdate := decidePodToUpdate(cls, podUpdateInfos)
 	podCh := make(chan *PodUpdateInfo, len(podToUpdate))
+	updater := newPodUpdater(ctx, r.client, cls)
 	updating := false
+	analysedPod := sets.NewString()
 
 	if cls.Spec.UpdateStrategy.PodUpdatePolicy != appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType {
 		// 3. prepare Pods to begin PodOpsLifecycle
@@ -680,11 +682,20 @@ func (r *RealSyncControl) Update(
 
 		// 4. begin podOpsLifecycle parallel
 
-		succCount, err := controllerutils.SlowStartBatch(len(podCh), controllerutils.SlowStartInitialBatchSize, false, func(_ int, err error) error {
+		succCount, err := controllerutils.SlowStartBatch(len(podCh), controllerutils.SlowStartInitialBatchSize, false, func(int, error) error {
 			podInfo := <-podCh
-
+			// fulfill Pod update information
+			if err = updater.FulfillPodUpdatedInfo(resources.UpdatedRevision, podInfo); err != nil {
+				return fmt.Errorf("fail to analyse pod %s/%s in-place update support: %s", podInfo.Namespace, podInfo.Name, err)
+			}
+			analysedPod.Insert(podInfo.Name)
 			logger.V(1).Info("try to begin PodOpsLifecycle for updating Pod of CollaSet", "pod", commonutils.ObjectKeyString(podInfo.Pod))
-			if updated, err := podopslifecycle.Begin(r.client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod); err != nil {
+			if updated, err := podopslifecycle.Begin(r.client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod, func(obj client.Object) (bool, error) {
+				if !podInfo.OnlyMetadataChanged && !podInfo.InPlaceUpdateSupport {
+					return podopslifecycle.WhenBeginDelete(obj)
+				}
+				return false, nil
+			}); err != nil {
 				return fmt.Errorf("fail to begin PodOpsLifecycle for updating Pod %s/%s: %s", podInfo.Namespace, podInfo.Name, err)
 			} else if updated {
 				// add an expectation for this pod update, before next reconciling
@@ -767,28 +778,27 @@ func (r *RealSyncControl) Update(
 	}
 
 	// 6. update Pod
-	updater := newPodUpdater(ctx, r.client, cls)
 	succCount, err := controllerutils.SlowStartBatch(len(podCh), controllerutils.SlowStartInitialBatchSize, false, func(_ int, _ error) error {
 		podInfo := <-podCh
-		// analyse Pod to get update information
-		inPlaceSupport, onlyMetadataChanged, updatedPod, err := updater.AnalyseAndGetUpdatedPod(resources.UpdatedRevision, podInfo)
-		if err != nil {
-			return fmt.Errorf("fail to analyse pod %s/%s in-place update support: %s", podInfo.Namespace, podInfo.Name, err)
+		if !analysedPod.Has(podInfo.Name) {
+			if err = updater.FulfillPodUpdatedInfo(resources.UpdatedRevision, podInfo); err != nil {
+				return fmt.Errorf("fail to analyse pod %s/%s in-place update support: %s", podInfo.Namespace, podInfo.Name, err)
+			}
 		}
 
 		logger.V(1).Info("before pod update operation",
 			"pod", commonutils.ObjectKeyString(podInfo.Pod),
 			"revision.from", podInfo.CurrentRevision.Name,
 			"revision.to", resources.UpdatedRevision.Name,
-			"inPlaceUpdate", inPlaceSupport,
-			"onlyMetadataChanged", onlyMetadataChanged,
+			"inPlaceUpdate", podInfo.InPlaceUpdateSupport,
+			"onlyMetadataChanged", podInfo.OnlyMetadataChanged,
 		)
-		if onlyMetadataChanged || inPlaceSupport {
+		if podInfo.OnlyMetadataChanged || podInfo.InPlaceUpdateSupport {
 			// 6.1 if pod template changes only include metadata or support in-place update, just apply these changes to pod directly
-			if err = r.podControl.UpdatePod(updatedPod); err != nil {
+			if err = r.podControl.UpdatePod(podInfo.UpdatedPod); err != nil {
 				return fmt.Errorf("fail to update Pod %s/%s when updating by in-place: %s", podInfo.Namespace, podInfo.Name, err)
 			} else {
-				podInfo.Pod = updatedPod
+				podInfo.Pod = podInfo.UpdatedPod
 				r.recorder.Eventf(podInfo.Pod,
 					corev1.EventTypeNormal,
 					"UpdatePod",
@@ -796,7 +806,7 @@ func (r *RealSyncControl) Update(
 					podInfo.Namespace, podInfo.Name,
 					podInfo.CurrentRevision.Name,
 					resources.UpdatedRevision.Name)
-				if err := collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.Pod, podInfo.Name, updatedPod.ResourceVersion); err != nil {
+				if err := collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.Pod, podInfo.Name, podInfo.UpdatedPod.ResourceVersion); err != nil {
 					return err
 				}
 			}
