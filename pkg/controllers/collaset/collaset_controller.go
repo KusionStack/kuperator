@@ -136,7 +136,7 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	} else if !satisfied {
 		logger.Info("CollaSet is not satisfied to reconcile")
-		return ctrl.Result{}, nil
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	if instance.DeletionTimestamp != nil {

@@ -35,6 +35,7 @@ type Interface interface {
 	CreatePod(pod *corev1.Pod) (*corev1.Pod, error)
 	DeletePod(pod *corev1.Pod) error
 	UpdatePod(pod *corev1.Pod) error
+	PatchPod(pod *corev1.Pod, patch client.Patch) error
 }
 
 func NewRealPodControl(client client.Client, scheme *runtime.Scheme) Interface {
@@ -81,6 +82,10 @@ func (pc *RealPodControl) DeletePod(pod *corev1.Pod) error {
 
 func (pc *RealPodControl) UpdatePod(pod *corev1.Pod) error {
 	return pc.client.Update(context.TODO(), pod)
+}
+
+func (pc *RealPodControl) PatchPod(pod *corev1.Pod, patch client.Patch) error {
+	return pc.client.Patch(context.TODO(), pod, patch)
 }
 
 func (pc *RealPodControl) getPodSetPods(pods []*corev1.Pod, selector *metav1.LabelSelector, owner client.Object) ([]*corev1.Pod, error) {

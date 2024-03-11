@@ -35,10 +35,16 @@ const (
 	PodPostCheckedLabelPrefix = "post-checked.podopslifecycle.kusionstack.io" // indicate a pod has finished post-check phase
 	PodCompletingLabelPrefix  = "completing.podopslifecycle.kusionstack.io"   // indicate a pod is completing operation
 
-	PodServiceAvailableLabel      = "podopslifecycle.kusionstack.io/service-available" // indicate a pod is available to serve
-	PodDeletionIndicationLabelKey = "podopslifecycle.kusionstack.io/to-delete"         // users can use this label to indicate a pod to delete
+	PodServiceAvailableLabel          = "podopslifecycle.kusionstack.io/service-available" // indicate a pod is available to serve
+	PodDeletionIndicationLabelKey     = "podopslifecycle.kusionstack.io/to-delete"         // users can use this label to indicate a pod to delete
+	PodReplaceIndicationLabelKey      = "podopslifecycle.kusionstack.io/to-replace"        // users can use this label to indicate a pod to replace
+	PodReplaceByReplaceUpdateLabelKey = "podopslifecycle.kusionstack.io/replaced-by-replace-update"
 
 	PodInstanceIDLabelKey = "collaset.kusionstack.io/instance-id" // used to attach Pod instance ID on Pod
+
+	PodReplacePairOriginName = "collaset.kusionstack.io/replace-pair-origin-name" // used to indicate the original Pod name for replacement.
+
+	PodReplacePairNewId = "collaset.kusionstack.io/replace-pair-new-id" // used to indicate the new created Pod instance ID for replacement.
 )
 
 const (
