@@ -17,52 +17,15 @@ limitations under the License.
 package utils
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/utils/expectations"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 )
 
-// ProvisionUpdatedPvc 1. create pvc for the pod using current
-// pvc template; 2. if pvc exists, not create again, reuse it
-func ProvisionUpdatedPvc(c client.Client, cls *appsv1alpha1.CollaSet, id string, existingPvcs []*corev1.PersistentVolumeClaim) (*map[string]*corev1.PersistentVolumeClaim, error) {
-	updatedPvcs, _, err := ClassifyPodPvcs(cls, id, existingPvcs)
-	if err != nil {
-		return nil, err
-	}
-	for _, pvcTmp := range cls.Spec.VolumeClaimTemplates {
-		if _, exist := (*updatedPvcs)[pvcTmp.Name]; exist {
-			continue
-		}
-
-		claim, err := BuildPvcWithHash(cls, &pvcTmp, id)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := c.Create(context.TODO(), claim); err != nil {
-			return nil, fmt.Errorf("fail to create pvc for id %s: %s", id, err)
-		} else {
-			if err = ActiveExpectations.ExpectCreate(cls, expectations.Pvc, claim.Name); err != nil {
-				return nil, err
-			}
-		}
-
-		if err != nil {
-			return nil, err
-		}
-		(*updatedPvcs)[pvcTmp.Name] = claim
-	}
-	return updatedPvcs, nil
-}
-
-// BuildPvcWithHash return a pvc labeled with a hash value
 func BuildPvcWithHash(cls *appsv1alpha1.CollaSet, pvcTmp *corev1.PersistentVolumeClaim, id string) (*corev1.PersistentVolumeClaim, error) {
 	claim := pvcTmp.DeepCopy()
 	claim.Name = ""
@@ -83,97 +46,6 @@ func BuildPvcWithHash(cls *appsv1alpha1.CollaSet, pvcTmp *corev1.PersistentVolum
 	claim.Labels[appsv1alpha1.PvcTemplateHashLabelKey] = hash
 	claim.Labels[appsv1alpha1.PodInstanceIDLabelKey] = id
 	return claim, nil
-}
-
-// ClassifyPodPvcs classify pvcs into old and new pvcs
-// by comparing to the hash of current pvc template
-func ClassifyPodPvcs(cls *appsv1alpha1.CollaSet, id string, existingPvcs []*corev1.PersistentVolumeClaim) (*map[string]*corev1.PersistentVolumeClaim, *map[string]*corev1.PersistentVolumeClaim, error) {
-	newPvcs := map[string]*corev1.PersistentVolumeClaim{}
-	oldPvcs := map[string]*corev1.PersistentVolumeClaim{}
-	newTmpHash, err := PvcTmpHashMapping(cls.Spec.VolumeClaimTemplates)
-	if err != nil {
-		return &newPvcs, &oldPvcs, err
-	}
-	// filter out the old pvcs
-	for _, pvc := range existingPvcs {
-		if pvc.DeletionTimestamp != nil {
-			continue
-		}
-
-		if pvc.Labels == nil {
-			continue
-		}
-
-		if val, exist := pvc.Labels[appsv1alpha1.PodInstanceIDLabelKey]; !exist {
-			continue
-		} else if val != id {
-			continue
-		}
-
-		if _, exist := pvc.Labels[appsv1alpha1.PvcTemplateHashLabelKey]; !exist {
-			continue
-		}
-		hash := pvc.Labels[appsv1alpha1.PvcTemplateHashLabelKey]
-		pvcTmpName, err := ExtractPvcTmpName(cls, pvc)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// filter out the old pvcs
-		if newTmpHash[pvcTmpName] == hash {
-			newPvcs[pvcTmpName] = pvc
-		} else {
-			oldPvcs[pvcTmpName] = pvc
-		}
-	}
-
-	return &newPvcs, &oldPvcs, nil
-}
-
-// IsPodPvcTmpChanged check whether pvc template
-// being modified, not aware of added or deleted
-func IsPodPvcTmpChanged(cls *appsv1alpha1.CollaSet, pod *corev1.Pod, existingPvcs []*corev1.PersistentVolumeClaim) (bool, error) {
-	// get pvc template hash values
-	newHashMapping, err := PvcTmpHashMapping(cls.Spec.VolumeClaimTemplates)
-	if err != nil {
-		return false, err
-	}
-
-	// get existing pvc hash values
-	oldHashMapping := map[string]string{}
-	for _, pvc := range existingPvcs {
-		if pvc.Labels == nil || pod.Labels == nil {
-			continue
-		}
-		if pvc.Labels[appsv1alpha1.PodInstanceIDLabelKey] != pod.Labels[appsv1alpha1.PodInstanceIDLabelKey] {
-			continue
-		}
-		if _, exist := pvc.Labels[appsv1alpha1.PvcTemplateHashLabelKey]; !exist {
-			continue
-		}
-		hash := pvc.Labels[appsv1alpha1.PvcTemplateHashLabelKey]
-		pvcTmpName, err := ExtractPvcTmpName(cls, pvc)
-		if err != nil {
-			return false, err
-		}
-		if _, exist := oldHashMapping[pvcTmpName]; !exist {
-			oldHashMapping[pvcTmpName] = hash
-		} else {
-			// skip, do not create new pvc twice
-			oldHashMapping[pvcTmpName] = newHashMapping[pvcTmpName]
-		}
-	}
-
-	// compare the hash new pvc from pvc template
-	for _, pvcTmp := range cls.Spec.VolumeClaimTemplates {
-		if _, exist := oldHashMapping[pvcTmp.Name]; !exist {
-			continue
-		}
-		if oldHashMapping[pvcTmp.Name] != newHashMapping[pvcTmp.Name] {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 func ExtractPvcTmpName(cls *appsv1alpha1.CollaSet, pvc *corev1.PersistentVolumeClaim) (string, error) {

@@ -693,7 +693,7 @@ func (r *RealSyncControl) Update(
 	}
 	for _, podInfo := range podUpdateInfos {
 		// if template is updated, update pod by recreate
-		podInfo.PvcTmpHashChanged, err = collasetutils.IsPodPvcTmpChanged(cls, podInfo.PodWrapper.Pod, resources.ExistingPvcs)
+		podInfo.PvcTmpHashChanged, err = pvccontrol.IsPodPvcTmpChanged(cls, podInfo.PodWrapper.Pod, resources.ExistingPvcs)
 		if err != nil {
 			return false, nil, fmt.Errorf("fail to check pvc template changed, %v", err)
 		}
