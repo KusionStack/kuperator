@@ -38,7 +38,7 @@ const (
 	PodServiceAvailableLabel          = "podopslifecycle.kusionstack.io/service-available" // indicate a pod is available to serve
 	PodDeletionIndicationLabelKey     = "podopslifecycle.kusionstack.io/to-delete"         // users can use this label to indicate a pod to delete
 	PodReplaceIndicationLabelKey      = "podopslifecycle.kusionstack.io/to-replace"        // users can use this label to indicate a pod to replace
-	PodReplaceByReplaceUpdateLabelKey = "podopslifecycle.kusionstack.io/replace-by-replace-update"
+	PodReplaceByReplaceUpdateLabelKey = "podopslifecycle.kusionstack.io/replaced-by-replace-update"
 
 	PodInstanceIDLabelKey = "collaset.kusionstack.io/instance-id" // used to attach Pod instance ID on Pod
 
