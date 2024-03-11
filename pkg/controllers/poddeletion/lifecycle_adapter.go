@@ -46,8 +46,8 @@ func (a *PodDeleteOpsLifecycleAdapter) AllowMultiType() bool {
 }
 
 // WhenBegin will be executed when begin a lifecycle
-func (a *PodDeleteOpsLifecycleAdapter) WhenBegin(_ client.Object) (bool, error) {
-	return false, nil
+func (a *PodDeleteOpsLifecycleAdapter) WhenBegin(obj client.Object) (bool, error) {
+	return podopslifecycle.WhenBeginDelete(obj)
 }
 
 // WhenFinish will be executed when finish a lifecycle

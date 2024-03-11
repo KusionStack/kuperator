@@ -42,6 +42,11 @@ import (
 type PodUpdateInfo struct {
 	*utils.PodWrapper
 
+	UpdatedPod *corev1.Pod
+
+	InPlaceUpdateSupport bool
+	OnlyMetadataChanged  bool
+
 	// indicate if this pod has up-to-date revision from its owner, like CollaSet
 	IsUpdatedRevision bool
 	// carry the pod's current revision
@@ -248,8 +253,7 @@ func (o orderByDefault) Less(i, j int) bool {
 }
 
 type PodUpdater interface {
-	AnalyseAndGetUpdatedPod(revision *appsv1.ControllerRevision, podUpdateInfo *PodUpdateInfo) (
-		inPlaceUpdateSupport bool, onlyMetadataChanged bool, updatedPod *corev1.Pod, err error)
+	FulfillPodUpdatedInfo(revision *appsv1.ControllerRevision, podUpdateInfo *PodUpdateInfo) error
 	GetPodUpdateFinishStatus(podUpdateInfo *PodUpdateInfo) (bool, string, error)
 }
 
@@ -284,10 +288,9 @@ type inPlaceIfPossibleUpdater struct {
 	client.Client
 }
 
-func (u *inPlaceIfPossibleUpdater) AnalyseAndGetUpdatedPod(
+func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(
 	updatedRevision *appsv1.ControllerRevision,
-	podUpdateInfo *PodUpdateInfo) (
-	inPlaceUpdateSupport bool, onlyMetadataChanged bool, updatedPod *corev1.Pod, err error) {
+	podUpdateInfo *PodUpdateInfo) error {
 
 	// 1. build pod from current and updated revision
 	ownerRef := metav1.NewControllerRef(u.collaSet, appsv1alpha1.GroupVersion.WithKind("CollaSet"))
@@ -296,33 +299,33 @@ func (u *inPlaceIfPossibleUpdater) AnalyseAndGetUpdatedPod(
 		return utilspoddecoration.PatchListOfDecorations(in, podUpdateInfo.CurrentPodDecorations)
 	})
 	if err != nil {
-		err = fmt.Errorf("fail to build Pod from current revision %s: %v", podUpdateInfo.CurrentRevision.Name, err)
-		return
+		return fmt.Errorf("fail to build Pod from current revision %s: %v", podUpdateInfo.CurrentRevision.Name, err)
 	}
 
 	// TODO: use cache
-	updatedPod, err = collasetutils.NewPodFrom(u.collaSet, ownerRef, updatedRevision, func(in *corev1.Pod) error {
+	podUpdateInfo.UpdatedPod, err = collasetutils.NewPodFrom(u.collaSet, ownerRef, updatedRevision, func(in *corev1.Pod) error {
 		return utilspoddecoration.PatchListOfDecorations(in, podUpdateInfo.UpdatedPodDecorations)
 	})
 	if err != nil {
-		err = fmt.Errorf("fail to build Pod from updated revision %s: %v", updatedRevision.Name, err)
-		return
+		return fmt.Errorf("fail to build Pod from updated revision %s: %v", updatedRevision.Name, err)
 	}
 
 	// 2. compare current and updated pods. Only pod image and metadata are supported to update in-place
 	// TODO: use cache
-	inPlaceUpdateSupport, onlyMetadataChanged = u.diffPod(currentPod, updatedPod)
+	podUpdateInfo.InPlaceUpdateSupport, podUpdateInfo.OnlyMetadataChanged = u.diffPod(currentPod, podUpdateInfo.UpdatedPod)
 	// 3. if pod has changes more than metadata and image
-	if !inPlaceUpdateSupport {
-		return false, onlyMetadataChanged, nil, nil
+	if !podUpdateInfo.InPlaceUpdateSupport {
+		return nil
 	}
 
-	inPlaceUpdateSupport = true
-	updatedPod, err = utils.PatchToPod(currentPod, updatedPod, podUpdateInfo.Pod)
+	podUpdateInfo.UpdatedPod, err = utils.PatchToPod(currentPod, podUpdateInfo.UpdatedPod, podUpdateInfo.Pod)
+	if err != nil {
+		return err
+	}
 
-	if onlyMetadataChanged {
-		if updatedPod.Annotations != nil {
-			delete(updatedPod.Annotations, appsv1alpha1.LastPodStatusAnnotationKey)
+	if podUpdateInfo.OnlyMetadataChanged {
+		if podUpdateInfo.UpdatedPod.Annotations != nil {
+			delete(podUpdateInfo.UpdatedPod.Annotations, appsv1alpha1.LastPodStatusAnnotationKey)
 		}
 	} else {
 		containerCurrentStatusMapping := map[string]*corev1.ContainerStatus{}
@@ -332,7 +335,7 @@ func (u *inPlaceIfPossibleUpdater) AnalyseAndGetUpdatedPod(
 		}
 
 		podStatus := &PodStatus{ContainerStates: map[string]*ContainerStatus{}}
-		for _, container := range updatedPod.Spec.Containers {
+		for _, container := range podUpdateInfo.UpdatedPod.Spec.Containers {
 			podStatus.ContainerStates[container.Name] = &ContainerStatus{
 				// store image of each container in updated Pod
 				LatestImage: container.Image,
@@ -349,16 +352,15 @@ func (u *inPlaceIfPossibleUpdater) AnalyseAndGetUpdatedPod(
 
 		podStatusStr, err := json.Marshal(podStatus)
 		if err != nil {
-			return inPlaceUpdateSupport, onlyMetadataChanged, updatedPod, err
+			return err
 		}
 
-		if updatedPod.Annotations == nil {
-			updatedPod.Annotations = map[string]string{}
+		if podUpdateInfo.UpdatedPod.Annotations == nil {
+			podUpdateInfo.UpdatedPod.Annotations = map[string]string{}
 		}
-		updatedPod.Annotations[appsv1alpha1.LastPodStatusAnnotationKey] = string(podStatusStr)
+		podUpdateInfo.UpdatedPod.Annotations[appsv1alpha1.LastPodStatusAnnotationKey] = string(podStatusStr)
 	}
-
-	return
+	return nil
 }
 
 func (u inPlaceIfPossibleUpdater) diffPod(currentPod, updatedPod *corev1.Pod) (inPlaceSetUpdateSupport bool, onlyMetadataChanged bool) {
@@ -461,7 +463,7 @@ func (u *inPlaceIfPossibleUpdater) GetPodUpdateFinishStatus(podUpdateInfo *PodUp
 type inPlaceOnlyPodUpdater struct {
 }
 
-func (u *inPlaceOnlyPodUpdater) AnalyseAndGetUpdatedPod(_ *appsv1.ControllerRevision, _ *PodUpdateInfo) (inPlaceUpdateSupport bool, onlyMetadataChanged bool, updatedPod *corev1.Pod, err error) {
+func (u *inPlaceOnlyPodUpdater) FulfillPodUpdatedInfo(_ *appsv1.ControllerRevision, _ *PodUpdateInfo) (inPlaceUpdateSupport bool, onlyMetadataChanged bool, updatedPod *corev1.Pod, err error) {
 
 	return
 }
@@ -473,8 +475,8 @@ func (u *inPlaceOnlyPodUpdater) GetPodUpdateFinishStatus(_ *PodUpdateInfo) (fini
 type recreatePodUpdater struct {
 }
 
-func (u *recreatePodUpdater) AnalyseAndGetUpdatedPod(_ *appsv1.ControllerRevision, _ *PodUpdateInfo) (inPlaceUpdateSupport bool, onlyMetadataChanged bool, updatedPod *corev1.Pod, err error) {
-	return false, false, nil, nil
+func (u *recreatePodUpdater) FulfillPodUpdatedInfo(_ *appsv1.ControllerRevision, _ *PodUpdateInfo) error {
+	return nil
 }
 
 func (u *recreatePodUpdater) GetPodUpdateFinishStatus(podInfo *PodUpdateInfo) (finished bool, msg string, err error) {
@@ -488,7 +490,7 @@ type replaceUpdatePodUpdater struct {
 	client.Client
 }
 
-func (u *replaceUpdatePodUpdater) AnalyseAndGetUpdatedPod(updatedRevision *appsv1.ControllerRevision, podUpdateInfo *PodUpdateInfo) (inPlaceUpdateSupport bool, onlyMetadataChanged bool, updatedPod *corev1.Pod, err error) {
+func (u *replaceUpdatePodUpdater) FulfillPodUpdatedInfo(updatedRevision *appsv1.ControllerRevision, podUpdateInfo *PodUpdateInfo) (err error) {
 	// when replaceUpdate, inPlaceUpdateSupport and onlyMetadataChanged always false
 
 	// 1. judge replace pair new pod is updated revision, if not, delete.
