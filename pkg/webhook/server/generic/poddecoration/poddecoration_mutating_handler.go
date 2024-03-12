@@ -61,9 +61,9 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 }
 
 func SetDefaultPodDecoration(pd *appsv1alpha1.PodDecoration) {
-	if pd.Spec.InjectStrategy.Weight == nil {
+	if pd.Spec.Weight == nil {
 		var int32Zero int32
-		pd.Spec.InjectStrategy.Weight = &int32Zero
+		pd.Spec.Weight = &int32Zero
 	}
 	for i := range pd.Spec.Template.Metadata {
 		if pd.Spec.Template.Metadata[i].PatchPolicy == "" {

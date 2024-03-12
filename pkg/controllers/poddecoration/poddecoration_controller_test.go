@@ -111,10 +111,7 @@ var _ = Describe("PodDecoration controller", func() {
 						"app": "foo",
 					},
 				},
-				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
-					Group:  "group-a",
-					Weight: int32Pointer(10),
-				},
+				Weight: int32Pointer(10),
 				UpdateStrategy: appsv1alpha1.PodDecorationUpdateStrategy{
 					RollingUpdate: &appsv1alpha1.PodDecorationRollingUpdate{
 						Selector: &metav1.LabelSelector{
@@ -263,9 +260,7 @@ var _ = Describe("PodDecoration controller", func() {
 						"app": "foo",
 					},
 				},
-				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
-					Weight: int32Pointer(10),
-				},
+				Weight: int32Pointer(10),
 				UpdateStrategy: appsv1alpha1.PodDecorationUpdateStrategy{
 					RollingUpdate: &appsv1alpha1.PodDecorationRollingUpdate{
 						Selector: &metav1.LabelSelector{
@@ -413,9 +408,7 @@ var _ = Describe("PodDecoration controller", func() {
 						"app": "foo",
 					},
 				},
-				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
-					Weight: int32Pointer(10),
-				},
+				Weight: int32Pointer(10),
 				UpdateStrategy: appsv1alpha1.PodDecorationUpdateStrategy{
 					RollingUpdate: &appsv1alpha1.PodDecorationRollingUpdate{
 						Selector: &metav1.LabelSelector{
@@ -559,10 +552,7 @@ var _ = Describe("PodDecoration controller", func() {
 						"app": "foo",
 					},
 				},
-				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
-					Group:  "group-a",
-					Weight: int32Pointer(10),
-				},
+				Weight: int32Pointer(10),
 				UpdateStrategy: appsv1alpha1.PodDecorationUpdateStrategy{
 					RollingUpdate: &appsv1alpha1.PodDecorationRollingUpdate{
 						Selector: &metav1.LabelSelector{
@@ -595,10 +585,7 @@ var _ = Describe("PodDecoration controller", func() {
 						"app": "foo",
 					},
 				},
-				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
-					Group:  "group-a",
-					Weight: int32Pointer(11),
-				},
+				Weight: int32Pointer(11),
 				UpdateStrategy: appsv1alpha1.PodDecorationUpdateStrategy{
 					RollingUpdate: &appsv1alpha1.PodDecorationRollingUpdate{
 						Selector: &metav1.LabelSelector{
@@ -681,257 +668,25 @@ var _ = Describe("PodDecoration controller", func() {
 			updatedCnt := 0
 			for _, po := range podList.Items {
 				info := utilspoddecoration.GetDecorationRevisionInfo(&po)
-				if info.Size() == 1 && info.GetRevision(podDecorationB.Name) != nil && *info.GetRevision(podDecorationB.Name) == podDecorationB.Status.UpdatedRevision {
+				if info.Size() == 2 && info.GetRevision(podDecorationB.Name) != nil && *info.GetRevision(podDecorationB.Name) == podDecorationB.Status.UpdatedRevision {
 					updatedCnt++
 				}
 			}
 			return updatedCnt
 		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
-	})
-
-	It("test no group PodDecoration", func() {
-		testcase := "test-pd-4"
-		Expect(createNamespace(c, testcase)).Should(BeNil())
-		collaSetA := &appsv1alpha1.CollaSet{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: testcase,
-				Name:      "foo-a",
-			},
-			Spec: appsv1alpha1.CollaSetSpec{
-				Replicas: int32Pointer(2),
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"app":  "foo",
-						"zone": "a",
-					},
-				},
-				Template: corev1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"app":  "foo",
-							"zone": "a",
-						},
-					},
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
-							{
-								Name:  "foo",
-								Image: "nginx:v1",
-							},
-						},
-					},
-				},
-			},
-		}
-		podDecorationA := &appsv1alpha1.PodDecoration{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: testcase,
-				Name:      "foo-a",
-			},
-			Spec: appsv1alpha1.PodDecorationSpec{
-				HistoryLimit: 5,
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"app": "foo",
-					},
-				},
-				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
-					Group:  "group-a",
-					Weight: int32Pointer(10),
-				},
-				UpdateStrategy: appsv1alpha1.PodDecorationUpdateStrategy{
-					RollingUpdate: &appsv1alpha1.PodDecorationRollingUpdate{
-						Selector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{},
-						},
-					},
-				},
-				Template: appsv1alpha1.PodDecorationPodTemplate{
-					Containers: []*appsv1alpha1.ContainerPatch{
-						{
-							InjectPolicy: appsv1alpha1.AfterPrimaryContainer,
-							Container: corev1.Container{
-								Name:  "sidecar-1",
-								Image: "nginx:v2",
-							},
-						},
-					},
-				},
-			},
-		}
-		podDecorationB := &appsv1alpha1.PodDecoration{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: testcase,
-				Name:      "foo-b",
-			},
-			Spec: appsv1alpha1.PodDecorationSpec{
-				HistoryLimit: 5,
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"app": "foo",
-					},
-				},
-				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
-					Weight: int32Pointer(10),
-				},
-				Template: appsv1alpha1.PodDecorationPodTemplate{
-					Containers: []*appsv1alpha1.ContainerPatch{
-						{
-							InjectPolicy: appsv1alpha1.AfterPrimaryContainer,
-							Container: corev1.Container{
-								Name:  "sidecar-2",
-								Image: "nginx:v3",
-							},
-						},
-					},
-				},
-			},
-		}
-		podDecorationC := &appsv1alpha1.PodDecoration{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: testcase,
-				Name:      "foo-c",
-			},
-			Spec: appsv1alpha1.PodDecorationSpec{
-				HistoryLimit: 5,
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"app": "foo",
-					},
-				},
-				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
-					Weight: int32Pointer(11),
-				},
-				Template: appsv1alpha1.PodDecorationPodTemplate{
-					Containers: []*appsv1alpha1.ContainerPatch{
-						{
-							InjectPolicy: appsv1alpha1.AfterPrimaryContainer,
-							Container: corev1.Container{
-								Name:  "sidecar-3",
-								Image: "nginx:v4",
-							},
-						},
-					},
-				},
-			},
-		}
-		Expect(c.Create(ctx, podDecorationA)).Should(BeNil())
-		Eventually(func() bool {
-			if err := c.Get(ctx, types.NamespacedName{Name: podDecorationA.Name, Namespace: testcase}, podDecorationA); err == nil {
-				if podDecorationA.Status.IsEffective != nil {
-					return *podDecorationA.Status.IsEffective
-				}
-			}
-			return false
-		}, 5*time.Second, 1*time.Second).Should(BeTrue())
-		Expect(c.Create(ctx, collaSetA)).Should(BeNil())
-		podList := &corev1.PodList{}
-		// 2 pods injected by PodDecoration-A
-		Eventually(func() int {
-			cnt := 0
-			Expect(c.List(ctx, podList, client.InNamespace(testcase))).Should(BeNil())
-			for _, po := range podList.Items {
-				if len(po.Spec.Containers) == 2 {
-					cnt++
-				}
-			}
-			return cnt
-		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
-
-		Eventually(func() bool {
-			if err := c.Get(ctx, types.NamespacedName{Name: podDecorationA.Name, Namespace: testcase}, podDecorationA); err == nil {
-				return podDecorationA.Status.CurrentRevision == podDecorationA.Status.UpdatedRevision
-			}
-			return false
-		}, 5*time.Second, 1*time.Second).Should(BeTrue())
-
-		// create PodDecoration-B
-		Expect(c.Create(ctx, podDecorationB)).Should(BeNil())
-
-		// 2 pods during ops
-		Eventually(func() int {
-			Expect(c.List(ctx, podList, client.InNamespace(testcase))).ShouldNot(HaveOccurred())
-			cnt := 0
-			for i := range podList.Items {
-				if podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, &podList.Items[i]) {
-					cnt++
-				}
-			}
-			return cnt
-		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
-		// allow Pod to do update
-		Expect(c.List(ctx, podList, client.InNamespace(testcase))).ShouldNot(HaveOccurred())
-		for i := range podList.Items {
-			pod := &podList.Items[i]
-			// allow Pod to do update
-			Expect(updatePodWithRetry(ctx, c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
-				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
-				return true
-			})).Should(BeNil())
-		}
-		// 2 pods inject PodDecoration-B
 		Eventually(func() int {
 			Expect(c.List(ctx, podList, client.InNamespace(testcase))).Should(BeNil())
-			Expect(c.Get(ctx, types.NamespacedName{Name: podDecorationB.Name, Namespace: podDecorationB.Namespace}, podDecorationB)).Should(BeNil())
 			updatedCnt := 0
 			for _, po := range podList.Items {
-				info := utilspoddecoration.GetDecorationRevisionInfo(&po)
-				if info.Size() == 2 &&
-					info.GetRevision(podDecorationB.Name) != nil &&
-					*info.GetRevision(podDecorationB.Name) == podDecorationB.Status.UpdatedRevision &&
-					info.GetRevision(podDecorationA.Name) != nil &&
-					*info.GetRevision(podDecorationA.Name) == podDecorationA.Status.UpdatedRevision {
+				if len(po.Spec.Containers) != 3 {
+					return 0
+				}
+				if po.Spec.Containers[2].Name == "sidecar-1" {
 					updatedCnt++
 				}
 			}
 			return updatedCnt
 		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
-
-		// create PodDecoration-C
-		Expect(c.Create(ctx, podDecorationC)).Should(BeNil())
-		// 2 pods during ops
-		Eventually(func() int {
-			Expect(c.List(ctx, podList, client.InNamespace(testcase))).ShouldNot(HaveOccurred())
-			cnt := 0
-			for i := range podList.Items {
-				if podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, &podList.Items[i]) {
-					cnt++
-				}
-			}
-			return cnt
-		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
-		// allow Pod to do update
-		Expect(c.List(ctx, podList, client.InNamespace(testcase))).ShouldNot(HaveOccurred())
-		for i := range podList.Items {
-			pod := &podList.Items[i]
-			// allow Pod to do update
-			Expect(updatePodWithRetry(ctx, c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
-				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
-				return true
-			})).Should(BeNil())
-		}
-		// 2 pods inject PodDecoration-C
-		Eventually(func() int {
-			Expect(c.List(ctx, podList, client.InNamespace(testcase))).Should(BeNil())
-			Expect(c.Get(ctx, types.NamespacedName{Name: podDecorationC.Name, Namespace: podDecorationC.Namespace}, podDecorationC)).Should(BeNil())
-			updatedCnt := 0
-			for _, po := range podList.Items {
-				info := utilspoddecoration.GetDecorationRevisionInfo(&po)
-				if info.Size() == 3 {
-					updatedCnt++
-				}
-			}
-			return updatedCnt
-		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
-		Expect(len(podList.Items[0].Spec.Containers)).Should(BeEquivalentTo(4))
-		// B -> C -> A
-		// foo -> sidecar-3 -> sidecar-2 -> sidecar-1
-		Expect(podList.Items[0].Spec.Containers[0].Name).Should(BeEquivalentTo("foo"))
-		Expect(podList.Items[0].Spec.Containers[1].Name).Should(BeEquivalentTo("sidecar-3"))
-		Expect(podList.Items[0].Spec.Containers[2].Name).Should(BeEquivalentTo("sidecar-2"))
-		Expect(podList.Items[0].Spec.Containers[3].Name).Should(BeEquivalentTo("sidecar-1"))
 	})
 })
 

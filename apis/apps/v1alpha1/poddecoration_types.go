@@ -149,16 +149,6 @@ type PodDecorationUpdateStrategy struct {
 	RollingUpdate *PodDecorationRollingUpdate `json:"rollingUpdate,omitempty"`
 }
 
-type PodDecorationInjectStrategy struct {
-	// Group provides the name of the group this PodDecoration belongs to.
-	// Only one PodDecoration is active when multiple PodDecorations share the same group value.
-	Group string `json:"group,omitempty"`
-	// Weight indicates the priority to apply for a group of PodDecorations with same group value.
-	// The greater one has higher priority to apply.
-	// Default value is 0.
-	Weight *int32 `json:"weight,omitempty"`
-}
-
 type PodDecorationRollingUpdate struct {
 	// Partition controls the update progress by indicating how many pods should be updated.
 	// Partition value indicates the number of Pods which should be updated to the updated revision.
@@ -187,8 +177,10 @@ type PodDecorationSpec struct {
 	// UpdateStrategy carries the strategy configuration for update.
 	UpdateStrategy PodDecorationUpdateStrategy `json:"updateStrategy,omitempty"`
 
-	// InjectStrategy carries the strategy configuration for injection
-	InjectStrategy PodDecorationInjectStrategy `json:"injectStrategy,omitempty"`
+	// Weight indicates the priority to apply for a group of PodDecorations with same group value.
+	// The greater one has higher priority to apply.
+	// Default value is 0.
+	Weight *int32 `json:"weight,omitempty"`
 
 	// Template includes the decoration message about pod template.
 	Template PodDecorationPodTemplate `json:"template,omitempty"`

@@ -36,15 +36,10 @@ func getPodDecorationPatch(pd *appsalphav1.PodDecoration) ([]byte, error) {
 	}
 	objCopy := make(map[string]interface{})
 	specCopy := make(map[string]interface{})
-	injectStrategyCopy := make(map[string]interface{})
 
 	spec := raw["spec"].(map[string]interface{})
 	template := spec["template"].(map[string]interface{})
-	injectStrategy := spec["injectStrategy"].(map[string]interface{})
 
-	group := injectStrategy["group"]
-	injectStrategyCopy["group"] = group
-	specCopy["injectStrategy"] = injectStrategyCopy
 	template["$patch"] = "replace"
 	specCopy["template"] = template
 	objCopy["spec"] = specCopy
