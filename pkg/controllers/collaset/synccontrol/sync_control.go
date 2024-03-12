@@ -108,7 +108,7 @@ func (r *RealSyncControl) SyncPods(
 	}
 
 	// list pvcs using selector
-	if resources.ExistingPvcs, err = r.pvcControl.GetFilteredPVCs(instance); err != nil {
+	if resources.ExistingPvcs, err = r.pvcControl.GetFilteredPvcs(instance); err != nil {
 		return false, nil, nil, fmt.Errorf("fail to get filtered PVCs: %s", err)
 	}
 	// release/set ownerRef refer to retention policy

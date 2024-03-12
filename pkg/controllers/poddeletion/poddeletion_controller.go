@@ -162,7 +162,7 @@ func (r *PodDeletionReconciler) deleteReplacedPodPvcs(pod *corev1.Pod) error {
 	if cls.Spec.VolumeClaimTemplates == nil {
 		return nil
 	}
-	pvcs, err := r.pvcControl.GetFilteredPVCs(cls)
+	pvcs, err := r.pvcControl.GetFilteredPvcs(cls)
 	if err != nil {
 		return err
 	}

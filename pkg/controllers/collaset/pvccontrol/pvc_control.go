@@ -31,7 +31,7 @@ import (
 )
 
 type Interface interface {
-	GetFilteredPVCs(*appsv1alpha1.CollaSet) ([]*corev1.PersistentVolumeClaim, error)
+	GetFilteredPvcs(*appsv1alpha1.CollaSet) ([]*corev1.PersistentVolumeClaim, error)
 	CreatePodPvcs(*appsv1alpha1.CollaSet, *corev1.Pod, []*corev1.PersistentVolumeClaim) error
 	DeletePodPvcs(*appsv1alpha1.CollaSet, *corev1.Pod, []*corev1.PersistentVolumeClaim) error
 	DeletePodUnusedPvcs(*appsv1alpha1.CollaSet, *corev1.Pod, []*corev1.PersistentVolumeClaim) error
@@ -51,7 +51,7 @@ func NewRealPvcControl(client client.Client, scheme *runtime.Scheme) Interface {
 	}
 }
 
-func (pc *RealPvcControl) GetFilteredPVCs(cls *appsv1alpha1.CollaSet) ([]*corev1.PersistentVolumeClaim, error) {
+func (pc *RealPvcControl) GetFilteredPvcs(cls *appsv1alpha1.CollaSet) ([]*corev1.PersistentVolumeClaim, error) {
 	var filteredPVCs []*corev1.PersistentVolumeClaim
 	ownerSelector := cls.Spec.Selector.DeepCopy()
 
@@ -76,11 +76,7 @@ func (pc *RealPvcControl) GetFilteredPVCs(cls *appsv1alpha1.CollaSet) ([]*corev1
 		}
 	}
 
-	// if retain pvcs when collaset is deleted, do not claim pvcs
-	if collasetutils.PvcPolicyWhenDelete(cls) == appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType {
-		return pc.ReleasePvcsOwnerRef(cls, filteredPVCs)
-	}
-	return pc.SetPvcsOwnerRef(cls, filteredPVCs)
+	return filteredPVCs, nil
 }
 
 func (pc *RealPvcControl) CreatePodPvcs(cls *appsv1alpha1.CollaSet, pod *corev1.Pod, existingPvcs []*corev1.PersistentVolumeClaim) error {
@@ -90,7 +86,7 @@ func (pc *RealPvcControl) CreatePodPvcs(cls *appsv1alpha1.CollaSet, pod *corev1.
 	}
 
 	// provision pvcs related to pod using pvc template
-	pvcsMap, err := ProvisionUpdatedPvc(pc.client, cls, id, existingPvcs)
+	pvcsMap, err := provisionUpdatedPvc(pc.client, cls, id, existingPvcs)
 	if err != nil {
 		return err
 	}
@@ -121,8 +117,8 @@ func (pc *RealPvcControl) CreatePodPvcs(cls *appsv1alpha1.CollaSet, pod *corev1.
 	return nil
 }
 
-func ProvisionUpdatedPvc(c client.Client, cls *appsv1alpha1.CollaSet, id string, existingPvcs []*corev1.PersistentVolumeClaim) (*map[string]*corev1.PersistentVolumeClaim, error) {
-	updatedPvcs, _, err := ClassifyPodPvcs(cls, id, existingPvcs)
+func provisionUpdatedPvc(c client.Client, cls *appsv1alpha1.CollaSet, id string, existingPvcs []*corev1.PersistentVolumeClaim) (*map[string]*corev1.PersistentVolumeClaim, error) {
+	updatedPvcs, _, err := classifyPodPvcs(cls, id, existingPvcs)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +178,7 @@ func (pc *RealPvcControl) DeletePodUnusedPvcs(cls *appsv1alpha1.CollaSet, pod *c
 	}
 
 	id := pod.Labels[appsv1alpha1.PodInstanceIDLabelKey]
-	newPvcs, oldPvcs, err := ClassifyPodPvcs(cls, id, existingPvcs)
+	newPvcs, oldPvcs, err := classifyPodPvcs(cls, id, existingPvcs)
 	if err != nil {
 		return err
 	}
@@ -244,7 +240,8 @@ func (pc *RealPvcControl) ReleasePvcsOwnerRef(cls *appsv1alpha1.CollaSet, pvcs [
 	return pvcs, nil
 }
 
-func ClassifyPodPvcs(cls *appsv1alpha1.CollaSet, id string, existingPvcs []*corev1.PersistentVolumeClaim) (*map[string]*corev1.PersistentVolumeClaim, *map[string]*corev1.PersistentVolumeClaim, error) {
+// classify pvcs into old and new ones
+func classifyPodPvcs(cls *appsv1alpha1.CollaSet, id string, existingPvcs []*corev1.PersistentVolumeClaim) (*map[string]*corev1.PersistentVolumeClaim, *map[string]*corev1.PersistentVolumeClaim, error) {
 	newPvcs := map[string]*corev1.PersistentVolumeClaim{}
 	oldPvcs := map[string]*corev1.PersistentVolumeClaim{}
 	newTmpHash, err := collasetutils.PvcTmpHashMapping(cls.Spec.VolumeClaimTemplates)
