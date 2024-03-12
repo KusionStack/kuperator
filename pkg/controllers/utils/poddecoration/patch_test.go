@@ -352,16 +352,12 @@ var _ = Describe("PodDecoration controller", func() {
 		}
 		i0Int32 := int32(0)
 		i1Int32 := int32(1)
-		i2Int32 := int32(3)
 		pdA := &appsv1alpha1.PodDecoration{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pd-a",
 			},
 			Spec: appsv1alpha1.PodDecorationSpec{
-				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
-					Group:  "group-a",
-					Weight: &i0Int32,
-				},
+				Weight: &i0Int32,
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"app": "foo",
@@ -384,13 +380,19 @@ var _ = Describe("PodDecoration controller", func() {
 				Name: "pd-b",
 			},
 			Spec: appsv1alpha1.PodDecorationSpec{
-				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
-					Group:  "group-b",
-					Weight: &i1Int32,
-				},
+				Weight: &i1Int32,
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"app": "foo",
+					},
+				},
+				UpdateStrategy: appsv1alpha1.PodDecorationUpdateStrategy{
+					RollingUpdate: &appsv1alpha1.PodDecorationRollingUpdate{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"id": "0",
+							},
+						},
 					},
 				},
 				Template: appsv1alpha1.PodDecorationPodTemplate{
@@ -405,67 +407,7 @@ var _ = Describe("PodDecoration controller", func() {
 				UpdatedRevision: "101",
 			},
 		}
-		pdC := &appsv1alpha1.PodDecoration{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "pd-c",
-			},
-			Spec: appsv1alpha1.PodDecorationSpec{
-				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
-					Group:  "group-b",
-					Weight: &i2Int32,
-				},
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"app": "foo",
-					},
-				},
-				Template: appsv1alpha1.PodDecorationPodTemplate{
-					Metadata: []*appsv1alpha1.PodDecorationPodTemplateMeta{
-						{
-							Labels: map[string]string{"inj": "group-b-new"},
-						},
-					},
-				},
-			},
-			Status: appsv1alpha1.PodDecorationStatus{
-				UpdatedRevision: "102",
-			},
-		}
-		pdD := &appsv1alpha1.PodDecoration{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "pd-d",
-			},
-			Spec: appsv1alpha1.PodDecorationSpec{
-				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
-					Weight: &i2Int32,
-				},
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"app": "foo",
-					},
-				},
-				UpdateStrategy: appsv1alpha1.PodDecorationUpdateStrategy{
-					RollingUpdate: &appsv1alpha1.PodDecorationRollingUpdate{
-						Selector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"id": "1",
-							},
-						},
-					},
-				},
-				Template: appsv1alpha1.PodDecorationPodTemplate{
-					Metadata: []*appsv1alpha1.PodDecorationPodTemplateMeta{
-						{
-							Labels: map[string]string{"inj": "group-b-new-1"},
-						},
-					},
-				},
-			},
-			Status: appsv1alpha1.PodDecorationStatus{
-				CurrentRevision: "201",
-				UpdatedRevision: "202",
-			},
-		}
+
 		pds := map[string]*appsv1alpha1.PodDecoration{
 			"100": pdA,
 			"101": pdB,
@@ -473,11 +415,12 @@ var _ = Describe("PodDecoration controller", func() {
 		Expect(PatchListOfDecorations(pod, pds)).Should(BeNil())
 		Expect(GetDecorationRevisionInfo(pod).Size()).Should(Equal(2))
 		appsv1alpha1.SchemeBuilder.AddToScheme(scheme.Scheme)
-		updatedRevisions, stableRevisions := GetEffectiveRevisionsFormLatestDecorations([]*appsv1alpha1.PodDecoration{pdA, pdB, pdC, pdD}, map[string]string{
+		updatedRevisions, stableRevisions := GetEffectiveRevisionsFormLatestDecorations([]*appsv1alpha1.PodDecoration{pdA, pdB}, map[string]string{
 			"app": "foo",
+			"id":  "1",
 		})
-		Expect(updatedRevisions.Len()).Should(Equal(2))
-		Expect(stableRevisions.Len()).Should(Equal(1))
+		Expect(updatedRevisions.Len()).Should(Equal(1))
+		Expect(stableRevisions.Len()).Should(Equal(0))
 	})
 })
 
@@ -501,10 +444,7 @@ func (*mockClient) List(ctx context.Context, list client.ObjectList, opts ...cli
 				CreationTimestamp: Tm1,
 			},
 			Spec: appsv1alpha1.PodDecorationSpec{
-				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
-					Group:  "group-b",
-					Weight: &i1Int32,
-				},
+				Weight: &i0Int32,
 			},
 		},
 		{
@@ -513,34 +453,7 @@ func (*mockClient) List(ctx context.Context, list client.ObjectList, opts ...cli
 				CreationTimestamp: Tm2,
 			},
 			Spec: appsv1alpha1.PodDecorationSpec{
-				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
-					Group:  "group-b",
-					Weight: &i1Int32,
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:              "pd-c",
-				CreationTimestamp: Tm1,
-			},
-			Spec: appsv1alpha1.PodDecorationSpec{
-				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
-					Group:  "group-b",
-					Weight: &i0Int32,
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:              "pd-d",
-				CreationTimestamp: Tm2,
-			},
-			Spec: appsv1alpha1.PodDecorationSpec{
-				InjectStrategy: appsv1alpha1.PodDecorationInjectStrategy{
-					Group:  "group-a",
-					Weight: &i0Int32,
-				},
+				Weight: &i1Int32,
 			},
 		},
 	}

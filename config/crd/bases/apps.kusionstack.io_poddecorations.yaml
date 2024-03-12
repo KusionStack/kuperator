@@ -77,22 +77,6 @@ spec:
                   defaults to 20
                 format: int32
                 type: integer
-              injectStrategy:
-                description: InjectStrategy carries the strategy configuration for
-                  injection
-                properties:
-                  group:
-                    description: Group provides the name of the group this PodDecoration
-                      belongs to. Only one PodDecoration is active when multiple PodDecorations
-                      share the same group value.
-                    type: string
-                  weight:
-                    description: Weight indicates the priority to apply for a group
-                      of PodDecorations with same group value. The greater one has
-                      higher priority to apply. Default value is 0.
-                    format: int32
-                    type: integer
-                type: object
               selector:
                 description: Selector is a label query over pods that should be injected
                   with PodDecoration
@@ -5394,6 +5378,12 @@ spec:
                         x-kubernetes-map-type: atomic
                     type: object
                 type: object
+              weight:
+                description: Weight indicates the priority to apply for a group of
+                  PodDecorations with same group value. The greater one has higher
+                  priority to apply. Default value is 0.
+                format: int32
+                type: integer
             type: object
           status:
             description: PodDecorationStatus defines the observed state of PodDecoration
