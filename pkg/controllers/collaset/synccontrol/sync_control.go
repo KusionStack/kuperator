@@ -245,6 +245,11 @@ func (r *RealSyncControl) SyncPods(
 			instanceId := fmt.Sprintf("%d", availableContexts[i].ID)
 			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
 			newPod.Labels[appsv1alpha1.PodReplacePairOriginName] = originPod.GetName()
+			// create pvcs for new pod
+			err = r.pvcControl.CreatePodPvcs(instance, newPod, resources.ExistingPvcs)
+			if err != nil {
+				return fmt.Errorf("fail to migrate PVCs from origin pod %s to replace pod %s: %s", originPod.Name, newPod.Name, err)
+			}
 			if newCreatedPod, err := r.podControl.CreatePod(newPod); err == nil {
 				r.recorder.Eventf(originPod,
 					corev1.EventTypeNormal,
@@ -579,8 +584,8 @@ func (r *RealSyncControl) Scale(
 			}
 
 			// delete PVC from PVC template
-			if err = r.pvcControl.DeletePodPvcs(cls, pod.Pod, resources.ExistingPvcs); err != nil {
-				return err
+			if collasetutils.PvcPolicyWhenScaled(cls) == appsv1alpha1.DeletePersistentVolumeClaimRetentionPolicyType {
+				return r.pvcControl.DeletePodPvcs(cls, pod.Pod, resources.ExistingPvcs)
 			}
 
 			return nil

@@ -154,9 +154,6 @@ func ProvisionUpdatedPvc(c client.Client, cls *appsv1alpha1.CollaSet, id string,
 }
 
 func (pc *RealPvcControl) DeletePodPvcs(cls *appsv1alpha1.CollaSet, pod *corev1.Pod, pvcs []*corev1.PersistentVolumeClaim) error {
-	if collasetutils.PvcPolicyWhenScaled(cls) == appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType {
-		return nil
-	}
 	for _, pvc := range pvcs {
 		if pvc.Labels == nil || pod.Labels == nil {
 			continue
