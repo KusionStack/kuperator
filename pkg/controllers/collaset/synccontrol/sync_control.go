@@ -583,11 +583,12 @@ func (r *RealSyncControl) Scale(
 				return err
 			}
 
-			// delete PVC from PVC template
-			if collasetutils.PvcPolicyWhenScaled(cls) == appsv1alpha1.DeletePersistentVolumeClaimRetentionPolicyType {
+			// delete PVC if pod is in update replace, or retention policy is "Deleted"
+			_, originExist := pod.Labels[appsv1alpha1.PodReplacePairNewId]
+			_, replaceExist := pod.Labels[appsv1alpha1.PodReplacePairOriginName]
+			if originExist || replaceExist || collasetutils.PvcPolicyWhenScaled(cls) == appsv1alpha1.DeletePersistentVolumeClaimRetentionPolicyType {
 				return r.pvcControl.DeletePodPvcs(cls, pod.Pod, resources.ExistingPvcs)
 			}
-
 			return nil
 		})
 		scaling := scaling || succCount > 0

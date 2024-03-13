@@ -133,22 +133,16 @@ func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			}
 		}
 		// if this pod in replaced update, delete pvcs
-		err := r.deleteReplacedPodPvcs(instance)
-		return ctrl.Result{}, err
+		if _, exist := instance.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
+			err := r.deleteReplacedPodPvcs(instance)
+			return ctrl.Result{}, err
+		}
 	}
 
 	return ctrl.Result{}, nil
 }
 
 func (r *PodDeletionReconciler) deleteReplacedPodPvcs(pod *corev1.Pod) error {
-	if pod.Labels == nil {
-		return nil
-	}
-	if _, exist := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist {
-		return nil
-	}
-
-	// pod is in replace update, delete pvcs
 	ownerRefs := pod.GetOwnerReferences()
 	cls := &appsv1alpha1.CollaSet{}
 	for _, ref := range ownerRefs {
