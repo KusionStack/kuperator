@@ -187,7 +187,10 @@ func (pc *RealPvcControl) DeletePodUnusedPvcs(cls *appsv1alpha1.CollaSet, pod *c
 	if err := deleteUnclaimedPvcs(pc.client, cls, oldPvcs); err != nil {
 		return err
 	}
-	// delete old pvc if new pvc is provisioned
+	if collasetutils.PvcPolicyWhenScaled(cls) == appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType {
+		return nil
+	}
+	// delete old pvc if new pvc is provisioned and WhenScaled is "Delete"
 	if err := deleteOldPvcs(pc.client, cls, newPvcs, oldPvcs); err != nil {
 		return err
 	}
