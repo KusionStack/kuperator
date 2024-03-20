@@ -37,7 +37,6 @@ type PodDecorationGetter interface {
 	GetDecorationByRevisions(ctx context.Context, revisions ...string) (map[string]*appsv1alpha1.PodDecoration, error)
 	GetLatestDecorationsByTargetLabel(ctx context.Context, labels map[string]string) (map[string]*appsv1alpha1.PodDecoration, error)
 	GetUpdatedDecorationsByOldPod(ctx context.Context, pod *corev1.Pod) (map[string]*appsv1alpha1.PodDecoration, error)
-	GetUpdatedDecorationsByOldRevisions(ctx context.Context, labels map[string]string, oldPDRevisions map[string]string) (map[string]*appsv1alpha1.PodDecoration, error)
 }
 
 func NewPodDecorationGetter(ctx context.Context, c client.Client, namespace string) (PodDecorationGetter, error) {
@@ -102,22 +101,17 @@ func (p *podDecorationGetter) GetUpdatedDecorationsByOldPod(ctx context.Context,
 	for _, info := range infos {
 		oldRevisions[info.Name] = info.Revision
 	}
-	return p.GetUpdatedDecorationsByOldRevisions(ctx, pod.Labels, oldRevisions)
+	return p.getUpdatedDecorationsByOldRevisions(ctx, pod.Labels, oldRevisions)
 }
 
-func (p *podDecorationGetter) GetUpdatedDecorationsByOldRevisions(ctx context.Context, labels map[string]string, oldPDRevisions map[string]string) (map[string]*appsv1alpha1.PodDecoration, error) {
+func (p *podDecorationGetter) getUpdatedDecorationsByOldRevisions(ctx context.Context, labels map[string]string, oldPDRevisions map[string]string) (map[string]*appsv1alpha1.PodDecoration, error) {
 	updatedRevisions, _ := utilspoddecoration.GetEffectiveRevisionsFormLatestDecorations(p.latestPodDecorations, labels)
-	// key: Group name, value: PodDecoration name
-	effectiveGroup := map[string]string{}
 	updatedPDs, err := p.GetDecorationByRevisions(ctx, updatedRevisions.List()...)
 	if err != nil {
 		return nil, err
 	}
 	// delete updated PodDecorations in old revisions
 	for _, pd := range updatedPDs {
-		if pd.Spec.InjectStrategy.Group != "" {
-			effectiveGroup[pd.Spec.InjectStrategy.Group] = pd.Name
-		}
 		delete(oldPDRevisions, pd.Name)
 	}
 
@@ -130,19 +124,6 @@ func (p *podDecorationGetter) GetUpdatedDecorationsByOldRevisions(ctx context.Co
 	oldStablePDs, err := p.GetDecorationByRevisions(ctx, oldStableRevisions...)
 	if err != nil {
 		return nil, err
-	}
-	// delete updated group in old stable PodDecorations
-	var shouldDeleteRevisions []string
-	for rev, pd := range oldStablePDs {
-		group := pd.Spec.InjectStrategy.Group
-		if group != "" {
-			if _, ok := effectiveGroup[group]; ok {
-				shouldDeleteRevisions = append(shouldDeleteRevisions, rev)
-			}
-		}
-	}
-	for _, rev := range shouldDeleteRevisions {
-		delete(oldStablePDs, rev)
 	}
 
 	for rev, pd := range oldStablePDs {

@@ -28,6 +28,8 @@ var (
 	OpsLifecycleTypeDelete  OperationType = "delete"
 )
 
+type UpdateFunc func(object client.Object) (bool, error)
+
 // LifecycleAdapter helps CRD Operators to easily access PodOpsLifecycle
 type LifecycleAdapter interface {
 	// GetID indicates ID of one PodOpsLifecycle

@@ -91,7 +91,7 @@ func (a *CollaSetScaleInOpsLifecycleAdapter) AllowMultiType() bool {
 
 // WhenBegin will be executed when begin a lifecycle
 func (a *CollaSetScaleInOpsLifecycleAdapter) WhenBegin(pod client.Object) (bool, error) {
-	return false, nil
+	return podopslifecycle.WhenBeginDelete(pod)
 }
 
 // WhenFinish will be executed when finish a lifecycle

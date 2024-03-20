@@ -27,36 +27,14 @@ import (
 )
 
 func GetEffectiveRevisionsFormLatestDecorations(latestPodDecorations []*appsv1alpha1.PodDecoration, lb map[string]string) (updatedRevisions, stableRevisions sets.String) {
-	groupedDecorations := map[string]*appsv1alpha1.PodDecoration{}
-	groupIsUpdatedRevision := map[string]bool{}
-	groupRevision := map[string]string{}
 	updatedRevisions = sets.NewString()
 	stableRevisions = sets.NewString()
-	for i, pd := range latestPodDecorations {
+	for _, pd := range latestPodDecorations {
 		revision, isUpdatedRevision := getEffectiveRevision(pd, lb)
 		if revision == "" {
 			continue
 		}
-		// no group PD is effective default
-		if pd.Spec.InjectStrategy.Group == "" {
-			if isUpdatedRevision {
-				updatedRevisions.Insert(revision)
-			} else {
-				stableRevisions.Insert(revision)
-			}
-			continue
-		}
-
-		// update by heaviest one
-		stable, ok := groupedDecorations[pd.Spec.InjectStrategy.Group]
-		if !ok || isHeaviest(latestPodDecorations[i], stable) {
-			groupedDecorations[pd.Spec.InjectStrategy.Group] = latestPodDecorations[i]
-			groupRevision[pd.Spec.InjectStrategy.Group] = revision
-			groupIsUpdatedRevision[pd.Spec.InjectStrategy.Group] = isUpdatedRevision
-		}
-	}
-	for group, revision := range groupRevision {
-		if groupIsUpdatedRevision[group] {
+		if isUpdatedRevision {
 			updatedRevisions.Insert(revision)
 		} else {
 			stableRevisions.Insert(revision)
@@ -74,14 +52,6 @@ func getEffectiveRevision(pd *appsv1alpha1.PodDecoration, lb map[string]string) 
 		return pd.Status.UpdatedRevision, true
 	}
 	return pd.Status.CurrentRevision, false
-}
-
-// if current is heaviest, return true
-func isHeaviest(current, t *appsv1alpha1.PodDecoration) bool {
-	if *current.Spec.InjectStrategy.Weight == *t.Spec.InjectStrategy.Weight {
-		return current.CreationTimestamp.Time.After(t.CreationTimestamp.Time)
-	}
-	return *current.Spec.InjectStrategy.Weight > *t.Spec.InjectStrategy.Weight
 }
 
 func inUpdateStrategy(pd *appsv1alpha1.PodDecoration, lb map[string]string) bool {

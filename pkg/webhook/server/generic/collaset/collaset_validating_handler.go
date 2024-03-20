@@ -121,11 +121,17 @@ func (h *ValidatingHandler) validateUpdateStrategy(cls *appsv1alpha1.CollaSet, f
 	case appsv1alpha1.CollaSetRecreatePodUpdateStrategyType,
 		appsv1alpha1.CollaSetInPlaceOnlyPodUpdateStrategyType,
 		appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType:
+
+	case appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType:
+		if cls.Spec.VolumeClaimTemplates != nil {
+			allErrs = append(allErrs, field.Forbidden(fSpec.Child("updateStrategy", "podUpdatePolicy"), "updateStrategy.podUpdatePolicy ReplaceUpdate is not supported to claim Spec.VolumeClaimTemplates"))
+		}
 	default:
 		allErrs = append(allErrs, field.NotSupported(fSpec.Child("updateStrategy", "podUpdatePolicy"),
 			cls.Spec.UpdateStrategy.PodUpdatePolicy, []string{string(appsv1alpha1.CollaSetRecreatePodUpdateStrategyType),
 				string(appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType),
-				string(appsv1alpha1.CollaSetInPlaceOnlyPodUpdateStrategyType)}))
+				string(appsv1alpha1.CollaSetInPlaceOnlyPodUpdateStrategyType),
+				string(appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType)}))
 	}
 
 	if cls.Spec.UpdateStrategy.RollingUpdate != nil && cls.Spec.UpdateStrategy.RollingUpdate.ByPartition != nil &&
