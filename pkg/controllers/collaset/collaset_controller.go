@@ -19,7 +19,6 @@ package collaset
 import (
 	"context"
 	"fmt"
-	"kusionstack.io/operating/pkg/controllers/collaset/pvccontrol"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -35,6 +34,7 @@ import (
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontext"
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
+	"kusionstack.io/operating/pkg/controllers/collaset/pvccontrol"
 	"kusionstack.io/operating/pkg/controllers/collaset/synccontrol"
 	"kusionstack.io/operating/pkg/controllers/collaset/utils"
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"

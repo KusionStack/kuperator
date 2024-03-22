@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The KusionStack Authors.
+Copyright 2024 The KusionStack Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,10 +20,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
-	"strings"
 )
 
 func BuildPvcWithHash(cls *appsv1alpha1.CollaSet, pvcTmp *corev1.PersistentVolumeClaim, id string) (*corev1.PersistentVolumeClaim, error) {

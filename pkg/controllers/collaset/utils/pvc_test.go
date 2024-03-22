@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The KusionStack Authors.
+Copyright 2024 The KusionStack Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,13 +17,14 @@ limitations under the License.
 package utils
 
 import (
-	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
 var _ = Describe("Pvc utils", func() {
