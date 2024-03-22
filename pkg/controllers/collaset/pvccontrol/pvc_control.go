@@ -55,12 +55,10 @@ func NewRealPvcControl(client client.Client, scheme *runtime.Scheme) Interface {
 
 func (pc *RealPvcControl) GetFilteredPvcs(ctx context.Context, cls *appsv1alpha1.CollaSet) ([]*corev1.PersistentVolumeClaim, error) {
 	var filteredPVCs []*corev1.PersistentVolumeClaim
-	ownerSelector := cls.Spec.Selector.DeepCopy()
-
-	if ownerSelector.MatchLabels == nil {
+	if cls.Spec.Selector.MatchLabels == nil {
 		return filteredPVCs, nil
 	}
-	selector, err := metav1.LabelSelectorAsSelector(ownerSelector)
+	selector, err := metav1.LabelSelectorAsSelector(cls.Spec.Selector)
 	if err != nil {
 		return filteredPVCs, err
 	}
@@ -202,11 +200,11 @@ func (pc *RealPvcControl) DeletePodUnusedPvcs(ctx context.Context, cls *appsv1al
 
 func (pc *RealPvcControl) SetPvcsOwnerRef(cls *appsv1alpha1.CollaSet, pvcs []*corev1.PersistentVolumeClaim) ([]*corev1.PersistentVolumeClaim, error) {
 	claimPvcs := make([]*corev1.PersistentVolumeClaim, len(pvcs))
-	ownerSelector := cls.Spec.Selector.DeepCopy()
-	if ownerSelector.MatchLabels == nil {
+
+	if cls.Spec.Selector.MatchLabels == nil {
 		return claimPvcs, nil
 	}
-	cm, err := refmanagerutil.NewRefManager(pc.client, ownerSelector, cls, pc.scheme)
+	cm, err := refmanagerutil.NewRefManager(pc.client, cls.Spec.Selector, cls, pc.scheme)
 	if err != nil {
 		return claimPvcs, fmt.Errorf("fail to create ref manager: %s", err)
 	}
@@ -227,12 +225,11 @@ func (pc *RealPvcControl) SetPvcsOwnerRef(cls *appsv1alpha1.CollaSet, pvcs []*co
 }
 
 func (pc *RealPvcControl) ReleasePvcsOwnerRef(cls *appsv1alpha1.CollaSet, pvcs []*corev1.PersistentVolumeClaim) ([]*corev1.PersistentVolumeClaim, error) {
-	ownerSelector := cls.Spec.Selector.DeepCopy()
-	if ownerSelector.MatchLabels == nil {
+	if cls.Spec.Selector.MatchLabels == nil {
 		return pvcs, nil
 	}
 
-	cm, err := refmanagerutil.NewRefManager(pc.client, ownerSelector, cls, pc.scheme)
+	cm, err := refmanagerutil.NewRefManager(pc.client, cls.Spec.Selector, cls, pc.scheme)
 	if err != nil {
 		return pvcs, fmt.Errorf("fail to create ref manager: %s", err)
 	}
