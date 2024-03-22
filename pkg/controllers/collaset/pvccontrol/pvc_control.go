@@ -294,37 +294,29 @@ func IsPodPvcTmpChanged(cls *appsv1alpha1.CollaSet, pod *corev1.Pod, existingPvc
 		return false, err
 	}
 
-	// get existing pvc hash values
-	oldHashMapping := map[string]string{}
+	// get existing pod pvcs hash values
+	existingPvcHash := map[string]string{}
 	for _, pvc := range existingPvcs {
 		if pvc.Labels == nil || pod.Labels == nil {
 			continue
 		}
-		if pvc.Labels[appsv1alpha1.PodInstanceIDLabelKey] != pod.Labels[appsv1alpha1.PodInstanceIDLabelKey] {
+		if pod.Labels[appsv1alpha1.PodInstanceIDLabelKey] != pvc.Labels[appsv1alpha1.PodInstanceIDLabelKey] {
 			continue
 		}
 		if _, exist := pvc.Labels[appsv1alpha1.PvcTemplateHashLabelKey]; !exist {
 			continue
 		}
-		hash := pvc.Labels[appsv1alpha1.PvcTemplateHashLabelKey]
-		pvcTmpName, err := collasetutils.ExtractPvcTmpName(cls, pvc)
-		if err != nil {
-			return false, err
-		}
-		if _, exist := oldHashMapping[pvcTmpName]; !exist {
-			oldHashMapping[pvcTmpName] = hash
-		} else {
-			// skip, do not create new pvc twice
-			oldHashMapping[pvcTmpName] = newHashMapping[pvcTmpName]
-		}
+		existingPvcHash[pvc.Name] = pvc.Labels[appsv1alpha1.PvcTemplateHashLabelKey]
 	}
 
-	// compare the hash new pvc from pvc template
-	for _, pvcTmp := range cls.Spec.VolumeClaimTemplates {
-		if _, exist := oldHashMapping[pvcTmp.Name]; !exist {
+	// check mounted pvcs changed
+	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim == nil || volume.PersistentVolumeClaim.ClaimName == "" {
 			continue
 		}
-		if oldHashMapping[pvcTmp.Name] != newHashMapping[pvcTmp.Name] {
+		pvcName := volume.PersistentVolumeClaim.ClaimName
+		TmpName := volume.Name
+		if newHashMapping[TmpName] != existingPvcHash[pvcName] {
 			return true, nil
 		}
 	}
