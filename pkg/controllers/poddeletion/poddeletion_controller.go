@@ -135,7 +135,7 @@ func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 		// if this pod in replaced update, delete pvcs
 		if _, exist := instance.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
-			err := r.deleteReplacedPodPvcs(instance)
+			err := r.deleteReplacedPodPvcs(ctx, instance)
 			return ctrl.Result{}, err
 		}
 	}
@@ -143,7 +143,7 @@ func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	return ctrl.Result{}, nil
 }
 
-func (r *PodDeletionReconciler) deleteReplacedPodPvcs(pod *corev1.Pod) error {
+func (r *PodDeletionReconciler) deleteReplacedPodPvcs(ctx context.Context, pod *corev1.Pod) error {
 	ownerRefs := pod.GetOwnerReferences()
 	cls := &appsv1alpha1.CollaSet{}
 	for _, ref := range ownerRefs {
@@ -157,9 +157,9 @@ func (r *PodDeletionReconciler) deleteReplacedPodPvcs(pod *corev1.Pod) error {
 	if cls.Spec.VolumeClaimTemplates == nil {
 		return nil
 	}
-	pvcs, err := r.pvcControl.GetFilteredPvcs(cls)
+	pvcs, err := r.pvcControl.GetFilteredPvcs(ctx, cls)
 	if err != nil {
 		return err
 	}
-	return r.pvcControl.DeletePodPvcs(cls, pod, pvcs)
+	return r.pvcControl.DeletePodPvcs(ctx, cls, pod, pvcs)
 }

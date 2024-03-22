@@ -108,7 +108,7 @@ func (r *RealSyncControl) SyncPods(
 	}
 
 	// list pvcs using selector
-	if resources.ExistingPvcs, err = r.pvcControl.GetFilteredPvcs(instance); err != nil {
+	if resources.ExistingPvcs, err = r.pvcControl.GetFilteredPvcs(ctx, instance); err != nil {
 		return false, nil, nil, fmt.Errorf("fail to get filtered PVCs: %s", err)
 	}
 	// release/set ownerRef refer to retention policy
@@ -195,7 +195,7 @@ func (r *RealSyncControl) SyncPods(
 		}
 
 		// delete unused pvcs
-		if err := r.pvcControl.DeletePodUnusedPvcs(instance, pod, resources.ExistingPvcs); err != nil {
+		if err := r.pvcControl.DeletePodUnusedPvcs(ctx, instance, pod, resources.ExistingPvcs); err != nil {
 			return false, nil, nil, fmt.Errorf("fail to delete unused pvcs %s", err)
 		}
 
@@ -246,7 +246,7 @@ func (r *RealSyncControl) SyncPods(
 			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
 			newPod.Labels[appsv1alpha1.PodReplacePairOriginName] = originPod.GetName()
 			// create pvcs for new pod
-			err = r.pvcControl.CreatePodPvcs(instance, newPod, resources.ExistingPvcs)
+			err = r.pvcControl.CreatePodPvcs(ctx, instance, newPod, resources.ExistingPvcs)
 			if err != nil {
 				return fmt.Errorf("fail to migrate PVCs from origin pod %s to replace pod %s: %s", originPod.Name, newPod.Name, err)
 			}
@@ -463,7 +463,7 @@ func (r *RealSyncControl) Scale(
 				return fmt.Errorf("fail to new Pod from revision %s: %s", revision.Name, err)
 			}
 
-			err = r.pvcControl.CreatePodPvcs(cls, pod, resources.ExistingPvcs)
+			err = r.pvcControl.CreatePodPvcs(ctx, cls, pod, resources.ExistingPvcs)
 			if err != nil {
 				return fmt.Errorf("fail to create PVCs for pod %s: %s", pod.Name, err)
 			}
@@ -587,7 +587,7 @@ func (r *RealSyncControl) Scale(
 			_, originExist := pod.Labels[appsv1alpha1.PodReplacePairNewId]
 			_, replaceExist := pod.Labels[appsv1alpha1.PodReplacePairOriginName]
 			if originExist || replaceExist || collasetutils.PvcPolicyWhenScaled(cls) == appsv1alpha1.DeletePersistentVolumeClaimRetentionPolicyType {
-				return r.pvcControl.DeletePodPvcs(cls, pod.Pod, resources.ExistingPvcs)
+				return r.pvcControl.DeletePodPvcs(ctx, cls, pod.Pod, resources.ExistingPvcs)
 			}
 			return nil
 		})
