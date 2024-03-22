@@ -40,6 +40,7 @@ func BuildPvcWithHash(cls *appsv1alpha1.CollaSet, pvcTmp *corev1.PersistentVolum
 	for k, v := range cls.Spec.Selector.MatchLabels {
 		claim.Labels[k] = v
 	}
+	claim.Labels[appsv1alpha1.ControlledByKusionStackLabelKey] = "true"
 
 	hash, err := PvcTmpHash(pvcTmp)
 	if err != nil {
