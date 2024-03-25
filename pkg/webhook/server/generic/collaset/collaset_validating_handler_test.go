@@ -17,11 +17,11 @@ limitations under the License.
 package collaset
 
 import (
-	"k8s.io/apimachinery/pkg/api/resource"
 	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
