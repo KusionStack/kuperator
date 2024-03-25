@@ -96,6 +96,14 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	err = c.Watch(&source.Kind{Type: &corev1.PersistentVolumeClaim{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &appsv1alpha1.CollaSet{},
+	}, &PvcPredicate{})
+	if err != nil {
+		return err
+	}
+
 	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &appsv1alpha1.CollaSet{},
@@ -142,6 +150,10 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	if instance.DeletionTimestamp != nil {
+		if reclaimed, err := r.ensureReclaimPvcs(ctx, instance); !reclaimed || err != nil {
+			// reclaim pvcs before remove finalizers
+			return ctrl.Result{}, err
+		}
 		if controllerutil.ContainsFinalizer(instance, preReclaimFinalizer) {
 			// reclaim owner IDs in ResourceContext
 			if err := r.reclaimResourceContext(instance); err != nil {
@@ -326,4 +338,27 @@ func requeueResult(requeueTime *time.Duration) reconcile.Result {
 		return reconcile.Result{RequeueAfter: *requeueTime}
 	}
 	return reconcile.Result{}
+}
+
+func (r *CollaSetReconciler) ensureReclaimPvcs(ctx context.Context, cls *appsv1alpha1.CollaSet) (bool, error) {
+	var needReclaimPvcs []*corev1.PersistentVolumeClaim
+	pvcControl := pvccontrol.NewRealPvcControl(r.Client, r.Scheme)
+	pvcs, err := pvcControl.GetFilteredPvcs(ctx, cls)
+	if err != nil {
+		return false, err
+	}
+	// reclaim pvcs according to whenDelete retention policy
+	for i := range pvcs {
+		owned := pvcs[i].OwnerReferences != nil && len(pvcs[i].OwnerReferences) > 0
+		if (!owned && collasetutils.PvcPolicyWhenDelete(cls) == appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType) ||
+			(owned && collasetutils.PvcPolicyWhenDelete(cls) == appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType) {
+			needReclaimPvcs = append(needReclaimPvcs, pvcs[i])
+		}
+	}
+	if collasetutils.PvcPolicyWhenDelete(cls) == appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType {
+		_, err = pvcControl.ReleasePvcsOwnerRef(cls, needReclaimPvcs)
+	} else {
+		_, err = pvcControl.SetPvcsOwnerRef(cls, needReclaimPvcs)
+	}
+	return len(needReclaimPvcs) == 0, err
 }

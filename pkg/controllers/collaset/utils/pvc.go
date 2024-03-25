@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
@@ -33,6 +34,8 @@ func BuildPvcWithHash(cls *appsv1alpha1.CollaSet, pvcTmp *corev1.PersistentVolum
 	claim.Name = ""
 	claim.GenerateName = fmt.Sprintf("%s-%s-", cls.Name, pvcTmp.Name)
 	claim.Namespace = cls.Namespace
+	claim.OwnerReferences = append(claim.OwnerReferences,
+		*metav1.NewControllerRef(cls, appsv1alpha1.GroupVersion.WithKind("CollaSet")))
 
 	if claim.Labels == nil {
 		claim.Labels = map[string]string{}

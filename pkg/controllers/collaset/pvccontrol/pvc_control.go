@@ -22,6 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,10 +31,12 @@ import (
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
 	refmanagerutil "kusionstack.io/operating/pkg/controllers/utils/refmanager"
+	"kusionstack.io/operating/pkg/utils/inject"
 )
 
 type Interface interface {
 	GetFilteredPvcs(context.Context, *appsv1alpha1.CollaSet) ([]*corev1.PersistentVolumeClaim, error)
+	AdoptOrphanedPvcs(context.Context, *appsv1alpha1.CollaSet) ([]*corev1.PersistentVolumeClaim, error)
 	CreatePodPvcs(context.Context, *appsv1alpha1.CollaSet, *corev1.Pod, []*corev1.PersistentVolumeClaim) error
 	DeletePodPvcs(context.Context, *appsv1alpha1.CollaSet, *corev1.Pod, []*corev1.PersistentVolumeClaim) error
 	DeletePodUnusedPvcs(context.Context, *appsv1alpha1.CollaSet, *corev1.Pod, []*corev1.PersistentVolumeClaim) error
@@ -54,30 +57,44 @@ func NewRealPvcControl(client client.Client, scheme *runtime.Scheme) Interface {
 }
 
 func (pc *RealPvcControl) GetFilteredPvcs(ctx context.Context, cls *appsv1alpha1.CollaSet) ([]*corev1.PersistentVolumeClaim, error) {
+	// list pvcs using ownerReference
 	var filteredPVCs []*corev1.PersistentVolumeClaim
-	if cls.Spec.Selector.MatchLabels == nil {
-		return filteredPVCs, nil
-	}
-	selector, err := metav1.LabelSelectorAsSelector(cls.Spec.Selector)
-	if err != nil {
-		return filteredPVCs, err
-	}
-
-	// list pvcs match label selector of set
-	pvcList := &corev1.PersistentVolumeClaimList{}
-	err = pc.client.List(ctx, pvcList, &client.ListOptions{Namespace: cls.Namespace, LabelSelector: selector})
-	if err != nil {
+	ownedPvcList := &corev1.PersistentVolumeClaimList{}
+	if err := pc.client.List(ctx, ownedPvcList, &client.ListOptions{Namespace: cls.Namespace,
+		FieldSelector: fields.OneTermEqualSelector(inject.FieldIndexOwnerRefUID, string(cls.GetUID()))}); err != nil {
 		return nil, err
 	}
 
-	for i := range pvcList.Items {
-		pvc := &pvcList.Items[i]
+	for i := range ownedPvcList.Items {
+		pvc := &ownedPvcList.Items[i]
 		if pvc.DeletionTimestamp == nil {
 			filteredPVCs = append(filteredPVCs, pvc)
 		}
 	}
-
 	return filteredPVCs, nil
+}
+
+func (pc *RealPvcControl) AdoptOrphanedPvcs(ctx context.Context, cls *appsv1alpha1.CollaSet) ([]*corev1.PersistentVolumeClaim, error) {
+	orphanedPvcList := &corev1.PersistentVolumeClaimList{}
+	selector, err := metav1.LabelSelectorAsSelector(cls.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+	if err = pc.client.List(ctx, orphanedPvcList, &client.ListOptions{Namespace: cls.Namespace,
+		LabelSelector: selector}); err != nil {
+		return nil, err
+	}
+
+	// adopt orphaned pvcs
+	var claims []*corev1.PersistentVolumeClaim
+	for i := range orphanedPvcList.Items {
+		pvc := orphanedPvcList.Items[i]
+		if pvc.OwnerReferences != nil && len(pvc.OwnerReferences) > 0 {
+			continue
+		}
+		claims = append(claims, &pvc)
+	}
+	return pc.SetPvcsOwnerRef(cls, claims)
 }
 
 func (pc *RealPvcControl) CreatePodPvcs(ctx context.Context, cls *appsv1alpha1.CollaSet, pod *corev1.Pod, existingPvcs []*corev1.PersistentVolumeClaim) error {
@@ -188,12 +205,10 @@ func (pc *RealPvcControl) DeletePodUnusedPvcs(ctx context.Context, cls *appsv1al
 	if err := deleteUnclaimedPvcs(pc.client, ctx, cls, oldPvcs); err != nil {
 		return err
 	}
-	if collasetutils.PvcPolicyWhenScaled(cls) == appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType {
-		return nil
-	}
+
 	// delete old pvc if new pvc is provisioned and WhenScaled is "Delete"
-	if err := deleteOldPvcs(pc.client, ctx, cls, newPvcs, oldPvcs); err != nil {
-		return err
+	if collasetutils.PvcPolicyWhenScaled(cls) == appsv1alpha1.DeletePersistentVolumeClaimRetentionPolicyType {
+		return deleteOldPvcs(pc.client, ctx, cls, newPvcs, oldPvcs)
 	}
 	return nil
 }

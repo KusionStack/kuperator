@@ -1814,8 +1814,13 @@ var _ = Describe("collaset controller", func() {
 				}
 				return true
 			})).Should(BeNil())
-			// delete set
+			// delete set and pods
 			Expect(c.Delete(context.TODO(), cs)).Should(BeNil())
+			podList := &corev1.PodList{}
+			Expect(c.List(context.TODO(), podList, client.InNamespace(csReCreate.Namespace))).Should(BeNil())
+			for _, pod := range podList.Items {
+				Expect(c.Delete(context.TODO(), pod.DeepCopy())).Should(BeNil())
+			}
 			time.Sleep(3 * time.Second)
 			// there should be 8 pvcs
 			allPvcs := &corev1.PersistentVolumeClaimList{}
@@ -1830,10 +1835,11 @@ var _ = Describe("collaset controller", func() {
 				pvcNames.Insert(allPvcs.Items[i].Name)
 			}
 			// recreate set
-			csReCreate.Name = "foo1"
+			csReCreate.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy = &appsv1alpha1.PersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType,
+			}
 			Expect(c.Create(context.TODO(), csReCreate)).Should(BeNil())
 			time.Sleep(3 * time.Second)
-			podList := &corev1.PodList{}
 			Eventually(func() bool {
 				Expect(c.List(context.TODO(), podList, client.InNamespace(csReCreate.Namespace))).Should(BeNil())
 				return len(podList.Items) == 4

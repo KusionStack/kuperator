@@ -55,7 +55,7 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 			if err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			} else if isMounted {
-				return admission.Denied(fmt.Sprintf("failed to validate, delete pending pvc is not allowed: %s", pvc.Name))
+				return admission.Denied(fmt.Sprintf("failed to validate, delete pending mounted pvc is not allowed: %s", pvc.Name))
 			}
 		}
 	}
