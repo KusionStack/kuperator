@@ -103,7 +103,8 @@ func (pc *RealPvcControl) CreatePodPvcs(ctx context.Context, cls *appsv1alpha1.C
 		return nil
 	}
 
-	// provision pvcs related to pod using pvc template
+	// provision pvcs related to pod using pvc template, and reuse
+	// pvcs if "instance-id" and "pvc-template-hash" label matched
 	pvcsMap, err := provisionUpdatedPvc(pc.client, ctx, cls, id, existingPvcs)
 	if err != nil {
 		return err
@@ -141,11 +142,12 @@ func provisionUpdatedPvc(c client.Client, ctx context.Context, cls *appsv1alpha1
 		return nil, err
 	}
 	for _, pvcTmp := range cls.Spec.VolumeClaimTemplates {
+		// reuse pvc
 		if _, exist := (*updatedPvcs)[pvcTmp.Name]; exist {
 			continue
 		}
 
-		// create pvc for pod using pvc template
+		// create new pvc
 		claim, err := collasetutils.BuildPvcWithHash(cls, &pvcTmp, id)
 		if err != nil {
 			return nil, err

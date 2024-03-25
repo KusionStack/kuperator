@@ -148,7 +148,7 @@ func (r *PodDeletionReconciler) deleteReplacedPodPvcs(ctx context.Context, pod *
 	cls := &appsv1alpha1.CollaSet{}
 	for _, ref := range ownerRefs {
 		if ref.Kind == "CollaSet" {
-			if err := r.Client.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: ref.Name}, cls); err != nil {
+			if err := r.Client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: ref.Name}, cls); err != nil {
 				return err
 			}
 			break
