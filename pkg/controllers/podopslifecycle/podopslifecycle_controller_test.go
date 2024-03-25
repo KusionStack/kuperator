@@ -402,7 +402,7 @@ var _ = Describe("Stage processing", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(labels)).To(Equal(2))
 
-		for k, _ := range idToLabelsMap {
+		for k := range idToLabelsMap {
 			key := fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, k)
 			preChecked, ok := labels[key]
 			Expect(ok).To(Equal(true))

@@ -18,6 +18,7 @@ package utils
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -231,6 +232,30 @@ func TestIsPodServiceAvailable(t *testing.T) {
 	}
 
 	if !IsPodServiceAvailable(pod) {
+		t.Fatalf("expected failure")
+	}
+}
+
+func TestGetProtectionFinalizers(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+		},
+		Spec: corev1.PodSpec{},
+	}
+
+	if finalizers := GetProtectionFinalizers(pod); finalizers != nil {
+		t.Fatalf("expected failure")
+	}
+
+	protectionFinalizer := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperationProtectionFinalizerPrefix, "finalizer1")
+	pod.ObjectMeta.Finalizers = []string{
+		protectionFinalizer,
+		"finalizer2",
+	}
+
+	finalizers := GetProtectionFinalizers(pod)
+	if len(finalizers) != 1 || finalizers[0] != protectionFinalizer {
 		t.Fatalf("expected failure")
 	}
 }

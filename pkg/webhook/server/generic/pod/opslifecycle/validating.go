@@ -41,7 +41,7 @@ func (lc *OpsLifecycle) Validating(ctx context.Context, c client.Client, oldPod,
 	expectedLabels := make(map[string]struct{})
 	foundLabels := make(map[string]struct{})
 	for label := range newPod.Labels {
-		for _, v := range pairLabelPrefixesMap { // labels must exist together and have the same id
+		for _, v := range pairLabelPrefixesMap { // Labels must exist together and have the same ID
 			if !strings.HasPrefix(label, v) {
 				continue
 			}
@@ -62,7 +62,7 @@ func (lc *OpsLifecycle) Validating(ctx context.Context, c client.Client, oldPod,
 		}
 
 		found := false
-		for v := range expectedLabels { // try to find the expected another label prefixes
+		for v := range expectedLabels { // Try to find the expected another label prefixes
 			if strings.HasPrefix(label, v) {
 				foundLabels[v] = struct{}{}
 				found = true
@@ -73,7 +73,7 @@ func (lc *OpsLifecycle) Validating(ctx context.Context, c client.Client, oldPod,
 			continue
 		}
 
-		for _, v := range coexistingLabelPrefixesMap { // labels must exist together
+		for _, v := range coexistingLabelPrefixesMap { // Labels must exist together
 			if !strings.HasPrefix(label, v) {
 				continue
 			}

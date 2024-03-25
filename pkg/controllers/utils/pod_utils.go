@@ -18,6 +18,7 @@ package utils
 
 import (
 	"encoding/json"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -104,6 +105,20 @@ func IsPodServiceAvailable(pod *corev1.Pod) bool {
 
 	_, exist := pod.Labels[appsv1alpha1.PodServiceAvailableLabel]
 	return exist
+}
+
+func GetProtectionFinalizers(pod *corev1.Pod) []string {
+	if pod == nil || pod.ObjectMeta.Finalizers == nil || len(pod.ObjectMeta.Finalizers) == 0 {
+		return nil
+	}
+
+	var finalizers []string
+	for _, f := range pod.ObjectMeta.Finalizers {
+		if strings.HasPrefix(f, v1alpha1.PodOperationProtectionFinalizerPrefix) {
+			finalizers = append(finalizers, f)
+		}
+	}
+	return finalizers
 }
 
 func IsExpectedFinalizerSatisfied(pod *corev1.Pod) (bool, map[string]string, error) {

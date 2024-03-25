@@ -36,7 +36,7 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 		return nil
 	}
 
-	// add readiness gate when pod is created
+	// Add readiness gate when pod is created
 	if operation == admissionv1.Create {
 		addReadinessGates(newPod, v1alpha1.ReadinessGatePodServiceReady)
 	}
@@ -50,14 +50,14 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 	var operatingCount, operateCount, operatedCount, completeCount int
 	var undoTypeToNumsMap = map[string]int{}
 	for id, labels := range newIDToLabelsMap {
-		if undoOperationType, ok := labels[v1alpha1.PodUndoOperationTypeLabelPrefix]; ok { // operation is canceled
+		if undoOperationType, ok := labels[v1alpha1.PodUndoOperationTypeLabelPrefix]; ok { // Operation is canceled
 			if _, ok := undoTypeToNumsMap[undoOperationType]; !ok {
 				undoTypeToNumsMap[undoOperationType] = 1
 			} else {
 				undoTypeToNumsMap[undoOperationType] = undoTypeToNumsMap[undoOperationType] + 1
 			}
 
-			// clean up these labels with id
+			// Clean up these labels with the ID
 			for _, v := range []string{v1alpha1.PodOperatingLabelPrefix,
 				v1alpha1.PodOperationTypeLabelPrefix,
 				v1alpha1.PodPreCheckLabelPrefix,
@@ -76,19 +76,18 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 			operatingCount++
 
 			if _, ok := labels[v1alpha1.PodPreCheckedLabelPrefix]; ok { // pre-checked
-				_, hasPrepare := labels[v1alpha1.PodPreparingLabelPrefix]
-				_, hasOperate := labels[v1alpha1.PodOperateLabelPrefix]
-
-				if !hasPrepare && !hasOperate {
+				_, hasPreparing := labels[v1alpha1.PodPreparingLabelPrefix]
+				if !hasPreparing {
 					delete(newPod.Labels, v1alpha1.PodServiceAvailableLabel)
 
-					lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodPreparingLabelPrefix, id)) // prepare
-				} else if !hasOperate {
-					if ready, _ := lc.readyToUpgrade(newPod); ready {
-						delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodPreparingLabelPrefix, id))
+					lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodPreparingLabelPrefix, id)) // preparing
+				}
 
-						lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id)) // operate
-					}
+				_, hasOperate := labels[v1alpha1.PodOperateLabelPrefix]
+				if !hasOperate && lc.readyToOperate(newPod) {
+					delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodPreparingLabelPrefix, id))
+
+					lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id)) // operate
 				}
 			} else {
 				if _, ok := labels[v1alpha1.PodPreCheckLabelPrefix]; !ok {
@@ -116,17 +115,17 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 	klog.Infof("pod: %s/%s, numOfIDs: %d, operatingCount: %d, operateCount: %d, operatedCount: %d, completeCount: %d", newPod.Namespace, newPod.Name, numOfIDs, operatingCount, operateCount, operatedCount, completeCount)
 
 	for t, num := range undoTypeToNumsMap {
-		if num == typeToNumsMap[t] { // reset the permission with type t if all operating with type t are canceled
+		if num == typeToNumsMap[t] { // Reset the permission with type t if all operating with type t are canceled
 			delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, t))
 		}
 	}
 
-	if operatingCount != 0 { // when operation is done, controller will remove operating label and operation type label
+	if operatingCount != 0 { // When operation is done, controller will remove operating label and operation type label
 		return nil
 	}
 
-	if completeCount == numOfIDs { // all operations are completed
-		satisfied, notSatisfiedFinalizers, err := controllerutils.IsExpectedFinalizerSatisfied(newPod) // whether all expected finalizers are satisfied
+	if completeCount == numOfIDs { // All operations are completed
+		satisfied, notSatisfiedFinalizers, err := controllerutils.IsExpectedFinalizerSatisfied(newPod) // Whether all expected finalizers are satisfied
 		if err != nil || !satisfied {
 			klog.Infof("pod: %s/%s, satisfied: %v, expectedFinalizer: %v, err: %v", newPod.Namespace, newPod.Name, satisfied, notSatisfiedFinalizers, err)
 			return err
@@ -146,7 +145,7 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 		return nil
 	}
 
-	if operateCount == numOfIDs { // all operations are going to be done
+	if operateCount == numOfIDs { // All operations are going to be done
 		oldIdToLabelsMap, _, err := podopslifecycle.PodIDAndTypesMap(oldPod)
 		if err != nil {
 			return err
@@ -172,7 +171,7 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 		}
 	}
 
-	if operatedCount == numOfIDs { // all operations are done
+	if operatedCount == numOfIDs { // All operations are done
 		for id, labels := range newIDToLabelsMap {
 			if _, ok := labels[v1alpha1.PodPostCheckLabelPrefix]; !ok {
 				lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, id)) // post-check
