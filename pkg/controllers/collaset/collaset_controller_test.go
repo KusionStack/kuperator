@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +29,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -46,6 +48,7 @@ import (
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset/synccontrol"
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
+	"kusionstack.io/operating/pkg/controllers/poddeletion"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/operating/pkg/utils/inject"
 )
@@ -1111,6 +1114,747 @@ var _ = Describe("collaset controller", func() {
 			}
 		}
 	})
+
+	It("pvc provision", func() {
+		testcase := "pvc-provision"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+
+		cs := &appsv1alpha1.CollaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.CollaSetSpec{
+				Replicas: int32Pointer(4),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "foo",
+								Image: "nginx:v1",
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										Name:      "pvc1",
+										MountPath: "/tmp/pvc1",
+									},
+									{
+										Name:      "pvc2",
+										MountPath: "/tmp/pvc2",
+									},
+								},
+							},
+						},
+					},
+				},
+				UpdateStrategy: appsv1alpha1.UpdateStrategy{
+					OperationDelaySeconds: int32Pointer(1),
+				},
+				VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pvc1",
+						},
+						Spec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									"storage": resource.MustParse("100m"),
+								},
+							},
+							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pvc2",
+						},
+						Spec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									"storage": resource.MustParse("100m"),
+								},
+							},
+							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						},
+					},
+				},
+			},
+		}
+		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
+
+		// test1: pvc provision
+		{
+			podList := &corev1.PodList{}
+			Eventually(func() bool {
+				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+				return len(podList.Items) == 4
+			}, 5*time.Second, 1*time.Second).Should(BeTrue())
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 4, 4, 0, 0, 0)).Should(BeNil())
+			// there should be 8 pvcs
+			allPvcs := &corev1.PersistentVolumeClaimList{}
+			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
+			Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range allPvcs.Items {
+				if allPvcs.Items[i].DeletionTimestamp != nil {
+					continue
+				}
+				activePvcs = append(activePvcs, &allPvcs.Items[i])
+			}
+			Expect(len(activePvcs) == 8).Should(BeTrue())
+			// check instance id consistency
+			idBounded := sets.String{}
+			for i := range podList.Items {
+				id := podList.Items[i].Labels[appsv1alpha1.PodInstanceIDLabelKey]
+				idBounded.Insert(id)
+			}
+			for i := range activePvcs {
+				id := activePvcs[i].Labels[appsv1alpha1.PodInstanceIDLabelKey]
+				Expect(idBounded.Has(id)).Should(BeTrue())
+			}
+		}
+
+		// test2: scale in pods with pvc template
+		{
+			Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+				cls.Spec.Replicas = int32Pointer(2)
+				cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
+				return true
+			})).Should(BeNil())
+			// mark all pods allowed to operate in PodOpsLifecycle
+			podList := &corev1.PodList{}
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			Expect(len(podList.Items)).Should(BeEquivalentTo(4))
+			for i := range podList.Items {
+				pod := &podList.Items[i]
+				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+					pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+					return true
+				})).Should(BeNil())
+			}
+			// there should be 2 pods
+			podList = &corev1.PodList{}
+			Eventually(func() bool {
+				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+				return len(podList.Items) == 2
+			}, 5*time.Second, 1*time.Second).Should(BeTrue())
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
+			// there should be 4 pvcs
+			allPvcs := &corev1.PersistentVolumeClaimList{}
+			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
+			Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range allPvcs.Items {
+				if allPvcs.Items[i].DeletionTimestamp != nil {
+					continue
+				}
+				activePvcs = append(activePvcs, &allPvcs.Items[i])
+			}
+			Expect(len(activePvcs) == 4).Should(BeTrue())
+			// check instance id consistency
+			idBounded := sets.String{}
+			for i := range podList.Items {
+				id := podList.Items[i].Labels[appsv1alpha1.PodInstanceIDLabelKey]
+				idBounded.Insert(id)
+			}
+			for i := range activePvcs {
+				id := activePvcs[i].Labels[appsv1alpha1.PodInstanceIDLabelKey]
+				Expect(idBounded.Has(id)).Should(BeTrue())
+			}
+			// complete scale in podOpsLifeCycle
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range podList.Items {
+				pod := &podList.Items[i]
+				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+					delete(pod.Labels, labelOperate)
+					return true
+				})).Should(BeNil())
+			}
+		}
+
+		// test3: scale out pods with pvc template
+		{
+			Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+				cls.Spec.Replicas = int32Pointer(4)
+				cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
+				return true
+			})).Should(BeNil())
+			podList := &corev1.PodList{}
+			Eventually(func() bool {
+				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+				return len(podList.Items) == 4
+			}, 5*time.Second, 1*time.Second).Should(BeTrue())
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 4, 4, 0, 0, 0)).Should(BeNil())
+			// there should be 8 pvcs
+			allPvcs := &corev1.PersistentVolumeClaimList{}
+			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
+			Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range allPvcs.Items {
+				if allPvcs.Items[i].DeletionTimestamp != nil {
+					continue
+				}
+				activePvcs = append(activePvcs, &allPvcs.Items[i])
+			}
+			Expect(len(activePvcs) == 8).Should(BeTrue())
+			// check instance id consistency
+			idBounded := sets.String{}
+			for i := range podList.Items {
+				id := podList.Items[i].Labels[appsv1alpha1.PodInstanceIDLabelKey]
+				idBounded.Insert(id)
+			}
+			for i := range activePvcs {
+				id := activePvcs[i].Labels[appsv1alpha1.PodInstanceIDLabelKey]
+				Expect(idBounded.Has(id)).Should(BeTrue())
+			}
+		}
+	})
+
+	It("pvc template update", func() {
+		testcase := "pvc-template-update"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+
+		cs := &appsv1alpha1.CollaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.CollaSetSpec{
+				Replicas: int32Pointer(3),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "foo",
+								Image: "nginx:v1",
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										Name:      "pvc1",
+										MountPath: "/tmp/pvc1",
+									},
+									{
+										Name:      "pvc2",
+										MountPath: "/tmp/pvc2",
+									},
+								},
+							},
+						},
+					},
+				},
+				UpdateStrategy: appsv1alpha1.UpdateStrategy{
+					OperationDelaySeconds: int32Pointer(1),
+				},
+				VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pvc1",
+						},
+						Spec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									"storage": resource.MustParse("100m"),
+								},
+							},
+							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pvc2",
+						},
+						Spec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									"storage": resource.MustParse("100m"),
+								},
+							},
+							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						},
+					},
+				},
+			},
+		}
+		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
+
+		podList := &corev1.PodList{}
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 3
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 3, 3, 0, 0, 0)).Should(BeNil())
+		for _, partition := range []int32{0, 1, 2, 3, 4} {
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+				cls.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pvc1",
+						},
+						Spec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									"storage": resource.MustParse("200m"),
+								},
+							},
+							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pvc2",
+						},
+						Spec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									"storage": resource.MustParse("300m"),
+								},
+							},
+							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						},
+					},
+				}
+				cls.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateCollaSetStrategy{
+					ByPartition: &appsv1alpha1.ByPartition{
+						Partition: &partition,
+					},
+				}
+				cls.Spec.UpdateStrategy.PodUpdatePolicy = appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType
+				cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
+				return true
+			})).Should(BeNil())
+			podList := &corev1.PodList{}
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			// allow Pod to do update
+			for i := range podList.Items {
+				pod := &podList.Items[i]
+				if !podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, pod) {
+					continue
+				}
+
+				if _, allowed := podopslifecycle.AllowOps(collasetutils.UpdateOpsLifecycleAdapter, 0, pod); allowed {
+					continue
+				}
+				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+					pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+					return true
+				})).Should(BeNil())
+			}
+			// wait for recreate update finished
+			time.Sleep(3 * time.Second)
+			// there should be 6 pvcs
+			allPvcs := &corev1.PersistentVolumeClaimList{}
+			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
+			Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range allPvcs.Items {
+				if allPvcs.Items[i].DeletionTimestamp != nil {
+					continue
+				}
+				activePvcs = append(activePvcs, &allPvcs.Items[i])
+			}
+			Expect(len(activePvcs) == 6).Should(BeTrue())
+			// check instance id consistency
+			podList = &corev1.PodList{}
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			idBounded := sets.String{}
+			for i := range podList.Items {
+				id := podList.Items[i].Labels[appsv1alpha1.PodInstanceIDLabelKey]
+				idBounded.Insert(id)
+			}
+			for i := range activePvcs {
+				id := activePvcs[i].Labels[appsv1alpha1.PodInstanceIDLabelKey]
+				Expect(idBounded.Has(id)).Should(BeTrue())
+			}
+			// check storage
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			pvcHashMapping, _ := collasetutils.PvcTmpHashMapping(cs.Spec.VolumeClaimTemplates)
+			for i := range activePvcs {
+				id := activePvcs[i].Labels[appsv1alpha1.PodInstanceIDLabelKey]
+				Expect(idBounded.Has(id)).Should(BeTrue())
+				pvcTmpName, _ := collasetutils.ExtractPvcTmpName(cs, activePvcs[i])
+				quantity := activePvcs[i].Spec.Resources.Requests["storage"]
+				hash := activePvcs[i].Labels[appsv1alpha1.PvcTemplateHashLabelKey]
+				if hash == pvcHashMapping[pvcTmpName] {
+					if pvcTmpName == "pvc1" {
+						Expect(quantity.String() == "200m").Should(BeTrue())
+					} else if pvcTmpName == "pvc2" {
+						Expect(quantity.String() == "300m").Should(BeTrue())
+					}
+				}
+			}
+		}
+
+	})
+
+	It("pvc with replace update", func() {
+		testcase := "pvc-with-replace-update"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+
+		cs := &appsv1alpha1.CollaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.CollaSetSpec{
+				Replicas: int32Pointer(3),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "foo",
+								Image: "nginx:v1",
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										Name:      "pvc1",
+										MountPath: "/tmp/pvc1",
+									},
+									{
+										Name:      "pvc2",
+										MountPath: "/tmp/pvc2",
+									},
+								},
+							},
+						},
+					},
+				},
+				UpdateStrategy: appsv1alpha1.UpdateStrategy{
+					OperationDelaySeconds: int32Pointer(1),
+				},
+				VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pvc1",
+						},
+						Spec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									"storage": resource.MustParse("100m"),
+								},
+							},
+							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pvc2",
+						},
+						Spec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									"storage": resource.MustParse("100m"),
+								},
+							},
+							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						},
+					},
+				},
+			},
+		}
+		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
+
+		podList := &corev1.PodList{}
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 3
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 3, 3, 0, 0, 0)).Should(BeNil())
+		for _, partition := range []int32{0, 1, 2, 3} {
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+				cls.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateCollaSetStrategy{
+					ByPartition: &appsv1alpha1.ByPartition{
+						Partition: &partition,
+					},
+				}
+				cls.Spec.UpdateStrategy.PodUpdatePolicy = appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType
+				cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
+				cls.Spec.Template.Spec.Containers[0].Image = "nginx:v2"
+				return true
+			})).Should(BeNil())
+			// wait for reconcile finished
+			time.Sleep(3 * time.Second)
+			podList := &corev1.PodList{}
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			// allow Pod to do replace
+			for i := range podList.Items {
+				pod := &podList.Items[i]
+				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID())
+					pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+					if _, exist := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
+						pod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] = fmt.Sprintf("%d", time.Now().UnixNano())
+					}
+					return true
+				})).Should(BeNil())
+			}
+			// wait for replace update finished
+			time.Sleep(3 * time.Second)
+			// there should be 6 pvcs
+			allPvcs := &corev1.PersistentVolumeClaimList{}
+			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
+			Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range allPvcs.Items {
+				if allPvcs.Items[i].DeletionTimestamp != nil {
+					continue
+				}
+				activePvcs = append(activePvcs, &allPvcs.Items[i])
+			}
+			Expect(len(activePvcs) == 6).Should(BeTrue())
+			// check instance id consistency
+			podList = &corev1.PodList{}
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			idBounded := sets.String{}
+			for i := range podList.Items {
+				id := podList.Items[i].Labels[appsv1alpha1.PodInstanceIDLabelKey]
+				idBounded.Insert(id)
+			}
+			for i := range activePvcs {
+				id := activePvcs[i].Labels[appsv1alpha1.PodInstanceIDLabelKey]
+				Expect(idBounded.Has(id)).Should(BeTrue())
+			}
+		}
+	})
+
+	It("pvc retention policy", func() {
+		testcase := "pvc-retention-policy"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+
+		cs := &appsv1alpha1.CollaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.CollaSetSpec{
+				Replicas: int32Pointer(4),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "foo",
+								Image: "nginx:v1",
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										Name:      "pvc1",
+										MountPath: "/tmp/pvc1",
+									},
+									{
+										Name:      "pvc2",
+										MountPath: "/tmp/pvc2",
+									},
+								},
+							},
+						},
+					},
+				},
+				UpdateStrategy: appsv1alpha1.UpdateStrategy{
+					OperationDelaySeconds: int32Pointer(1),
+				},
+				VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pvc1",
+						},
+						Spec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									"storage": resource.MustParse("100m"),
+								},
+							},
+							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pvc2",
+						},
+						Spec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									"storage": resource.MustParse("100m"),
+								},
+							},
+							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						},
+					},
+				},
+			},
+		}
+		csReCreate := cs.DeepCopy()
+		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
+
+		// test1: pvc whenScaled retention policy
+		{
+			podList := &corev1.PodList{}
+			Eventually(func() bool {
+				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+				return len(podList.Items) == 4
+			}, 5*time.Second, 1*time.Second).Should(BeTrue())
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 4, 4, 0, 0, 0)).Should(BeNil())
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			// scale in 2 pods
+			Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+				cls.Spec.Replicas = int32Pointer(2)
+				cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
+				cls.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy = &appsv1alpha1.PersistentVolumeClaimRetentionPolicy{
+					WhenScaled: appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType,
+				}
+				return true
+			})).Should(BeNil())
+			// mark all pods allowed to operate in PodOpsLifecycle
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			Expect(len(podList.Items)).Should(BeEquivalentTo(4))
+			for i := range podList.Items {
+				pod := &podList.Items[i]
+				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+					pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+					return true
+				})).Should(BeNil())
+			}
+			// there should be 2 pods
+			Eventually(func() bool {
+				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+				return len(podList.Items) == 2
+			}, 5*time.Second, 1*time.Second).Should(BeTrue())
+			// there should be 8 pvcs
+			allPvcs := &corev1.PersistentVolumeClaimList{}
+			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
+			Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
+			pvcNames := sets.String{}
+			for i := range allPvcs.Items {
+				if allPvcs.Items[i].DeletionTimestamp != nil {
+					continue
+				}
+				activePvcs = append(activePvcs, &allPvcs.Items[i])
+				pvcNames.Insert(allPvcs.Items[i].Name)
+			}
+			Expect(len(activePvcs) == 8).Should(BeTrue())
+			// complete scale in podOpsLifeCycle
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range podList.Items {
+				pod := &podList.Items[i]
+				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+					delete(pod.Labels, labelOperate)
+					return true
+				})).Should(BeNil())
+			}
+			// scale out 2 pods
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+				cls.Spec.Replicas = int32Pointer(4)
+				cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
+				return true
+			})).Should(BeNil())
+			// there should be 4 pods
+			Eventually(func() bool {
+				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+				return len(podList.Items) == 4
+			}, 5*time.Second, 1*time.Second).Should(BeTrue())
+			// pvcs should be retained
+			for i := range podList.Items {
+				pod := podList.Items[i]
+				for j := range pod.Spec.Volumes {
+					volume := pod.Spec.Volumes[j]
+					Expect(pvcNames.Has(volume.PersistentVolumeClaim.ClaimName)).Should(BeTrue())
+				}
+			}
+		}
+
+		// test2: pvc whenDeleted retention policy
+		{
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+				cls.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy = &appsv1alpha1.PersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType,
+				}
+				return true
+			})).Should(BeNil())
+			// delete set and pods
+			Expect(c.Delete(context.TODO(), cs)).Should(BeNil())
+			podList := &corev1.PodList{}
+			Expect(c.List(context.TODO(), podList, client.InNamespace(csReCreate.Namespace))).Should(BeNil())
+			for _, pod := range podList.Items {
+				Expect(c.Delete(context.TODO(), pod.DeepCopy())).Should(BeNil())
+			}
+			time.Sleep(3 * time.Second)
+			// there should be 8 pvcs
+			allPvcs := &corev1.PersistentVolumeClaimList{}
+			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
+			Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
+			pvcNames := sets.String{}
+			for i := range allPvcs.Items {
+				if allPvcs.Items[i].DeletionTimestamp != nil {
+					continue
+				}
+				activePvcs = append(activePvcs, &allPvcs.Items[i])
+				pvcNames.Insert(allPvcs.Items[i].Name)
+			}
+			// recreate set
+			csReCreate.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy = &appsv1alpha1.PersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType,
+			}
+			Expect(c.Create(context.TODO(), csReCreate)).Should(BeNil())
+			time.Sleep(3 * time.Second)
+			Eventually(func() bool {
+				Expect(c.List(context.TODO(), podList, client.InNamespace(csReCreate.Namespace))).Should(BeNil())
+				return len(podList.Items) == 4
+			}, 5*time.Second, 1*time.Second).Should(BeTrue())
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: csReCreate.Namespace, Name: csReCreate.Name}, csReCreate)).Should(BeNil())
+			// pvcs should be retained
+			for i := range podList.Items {
+				pod := podList.Items[i]
+				for j := range pod.Spec.Volumes {
+					volume := pod.Spec.Volumes[j]
+					Expect(pvcNames.Has(volume.PersistentVolumeClaim.ClaimName)).Should(BeTrue())
+				}
+			}
+		}
+	})
 })
 
 func expectedStatusReplicas(c client.Client, cls *appsv1alpha1.CollaSet, scheduledReplicas, readyReplicas, availableReplicas, replicas, updatedReplicas, operatingReplicas,
@@ -1224,6 +1968,13 @@ var _ = BeforeSuite(func() {
 
 	env = &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
+		ControlPlane: envtest.ControlPlane{
+			APIServer: &envtest.APIServer{
+				URL: &url.URL{
+					Host: "127.0.0.1:64431",
+				},
+			},
+		},
 	}
 
 	config, err := env.Start()
@@ -1244,6 +1995,9 @@ var _ = BeforeSuite(func() {
 	var r reconcile.Reconciler
 	r, request = testReconcile(NewReconciler(mgr))
 	err = AddToMgr(mgr, r)
+	Expect(err).NotTo(HaveOccurred())
+	r, request = testReconcile(poddeletion.NewReconciler(mgr))
+	err = poddeletion.AddToMgr(mgr, r)
 	Expect(err).NotTo(HaveOccurred())
 
 	go func() {

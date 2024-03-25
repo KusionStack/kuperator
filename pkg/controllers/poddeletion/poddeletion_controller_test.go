@@ -99,6 +99,8 @@ var _ = Describe("Pod Deletion controller", func() {
 				pod.Labels = map[string]string{}
 			}
 			pod.Labels[labelOperate] = "true"
+			// mock pod is replaced deleting
+			pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] = fmt.Sprintf("%d", time.Now().UnixNano())
 			return true
 		})).Should(BeNil())
 

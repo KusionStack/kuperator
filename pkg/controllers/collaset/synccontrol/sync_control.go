@@ -36,6 +36,7 @@ import (
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontext"
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
+	"kusionstack.io/operating/pkg/controllers/collaset/pvccontrol"
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
@@ -72,11 +73,12 @@ type Interface interface {
 	) (bool, *time.Duration, error)
 }
 
-func NewRealSyncControl(client client.Client, logger logr.Logger, podControl podcontrol.Interface, recorder record.EventRecorder) Interface {
+func NewRealSyncControl(client client.Client, logger logr.Logger, podControl podcontrol.Interface, pvcControl pvccontrol.Interface, recorder record.EventRecorder) Interface {
 	return &RealSyncControl{
 		client:     client,
 		logger:     logger,
 		podControl: podControl,
+		pvcControl: pvcControl,
 		recorder:   recorder,
 	}
 }
@@ -87,6 +89,7 @@ type RealSyncControl struct {
 	client     client.Client
 	logger     logr.Logger
 	podControl podcontrol.Interface
+	pvcControl pvccontrol.Interface
 	recorder   record.EventRecorder
 }
 
@@ -102,6 +105,17 @@ func (r *RealSyncControl) SyncPods(
 	filteredPods, err := r.podControl.GetFilteredPods(instance.Spec.Selector, instance)
 	if err != nil {
 		return false, nil, nil, fmt.Errorf("fail to get filtered Pods: %s", err)
+	}
+
+	// list pvcs using ownerReference
+	if resources.ExistingPvcs, err = r.pvcControl.GetFilteredPvcs(ctx, instance); err != nil {
+		return false, nil, nil, fmt.Errorf("fail to get filtered PVCs: %s", err)
+	}
+	// adopt and retain orphaned pvcs according to PVC retention policy
+	if adoptedPvcs, err := r.pvcControl.AdoptOrphanedPvcs(ctx, instance); err != nil {
+		return false, nil, nil, fmt.Errorf("fail to adopt orphaned PVCs: %s", err)
+	} else {
+		resources.ExistingPvcs = append(resources.ExistingPvcs, adoptedPvcs...)
 	}
 
 	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(filteredPods, instance)
@@ -177,6 +191,11 @@ func (r *RealSyncControl) SyncPods(
 			continue
 		}
 
+		// delete unused pvcs
+		if err := r.pvcControl.DeletePodUnusedPvcs(ctx, instance, pod, resources.ExistingPvcs); err != nil {
+			return false, nil, nil, fmt.Errorf("fail to delete unused pvcs %s", err)
+		}
+
 		podWrappers = append(podWrappers, &collasetutils.PodWrapper{
 			Pod:           pod,
 			ID:            id,
@@ -223,6 +242,11 @@ func (r *RealSyncControl) SyncPods(
 			instanceId := fmt.Sprintf("%d", availableContexts[i].ID)
 			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
 			newPod.Labels[appsv1alpha1.PodReplacePairOriginName] = originPod.GetName()
+			// create pvcs for new pod
+			err = r.pvcControl.CreatePodPvcs(ctx, instance, newPod, resources.ExistingPvcs)
+			if err != nil {
+				return fmt.Errorf("fail to migrate PVCs from origin pod %s to replace pod %s: %s", originPod.Name, newPod.Name, err)
+			}
 			if newCreatedPod, err := r.podControl.CreatePod(newPod); err == nil {
 				r.recorder.Eventf(originPod,
 					corev1.EventTypeNormal,
@@ -435,6 +459,12 @@ func (r *RealSyncControl) Scale(
 			if err != nil {
 				return fmt.Errorf("fail to new Pod from revision %s: %s", revision.Name, err)
 			}
+
+			err = r.pvcControl.CreatePodPvcs(ctx, cls, pod, resources.ExistingPvcs)
+			if err != nil {
+				return fmt.Errorf("fail to create PVCs for pod %s: %s", pod.Name, err)
+			}
+
 			newPod := pod.DeepCopy()
 			logger.V(1).Info("try to create Pod with revision of collaSet", "revision", revision.Name)
 			if pod, err = r.podControl.CreatePod(newPod); err != nil {
@@ -550,8 +580,12 @@ func (r *RealSyncControl) Scale(
 				return err
 			}
 
-			// TODO also need to delete PVC from PVC template here
-
+			// delete PVC if pod is in update replace, or retention policy is "Deleted"
+			_, originExist := pod.Labels[appsv1alpha1.PodReplacePairNewId]
+			_, replaceExist := pod.Labels[appsv1alpha1.PodReplacePairOriginName]
+			if originExist || replaceExist || collasetutils.PvcPolicyWhenScaled(cls) == appsv1alpha1.DeletePersistentVolumeClaimRetentionPolicyType {
+				return r.pvcControl.DeletePodPvcs(ctx, cls, pod.Pod, resources.ExistingPvcs)
+			}
 			return nil
 		})
 		scaling := scaling || succCount > 0
@@ -660,6 +694,14 @@ func (r *RealSyncControl) Update(
 	if err != nil {
 		return false, nil, fmt.Errorf("fail to attach pod update info, %v", err)
 	}
+	for _, podInfo := range podUpdateInfos {
+		// if template is updated, update pod by recreate
+		podInfo.PvcTmpHashChanged, err = pvccontrol.IsPodPvcTmpChanged(cls, podInfo.PodWrapper.Pod, resources.ExistingPvcs)
+		if err != nil {
+			return false, nil, fmt.Errorf("fail to check pvc template changed, %v", err)
+		}
+	}
+
 	// 2. decide Pod update candidates
 	podToUpdate := decidePodToUpdate(cls, podUpdateInfos)
 	podCh := make(chan *PodUpdateInfo, len(podToUpdate))
@@ -703,7 +745,6 @@ func (r *RealSyncControl) Update(
 					return err
 				}
 			}
-
 			return nil
 		})
 
@@ -770,7 +811,7 @@ func (r *RealSyncControl) Update(
 	} else {
 		for i, podInfo := range podToUpdate {
 			// The pod is in a "replaceUpdate" state, always requires further update processing.
-			if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged {
+			if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged && !podInfo.PvcTmpHashChanged {
 				continue
 			}
 			podCh <- podToUpdate[i]
@@ -793,7 +834,8 @@ func (r *RealSyncControl) Update(
 			"inPlaceUpdate", podInfo.InPlaceUpdateSupport,
 			"onlyMetadataChanged", podInfo.OnlyMetadataChanged,
 		)
-		if podInfo.OnlyMetadataChanged || podInfo.InPlaceUpdateSupport {
+
+		if (podInfo.OnlyMetadataChanged || podInfo.InPlaceUpdateSupport) && !podInfo.PvcTmpHashChanged {
 			// 6.1 if pod template changes only include metadata or support in-place update, just apply these changes to pod directly
 			if err = r.podControl.UpdatePod(podInfo.UpdatedPod); err != nil {
 				return fmt.Errorf("fail to update Pod %s/%s when updating by in-place: %s", podInfo.Namespace, podInfo.Name, err)

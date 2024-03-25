@@ -22,12 +22,15 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/collaset/pvccontrol"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/operating/pkg/utils/mixin"
@@ -40,6 +43,7 @@ const (
 // PodDeletionReconciler reconciles and reclaims a Pod object
 type PodDeletionReconciler struct {
 	*mixin.ReconcilerMixin
+	pvcControl pvccontrol.Interface
 }
 
 func Add(mgr ctrl.Manager) error {
@@ -54,6 +58,7 @@ func NewReconciler(mgr ctrl.Manager) reconcile.Reconciler {
 
 	return &PodDeletionReconciler{
 		ReconcilerMixin: mixin,
+		pvcControl:      pvccontrol.NewRealPvcControl(mixin.Client, mixin.Scheme),
 	}
 }
 
@@ -128,7 +133,33 @@ func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 				return ctrl.Result{}, fmt.Errorf("fail to expect Pod  %s deleted: %s", req, err)
 			}
 		}
+		// if this pod in replaced update, delete pvcs
+		if _, exist := instance.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
+			err := r.deleteReplacedPodPvcs(ctx, instance)
+			return ctrl.Result{}, err
+		}
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *PodDeletionReconciler) deleteReplacedPodPvcs(ctx context.Context, pod *corev1.Pod) error {
+	ownerRefs := pod.GetOwnerReferences()
+	cls := &appsv1alpha1.CollaSet{}
+	for _, ref := range ownerRefs {
+		if ref.Kind == "CollaSet" {
+			if err := r.Client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: ref.Name}, cls); err != nil {
+				return err
+			}
+			break
+		}
+	}
+	if cls.Spec.VolumeClaimTemplates == nil {
+		return nil
+	}
+	pvcs, err := r.pvcControl.GetFilteredPvcs(ctx, cls)
+	if err != nil {
+		return err
+	}
+	return r.pvcControl.DeletePodPvcs(ctx, cls, pod, pvcs)
 }

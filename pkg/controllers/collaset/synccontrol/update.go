@@ -54,6 +54,8 @@ type PodUpdateInfo struct {
 
 	// indicates effected PodDecorations changed
 	PodDecorationChanged bool
+	// indicate if the pvc template changed
+	PvcTmpHashChanged bool
 
 	CurrentPodDecorations map[string]*appsv1alpha1.PodDecoration
 	UpdatedPodDecorations map[string]*appsv1alpha1.PodDecoration

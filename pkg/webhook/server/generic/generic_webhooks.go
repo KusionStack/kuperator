@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"kusionstack.io/operating/pkg/webhook/server/generic/collaset"
+	"kusionstack.io/operating/pkg/webhook/server/generic/persistentvolumeclaim"
 	"kusionstack.io/operating/pkg/webhook/server/generic/poddecoration"
 
 	webhookdmission "kusionstack.io/operating/pkg/webhook/admission"
@@ -52,4 +53,7 @@ func init() {
 
 	MutatingTypeHandlerMap["CollaSet"] = collaset.NewMutatingHandler()
 	ValidatingTypeHandlerMap["CollaSet"] = collaset.NewValidatingHandler()
+
+	MutatingTypeHandlerMap["PersistentVolumeClaim"] = persistentvolumeclaim.NewMutatingHandler()
+	ValidatingTypeHandlerMap["PersistentVolumeClaim"] = persistentvolumeclaim.NewValidatingHandler()
 }

@@ -108,7 +108,7 @@ func (mgr *RefManager) adopt(obj client.Object) error {
 	return mgr.client.Update(context.TODO(), obj)
 }
 
-func (mgr *RefManager) release(obj client.Object) error {
+func (mgr *RefManager) Release(obj client.Object) error {
 	idx := -1
 	for i, ref := range obj.GetOwnerReferences() {
 		if ref.UID == mgr.owner.GetUID() {
@@ -160,7 +160,7 @@ func (mgr *RefManager) ClaimObject(obj client.Object, match func(metav1.Object) 
 		if mgr.owner.GetDeletionTimestamp() != nil {
 			return false, nil
 		}
-		if err := mgr.release(obj); err != nil {
+		if err := mgr.Release(obj); err != nil {
 			// If the pod no longer exists, ignore the error.
 			if apierrors.IsNotFound(err) {
 				return false, nil
