@@ -32,7 +32,7 @@ import (
 func TestValidating(t *testing.T) {
 	inputs := []struct {
 		labels   map[string]string
-		keyWords string // used to check the error message
+		keyWords string // Used to check the error message
 	}{
 		{
 			labels: map[string]string{
@@ -117,18 +117,17 @@ func TestValidating(t *testing.T) {
 
 func TestMutating(t *testing.T) {
 	inputs := []struct {
-		notes    string
-		keyWords string // used to check the error message
+		note     string
+		keyWords string // Used to check the error message
 
 		oldPodLabels   map[string]string
 		newPodLabels   map[string]string
 		expectedLabels map[string]string
 
-		readyToUpgrade ReadyToUpgrade
-		isPodReady     IsPodReady
+		readyToOperate ReadyToOperate
 	}{
 		{
-			notes: "pre-check",
+			note: "pre-check",
 			newPodLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):     "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
@@ -141,7 +140,7 @@ func TestMutating(t *testing.T) {
 			},
 		},
 		{
-			notes: "pre-check",
+			note: "pre-check",
 			newPodLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):     "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
@@ -163,7 +162,7 @@ func TestMutating(t *testing.T) {
 		},
 
 		{
-			notes: "prepare",
+			note: "preparing",
 			newPodLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):               "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"):           "upgrade",
@@ -181,11 +180,11 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreparingLabelPrefix, "123"): "1402144848",
 			},
 
-			readyToUpgrade: readyToUpgradeReturnFalse,
+			readyToOperate: readyToUpgradeReturnFalse,
 		},
 
 		{
-			notes: "prepare, undo",
+			note: "preparing, undo",
 			newPodLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):               "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"):           "upgrade",
@@ -199,7 +198,7 @@ func TestMutating(t *testing.T) {
 		},
 
 		{
-			notes: "prepare, operate, undo",
+			note: "preparing, operate, undo",
 			newPodLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):               "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"):           "upgrade",
@@ -224,11 +223,11 @@ func TestMutating(t *testing.T) {
 
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreparingLabelPrefix, "456"): "1402144848",
 			},
-			readyToUpgrade: readyToUpgradeReturnFalse,
+			readyToOperate: readyToUpgradeReturnFalse,
 		},
 
 		{
-			notes: "prepare, pre-check",
+			note: "preparing, pre-check",
 			newPodLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):               "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"):           "upgrade",
@@ -254,11 +253,11 @@ func TestMutating(t *testing.T) {
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "456"): "1402144848",
 			},
 
-			readyToUpgrade: readyToUpgradeReturnFalse,
+			readyToOperate: readyToUpgradeReturnFalse,
 		},
 
 		{
-			notes: "prepare, operate",
+			note: "preparing, operate",
 			newPodLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):               "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"):           "upgrade",
@@ -275,10 +274,45 @@ func TestMutating(t *testing.T) {
 
 				fmt.Sprintf("%s/%s", v1alpha1.PodPreparingLabelPrefix, "123"): "1402144848",
 			},
+			readyToOperate: readyToUpgradeReturnFalse,
 		},
 
 		{
-			notes: "operated",
+			note: "preparing, operate",
+			newPodLabels: map[string]string{
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):               "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"):           "restart",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "123"):                "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, "123"):              "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "restart"): "1402144848",
+
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "456"):              "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "456"):          "delete",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "456"):               "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, "456"):             "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "delete"): "1402144848",
+			},
+			expectedLabels: map[string]string{
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):               "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"):           "restart",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "123"):                "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, "123"):              "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "restart"): "1402144848",
+
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "123"): "1402144848",
+
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "456"):              "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "456"):          "delete",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, "456"):               "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, "456"):             "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, "delete"): "1402144848",
+
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "456"): "1402144848",
+			},
+		},
+
+		{
+			note: "operated",
 			oldPodLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):     "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
@@ -303,7 +337,7 @@ func TestMutating(t *testing.T) {
 		},
 
 		{
-			notes: "post-check, but wait for operating",
+			note: "post-check, but wait for operating",
 			oldPodLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):     "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
@@ -324,7 +358,7 @@ func TestMutating(t *testing.T) {
 		},
 
 		{
-			notes: "post-check",
+			note: "post-check",
 			newPodLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "123"):           "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1402144848",
@@ -350,7 +384,7 @@ func TestMutating(t *testing.T) {
 		},
 
 		{
-			notes: "complete",
+			note: "complete",
 			newPodLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "123"):           "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1402144848",
@@ -384,7 +418,7 @@ func TestMutating(t *testing.T) {
 		},
 
 		{
-			notes: "wait for removing finalizers",
+			note: "wait for removing finalizers",
 			newPodLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "123"): "upgrade",
@@ -404,7 +438,7 @@ func TestMutating(t *testing.T) {
 		},
 
 		{
-			notes: "all finished",
+			note: "all finished",
 			newPodLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "123"):           "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1402144848",
@@ -426,7 +460,6 @@ func TestMutating(t *testing.T) {
 		},
 	}
 
-	opslifecycle := &OpsLifecycle{}
 	for _, v := range inputs {
 		if v.oldPodLabels != nil {
 			v.oldPodLabels[v1alpha1.ControlledByKusionStackLabelKey] = "true"
@@ -450,15 +483,9 @@ func TestMutating(t *testing.T) {
 			},
 		}
 
-		opsLifecycleDefaultFunc(opslifecycle)
-		if v.readyToUpgrade != nil {
-			opslifecycle.readyToUpgrade = v.readyToUpgrade
-		}
-		if v.isPodReady != nil {
-			opslifecycle.isPodReady = v.isPodReady
-		}
+		opslifecycle := getOpsLifecycleWithFuncs(v.readyToOperate)
 
-		t.Logf("notes: %s", v.notes)
+		t.Logf("note: %s", v.note)
 		err := opslifecycle.Mutating(context.Background(), nil, oldPod, newPod, admissionv1.Update)
 		if v.keyWords == "" {
 			assert.Nil(t, err)
@@ -476,27 +503,112 @@ func TestMutating(t *testing.T) {
 	}
 }
 
-func opsLifecycleDefaultFunc(opslifecycle *OpsLifecycle) {
-	opslifecycle.timeLabelValue = func() string {
-		return "1402144848"
+func TestReadyToUpgrade(t *testing.T) {
+	inputs := []struct {
+		note string
+
+		podStatus      corev1.PodStatus
+		finalizers     []string
+		readyToOperate bool
+	}{
+		{
+			note: "no protection finalizer, and no expected conditions",
+			podStatus: corev1.PodStatus{
+				Conditions: []corev1.PodCondition{
+					{
+						Type:   "pod.kusionstack.io/test",
+						Status: corev1.ConditionTrue,
+					},
+				},
+			},
+			readyToOperate: true,
+		},
+		{
+			note: "no protection finalizer, and service-ready is true",
+			podStatus: corev1.PodStatus{
+				Conditions: []corev1.PodCondition{
+					{
+						Type:   v1alpha1.ReadinessGatePodServiceReady,
+						Status: corev1.ConditionTrue,
+					},
+				},
+			},
+			readyToOperate: false,
+		},
+		{
+			note: "no protection finalizer, and service-ready is false",
+			podStatus: corev1.PodStatus{
+				Conditions: []corev1.PodCondition{
+					{
+						Type:   v1alpha1.ReadinessGatePodServiceReady,
+						Status: corev1.ConditionFalse,
+					},
+				},
+			},
+			readyToOperate: true,
+		},
+		{
+			note: "has protection finalizer, and service-ready is false",
+			podStatus: corev1.PodStatus{
+				Conditions: []corev1.PodCondition{
+					{
+						Type:   v1alpha1.ReadinessGatePodServiceReady,
+						Status: corev1.ConditionFalse,
+					},
+				},
+			},
+			finalizers:     []string{fmt.Sprintf("%s/%s", v1alpha1.PodOperationProtectionFinalizerPrefix, "finalizer1")},
+			readyToOperate: false,
+		},
+		{
+			note: "has protection finalizer, and service-ready is true",
+			podStatus: corev1.PodStatus{
+				Conditions: []corev1.PodCondition{
+					{
+						Type:   v1alpha1.ReadinessGatePodServiceReady,
+						Status: corev1.ConditionTrue,
+					},
+				},
+			},
+			finalizers:     []string{fmt.Sprintf("%s/%s", v1alpha1.PodOperationProtectionFinalizerPrefix, "finalizer1")},
+			readyToOperate: false,
+		},
+	}
+	for _, v := range inputs {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "test1",
+				Namespace:  "default",
+				Finalizers: v.finalizers,
+			},
+			Spec:   corev1.PodSpec{},
+			Status: v.podStatus,
+		}
+
+		if assert.Equal(t, v.readyToOperate, readyToOperate(pod)) {
+			t.Logf("note: %s", v.note)
+		}
+	}
+}
+
+func getOpsLifecycleWithFuncs(readyToOperate ReadyToOperate) *OpsLifecycle {
+	opslifecycle := &OpsLifecycle{
+		timeLabelValue: func() string {
+			return "1402144848"
+		},
+		readyToOperate: readyToUpgradeReturnTrue,
 	}
 
-	opslifecycle.readyToUpgrade = readyToUpgradeReturnTrue
-	opslifecycle.isPodReady = isPodReadyReturnTrue
+	if readyToOperate != nil {
+		opslifecycle.readyToOperate = readyToOperate
+	}
+	return opslifecycle
 }
 
-func readyToUpgradeReturnTrue(pod *corev1.Pod) (bool, []string) {
-	return true, nil
-}
-
-func readyToUpgradeReturnFalse(pod *corev1.Pod) (bool, []string) {
-	return false, nil
-}
-
-func isPodReadyReturnTrue(pod *corev1.Pod) bool {
+func readyToUpgradeReturnTrue(pod *corev1.Pod) bool {
 	return true
 }
 
-func isPodReadyReturnFalse(pod *corev1.Pod) bool {
-	return true
+func readyToUpgradeReturnFalse(pod *corev1.Pod) bool {
+	return false
 }
