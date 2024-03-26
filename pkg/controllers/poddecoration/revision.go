@@ -21,10 +21,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	appsalphav1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
-func getPodDecorationPatch(pd *appsalphav1.PodDecoration) ([]byte, error) {
+func getPodDecorationPatch(pd *appsv1alpha1.PodDecoration) ([]byte, error) {
 	dsBytes, err := json.Marshal(pd)
 	if err != nil {
 		return nil, err
@@ -53,27 +53,27 @@ type revisionOwnerAdapter struct {
 }
 
 func (roa *revisionOwnerAdapter) GetSelector(obj metav1.Object) *metav1.LabelSelector {
-	ips, _ := obj.(*appsalphav1.PodDecoration)
+	ips, _ := obj.(*appsv1alpha1.PodDecoration)
 	return ips.Spec.Selector
 }
 
 func (roa *revisionOwnerAdapter) GetCollisionCount(obj metav1.Object) *int32 {
-	ips, _ := obj.(*appsalphav1.PodDecoration)
+	ips, _ := obj.(*appsv1alpha1.PodDecoration)
 	return &ips.Status.CollisionCount
 }
 
 func (roa *revisionOwnerAdapter) GetHistoryLimit(obj metav1.Object) int32 {
-	ips, _ := obj.(*appsalphav1.PodDecoration)
+	ips, _ := obj.(*appsv1alpha1.PodDecoration)
 	return ips.Spec.HistoryLimit
 }
 
 func (roa *revisionOwnerAdapter) GetPatch(obj metav1.Object) ([]byte, error) {
-	cs, _ := obj.(*appsalphav1.PodDecoration)
+	cs, _ := obj.(*appsv1alpha1.PodDecoration)
 	return getPodDecorationPatch(cs)
 }
 
 func (roa *revisionOwnerAdapter) GetCurrentRevision(obj metav1.Object) string {
-	ips, _ := obj.(*appsalphav1.PodDecoration)
+	ips, _ := obj.(*appsv1alpha1.PodDecoration)
 	return ips.Status.CurrentRevision
 }
 

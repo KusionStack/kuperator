@@ -452,13 +452,9 @@ func (*mockClient) List(ctx context.Context, list client.ObjectList, opts ...cli
 	return nil
 }
 
-var _ = BeforeSuite(func() {
-
-})
-
 func TestPodDecorationController(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "test PodDecoration patch")
+	RunSpecs(t, "test PodDecoration utils")
 }
 
 func StringPoint(str string) *string {

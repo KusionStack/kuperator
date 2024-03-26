@@ -53,9 +53,8 @@ type Controller interface {
 	Updater
 	Reader
 
-	// Start starts running the component.  The component will stop running
-	// when the context is closed. Start blocks until the context is closed or
-	// an error occurs.
+	// Start will load the PodDecoration resources in controller cache. No blocking.
+	//  It will stop running when the context is closed.
 	Start(context.Context) error
 	// RegisterGenericEventChannel registers a channel to listen for changes associated with the CollaSet.
 	RegisterGenericEventChannel(chan<- event.GenericEvent)

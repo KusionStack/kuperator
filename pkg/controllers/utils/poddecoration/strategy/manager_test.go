@@ -42,8 +42,7 @@ import (
 )
 
 var (
-	env *envtest.Environment
-	//mgr    manager.Manager
+	env    *envtest.Environment
 	cancel context.CancelFunc
 	ctx    context.Context
 	c      client.Client
@@ -338,6 +337,7 @@ var _ = AfterEach(func() {
 
 var _ = AfterSuite(func() {
 	cancel()
+	env.Stop()
 })
 
 func TestPodDecorationStrategyController(t *testing.T) {
