@@ -5443,10 +5443,6 @@ spec:
                   injected with this PodDecoration
                 format: int32
                 type: integer
-              isEffective:
-                description: IsEffective indicates PodDecoration is the only one that
-                  takes effect in the same group
-                type: boolean
               matchedPods:
                 description: MatchedPods is the number of Pods whose labels are matched
                   with this PodDecoration's selector

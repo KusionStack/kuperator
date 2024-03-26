@@ -39,9 +39,11 @@ func getPodDecorationPatch(pd *appsalphav1.PodDecoration) ([]byte, error) {
 
 	spec := raw["spec"].(map[string]interface{})
 	template := spec["template"].(map[string]interface{})
+	weight := spec["weight"]
 
 	template["$patch"] = "replace"
 	specCopy["template"] = template
+	specCopy["weight"] = weight
 	objCopy["spec"] = specCopy
 	patch, err := json.Marshal(objCopy)
 	return patch, err

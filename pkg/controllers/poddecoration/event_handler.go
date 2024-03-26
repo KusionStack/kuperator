@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsalphav1 "kusionstack.io/operating/apis/apps/v1alpha1"
-	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration"
+	"kusionstack.io/operating/pkg/controllers/utils"
 )
 
 type collaSetHandler struct {
@@ -42,7 +42,7 @@ func (c *collaSetHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 		return
 	}
 	for _, pd := range pdList.Items {
-		if utilspoddecoration.IsCollaSetSelectedByPD(colla, &pd) {
+		if utils.Selected(pd.Spec.Selector, colla.Spec.Template.Labels) {
 			q.Add(reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&pd)})
 		}
 	}

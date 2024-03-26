@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The KusionStack Authors.
+Copyright 2024 The KusionStack Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,16 +17,11 @@ limitations under the License.
 package poddecoration
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/strategy"
 )
 
-func IsCollaSetSelectedByPD(collaSet *appsv1alpha1.CollaSet, pd *appsv1alpha1.PodDecoration) bool {
-	sel := labels.Everything()
-	if pd.Spec.Selector != nil {
-		sel, _ = metav1.LabelSelectorAsSelector(pd.Spec.Selector)
-	}
-	return sel.Matches(labels.Set(collaSet.Spec.Template.Labels))
+func addRunner(mgr manager.Manager) error {
+	return mgr.Add(strategy.SharedStrategyController)
 }

@@ -40,7 +40,7 @@ func getCollaSetPatch(cls *appsv1alpha1.CollaSet) ([]byte, error) {
 	objCopy := make(map[string]interface{})
 	specCopy := make(map[string]interface{})
 
-	// Create a patch of the DaemonSet that replaces spec.template
+	// Create a patch of the CollaSet that replaces spec.template
 	spec := raw["spec"].(map[string]interface{})
 	template := spec["template"].(map[string]interface{})
 	template["$patch"] = "replace"

@@ -49,6 +49,7 @@ import (
 	"kusionstack.io/operating/pkg/controllers/collaset/synccontrol"
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
 	"kusionstack.io/operating/pkg/controllers/poddeletion"
+	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/strategy"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/operating/pkg/utils/inject"
 )
@@ -1981,6 +1982,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(config).NotTo(BeNil())
 	sch := scheme.Scheme
+	// ignore PodDecoration SharedStrategyController
+	strategy.SharedStrategyController.Synced()
 	Expect(appsv1.SchemeBuilder.AddToScheme(sch)).NotTo(HaveOccurred())
 	Expect(appsv1alpha1.SchemeBuilder.AddToScheme(sch)).NotTo(HaveOccurred())
 	mgr, err = manager.New(config, manager.Options{

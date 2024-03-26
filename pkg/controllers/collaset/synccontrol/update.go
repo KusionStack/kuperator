@@ -81,11 +81,11 @@ func attachPodUpdateInfo(ctx context.Context, pods []*collasetutils.PodWrapper, 
 		updateInfo := &PodUpdateInfo{
 			PodWrapper: pod,
 		}
-		currentPDs, err := resource.PDGetter.GetCurrentDecorationsOnPod(ctx, pod.Pod)
+		currentPDs, err := resource.PDGetter.GetOnPod(ctx, pod.Pod)
 		if err != nil {
 			return nil, err
 		}
-		updatedPDs, err := resource.PDGetter.GetUpdatedDecorationsByOldPod(ctx, pod.Pod)
+		updatedPDs, err := resource.PDGetter.GetEffective(ctx, pod.Pod)
 		if err != nil {
 			return nil, err
 		}
