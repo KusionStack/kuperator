@@ -55,7 +55,7 @@ const pollInterval = 500 * time.Millisecond
 
 var _ = Describe("Test PodDecoration getter", func() {
 	It("test getter", func() {
-		testcase := "test-pd-2"
+		testcase := "test-getter"
 		Expect(createNamespace(testcase)).Should(BeNil())
 		podDecoration := &appsv1alpha1.PodDecoration{
 			ObjectMeta: metav1.ObjectMeta{

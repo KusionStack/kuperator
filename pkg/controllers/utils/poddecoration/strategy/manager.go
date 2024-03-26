@@ -391,9 +391,12 @@ func (pm *podDecorationManager) updatePartitionPods(pods effectivePods, revision
 		sortedPodInfos.infos = append(sortedPodInfos.infos, info)
 	}
 	sort.Sort(sortedPodInfos)
-
-	for i := len(sortedPodInfos.infos) - partition; i < len(sortedPodInfos.infos); i++ {
-		pm.partitionOldRevisionPods.Insert(sortedPodInfos.infos[i].name)
+	idx := len(sortedPodInfos.infos) - partition
+	if idx < 0 {
+		idx = 0
+	}
+	for ; idx < len(sortedPodInfos.infos); idx++ {
+		pm.partitionOldRevisionPods.Insert(sortedPodInfos.infos[idx].name)
 	}
 }
 
