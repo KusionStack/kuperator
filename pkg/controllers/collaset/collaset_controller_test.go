@@ -651,7 +651,7 @@ var _ = Describe("collaset controller", func() {
 				},
 				UpdateStrategy: appsv1alpha1.UpdateStrategy{
 					OperationDelaySeconds: int32Pointer(1),
-					PodUpdatePolicy:       appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType,
+					PodUpdatePolicy:       appsv1alpha1.CollaSetReplacePodUpdateStrategyType,
 				},
 			},
 		}
@@ -786,7 +786,7 @@ var _ = Describe("collaset controller", func() {
 				},
 				UpdateStrategy: appsv1alpha1.UpdateStrategy{
 					OperationDelaySeconds: int32Pointer(1),
-					PodUpdatePolicy:       appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType,
+					PodUpdatePolicy:       appsv1alpha1.CollaSetReplacePodUpdateStrategyType,
 				},
 			},
 		}
@@ -940,7 +940,7 @@ var _ = Describe("collaset controller", func() {
 				},
 				UpdateStrategy: appsv1alpha1.UpdateStrategy{
 					OperationDelaySeconds: int32Pointer(1),
-					PodUpdatePolicy:       appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType,
+					PodUpdatePolicy:       appsv1alpha1.CollaSetReplacePodUpdateStrategyType,
 				},
 			},
 		}
@@ -1041,7 +1041,7 @@ var _ = Describe("collaset controller", func() {
 				},
 				UpdateStrategy: appsv1alpha1.UpdateStrategy{
 					OperationDelaySeconds: int32Pointer(1),
-					PodUpdatePolicy:       appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType,
+					PodUpdatePolicy:       appsv1alpha1.CollaSetReplacePodUpdateStrategyType,
 				},
 			},
 		}
@@ -1599,7 +1599,7 @@ var _ = Describe("collaset controller", func() {
 						Partition: &partition,
 					},
 				}
-				cls.Spec.UpdateStrategy.PodUpdatePolicy = appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType
+				cls.Spec.UpdateStrategy.PodUpdatePolicy = appsv1alpha1.CollaSetReplacePodUpdateStrategyType
 				cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
 				cls.Spec.Template.Spec.Containers[0].Image = "nginx:v2"
 				return true
