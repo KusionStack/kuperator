@@ -50,7 +50,7 @@ type PodUpdateStrategyType string
 
 const (
 	// CollaSetRecreatePodUpdateStrategyType indicates that CollaSet will always update Pod by deleting and recreate it.
-	CollaSetRecreatePodUpdateStrategyType PodUpdateStrategyType = "ReCreate"
+	CollaSetRecreatePodUpdateStrategyType PodUpdateStrategyType = "Recreate"
 	// CollaSetInPlaceIfPossiblePodUpdateStrategyType indicates thath CollaSet will try to update Pod by in-place update
 	// when it is possible. Recently, only Pod image can be updated in-place. Any other Pod spec change will make the
 	// policy fall back to CollaSetRecreatePodUpdateStrategyType.

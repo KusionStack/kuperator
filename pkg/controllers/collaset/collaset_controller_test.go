@@ -1722,7 +1722,7 @@ var _ = Describe("collaset controller", func() {
 				},
 			},
 		}
-		csReCreate := cs.DeepCopy()
+		csRecreate := cs.DeepCopy()
 		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
 
 		// test1: pvc whenScaled retention policy
@@ -1817,7 +1817,7 @@ var _ = Describe("collaset controller", func() {
 			// delete set and pods
 			Expect(c.Delete(context.TODO(), cs)).Should(BeNil())
 			podList := &corev1.PodList{}
-			Expect(c.List(context.TODO(), podList, client.InNamespace(csReCreate.Namespace))).Should(BeNil())
+			Expect(c.List(context.TODO(), podList, client.InNamespace(csRecreate.Namespace))).Should(BeNil())
 			for _, pod := range podList.Items {
 				Expect(c.Delete(context.TODO(), pod.DeepCopy())).Should(BeNil())
 			}
@@ -1835,16 +1835,16 @@ var _ = Describe("collaset controller", func() {
 				pvcNames.Insert(allPvcs.Items[i].Name)
 			}
 			// recreate set
-			csReCreate.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy = &appsv1alpha1.PersistentVolumeClaimRetentionPolicy{
+			csRecreate.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy = &appsv1alpha1.PersistentVolumeClaimRetentionPolicy{
 				WhenDeleted: appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType,
 			}
-			Expect(c.Create(context.TODO(), csReCreate)).Should(BeNil())
+			Expect(c.Create(context.TODO(), csRecreate)).Should(BeNil())
 			time.Sleep(3 * time.Second)
 			Eventually(func() bool {
-				Expect(c.List(context.TODO(), podList, client.InNamespace(csReCreate.Namespace))).Should(BeNil())
+				Expect(c.List(context.TODO(), podList, client.InNamespace(csRecreate.Namespace))).Should(BeNil())
 				return len(podList.Items) == 4
 			}, 5*time.Second, 1*time.Second).Should(BeTrue())
-			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: csReCreate.Namespace, Name: csReCreate.Name}, csReCreate)).Should(BeNil())
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: csRecreate.Namespace, Name: csRecreate.Name}, csRecreate)).Should(BeNil())
 			// pvcs should be retained
 			for i := range podList.Items {
 				pod := podList.Items[i]
