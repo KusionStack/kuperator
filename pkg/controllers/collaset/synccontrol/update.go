@@ -268,7 +268,7 @@ func newPodUpdater(ctx context.Context, client client.Client, cls *appsv1alpha1.
 		// In case of using native K8s, Pod is only allowed to update with container image, so InPlaceOnly policy is
 		// implemented with InPlaceIfPossible policy as default for compatibility.
 		return &inPlaceIfPossibleUpdater{collaSet: cls, ctx: ctx, Client: client}
-	case appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType:
+	case appsv1alpha1.CollaSetReplacePodUpdateStrategyType:
 		return &replaceUpdatePodUpdater{collaSet: cls, ctx: ctx, Client: client}
 	default:
 		return &inPlaceIfPossibleUpdater{collaSet: cls, ctx: ctx, Client: client}

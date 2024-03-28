@@ -352,7 +352,7 @@ func dealReplacePods(pods []*corev1.Pod, instance *appsv1alpha1.CollaSet) (needR
 
 		needReplacePods = append(needReplacePods, pod)
 	}
-	isReplaceUpdate := instance.Spec.UpdateStrategy.PodUpdatePolicy == appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType
+	isReplaceUpdate := instance.Spec.UpdateStrategy.PodUpdatePolicy == appsv1alpha1.CollaSetReplacePodUpdateStrategyType
 	// deal pods need to delete when pod update strategy is not replace update
 
 	for _, pod := range pods {
@@ -709,7 +709,7 @@ func (r *RealSyncControl) Update(
 	updating := false
 	analysedPod := sets.NewString()
 
-	if cls.Spec.UpdateStrategy.PodUpdatePolicy != appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType {
+	if cls.Spec.UpdateStrategy.PodUpdatePolicy != appsv1alpha1.CollaSetReplacePodUpdateStrategyType {
 		// 3. prepare Pods to begin PodOpsLifecycle
 		for i, podInfo := range podToUpdate {
 			if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged {
@@ -852,7 +852,7 @@ func (r *RealSyncControl) Update(
 					return err
 				}
 			}
-		} else if cls.Spec.UpdateStrategy.PodUpdatePolicy == appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType {
+		} else if cls.Spec.UpdateStrategy.PodUpdatePolicy == appsv1alpha1.CollaSetReplacePodUpdateStrategyType {
 			return nil
 		} else {
 			// 6.2 if pod has changes not in-place supported, recreate it
