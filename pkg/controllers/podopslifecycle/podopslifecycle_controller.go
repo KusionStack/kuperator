@@ -126,18 +126,22 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 		return reconcile.Result{}, err
 	}
 
-	// If all lifecycle is finished, or the is no lifecycle begined
+	// All lifecycles are finished, or no lifecycle begined
 	if len(idToLabelsMap) == 0 {
 		updated, err := r.addServiceAvailable(pod)
-		if updated {
-			r.Recorder.Eventf(pod, corev1.EventTypeNormal, "ServiceAvailable", "Label pod as service available, error: %v", err)
+		if err != nil {
 			return reconcile.Result{}, err
+		}
+		if updated {
+			return reconcile.Result{}, nil
 		}
 
 		updated, err = r.updateServiceReadiness(ctx, pod, true)
-		if updated {
-			r.Recorder.Eventf(pod, corev1.EventTypeNormal, "ReadinessGate", "Set service ready readiness gate to true, error: %v", err)
+		if err != nil {
 			return reconcile.Result{}, err
+		}
+		if updated {
+			return reconcile.Result{}, nil
 		}
 	}
 
@@ -181,7 +185,6 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 				return reconcile.Result{}, err // Only need set once
 			}
 			if updated {
-				r.Recorder.Eventf(pod, corev1.EventTypeNormal, "ReadinessGate", "Set service ready readiness gate to %v", v)
 				return reconcile.Result{}, nil
 			}
 		}
@@ -325,6 +328,9 @@ func (r *ReconcilePodOpsLifecycle) updateServiceReadiness(ctx context.Context, p
 
 		return false, err
 	}
+
+	r.Recorder.Eventf(pod, corev1.EventTypeNormal, v1alpha1.ServiceReadyEvent, "Set ReadinessGate service-ready to %v", isReady)
+
 	return true, nil
 }
 
@@ -436,7 +442,6 @@ func (r *ReconcilePodOpsLifecycle) addLabels(ctx context.Context, pod *corev1.Po
 		r.Logger.Error(err, "failed to update pod with labels", "pod", utils.ObjectKeyString(pod), "labels", labels)
 		r.expectation.DeleteExpectations(key)
 	}
-	r.Recorder.Eventf(pod, corev1.EventTypeNormal, "UpdatePod", "Succeed to update labels: %v", labels)
 
 	return err
 }
