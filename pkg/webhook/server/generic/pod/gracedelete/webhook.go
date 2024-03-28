@@ -101,10 +101,10 @@ func (gd *GraceDelete) Validating(ctx context.Context, c client.Client, oldPod, 
 	}
 
 	if len(finalizers) == 0 {
-		return fmt.Errorf("this Pod's deletion process is underway and being managed by PodOpsLifecycle")
+		return fmt.Errorf("pod deletion process is underway and being managed by PodOpsLifecycle")
 	}
 
-	return fmt.Errorf("this Pod's deletion process is underway and being managed by PodOpsLifecycle with finalizers: %v", finalizers)
+	return fmt.Errorf("pod deletion process is underway and being managed by PodOpsLifecycle with finalizers: %v", finalizers)
 }
 
 func (gd *GraceDelete) Mutating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) error {

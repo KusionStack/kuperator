@@ -119,7 +119,7 @@ func TestGraceDelete(t *testing.T) {
 			expectedLabels: map[string]string{
 				appsv1alpha1.PodDeletionIndicationLabelKey: "true",
 			},
-			keyWords:     "podOpsLifecycle denied",
+			keyWords:     "pod deletion process is underway",
 			reqOperation: admissionv1.Delete,
 		},
 		{
@@ -148,7 +148,7 @@ func TestGraceDelete(t *testing.T) {
 			expectedLabels: map[string]string{
 				appsv1alpha1.PodDeletionIndicationLabelKey: "true",
 			},
-			keyWords:     "podOpsLifecycle denied",
+			keyWords:     "pod deletion process is underway",
 			reqOperation: admissionv1.Delete,
 		},
 		{
