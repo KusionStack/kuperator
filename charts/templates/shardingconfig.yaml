@@ -1,0 +1,34 @@
+{{- if .Values.sharding.enabled -}}
+apiVersion: ctrlmesh.kusionstack.io/v1alpha1
+kind: ShardingConfig
+metadata:
+  name: sharding-root
+  namespace: {{ .Values.namespace }}
+spec:
+  root:
+    prefix: operating
+    targetStatefulSet: kusionstack-operating
+    canary:
+      replicas: 1
+      inNamespaces:
+      - {{ .Values.namespace }}
+    auto:
+      everyShardReplicas: 2
+      shardingSize: {{ .Values.sharding.size }}
+    resourceSelector:
+    - relateResources:
+      - apiGroups:
+        - '*'
+        resources:
+        - configmaps
+        - pods
+        - endpoints
+        - services
+        - replicasets
+      - apiGroups:
+        - apps.kusionstack.io
+        resources:
+        - '*'
+  controller:
+    leaderElectionName: kusionstack-controller-manager
+{{- end }}

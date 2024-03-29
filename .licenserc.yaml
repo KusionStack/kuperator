@@ -48,6 +48,7 @@ header:
     - '.dist/**'
     - '.husky/**'
     - 'hack/**'
+    - 'charts/**'
     - 'LICENSE'
     - 'OWNERS_ALIASES'
     - 'SECURITY_CONTACTS'
