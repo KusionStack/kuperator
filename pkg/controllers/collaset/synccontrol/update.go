@@ -628,7 +628,6 @@ func (u *recreatePodUpdater) PrepareAndFilterPodUpdate(podToUpdate []*PodUpdateI
 			return fmt.Errorf("fail to analyse pod %s/%s in-place update support: %s", podInfo.Namespace, podInfo.Name, err)
 		}
 
-		//logger.V(1).Info("try to begin PodOpsLifecycle for updating Pod of CollaSet", "pod", commonutils.ObjectKeyString(podInfo.Pod))
 		if updated, err := podopslifecycle.Begin(u.Client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod, func(obj client.Object) (bool, error) {
 			if !podInfo.OnlyMetadataChanged && !podInfo.InPlaceUpdateSupport {
 				return podopslifecycle.WhenBeginDelete(obj)
@@ -664,7 +663,7 @@ func (u *recreatePodUpdater) PrepareAndFilterPodUpdate(podToUpdate []*PodUpdateI
 		collasetutils.AddOrUpdateCondition(resources.NewStatus,
 			appsv1alpha1.CollaSetScale, nil, "UpdateFailed", "")
 	}
-	return updating, nil, nil
+	return updating, recordedRequeueAfter, nil
 }
 
 func (u *recreatePodUpdater) FulfillPodUpdatedInfo(_ *appsv1.ControllerRevision, _ *PodUpdateInfo) error {
@@ -681,7 +680,6 @@ func (u *recreatePodUpdater) GetPodUpdateFinishStatus(podInfo *PodUpdateInfo) (f
 }
 
 func (u *recreatePodUpdater) FinishUpdatePod(podInfo *PodUpdateInfo) error {
-	//u.recorder.Eventf().V(1).Info("try to finish update PodOpsLifecycle for Pod", "pod", commonutils.ObjectKeyString(podInfo.Pod))
 	if updated, err := podopslifecycle.Finish(u.Client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod); err != nil {
 		return fmt.Errorf("failed to finish PodOpsLifecycle for updating Pod %s/%s: %s", podInfo.Namespace, podInfo.Name, err)
 	} else if updated {

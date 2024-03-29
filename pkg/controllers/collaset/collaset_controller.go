@@ -107,7 +107,7 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 }
 
 // +kubebuilder:rbac:groups=apps.kusionstack.io,resources=collasets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps.kusionstack.io,resources=collasets/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kusionstack.io,resources=collasets/status,verbs=get;update;patchu
 // +kubebuilder:rbac:groups=apps.kusionstack.io,resources=collasets/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps.kusionstack.io,resources=resourcecontexts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kusionstack.io,resources=resourcecontexts/status,verbs=get;update;patch
