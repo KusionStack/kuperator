@@ -10,7 +10,7 @@ webhooks:
   clientConfig:
     service:
       namespace: {{ .Values.namespace }}
-      name: kusionstack-controller-manager
+      name: {{ .Values.webhookServiceName }}
       path: /mutating-generic
   failurePolicy: Fail
   name: mutating-pod.apps.kusionstack.io
@@ -33,16 +33,16 @@ webhooks:
     - pods
     - pods/status
     scope: '*'
-  sideEffects: NoneOnDryRun
+  sideEffects: None
 - name: mutating-generic.apps.kusionstack.io
-  sideEffects: NoneOnDryRun
+  sideEffects: None
   admissionReviewVersions: 
   - v1
   - v1beta1
   clientConfig:
     service:
       namespace: {{ .Values.namespace }}
-      name: kusionstack-controller-manager
+      name: {{ .Values.webhookServiceName }}
       path: /mutating-generic
   failurePolicy: Fail
   rules:
@@ -68,7 +68,7 @@ webhooks:
   clientConfig:
     service:
       namespace: {{ .Values.namespace }}
-      name: kusionstack-controller-manager
+      name: {{ .Values.webhookServiceName }}
       path: /validating-generic
   failurePolicy: Fail
   name: validating-pod.apps.kusionstack.io
@@ -86,19 +86,20 @@ webhooks:
     operations:
     - CREATE
     - UPDATE
+    - DELETE
     resources:
     - pods
     scope: '*'
-  sideEffects: NoneOnDryRun
+  sideEffects: None
 - name: validating-generic.apps.kusionstack.io
-  sideEffects: NoneOnDryRun
+  sideEffects: None
   admissionReviewVersions: 
   - v1
   - v1beta1
   clientConfig:
     service:
       namespace: {{ .Values.namespace }}
-      name: kusionstack-controller-manager
+      name: {{ .Values.webhookServiceName }}
       path: /validating-generic
   failurePolicy: Fail
   rules:
@@ -113,3 +114,30 @@ webhooks:
     resources:
     - "*/*"
     scope: '*'
+- name: validating-pvc.apps.kusionstack.io
+  sideEffects: None
+  admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      namespace: {{ .Values.namespace }}
+      name: {{ .Values.webhookServiceName }}
+      path: /validating-generic
+  failurePolicy: Fail
+  rules:
+    - apiGroups:
+        - "*"
+      apiVersions:
+        - v1
+      operations:
+        - DELETE
+      resources:
+        - persistentvolumeclaims
+      scope: '*'
+  objectSelector:
+    matchExpressions:
+      - key: kusionstack.io/control
+        operator: In
+        values:
+          - 'true'

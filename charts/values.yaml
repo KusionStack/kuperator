@@ -4,6 +4,9 @@ project: operating
 namespace: kusionstack-system
 namespaceEnabled: true
 
+webhookServiceName: kusionstack-controller-manager
+serviceAccountName: kusionstack-controller-manager
+
 sharding:
   enabled: false
   isDemo: false
@@ -13,7 +16,7 @@ sharding:
 controlPlane: kusionstack-operating
 
 image:
-  tag: v0.2.0
+  tag: v0.3.0
   repo: kusionstack/operating
   pullPolicy: IfNotPresent
 

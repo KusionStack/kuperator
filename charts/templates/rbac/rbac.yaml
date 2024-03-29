@@ -4,7 +4,7 @@ kind: ServiceAccount
 metadata:
   labels:
     {{- toYaml .Values.commonLabels | nindent 4 }}
-  name: kusionstack-controller-manager
+  name: {{ .Values.serviceAccountName }}
   namespace: {{ .Values.namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -105,6 +105,7 @@ rules:
   - ""
   resources:
   - services
+  - persistentvolumeclaims
   verbs:
   - create
   - delete
@@ -167,7 +168,7 @@ roleRef:
   name: kusionstack-leader-election-role
 subjects:
 - kind: ServiceAccount
-  name: kusionstack-controller-manager
+  name: {{ .Values.serviceAccountName }}
   namespace: {{ .Values.namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -182,7 +183,7 @@ roleRef:
   name: kusionstack-manager-role
 subjects:
 - kind: ServiceAccount
-  name: kusionstack-controller-manager
+  name: {{ .Values.serviceAccountName }}
   namespace: {{ .Values.namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -197,5 +198,5 @@ roleRef:
   name: kusionstack-webhook-role
 subjects:
 - kind: ServiceAccount
-  name: kusionstack-controller-manager
+  name: {{ .Values.serviceAccountName }}
   namespace: {{ .Values.namespace }}

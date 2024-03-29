@@ -77,22 +77,6 @@ spec:
                   defaults to 20
                 format: int32
                 type: integer
-              injectStrategy:
-                description: InjectStrategy carries the strategy configuration for
-                  injection
-                properties:
-                  group:
-                    description: Group provides the name of the group this PodDecoration
-                      belongs to. Only one PodDecoration is active when multiple PodDecorations
-                      share the same group value.
-                    type: string
-                  weight:
-                    description: Weight indicates the priority to apply for a group
-                      of PodDecorations with same group value. The greater one has
-                      higher priority to apply. Default value is 0.
-                    format: int32
-                    type: integer
-                type: object
               selector:
                 description: Selector is a label query over pods that should be injected
                   with PodDecoration
@@ -4229,6 +4213,23 @@ spec:
                                     that will be copied into the PVC when creating
                                     it. No other fields are allowed and will be rejected
                                     during validation.
+                                  properties:
+                                    annotations:
+                                      additionalProperties:
+                                        type: string
+                                      type: object
+                                    finalizers:
+                                      items:
+                                        type: string
+                                      type: array
+                                    labels:
+                                      additionalProperties:
+                                        type: string
+                                      type: object
+                                    name:
+                                      type: string
+                                    namespace:
+                                      type: string
                                   type: object
                                 spec:
                                   description: The specification for the PersistentVolumeClaim.
@@ -5394,6 +5395,12 @@ spec:
                         x-kubernetes-map-type: atomic
                     type: object
                 type: object
+              weight:
+                description: Weight indicates the priority to apply for a group of
+                  PodDecorations with same group value. The greater one has higher
+                  priority to apply. Default value is 0.
+                format: int32
+                type: integer
             type: object
           status:
             description: PodDecorationStatus defines the observed state of PodDecoration
