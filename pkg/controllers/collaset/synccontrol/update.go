@@ -660,7 +660,7 @@ func (u *recreatePodUpdater) PrepareAndFilterPodUpdate(podToUpdate []*PodUpdateI
 		collasetutils.AddOrUpdateCondition(resources.NewStatus,
 			appsv1alpha1.CollaSetScale, nil, "UpdateFailed", "")
 	}
-	return updating, nil, nil
+	return updating, recordedRequeueAfter, nil
 }
 
 func (u *recreatePodUpdater) FulfillPodUpdatedInfo(_ *appsv1.ControllerRevision, _ *PodUpdateInfo) error {
