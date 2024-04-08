@@ -50,7 +50,7 @@ type PodUpdateStrategyType string
 
 const (
 	// CollaSetRecreatePodUpdateStrategyType indicates that CollaSet will always update Pod by deleting and recreate it.
-	CollaSetRecreatePodUpdateStrategyType PodUpdateStrategyType = "ReCreate"
+	CollaSetRecreatePodUpdateStrategyType PodUpdateStrategyType = "Recreate"
 	// CollaSetInPlaceIfPossiblePodUpdateStrategyType indicates thath CollaSet will try to update Pod by in-place update
 	// when it is possible. Recently, only Pod image can be updated in-place. Any other Pod spec change will make the
 	// policy fall back to CollaSetRecreatePodUpdateStrategyType.
@@ -58,10 +58,9 @@ const (
 	// CollaSetInPlaceOnlyPodUpdateStrategyType indicates that CollaSet will always update Pod in-place, instead of
 	// recreating pod. It will encounter an error on original Kubernetes cluster.
 	CollaSetInPlaceOnlyPodUpdateStrategyType PodUpdateStrategyType = "InPlaceOnly"
-
-	// CollaSetReplaceUpdatePodUpdateStrategyType indicates that CollaSet will always update Pod by replace, it will
-	// create a new Pod and delete update pod when new created pod service available.
-	CollaSetReplaceUpdatePodUpdateStrategyType PodUpdateStrategyType = "ReplaceUpdate"
+	// CollaSetReplacePodUpdateStrategyType indicates that CollaSet will always update Pod by replace, it will
+	// create a new Pod and delete the old pod when the new one service available.
+	CollaSetReplacePodUpdateStrategyType PodUpdateStrategyType = "Replace"
 )
 
 // CollaSetSpec defines the desired state of CollaSet

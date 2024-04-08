@@ -4,7 +4,7 @@ metadata:
   name: controller-manager-mutating
 webhooks:
   - name: mutating-pod.apps.kusionstack.io
-    sideEffects: NoneOnDryRun
+    sideEffects: None
     admissionReviewVersions: ["v1", "v1beta1"]
     clientConfig:
       service:
@@ -32,7 +32,7 @@ webhooks:
           values:
             - 'true'
   - name: mutating-generic.apps.kusionstack.io
-    sideEffects: NoneOnDryRun
+    sideEffects: None
     admissionReviewVersions: ["v1", "v1beta1"]
     clientConfig:
       service:
@@ -60,7 +60,7 @@ metadata:
   name: controller-manager-validating
 webhooks:
   - name: validating-pod.apps.kusionstack.io
-    sideEffects: NoneOnDryRun
+    sideEffects: None
     admissionReviewVersions: ["v1", "v1beta1"]
     clientConfig:
       service:
@@ -86,8 +86,33 @@ webhooks:
           operator: In
           values:
             - 'true'
+  - name: validating-pvc.apps.kusionstack.io
+    sideEffects: None
+    admissionReviewVersions: ["v1", "v1beta1"]
+    clientConfig:
+      service:
+        namespace: kusionstack-system
+        name: controller-manager
+        path: /validating-generic
+    failurePolicy: Fail
+    rules:
+      - apiGroups:
+          - "*"
+        apiVersions:
+          - v1
+        operations:
+          - DELETE
+        resources:
+          - persistentvolumeclaims
+        scope: '*'
+    objectSelector:
+      matchExpressions:
+        - key: kusionstack.io/control
+          operator: In
+          values:
+            - 'true'
   - name: validating-generic.apps.kusionstack.io
-    sideEffects: NoneOnDryRun
+    sideEffects: None
     admissionReviewVersions: ["v1", "v1beta1"]
     clientConfig:
       service:

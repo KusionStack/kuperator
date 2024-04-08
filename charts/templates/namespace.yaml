@@ -1,0 +1,107 @@
+{{- if .Values.namespaceEnabled -}}
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+    control-plane: {{ .Values.controlPlane }}
+  name: {{ .Values.namespace }}
+{{- end }}
+
+{{- if .Values.sharding.isDemo }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0a
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0b
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0c
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0d
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0e
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0f
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0g
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0o
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0p
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0q
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0r
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0s
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0t
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0u
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0v
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0w
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0x
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0y
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-0z
+{{- end }}

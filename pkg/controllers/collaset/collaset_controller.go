@@ -34,6 +34,7 @@ import (
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontext"
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
+	"kusionstack.io/operating/pkg/controllers/collaset/pvccontrol"
 	"kusionstack.io/operating/pkg/controllers/collaset/synccontrol"
 	"kusionstack.io/operating/pkg/controllers/collaset/utils"
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
@@ -71,7 +72,7 @@ func NewReconciler(mgr ctrl.Manager) reconcile.Reconciler {
 	return &CollaSetReconciler{
 		ReconcilerMixin: mixin,
 		revisionManager: revision.NewRevisionManager(mixin.Client, mixin.Scheme, NewRevisionOwnerAdapter(podcontrol.NewRealPodControl(mixin.Client, mixin.Scheme))),
-		syncControl:     synccontrol.NewRealSyncControl(mixin.Client, mixin.Logger, podcontrol.NewRealPodControl(mixin.Client, mixin.Scheme), mixin.Recorder),
+		syncControl:     synccontrol.NewRealSyncControl(mixin.Client, mixin.Logger, podcontrol.NewRealPodControl(mixin.Client, mixin.Scheme), pvccontrol.NewRealPvcControl(mixin.Client, mixin.Scheme), mixin.Recorder),
 	}
 }
 
@@ -112,6 +113,7 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 // +kubebuilder:rbac:groups=apps.kusionstack.io,resources=resourcecontexts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kusionstack.io,resources=resourcecontexts/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kusionstack.io,resources=resourcecontexts/finalizers,verbs=update
+// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=controllerrevisions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch
@@ -140,6 +142,10 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	if instance.DeletionTimestamp != nil {
+		if err := r.ensureReclaimPvcs(ctx, instance); err != nil {
+			// reclaim pvcs before remove finalizers
+			return ctrl.Result{}, err
+		}
 		if controllerutil.ContainsFinalizer(instance, preReclaimFinalizer) {
 			// reclaim owner IDs in ResourceContext
 			if err := r.reclaimResourceContext(instance); err != nil {
@@ -324,4 +330,24 @@ func requeueResult(requeueTime *time.Duration) reconcile.Result {
 		return reconcile.Result{RequeueAfter: *requeueTime}
 	}
 	return reconcile.Result{}
+}
+
+func (r *CollaSetReconciler) ensureReclaimPvcs(ctx context.Context, cls *appsv1alpha1.CollaSet) error {
+	var needReclaimPvcs []*corev1.PersistentVolumeClaim
+	pvcControl := pvccontrol.NewRealPvcControl(r.Client, r.Scheme)
+	pvcs, err := pvcControl.GetFilteredPvcs(ctx, cls)
+	if err != nil {
+		return err
+	}
+	// reclaim pvcs according to whenDelete retention policy
+	for i := range pvcs {
+		owned := pvcs[i].OwnerReferences != nil && len(pvcs[i].OwnerReferences) > 0
+		if owned && collasetutils.PvcPolicyWhenDelete(cls) == appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType {
+			needReclaimPvcs = append(needReclaimPvcs, pvcs[i])
+		}
+	}
+	if len(needReclaimPvcs) > 0 {
+		_, err = pvcControl.ReleasePvcsOwnerRef(cls, needReclaimPvcs)
+	}
+	return err
 }

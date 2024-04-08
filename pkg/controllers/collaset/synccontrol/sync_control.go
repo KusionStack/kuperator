@@ -36,6 +36,7 @@ import (
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontext"
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
+	"kusionstack.io/operating/pkg/controllers/collaset/pvccontrol"
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
@@ -72,11 +73,12 @@ type Interface interface {
 	) (bool, *time.Duration, error)
 }
 
-func NewRealSyncControl(client client.Client, logger logr.Logger, podControl podcontrol.Interface, recorder record.EventRecorder) Interface {
+func NewRealSyncControl(client client.Client, logger logr.Logger, podControl podcontrol.Interface, pvcControl pvccontrol.Interface, recorder record.EventRecorder) Interface {
 	return &RealSyncControl{
 		client:     client,
 		logger:     logger,
 		podControl: podControl,
+		pvcControl: pvcControl,
 		recorder:   recorder,
 	}
 }
@@ -87,6 +89,7 @@ type RealSyncControl struct {
 	client     client.Client
 	logger     logr.Logger
 	podControl podcontrol.Interface
+	pvcControl pvccontrol.Interface
 	recorder   record.EventRecorder
 }
 
@@ -102,6 +105,17 @@ func (r *RealSyncControl) SyncPods(
 	filteredPods, err := r.podControl.GetFilteredPods(instance.Spec.Selector, instance)
 	if err != nil {
 		return false, nil, nil, fmt.Errorf("fail to get filtered Pods: %s", err)
+	}
+
+	// list pvcs using ownerReference
+	if resources.ExistingPvcs, err = r.pvcControl.GetFilteredPvcs(ctx, instance); err != nil {
+		return false, nil, nil, fmt.Errorf("fail to get filtered PVCs: %s", err)
+	}
+	// adopt and retain orphaned pvcs according to PVC retention policy
+	if adoptedPvcs, err := r.pvcControl.AdoptOrphanedPvcs(ctx, instance); err != nil {
+		return false, nil, nil, fmt.Errorf("fail to adopt orphaned PVCs: %s", err)
+	} else {
+		resources.ExistingPvcs = append(resources.ExistingPvcs, adoptedPvcs...)
 	}
 
 	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(filteredPods, instance)
@@ -177,6 +191,11 @@ func (r *RealSyncControl) SyncPods(
 			continue
 		}
 
+		// delete unused pvcs
+		if err := r.pvcControl.DeletePodUnusedPvcs(ctx, instance, pod, resources.ExistingPvcs); err != nil {
+			return false, nil, nil, fmt.Errorf("fail to delete unused pvcs %s", err)
+		}
+
 		podWrappers = append(podWrappers, &collasetutils.PodWrapper{
 			Pod:           pod,
 			ID:            id,
@@ -223,6 +242,11 @@ func (r *RealSyncControl) SyncPods(
 			instanceId := fmt.Sprintf("%d", availableContexts[i].ID)
 			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
 			newPod.Labels[appsv1alpha1.PodReplacePairOriginName] = originPod.GetName()
+			// create pvcs for new pod
+			err = r.pvcControl.CreatePodPvcs(ctx, instance, newPod, resources.ExistingPvcs)
+			if err != nil {
+				return fmt.Errorf("fail to migrate PVCs from origin pod %s to replace pod %s: %s", originPod.Name, newPod.Name, err)
+			}
 			if newCreatedPod, err := r.podControl.CreatePod(newPod); err == nil {
 				r.recorder.Eventf(originPod,
 					corev1.EventTypeNormal,
@@ -328,7 +352,7 @@ func dealReplacePods(pods []*corev1.Pod, instance *appsv1alpha1.CollaSet) (needR
 
 		needReplacePods = append(needReplacePods, pod)
 	}
-	isReplaceUpdate := instance.Spec.UpdateStrategy.PodUpdatePolicy == appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType
+	isReplaceUpdate := instance.Spec.UpdateStrategy.PodUpdatePolicy == appsv1alpha1.CollaSetReplacePodUpdateStrategyType
 	// deal pods need to delete when pod update strategy is not replace update
 
 	for _, pod := range pods {
@@ -339,6 +363,7 @@ func dealReplacePods(pods []*corev1.Pod, instance *appsv1alpha1.CollaSet) (needR
 			needCleanLabels = []string{appsv1alpha1.PodReplaceIndicationLabelKey, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey}
 		}
 
+		// pod is replace new created pod, skip replace
 		if originPodName, exist := pod.Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
 			// replace pair origin pod is not exist, clean label.
 			if originPod, exist := podNameMap[originPodName]; !exist {
@@ -440,6 +465,12 @@ func (r *RealSyncControl) Scale(
 			if err != nil {
 				return fmt.Errorf("fail to new Pod from revision %s: %s", revision.Name, err)
 			}
+
+			err = r.pvcControl.CreatePodPvcs(ctx, cls, pod, resources.ExistingPvcs)
+			if err != nil {
+				return fmt.Errorf("fail to create PVCs for pod %s: %s", pod.Name, err)
+			}
+
 			newPod := pod.DeepCopy()
 			logger.V(1).Info("try to create Pod with revision of collaSet", "revision", revision.Name)
 			if pod, err = r.podControl.CreatePod(newPod); err != nil {
@@ -555,8 +586,12 @@ func (r *RealSyncControl) Scale(
 				return err
 			}
 
-			// TODO also need to delete PVC from PVC template here
-
+			// delete PVC if pod is in update replace, or retention policy is "Deleted"
+			_, originExist := pod.Labels[appsv1alpha1.PodReplacePairNewId]
+			_, replaceExist := pod.Labels[appsv1alpha1.PodReplacePairOriginName]
+			if originExist || replaceExist || collasetutils.PvcPolicyWhenScaled(cls) == appsv1alpha1.DeletePersistentVolumeClaimRetentionPolicyType {
+				return r.pvcControl.DeletePodPvcs(ctx, cls, pod.Pod, resources.ExistingPvcs)
+			}
 			return nil
 		})
 		scaling := scaling || succCount > 0
@@ -661,29 +696,52 @@ func (r *RealSyncControl) Update(
 	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
 	var recordedRequeueAfter *time.Duration
 	// 1. scan and analysis pods update info
-	podUpdateInfos, err := attachPodUpdateInfo(ctx, podWrappers, resources)
+	podUpdateInfos, err := attachPodUpdateInfo(ctx, cls, podWrappers, resources)
 	if err != nil {
 		return false, nil, fmt.Errorf("fail to attach pod update info, %v", err)
 	}
-	// 2. decide Pod update candidates
+
+	// 3. decide Pod update candidates
 	podToUpdate := decidePodToUpdate(cls, podUpdateInfos)
 	podCh := make(chan *PodUpdateInfo, len(podToUpdate))
 	updater := newPodUpdater(ctx, r.client, cls, r.podControl, r.recorder)
+	updating := false
 
-	updating, recordedRequeueAfter, err := updater.PrepareAndFilterPodUpdate(podToUpdate, resources, ownedIDs, podCh)
+	for i, podInfo := range podToUpdate {
+		if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged && !podInfo.PvcTmpHashChanged {
+			continue
+		}
+
+		// fulfillPodUpdateInfo to all not updatedRevision pod
+		if err = updater.FulfillPodUpdatedInfo(resources.UpdatedRevision, podInfo); err != nil {
+			logger.Error(err, fmt.Sprintf("fail to analyse pod %s/%s in-place update support: %s", podInfo.Namespace, podInfo.Name))
+			continue
+		}
+
+		if podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, podInfo) {
+			continue
+		}
+		podCh <- podToUpdate[i]
+	}
+
+	updating, err = updater.BeginUpdate(resources, podCh)
 	if err != nil {
 		return updating, recordedRequeueAfter, err
+	}
+	recordedRequeueAfter, err = updater.FilterAllowOpsPodsAndUpdatePodContext(podToUpdate, ownedIDs, resources, podCh)
+	if err != nil {
+		collasetutils.AddOrUpdateCondition(resources.NewStatus,
+			appsv1alpha1.CollaSetScale, err, "UpdateFailed",
+			fmt.Sprintf("fail to update Context for updating: %s", err))
+		return updating, recordedRequeueAfter, err
+	} else {
+		collasetutils.AddOrUpdateCondition(resources.NewStatus,
+			appsv1alpha1.CollaSetScale, nil, "Updated", "")
 	}
 
 	// 6. update Pod
 	succCount, err := controllerutils.SlowStartBatch(len(podCh), controllerutils.SlowStartInitialBatchSize, false, func(_ int, _ error) error {
 		podInfo := <-podCh
-		if !podInfo.analysed {
-			if err = updater.FulfillPodUpdatedInfo(resources.UpdatedRevision, podInfo); err != nil {
-				return fmt.Errorf("fail to analyse pod %s/%s in-place update support: %s", podInfo.Namespace, podInfo.Name, err)
-			}
-		}
-
 		logger.V(1).Info("before pod update operation",
 			"pod", commonutils.ObjectKeyString(podInfo.Pod),
 			"revision.from", podInfo.CurrentRevision.Name,

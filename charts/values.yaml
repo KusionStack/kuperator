@@ -1,0 +1,36 @@
+managerReplicas: 3
+
+project: operating
+namespace: kusionstack-system
+namespaceEnabled: true
+
+webhookServiceName: kusionstack-controller-manager
+serviceAccountName: kusionstack-controller-manager
+
+sharding:
+  enabled: false
+  isDemo: false
+  replicas: 5
+  size: 2
+
+controlPlane: kusionstack-operating
+
+image:
+  tag: v0.3.0
+  repo: kusionstack/operating
+  pullPolicy: IfNotPresent
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 64Mi
+
+commonLabels:
+  app.kubernetes.io/part-of: operating
+
+
+
+

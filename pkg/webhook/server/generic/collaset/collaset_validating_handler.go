@@ -21,12 +21,13 @@ import (
 	"fmt"
 	"net/http"
 
+	"k8s.io/kubernetes/pkg/apis/core"
+
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/apis/core"
 	k8scorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -115,18 +116,14 @@ func (h *ValidatingHandler) validateUpdateStrategy(cls *appsv1alpha1.CollaSet, f
 	switch cls.Spec.UpdateStrategy.PodUpdatePolicy {
 	case appsv1alpha1.CollaSetRecreatePodUpdateStrategyType,
 		appsv1alpha1.CollaSetInPlaceOnlyPodUpdateStrategyType,
-		appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType:
-
-	case appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType:
-		if cls.Spec.VolumeClaimTemplates != nil {
-			allErrs = append(allErrs, field.Forbidden(fSpec.Child("updateStrategy", "podUpdatePolicy"), "updateStrategy.podUpdatePolicy ReplaceUpdate is not supported to claim Spec.VolumeClaimTemplates"))
-		}
+		appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType,
+		appsv1alpha1.CollaSetReplacePodUpdateStrategyType:
 	default:
 		allErrs = append(allErrs, field.NotSupported(fSpec.Child("updateStrategy", "podUpdatePolicy"),
 			cls.Spec.UpdateStrategy.PodUpdatePolicy, []string{string(appsv1alpha1.CollaSetRecreatePodUpdateStrategyType),
 				string(appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType),
 				string(appsv1alpha1.CollaSetInPlaceOnlyPodUpdateStrategyType),
-				string(appsv1alpha1.CollaSetReplaceUpdatePodUpdateStrategyType)}))
+				string(appsv1alpha1.CollaSetReplacePodUpdateStrategyType)}))
 	}
 
 	if cls.Spec.UpdateStrategy.RollingUpdate != nil && cls.Spec.UpdateStrategy.RollingUpdate.ByPartition != nil &&
@@ -161,6 +158,17 @@ func (h *ValidatingHandler) validatePodTemplateSpec(cls *appsv1alpha1.CollaSet, 
 		return append(allErrs, field.Invalid(fSpec.Child("template"), cls.Spec.Template, fmt.Sprintf("fail to convert to core PodTemplateSpec: %s", err)))
 	}
 
+	for _, pvc := range cls.Spec.VolumeClaimTemplates {
+		podTemplateSpec.Spec.Volumes = append(podTemplateSpec.Spec.Volumes, core.Volume{
+			Name: pvc.Name,
+			VolumeSource: core.VolumeSource{
+				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvc.Name,
+					ReadOnly:  false,
+				},
+			},
+		})
+	}
 	return corevalidation.ValidatePodTemplateSpec(podTemplateSpec, fSpec, utils.PodValidationOptions)
 }
 

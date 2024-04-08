@@ -46,6 +46,9 @@ const (
 	PodReplacePairOriginName = "collaset.kusionstack.io/replace-pair-origin-name" // used to indicate the original Pod name for replacement.
 
 	PodReplacePairNewId = "collaset.kusionstack.io/replace-pair-new-id" // used to indicate the new created Pod instance ID for replacement.
+
+	PvcTemplateHashLabelKey = "collaset.kusionstack.io/pvc-template-hash" // used to attach hash of pvc template to pvc resource
+
 )
 
 const (

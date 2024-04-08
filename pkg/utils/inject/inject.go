@@ -63,6 +63,18 @@ func NewCacheWithFieldIndex(config *rest.Config, opts cache.Options) (cache.Cach
 
 	runtime.Must(c.IndexField(
 		context.TODO(),
+		&corev1.PersistentVolumeClaim{},
+		FieldIndexOwnerRefUID,
+		func(pvc client.Object) []string {
+			ownerRef := metav1.GetControllerOf(pvc)
+			if ownerRef == nil {
+				return nil
+			}
+			return []string{string(ownerRef.UID)}
+		}))
+
+	runtime.Must(c.IndexField(
+		context.TODO(),
 		&appv1.ControllerRevision{},
 		FieldIndexOwnerRefUID,
 		func(revision client.Object) []string {

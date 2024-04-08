@@ -52,6 +52,5 @@ func (a *PodDeleteOpsLifecycleAdapter) WhenBegin(obj client.Object) (bool, error
 
 // WhenFinish will be executed when finish a lifecycle
 func (a *PodDeleteOpsLifecycleAdapter) WhenFinish(_ client.Object) (bool, error) {
-
 	return false, nil
 }

@@ -21,10 +21,11 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	commonutils "kusionstack.io/operating/pkg/utils"
-	"kusionstack.io/operating/pkg/utils/mixin"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	commonutils "kusionstack.io/operating/pkg/utils"
+	"kusionstack.io/operating/pkg/utils/mixin"
 )
 
 var _ inject.Injector = &ValidatingHandler{}
@@ -58,6 +59,7 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 		"key", commonutils.AdmissionRequestObjectKeyString(req),
 		"op", req.Operation,
 	)
+	h.Logger.Info("validating", key)
 
 	if handler, exist := ValidatingTypeHandlerMap[key]; exist {
 		return handler.Handle(ctx, req)

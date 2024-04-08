@@ -84,10 +84,7 @@ func (gd *GraceDelete) Validating(ctx context.Context, c client.Client, oldPod, 
 		if newPod.Labels == nil {
 			newPod.Labels = map[string]string{}
 		}
-		if _, ok := newPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; ok {
-			return nil
-		}
-		newPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] = strconv.FormatInt(time.Now().Unix(), 10)
+		newPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] = strconv.FormatInt(time.Now().UnixNano(), 10)
 
 		return c.Update(ctx, newPod)
 	})
@@ -102,7 +99,12 @@ func (gd *GraceDelete) Validating(ctx context.Context, c client.Client, oldPod, 
 			finalizers = append(finalizers, f)
 		}
 	}
-	return fmt.Errorf("podOpsLifecycle denied delete request, since related resources and finalizers have not been processed. Waiting for removing finalizers: %v", finalizers)
+
+	if len(finalizers) == 0 {
+		return fmt.Errorf("pod deletion process is underway and being managed by PodOpsLifecycle")
+	}
+
+	return fmt.Errorf("pod deletion process is underway and being managed by PodOpsLifecycle with finalizers: %v", finalizers)
 }
 
 func (gd *GraceDelete) Mutating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) error {

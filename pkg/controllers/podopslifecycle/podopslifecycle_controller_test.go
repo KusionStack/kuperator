@@ -31,7 +31,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/klogr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -41,6 +43,8 @@ import (
 	"kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/podtransitionrule"
 	"kusionstack.io/operating/pkg/controllers/podtransitionrule/checker"
+	"kusionstack.io/operating/pkg/controllers/utils/expectations"
+	"kusionstack.io/operating/pkg/utils/mixin"
 )
 
 var (
@@ -402,7 +406,7 @@ var _ = Describe("Stage processing", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(labels)).To(Equal(2))
 
-		for k, _ := range idToLabelsMap {
+		for k := range idToLabelsMap {
 			key := fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, k)
 			preChecked, ok := labels[key]
 			Expect(ok).To(Equal(true))
@@ -411,7 +415,7 @@ var _ = Describe("Stage processing", func() {
 	})
 })
 
-var _ = Describe("Expected finalizer processng", func() {
+var _ = Describe("Finalizer processing", func() {
 	var (
 		name      = "test"
 		namespace = "default"
@@ -503,6 +507,61 @@ var _ = Describe("Expected finalizer processng", func() {
 		isAvailableConditionDirty, err := podOpsLifecycle.isAvailableConditionDirty(pod, key)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(isAvailableConditionDirty).To(Equal(true))
+	})
+})
+
+var _ = Describe("Label service-available processing", func() {
+	scheme := runtime.NewScheme()
+	err := corev1.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test1",
+			Namespace: "default",
+			Labels: map[string]string{
+				v1alpha1.ControlledByKusionStackLabelKey: "true",
+			},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			Conditions: []corev1.PodCondition{
+				{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionTrue,
+				},
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(pod).
+		Build()
+
+	podOpsLifecycle := &ReconcilePodOpsLifecycle{
+		ReconcilerMixin: &mixin.ReconcilerMixin{
+			Client: fakeClient,
+			Logger: klogr.New().WithName(controllerName),
+		},
+		expectation: expectations.NewResourceVersionExpectation(),
+	}
+
+	It("Service is available", func() {
+		_, err := podOpsLifecycle.Reconcile(context.Background(), reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      "test1",
+				Namespace: "default",
+			},
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		pod1 := &corev1.Pod{}
+		fakeClient.Get(context.Background(), client.ObjectKey{
+			Name:      "test1",
+			Namespace: "default",
+		}, pod1)
+		Expect(pod1.Labels[v1alpha1.PodServiceAvailableLabel]).NotTo(BeEmpty())
 	})
 })
 
