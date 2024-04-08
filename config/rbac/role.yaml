@@ -18,6 +18,34 @@ rules:
   - update
   - watch
 - apiGroups:
+  - apps.kruise.io
+  resources:
+  - containerrecreaterequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - containerrecreaterequests/finalizers
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - containerrecreaterequests/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - apps.kusionstack.io
   resources:
   - collasets
@@ -39,6 +67,34 @@ rules:
   - apps.kusionstack.io
   resources:
   - collasets/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kusionstack.io
+  resources:
+  - operationjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kusionstack.io
+  resources:
+  - operationjobs/finalizers
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kusionstack.io
+  resources:
+  - operationjobs/status
   verbs:
   - get
   - patch

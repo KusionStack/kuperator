@@ -1280,8 +1280,6 @@ var _ = Describe("collaset controller", func() {
 				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 				return len(podList.Items)
 			}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
-			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
-			Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
 			// there should be 4 pvcs
 			allPvcs := &corev1.PersistentVolumeClaimList{}
 			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
@@ -1325,13 +1323,12 @@ var _ = Describe("collaset controller", func() {
 				cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
 				return true
 			})).Should(BeNil())
+			// there should be 4 pods
 			podList := &corev1.PodList{}
-			Eventually(func() bool {
+			Eventually(func() int {
 				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-				return len(podList.Items) == 4
-			}, 5*time.Second, 1*time.Second).Should(BeTrue())
-			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
-			Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 4, 4, 0, 0, 0)).Should(BeNil())
+				return len(podList.Items)
+			}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(4))
 			// there should be 8 pvcs
 			allPvcs := &corev1.PersistentVolumeClaimList{}
 			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)

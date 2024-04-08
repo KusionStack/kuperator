@@ -23,9 +23,10 @@ import (
 type OperationType string
 
 var (
-	OpsLifecycleTypeUpdate  OperationType = "update"
-	OpsLifecycleTypeScaleIn OperationType = "scale-in"
-	OpsLifecycleTypeDelete  OperationType = "delete"
+	OpsLifecycleTypeUpdate   OperationType = "update"
+	OpsLifecycleTypeScaleIn  OperationType = "scale-in"
+	OpsLifecycleTypeDelete   OperationType = "delete"
+	OpsLifecycleTypeRecreate OperationType = "recreate"
 )
 
 type UpdateFunc func(object client.Object) (bool, error)

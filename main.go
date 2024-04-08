@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
+	kruisev1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/spf13/pflag"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -108,6 +109,11 @@ func main() {
 
 	if err = apis.AddToScheme(mgr.GetScheme()); err != nil {
 		setupLog.Error(err, "unable to add APIs scheme")
+		os.Exit(1)
+	}
+
+	if err = kruisev1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
+		setupLog.Error(err, "unable to add containerRecreateRequest API scheme")
 		os.Exit(1)
 	}
 
