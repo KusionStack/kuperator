@@ -713,7 +713,7 @@ func (r *RealSyncControl) Update(
 			continue
 		}
 
-		// fulfillPodUpdateInfo to all not updatedRevision pod
+		// 3.1 fulfillPodUpdateInfo to all not updatedRevision pod
 		if err = updater.FulfillPodUpdatedInfo(resources.UpdatedRevision, podInfo); err != nil {
 			logger.Error(err, fmt.Sprintf("fail to analyse pod %s/%s in-place update support", podInfo.Namespace, podInfo.Name))
 			continue
@@ -726,10 +726,13 @@ func (r *RealSyncControl) Update(
 		podCh <- podToUpdate[i]
 	}
 
+	// 4. begin pod update lifecycle
 	updating, err = updater.BeginUpdatePod(resources, podCh)
 	if err != nil {
 		return updating, recordedRequeueAfter, err
 	}
+
+	// 5. filter pods not allow to ops now, such as OperationDelaySeconds strategy
 	recordedRequeueAfter, err = updater.FilterAllowOpsPods(podToUpdate, ownedIDs, resources, podCh)
 	if err != nil {
 		collasetutils.AddOrUpdateCondition(resources.NewStatus,
@@ -767,7 +770,7 @@ func (r *RealSyncControl) Update(
 		collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetUpdate, nil, "Updated", "")
 	}
 
-	// try to finish all Pods'PodOpsLifecycle if its update is finished.
+	// 7. try to finish all Pods'PodOpsLifecycle if its update is finished.
 	succCount, err = controllerutils.SlowStartBatch(len(podUpdateInfos), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		podInfo := podUpdateInfos[i]
 

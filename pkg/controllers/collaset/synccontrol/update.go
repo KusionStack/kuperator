@@ -351,7 +351,7 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(podToUpdate []*PodUpdateInfo, own
 		// if Pod has not been updated, update it.
 		podCh <- podToUpdate[i]
 	}
-	// 4. mark Pod to use updated revision before updating it.
+	// mark Pod to use updated revision before updating it.
 	if needUpdateContext {
 		u.recorder.Eventf(u.collaSet, corev1.EventTypeNormal, "UpdateToPodContext", "try to update ResourceContext for CollaSet")
 		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -363,7 +363,6 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(podToUpdate []*PodUpdateInfo, own
 }
 
 func (u *GenericPodUpdater) FinishUpdatePod(podInfo *PodUpdateInfo) error {
-	//u.recorder.Eventf().V(1).Info("try to finish update PodOpsLifecycle for Pod", "pod", commonutils.ObjectKeyString(podInfo.Pod))
 	if updated, err := podopslifecycle.Finish(u.Client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod); err != nil {
 		return fmt.Errorf("failed to finish PodOpsLifecycle for updating Pod %s/%s: %s", podInfo.Namespace, podInfo.Name, err)
 	} else if updated {
@@ -493,7 +492,7 @@ func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(
 
 func (u *inPlaceIfPossibleUpdater) UpgradePod(podInfo *PodUpdateInfo) error {
 	if podInfo.OnlyMetadataChanged || podInfo.InPlaceUpdateSupport {
-		// 6.1 if pod template changes only include metadata or support in-place update, just apply these changes to pod directly
+		// if pod template changes only include metadata or support in-place update, just apply these changes to pod directly
 		if err := u.podControl.UpdatePod(podInfo.UpdatedPod); err != nil {
 			return fmt.Errorf("fail to update Pod %s/%s when updating by in-place: %s", podInfo.Namespace, podInfo.Name, err)
 		} else {
@@ -510,7 +509,7 @@ func (u *inPlaceIfPossibleUpdater) UpgradePod(podInfo *PodUpdateInfo) error {
 			}
 		}
 	} else {
-		// 6.2 if pod has changes not in-place supported, recreate it
+		// if pod has changes not in-place supported, recreate it
 		return recreatePod(u.collaSet, podInfo, u.podControl, u.recorder)
 	}
 	return nil
