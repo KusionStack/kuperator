@@ -701,12 +701,13 @@ func (r *RealSyncControl) Update(
 		return false, nil, fmt.Errorf("fail to attach pod update info, %v", err)
 	}
 
-	// 3. decide Pod update candidates
+	// 2. decide Pod update candidates
 	podToUpdate := decidePodToUpdate(cls, podUpdateInfos)
 	podCh := make(chan *PodUpdateInfo, len(podToUpdate))
 	updater := newPodUpdater(ctx, r.client, cls, r.podControl, r.recorder)
 	updating := false
 
+	// 3. filter already updated revision,
 	for i, podInfo := range podToUpdate {
 		if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged && !podInfo.PvcTmpHashChanged {
 			continue
@@ -721,14 +722,15 @@ func (r *RealSyncControl) Update(
 		if podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, podInfo) {
 			continue
 		}
+
 		podCh <- podToUpdate[i]
 	}
 
-	updating, err = updater.BeginUpdate(resources, podCh)
+	updating, err = updater.BeginUpdatePod(resources, podCh)
 	if err != nil {
 		return updating, recordedRequeueAfter, err
 	}
-	recordedRequeueAfter, err = updater.FilterAllowOpsPodsAndUpdatePodContext(podToUpdate, ownedIDs, resources, podCh)
+	recordedRequeueAfter, err = updater.FilterAllowOpsPods(podToUpdate, ownedIDs, resources, podCh)
 	if err != nil {
 		collasetutils.AddOrUpdateCondition(resources.NewStatus,
 			appsv1alpha1.CollaSetScale, err, "UpdateFailed",
