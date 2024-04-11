@@ -715,7 +715,7 @@ func (r *RealSyncControl) Update(
 
 		// fulfillPodUpdateInfo to all not updatedRevision pod
 		if err = updater.FulfillPodUpdatedInfo(resources.UpdatedRevision, podInfo); err != nil {
-			logger.Error(err, fmt.Sprintf("fail to analyse pod %s/%s in-place update support: %s", podInfo.Namespace, podInfo.Name))
+			logger.Error(err, fmt.Sprintf("fail to analyse pod %s/%s in-place update support", podInfo.Namespace, podInfo.Name))
 			continue
 		}
 
