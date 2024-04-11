@@ -41,7 +41,7 @@ rules:
   - collasets/status
   verbs:
   - get
-  - patchu
+  - patch
   - update
 - apiGroups:
   - apps.kusionstack.io
