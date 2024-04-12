@@ -45,3 +45,11 @@ func init() {
 		webhooks = append(webhooks, podResourceConsistWebhook)
 	}
 }
+
+func RegisterAdmissionWebhook(webhook AdmissionWebhook) {
+	webhooks = append(webhooks, webhook)
+}
+
+func ListAdmissionWebhooks() []AdmissionWebhook {
+	return webhooks
+}
