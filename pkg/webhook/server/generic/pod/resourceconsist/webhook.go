@@ -62,6 +62,15 @@ func (r *PodResourceConsistWebhook) Mutating(ctx context.Context, c client.Clien
 	availableExpectedFlzs := v1alpha1.PodAvailableConditions{
 		ExpectedFinalizers: map[string]string{},
 	}
+
+	// compatible if PodAvailableConditionsAnnotation already exist during creation
+	if newPod.GetAnnotations()[v1alpha1.PodAvailableConditionsAnnotation] != "" {
+		err = json.Unmarshal([]byte(newPod.GetAnnotations()[v1alpha1.PodAvailableConditionsAnnotation]), &availableExpectedFlzs)
+		if err != nil {
+			return err
+		}
+	}
+
 	for _, employer := range employers {
 		expectedFlzKey := GenerateLifecycleFinalizerKey(employer)
 		expectedFlz := GenerateLifecycleFinalizer(employer.GetName())
