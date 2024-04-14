@@ -51,11 +51,11 @@ func NewMutatingHandler() *MutatingHandler {
 
 func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
 	if req.Kind.Kind != "Pod" {
-		return admission.Patched("Invalid kind")
+		return admission.Patched("invalid kind")
 	}
 
 	if req.Operation != admissionv1.Create && req.Operation != admissionv1.Update {
-		return admission.Patched("Not Create or Update, but " + string(req.Operation))
+		return admission.Patched("not Create or Update, but " + string(req.Operation))
 	}
 
 	logger := h.Logger.WithValues(

@@ -77,13 +77,14 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 
 			if _, ok := labels[v1alpha1.PodPreCheckedLabelPrefix]; ok { // pre-checked
 				_, hasPreparing := labels[v1alpha1.PodPreparingLabelPrefix]
-				if !hasPreparing {
+				_, hasOperate := labels[v1alpha1.PodOperateLabelPrefix]
+
+				if !hasPreparing && !hasOperate {
 					delete(newPod.Labels, v1alpha1.PodServiceAvailableLabel)
 
 					lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodPreparingLabelPrefix, id)) // preparing
 				}
 
-				_, hasOperate := labels[v1alpha1.PodOperateLabelPrefix]
 				if !hasOperate && lc.readyToOperate(newPod) {
 					delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodPreparingLabelPrefix, id))
 
@@ -112,7 +113,7 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 			completeCount++
 		}
 	}
-	klog.Infof("pod: %s/%s, numOfIDs: %d, operatingCount: %d, operateCount: %d, operatedCount: %d, completeCount: %d", newPod.Namespace, newPod.Name, numOfIDs, operatingCount, operateCount, operatedCount, completeCount)
+	klog.V(5).Infof("pod: %s/%s, numOfIDs: %d, operatingCount: %d, operateCount: %d, operatedCount: %d, completeCount: %d", newPod.Namespace, newPod.Name, numOfIDs, operatingCount, operateCount, operatedCount, completeCount)
 
 	for t, num := range undoTypeToNumsMap {
 		if num == typeToNumsMap[t] { // Reset the permission with type t if all operating with type t are canceled
