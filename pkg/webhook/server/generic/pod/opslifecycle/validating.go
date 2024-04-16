@@ -23,18 +23,26 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/utils"
 )
 
-func (lc *OpsLifecycle) Validating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) error {
+func (lc *OpsLifecycle) Validating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) (err error) {
 	if operation == admissionv1.Delete || !utils.ControlledByKusionStack(newPod) {
 		return nil
 	}
 
-	if _, err := controllerutils.PodAvailableConditions(newPod); err != nil {
+	defer func() {
+		if err != nil {
+			klog.Errorf("opslifecycle failed to validate pod: %s/%s, err: %v", newPod.Namespace, newPod.Name, err)
+		}
+	}()
+
+	_, err = controllerutils.PodAvailableConditions(newPod)
+	if err != nil {
 		return err
 	}
 
@@ -48,7 +56,8 @@ func (lc *OpsLifecycle) Validating(ctx context.Context, c client.Client, oldPod,
 
 			s := strings.Split(label, "/")
 			if len(s) != 2 {
-				return fmt.Errorf("invalid label %s", label)
+				err = fmt.Errorf("invalid label %s", label)
+				return
 			}
 			id := s[1]
 
@@ -56,7 +65,8 @@ func (lc *OpsLifecycle) Validating(ctx context.Context, c client.Client, oldPod,
 				pairLabel := fmt.Sprintf("%s/%s", pairLabelPrefixesMap[v], id)
 				_, ok := newPod.Labels[pairLabel]
 				if !ok {
-					return fmt.Errorf("not found label %s", pairLabel)
+					err = fmt.Errorf("not found label %s", pairLabel)
+					return
 				}
 			}
 		}
@@ -82,7 +92,8 @@ func (lc *OpsLifecycle) Validating(ctx context.Context, c client.Client, oldPod,
 	}
 
 	if len(expectedLabels) != len(foundLabels) {
-		return fmt.Errorf("not found the expected label prefixes: %v", expectedLabels)
+		err = fmt.Errorf("not found the expected label prefixes: %v", expectedLabels)
+		return
 	}
 	return nil
 }

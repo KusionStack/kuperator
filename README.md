@@ -6,7 +6,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/KusionStack/operating)](https://goreportcard.com/report/github.com/KusionStack/operating)
 [![codecov](https://codecov.io/gh/KusionStack/operating/graph/badge.svg?token=CEQX77G7UH)](https://codecov.io/gh/KusionStack/operating)
 
-KusionStack Operating ([official site](https://kusionstack.io/docs/operating/introduction/)) provides a set of workloads and operators
+KusionStack Operating ([official site](https://www.kusionstack.io/operating/introduction/)) provides a set of workloads and operators
 built on Kubernetes Custom Resource Definitions (CRDs), with a primary aim of bridging the gap 
 between platform development and Kubernetes.
 
@@ -17,23 +17,23 @@ streamlining application operations when developing platforms based on Kubernete
 
 * Fine-grained operation
 
-[**PodOpsLifecycle**](https://kusionstack.io/docs/operating/concepts/podopslifecycle) 
+[**PodOpsLifecycle**](https://www.kusionstack.io/operating/concepts/podopslifecycle) 
 extends native Pod lifecycle with more phase, like `PreCheck`, `Preparing`, `PostCheck`, to allow fine-grained operation management. 
 
 * Advanced workloads
 
-[**CollaSet**](https://kusionstack.io/docs/operating/manuals/collaset) designed to manage Pods with respect to PodOpsLifecycle.
+[**CollaSet**](https://www.kusionstack.io/operating/manuals/collaset) designed to manage Pods with respect to PodOpsLifecycle.
 
-[**PodDecoration**](https://kusionstack.io/docs/operating/manuals/poddecoration) provides secondary grouping and operational capabilities for Pods.
+[**PodDecoration**](https://www.kusionstack.io/operating/manuals/poddecoration) provides secondary grouping and operational capabilities for Pods.
 
 * Streamlined pod operation
 
-[**ResourceConsist**](https://kusionstack.io/docs/operating/manuals/resourceconsist) framework offers 
+[**ResourceConsist**](https://www.kusionstack.io/operating/manuals/resourceconsist) framework offers 
 a graceful way to integrate resource management around Pods, like traffic control, into PodOpsLifecycle.
 
 * Risk management
 
-[**PodTransitionRule**](https://kusionstack.io/docs/operating/manuals/podtransitionrule) 
+[**PodTransitionRule**](https://www.kusionstack.io/operating/manuals/podtransitionrule) 
 is responsible to keep Pod operation risks under control.
 
 ## Getting started
