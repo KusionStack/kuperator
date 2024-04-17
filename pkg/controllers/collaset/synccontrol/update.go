@@ -534,7 +534,7 @@ func recreatePod(collaSet *appsv1alpha1.CollaSet, podInfo *PodUpdateInfo, podCon
 	return nil
 }
 
-func (u inPlaceIfPossibleUpdater) diffPod(currentPod, updatedPod *corev1.Pod) (inPlaceSetUpdateSupport bool, onlyMetadataChanged bool) {
+func (u *inPlaceIfPossibleUpdater) diffPod(currentPod, updatedPod *corev1.Pod) (inPlaceSetUpdateSupport bool, onlyMetadataChanged bool) {
 	if len(currentPod.Spec.Containers) != len(updatedPod.Spec.Containers) {
 		return false, false
 	}
@@ -752,7 +752,7 @@ func (u *replaceUpdatePodUpdater) UpgradePod(podInfo *PodUpdateInfo) error {
 func (u *replaceUpdatePodUpdater) GetPodUpdateFinishStatus(podUpdateInfo *PodUpdateInfo) (finished bool, msg string, err error) {
 	replaceNewPodInfo := podUpdateInfo.replacePairNewPodInfo
 	if replaceNewPodInfo == nil {
-		return isPodUpdatedServiceAvailable(podUpdateInfo)
+		return
 	}
 
 	return isPodUpdatedServiceAvailable(replaceNewPodInfo)
