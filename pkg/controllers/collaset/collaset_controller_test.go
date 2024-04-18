@@ -618,7 +618,7 @@ var _ = Describe("collaset controller", func() {
 		}
 	})
 
-	It("replace update reconcile by partition", func() {
+	It("[replace update] reconcile by partition", func() {
 		testcase := "test-replace-update-by-partition"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
 
@@ -753,7 +753,7 @@ var _ = Describe("collaset controller", func() {
 		Expect(inDeleteReplicas).Should(BeEquivalentTo(4))
 	})
 
-	It("replace update reconcile by label", func() {
+	It("[replace update] reconcile by label", func() {
 		testcase := "test-replace-update-by-label"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
 
@@ -989,7 +989,7 @@ var _ = Describe("collaset controller", func() {
 
 		// double check updated pod replicas
 		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-		var replacePairNewId, newPodInstanceId string
+		var replacePairNewId, newPodInstanceId, newCreatePodName string
 		for _, pod := range podList.Items {
 			Expect(pod.Labels).ShouldNot(BeNil())
 			// replace by current revision
@@ -999,6 +999,7 @@ var _ = Describe("collaset controller", func() {
 				replacePairNewId = pod.Labels[appsv1alpha1.PodReplacePairNewId]
 				Expect(replacePairNewId).ShouldNot(BeNil())
 			} else {
+				newCreatePodName = pod.Name
 				newPodInstanceId = pod.Labels[appsv1alpha1.PodInstanceIDLabelKey]
 				Expect(pod.Labels[appsv1alpha1.PodReplacePairOriginName]).Should(BeEquivalentTo(replacePod.Name))
 			}
@@ -1006,6 +1007,32 @@ var _ = Describe("collaset controller", func() {
 		Expect(replacePairNewId).ShouldNot(BeEquivalentTo(""))
 		Expect(newPodInstanceId).ShouldNot(BeEquivalentTo(""))
 		Expect(newPodInstanceId).Should(BeEquivalentTo(replacePairNewId))
+		Expect(newCreatePodName).ShouldNot(BeEquivalentTo(""))
+
+		Expect(updatePodWithRetry(c, replacePod.Namespace, newCreatePodName, func(pod *corev1.Pod) bool {
+			if pod.Labels == nil {
+				pod.Labels = map[string]string{}
+			}
+			pod.Labels[appsv1alpha1.PodServiceAvailableLabel] = "true"
+			return true
+		})).Should(BeNil())
+
+		Eventually(func() error {
+			// check updated pod replicas by CollaSet status
+			return expectedStatusReplicas(c, cs, 0, 0, 1, 2, 0, 0, 0, 0)
+		}, 30*time.Second, 1*time.Second).Should(BeNil())
+
+		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+		for _, pod := range podList.Items {
+			Expect(pod.Labels).ShouldNot(BeNil())
+			// replace by current revision
+			Expect(pod.Labels[appsv1.ControllerRevisionHashLabelKey]).Should(BeEquivalentTo(cs.Status.CurrentRevision))
+			Expect(pod.Spec.Containers[0].Image).Should(BeEquivalentTo("nginx:v1"))
+			if pod.Name == replacePod.Name {
+				_, exist := pod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]
+				Expect(exist).Should(BeTrue())
+			}
+		}
 	})
 
 	It("replace update change to inplaceUpdate", func() {
