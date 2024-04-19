@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -119,6 +120,7 @@ func (r *RealSyncControl) SyncPods(
 	}
 
 	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(filteredPods, instance)
+	needDeletePodsIDs := sets.String{}
 	if len(needDeletePods) > 0 {
 		_, err := controllerutils.SlowStartBatch(len(needDeletePods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 			pod := needDeletePods[i]
@@ -128,6 +130,7 @@ func (r *RealSyncControl) SyncPods(
 					return fmt.Errorf("failed to delete pod when syncPods %s/%s %s", pod.Namespace, pod.Name, err)
 				}
 			}
+			needDeletePodsIDs.Insert(pod.Labels[appsv1alpha1.PodInstanceIDLabelKey])
 			return nil
 		})
 		if err != nil {
@@ -209,8 +212,11 @@ func (r *RealSyncControl) SyncPods(
 
 	// 3. Reclaim Pod ID which Pod & PVC are all non-existing
 	for id, contextDetail := range ownedIDs {
-		_, exist := currentIDs[id]
-		if contextDetail.Contains(ScaleInContextDataKey, "true") && !exist {
+		if _, exist := currentIDs[id]; exist {
+			continue
+		}
+		_, exist := needDeletePodsIDs[strconv.Itoa(contextDetail.ID)]
+		if contextDetail.Contains(ScaleInContextDataKey, "true") || exist {
 			idToReclaim.Insert(id)
 		}
 	}
@@ -245,7 +251,7 @@ func (r *RealSyncControl) SyncPods(
 			// create pvcs for new pod
 			err = r.pvcControl.CreatePodPvcs(ctx, instance, newPod, resources.ExistingPvcs)
 			if err != nil {
-				return fmt.Errorf("fail to migrate PVCs from origin pod %s to replace pod %s: %s", originPod.Name, newPod.Name, err)
+				return fmt.Errorf("fail to create PVCs for replace pod %s: %s", newPod.Name, err)
 			}
 			if newCreatedPod, err := r.podControl.CreatePod(newPod); err == nil {
 				r.recorder.Eventf(originPod,
