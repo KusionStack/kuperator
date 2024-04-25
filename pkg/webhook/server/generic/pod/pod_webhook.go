@@ -41,3 +41,11 @@ func init() {
 	webhooks = append(webhooks, opslifecycle.New())
 	webhooks = append(webhooks, gracedelete.New())
 }
+
+func RegisterAdmissionWebhook(webhook AdmissionWebhook) {
+	webhooks = append(webhooks, webhook)
+}
+
+func ListAdmissionWebhooks() []AdmissionWebhook {
+	return webhooks
+}
