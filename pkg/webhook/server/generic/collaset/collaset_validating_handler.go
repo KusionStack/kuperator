@@ -19,8 +19,9 @@ package collaset
 import (
 	"context"
 	"fmt"
-	"k8s.io/kubernetes/pkg/apis/core"
 	"net/http"
+
+	"k8s.io/kubernetes/pkg/apis/core"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,13 +30,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	k8scorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	commonutils "kusionstack.io/operating/pkg/utils"
 	"kusionstack.io/operating/pkg/utils/mixin"
 	"kusionstack.io/operating/pkg/webhook/server/generic/utils"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 type ValidatingHandler struct {
