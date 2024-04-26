@@ -128,6 +128,10 @@ type ScaleStrategy struct {
 	// +optional
 	PodToInclude []string `json:"podToInclude,omitempty"`
 
+	// PodToInclude indicates the pods which will be adapted by CollaSet.
+	// +optional
+	PodToDelete []string `json:"podToDelete,omitempty"`
+
 	// PersistentVolumeClaimRetentionPolicy describes the lifecycle of PersistentVolumeClaim
 	// created from volumeClaimTemplates. By default, all persistent volume claims are created as needed and
 	// deleted after no pod is using them. This policy allows the lifecycle to be altered, for example

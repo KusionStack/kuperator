@@ -1133,6 +1133,11 @@ func (in *ScaleStrategy) DeepCopyInto(out *ScaleStrategy) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.PodToDelete != nil {
+		in, out := &in.PodToDelete, &out.PodToDelete
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.PersistentVolumeClaimRetentionPolicy != nil {
 		in, out := &in.PersistentVolumeClaimRetentionPolicy, &out.PersistentVolumeClaimRetentionPolicy
 		*out = new(PersistentVolumeClaimRetentionPolicy)

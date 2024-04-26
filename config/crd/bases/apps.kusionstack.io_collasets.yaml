@@ -129,6 +129,12 @@ spec:
                           count to be deleted.
                         type: string
                     type: object
+                  podToDelete:
+                    description: PodToInclude indicates the pods which will be adapted
+                      by CollaSet.
+                    items:
+                      type: string
+                    type: array
                   podToExclude:
                     description: PodToExclude indicates the pods which will be orphaned
                       by CollaSet.
