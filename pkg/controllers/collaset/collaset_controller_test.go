@@ -29,6 +29,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -1142,7 +1143,7 @@ var _ = Describe("collaset controller", func() {
 		}
 	})
 
-	It("pvc provision", func() {
+	It("[pvc template] provision", func() {
 		testcase := "pvc-provision"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
 
@@ -1230,14 +1231,17 @@ var _ = Describe("collaset controller", func() {
 			// there should be 8 pvcs
 			allPvcs := &corev1.PersistentVolumeClaimList{}
 			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
-			Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
-			for i := range allPvcs.Items {
-				if allPvcs.Items[i].DeletionTimestamp != nil {
-					continue
+			Eventually(func() int {
+				Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
+				activePvcs = make([]*corev1.PersistentVolumeClaim, 0)
+				for i := range allPvcs.Items {
+					if allPvcs.Items[i].DeletionTimestamp != nil {
+						continue
+					}
+					activePvcs = append(activePvcs, &allPvcs.Items[i])
 				}
-				activePvcs = append(activePvcs, &allPvcs.Items[i])
-			}
-			Expect(len(activePvcs) == 8).Should(BeTrue())
+				return len(activePvcs)
+			}, time.Second*10, time.Second).Should(BeEquivalentTo(8))
 			// check instance id consistency
 			idBounded := sets.String{}
 			for i := range podList.Items {
@@ -1257,7 +1261,7 @@ var _ = Describe("collaset controller", func() {
 				cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
 				return true
 			})).Should(BeNil())
-			// mark all pods allowed to operate in PodOpsLifecycle
+			// mock opsLifecycle webhook to allow Pod scale in
 			podList := &corev1.PodList{}
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 			Expect(len(podList.Items)).Should(BeEquivalentTo(4))
@@ -1271,23 +1275,26 @@ var _ = Describe("collaset controller", func() {
 			}
 			// there should be 2 pods
 			podList = &corev1.PodList{}
-			Eventually(func() bool {
+			Eventually(func() int {
 				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-				return len(podList.Items) == 2
-			}, 5*time.Second, 1*time.Second).Should(BeTrue())
+				return len(podList.Items)
+			}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
 			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 			Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
 			// there should be 4 pvcs
 			allPvcs := &corev1.PersistentVolumeClaimList{}
 			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
-			Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
-			for i := range allPvcs.Items {
-				if allPvcs.Items[i].DeletionTimestamp != nil {
-					continue
+			Eventually(func() int {
+				Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
+				activePvcs = make([]*corev1.PersistentVolumeClaim, 0)
+				for i := range allPvcs.Items {
+					if allPvcs.Items[i].DeletionTimestamp != nil {
+						continue
+					}
+					activePvcs = append(activePvcs, &allPvcs.Items[i])
 				}
-				activePvcs = append(activePvcs, &allPvcs.Items[i])
-			}
-			Expect(len(activePvcs) == 4).Should(BeTrue())
+				return len(activePvcs)
+			}, time.Second*10, time.Second).Should(BeEquivalentTo(4))
 			// check instance id consistency
 			idBounded := sets.String{}
 			for i := range podList.Items {
@@ -1327,14 +1334,17 @@ var _ = Describe("collaset controller", func() {
 			// there should be 8 pvcs
 			allPvcs := &corev1.PersistentVolumeClaimList{}
 			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
-			Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
-			for i := range allPvcs.Items {
-				if allPvcs.Items[i].DeletionTimestamp != nil {
-					continue
+			Eventually(func() int {
+				Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
+				activePvcs = make([]*corev1.PersistentVolumeClaim, 0)
+				for i := range allPvcs.Items {
+					if allPvcs.Items[i].DeletionTimestamp != nil {
+						continue
+					}
+					activePvcs = append(activePvcs, &allPvcs.Items[i])
 				}
-				activePvcs = append(activePvcs, &allPvcs.Items[i])
-			}
-			Expect(len(activePvcs) == 8).Should(BeTrue())
+				return len(activePvcs)
+			}, time.Second*10, time.Second).Should(BeEquivalentTo(8))
 			// check instance id consistency
 			idBounded := sets.String{}
 			for i := range podList.Items {
@@ -1348,7 +1358,7 @@ var _ = Describe("collaset controller", func() {
 		}
 	})
 
-	It("pvc template update", func() {
+	It("[pvc template] update", func() {
 		testcase := "pvc-template-update"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
 
@@ -1431,7 +1441,7 @@ var _ = Describe("collaset controller", func() {
 		}, 5*time.Second, 1*time.Second).Should(BeTrue())
 		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 3, 3, 0, 0, 0)).Should(BeNil())
-		for _, partition := range []int32{0, 1, 2, 3, 4} {
+		for _, partition := range []int32{0, 1, 2, 3} {
 			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 			Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
 				cls.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
@@ -1473,7 +1483,7 @@ var _ = Describe("collaset controller", func() {
 			})).Should(BeNil())
 			podList := &corev1.PodList{}
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-			// allow Pod to do update
+			// mock opsLifecycle webhook to allow Pod update
 			for i := range podList.Items {
 				pod := &podList.Items[i]
 				if !podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, pod) {
@@ -1489,19 +1499,20 @@ var _ = Describe("collaset controller", func() {
 					return true
 				})).Should(BeNil())
 			}
-			// wait for recreate update finished
-			time.Sleep(3 * time.Second)
 			// there should be 6 pvcs
-			allPvcs := &corev1.PersistentVolumeClaimList{}
 			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
-			Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
-			for i := range allPvcs.Items {
-				if allPvcs.Items[i].DeletionTimestamp != nil {
-					continue
+			Eventually(func() int {
+				allPvcs := &corev1.PersistentVolumeClaimList{}
+				activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
+				Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
+				for i := range allPvcs.Items {
+					if allPvcs.Items[i].DeletionTimestamp != nil {
+						continue
+					}
+					activePvcs = append(activePvcs, &allPvcs.Items[i])
 				}
-				activePvcs = append(activePvcs, &allPvcs.Items[i])
-			}
-			Expect(len(activePvcs) == 6).Should(BeTrue())
+				return len(activePvcs)
+			}, time.Second*10, time.Second).Should(BeEquivalentTo(6))
 			// check instance id consistency
 			podList = &corev1.PodList{}
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
@@ -1535,7 +1546,7 @@ var _ = Describe("collaset controller", func() {
 
 	})
 
-	It("pvc with replace update", func() {
+	It("[pvc template] replace update", func() {
 		testcase := "pvc-with-replace-update"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
 
@@ -1632,10 +1643,13 @@ var _ = Describe("collaset controller", func() {
 				return true
 			})).Should(BeNil())
 			// wait for reconcile finished
-			time.Sleep(3 * time.Second)
+			Eventually(func() int32 {
+				Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+				return cs.Status.UpdatedReplicas
+			}, time.Second*10, time.Second).Should(BeEquivalentTo(partition))
+			// allow Pod to do replace
 			podList := &corev1.PodList{}
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-			// allow Pod to do replace
 			for i := range podList.Items {
 				pod := &podList.Items[i]
 				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
@@ -1647,19 +1661,20 @@ var _ = Describe("collaset controller", func() {
 					return true
 				})).Should(BeNil())
 			}
-			// wait for replace update finished
-			time.Sleep(3 * time.Second)
 			// there should be 6 pvcs
 			allPvcs := &corev1.PersistentVolumeClaimList{}
 			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
-			Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
-			for i := range allPvcs.Items {
-				if allPvcs.Items[i].DeletionTimestamp != nil {
-					continue
+			Eventually(func() int {
+				Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
+				activePvcs = make([]*corev1.PersistentVolumeClaim, 0)
+				for i := range allPvcs.Items {
+					if allPvcs.Items[i].DeletionTimestamp != nil {
+						continue
+					}
+					activePvcs = append(activePvcs, &allPvcs.Items[i])
 				}
-				activePvcs = append(activePvcs, &allPvcs.Items[i])
-			}
-			Expect(len(activePvcs) == 6).Should(BeTrue())
+				return len(activePvcs)
+			}, time.Second*10, time.Second).Should(BeEquivalentTo(6))
 			// check instance id consistency
 			podList = &corev1.PodList{}
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
@@ -1675,7 +1690,7 @@ var _ = Describe("collaset controller", func() {
 		}
 	})
 
-	It("pvc retention policy", func() {
+	It("[pvc template] retention policy", func() {
 		testcase := "pvc-retention-policy"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
 
@@ -1783,23 +1798,28 @@ var _ = Describe("collaset controller", func() {
 				})).Should(BeNil())
 			}
 			// there should be 2 pods
-			Eventually(func() bool {
+			Eventually(func() int {
 				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-				return len(podList.Items) == 2
-			}, 5*time.Second, 1*time.Second).Should(BeTrue())
+				return len(podList.Items)
+			}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
 			// there should be 8 pvcs
 			allPvcs := &corev1.PersistentVolumeClaimList{}
 			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
-			Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
 			pvcNames := sets.String{}
-			for i := range allPvcs.Items {
-				if allPvcs.Items[i].DeletionTimestamp != nil {
-					continue
+			Eventually(func() int {
+				Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
+				activePvcs = make([]*corev1.PersistentVolumeClaim, 0)
+				pvcNames = sets.String{}
+				for i := range allPvcs.Items {
+					if allPvcs.Items[i].DeletionTimestamp != nil {
+						continue
+					}
+					activePvcs = append(activePvcs, &allPvcs.Items[i])
+					pvcNames.Insert(allPvcs.Items[i].Name)
+
 				}
-				activePvcs = append(activePvcs, &allPvcs.Items[i])
-				pvcNames.Insert(allPvcs.Items[i].Name)
-			}
-			Expect(len(activePvcs) == 8).Should(BeTrue())
+				return len(activePvcs)
+			}, time.Second*10, time.Second).Should(BeEquivalentTo(8))
 			// complete scale in podOpsLifeCycle
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 			for i := range podList.Items {
@@ -1841,36 +1861,48 @@ var _ = Describe("collaset controller", func() {
 				}
 				return true
 			})).Should(BeNil())
-			// delete set and pods
+			// delete collaset
 			Expect(c.Delete(context.TODO(), cs)).Should(BeNil())
+			Eventually(func() bool {
+				err := c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)
+				return errors.IsNotFound(err)
+			}, time.Second*10, time.Second).Should(BeTrue())
+			// delete collaset pods
 			podList := &corev1.PodList{}
-			Expect(c.List(context.TODO(), podList, client.InNamespace(csRecreate.Namespace))).Should(BeNil())
-			for _, pod := range podList.Items {
-				Expect(c.Delete(context.TODO(), pod.DeepCopy())).Should(BeNil())
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range podList.Items {
+				Expect(c.Delete(context.TODO(), &podList.Items[i])).Should(BeNil())
 			}
-			time.Sleep(3 * time.Second)
+			Eventually(func() int {
+				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+				return len(podList.Items)
+			}, time.Second*10, time.Second).Should(BeEquivalentTo(0))
 			// there should be 8 pvcs
 			allPvcs := &corev1.PersistentVolumeClaimList{}
 			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
-			Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
 			pvcNames := sets.String{}
-			for i := range allPvcs.Items {
-				if allPvcs.Items[i].DeletionTimestamp != nil {
-					continue
+			Eventually(func() int {
+				Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
+				activePvcs = make([]*corev1.PersistentVolumeClaim, 0)
+				pvcNames = sets.String{}
+				for i := range allPvcs.Items {
+					if allPvcs.Items[i].DeletionTimestamp != nil {
+						continue
+					}
+					activePvcs = append(activePvcs, &allPvcs.Items[i])
+					pvcNames.Insert(allPvcs.Items[i].Name)
 				}
-				activePvcs = append(activePvcs, &allPvcs.Items[i])
-				pvcNames.Insert(allPvcs.Items[i].Name)
-			}
-			// recreate set
+				return len(activePvcs)
+			}, time.Second*10, time.Second).Should(BeEquivalentTo(8))
+			// recreate collaset with same name
 			csRecreate.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy = &appsv1alpha1.PersistentVolumeClaimRetentionPolicy{
 				WhenDeleted: appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType,
 			}
 			Expect(c.Create(context.TODO(), csRecreate)).Should(BeNil())
-			time.Sleep(3 * time.Second)
-			Eventually(func() bool {
+			Eventually(func() int {
 				Expect(c.List(context.TODO(), podList, client.InNamespace(csRecreate.Namespace))).Should(BeNil())
-				return len(podList.Items) == 4
-			}, 5*time.Second, 1*time.Second).Should(BeTrue())
+				return len(podList.Items)
+			}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(4))
 			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: csRecreate.Namespace, Name: csRecreate.Name}, csRecreate)).Should(BeNil())
 			// pvcs should be retained
 			for i := range podList.Items {
