@@ -38,7 +38,7 @@ import (
 )
 
 var (
-	updatePodDeletionIndicationLabelInterval = 10 * 1000 * 1000 * 1000
+	updatePodDeletionIndicationLabelInterval = 5 * 1000 * 1000 * 1000
 )
 
 type GraceDelete struct {
