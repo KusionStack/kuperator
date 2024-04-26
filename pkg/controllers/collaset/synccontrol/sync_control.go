@@ -119,20 +119,8 @@ func (r *RealSyncControl) SyncPods(
 	}
 
 	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(filteredPods, instance)
-	if len(needDeletePods) > 0 {
-		_, err := controllerutils.SlowStartBatch(len(needDeletePods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
-			pod := needDeletePods[i]
-			if _, exist := pod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; !exist {
-				patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%d"}}}`, appsv1alpha1.PodDeletionIndicationLabelKey, time.Now().UnixNano())))
-				if err = r.podControl.PatchPod(pod, patch); err != nil {
-					return fmt.Errorf("failed to delete pod when syncPods %s/%s %s", pod.Namespace, pod.Name, err)
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "clean pods replace pair new id label with error: %s", err.Error())
-		}
+	if err := r.deletePodsByLabel(needDeletePods); err != nil {
+		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "clean pods replace pair new id label with error: %s", err.Error())
 	}
 
 	if len(needCleanLabelPods) > 0 {
@@ -178,6 +166,7 @@ func (r *RealSyncControl) SyncPods(
 	// stateless case
 	currentIDs := make(map[int]struct{})
 	idToReclaim := sets.Int{}
+	toDeletePodNames := sets.NewString(instance.Spec.ScaleStrategy.PodToDelete...)
 	for i := range filteredPods {
 		pod := filteredPods[i]
 		id, _ := collasetutils.GetPodInstanceID(pod)
@@ -200,6 +189,7 @@ func (r *RealSyncControl) SyncPods(
 			Pod:           pod,
 			ID:            id,
 			ContextDetail: ownedIDs[id],
+			ToDelete:      toDeletePodNames.Has(pod.Name),
 		})
 
 		if id >= 0 {
@@ -607,6 +597,16 @@ func (r *RealSyncControl) Scale(
 		}
 
 		return scaling, recordedRequeueAfter, err
+	} else if diff == 0 {
+		// delete pods indicated in ScaleStrategy.PodToDelete
+		for _, wrapper := range podWrappers {
+			if wrapper.ToDelete {
+				err := r.deletePodsByLabel([]*corev1.Pod{wrapper.Pod})
+				if err != nil {
+					return false, recordedRequeueAfter, err
+				}
+			}
+		}
 	}
 
 	// reset ContextDetail.ScalingIn, if there are Pods had its PodOpsLifecycle reverted
@@ -683,6 +683,20 @@ func extractAvailableContexts(diff int, ownedIDs map[int]*appsv1alpha1.ContextDe
 	}
 
 	return availableContexts
+}
+
+func (r *RealSyncControl) deletePodsByLabel(needDeletePods []*corev1.Pod) error {
+	_, err := controllerutils.SlowStartBatch(len(needDeletePods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+		pod := needDeletePods[i]
+		if _, exist := pod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; !exist {
+			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%d"}}}`, appsv1alpha1.PodDeletionIndicationLabelKey, time.Now().UnixNano())))
+			if err := r.podControl.PatchPod(pod, patch); err != nil {
+				return fmt.Errorf("failed to delete pod when syncPods %s/%s %s", pod.Namespace, pod.Name, err)
+			}
+		}
+		return nil
+	})
+	return err
 }
 
 func (r *RealSyncControl) Update(

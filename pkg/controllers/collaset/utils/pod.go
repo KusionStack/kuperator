@@ -39,6 +39,9 @@ type PodWrapper struct {
 	*corev1.Pod
 	ID            int
 	ContextDetail *appsv1alpha1.ContextDetail
+
+	// TODO ToExclude, ToInclude
+	ToDelete bool
 }
 
 func CollectPodInstanceID(pods []*PodWrapper) map[int]struct{} {
