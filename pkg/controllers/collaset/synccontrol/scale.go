@@ -65,17 +65,21 @@ func (s ActivePodsForDeletion) Less(i, j int) bool {
 	// pods which are indicated by ScaleStrategy.PodToDelete be deleted before others
 	if l.ToDelete && !r.ToDelete {
 		return false
-	} else if !l.ToDelete && r.ToDelete {
+	}
+
+	if !l.ToDelete && r.ToDelete {
 		return false
 	}
 
+	// pods which are during scaleInOps should be deleted before those not during
 	lDuringScaleIn := podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, l)
 	rDuringScaleIn := podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, r)
 
-	// pods which are during scaleInOps should be deleted before those not during
 	if lDuringScaleIn && !rDuringScaleIn {
 		return false
-	} else if !lDuringScaleIn && rDuringScaleIn {
+	}
+
+	if !lDuringScaleIn && rDuringScaleIn {
 		return true
 	}
 
