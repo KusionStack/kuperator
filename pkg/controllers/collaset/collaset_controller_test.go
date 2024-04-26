@@ -1894,7 +1894,7 @@ var _ = Describe("collaset controller", func() {
 				}
 				return len(activePvcs)
 			}, time.Second*10, time.Second).Should(BeEquivalentTo(8))
-			// recreate
+			// recreate collaset with same name
 			csRecreate.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy = &appsv1alpha1.PersistentVolumeClaimRetentionPolicy{
 				WhenDeleted: appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType,
 			}
