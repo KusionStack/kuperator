@@ -68,7 +68,7 @@ func (s ActivePodsForDeletion) Less(i, j int) bool {
 	}
 
 	if !l.ToDelete && r.ToDelete {
-		return false
+		return true
 	}
 
 	// pods which are during scaleInOps should be deleted before those not during

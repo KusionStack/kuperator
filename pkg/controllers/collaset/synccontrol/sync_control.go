@@ -599,9 +599,9 @@ func (r *RealSyncControl) Scale(
 		return scaling, recordedRequeueAfter, err
 	} else if diff == 0 {
 		// delete pods indicated in ScaleStrategy.PodToDelete
-		for _, wrapper := range podWrappers {
-			if wrapper.ToDelete {
-				err := r.deletePodsByLabel([]*corev1.Pod{wrapper.Pod})
+		for _, podWrapper := range podWrappers {
+			if podWrapper.ToDelete {
+				err := r.deletePodsByLabel([]*corev1.Pod{podWrapper.Pod})
 				if err != nil {
 					return false, recordedRequeueAfter, err
 				}
