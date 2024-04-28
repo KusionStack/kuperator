@@ -1990,7 +1990,7 @@ var _ = Describe("collaset controller", func() {
 		}, 10*time.Second, 1*time.Second).Should(BeTrue())
 	})
 
-	It("[podToDelete] scalingIn", func() {
+	It("[podToDelete] scale In", func() {
 		testcase := "test-pod-to-delete-scale"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
 

@@ -40,7 +40,7 @@ type PodWrapper struct {
 	ID            int
 	ContextDetail *appsv1alpha1.ContextDetail
 
-	// TODO ToExclude, ToInclude
+	// TODO ToExclude
 	ToDelete bool
 }
 

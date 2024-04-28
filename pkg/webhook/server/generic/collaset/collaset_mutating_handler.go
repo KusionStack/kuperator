@@ -19,9 +19,13 @@ package collaset
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -61,6 +65,25 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 	if err != nil {
 		logger.Error(err, "failed to marshal collaset to json")
 		return admission.Errored(http.StatusInternalServerError, err)
+	}
+
+	for _, podName := range cls.Spec.ScaleStrategy.PodToDelete {
+		pod := &corev1.Pod{}
+		if err := h.Client.Get(ctx, types.NamespacedName{Namespace: cls.Namespace, Name: podName}, pod); err != nil {
+			if errors.IsNotFound(err) {
+				return admission.Errored(http.StatusBadRequest, fmt.Errorf("no found Pod named %s to delete", podName))
+			}
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("failed to find Pod %s: %v", podName, err))
+		}
+		owned := false
+		for _, ref := range pod.OwnerReferences {
+			if ref.Name == cls.Name {
+				owned = true
+			}
+		}
+		if !owned {
+			return admission.Errored(http.StatusBadRequest, fmt.Errorf("not allwed to delete pod %s which is not owned by collaset %s", podName, cls.Name))
+		}
 	}
 
 	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)

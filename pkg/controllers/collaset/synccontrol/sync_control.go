@@ -170,6 +170,12 @@ func (r *RealSyncControl) SyncPods(
 	for i := range filteredPods {
 		pod := filteredPods[i]
 		id, _ := collasetutils.GetPodInstanceID(pod)
+		toDelete := toDeletePodNames.Has(pod.Name)
+
+		if toDelete {
+			toDeletePodNames.Delete(pod.Name)
+		}
+
 		if pod.DeletionTimestamp != nil {
 			// 1. Reclaim ID from Pod which is scaling in and terminating.
 			if contextDetail, exist := ownedIDs[id]; exist && contextDetail.Contains(ScaleInContextDataKey, "true") {
@@ -189,7 +195,7 @@ func (r *RealSyncControl) SyncPods(
 			Pod:           pod,
 			ID:            id,
 			ContextDetail: ownedIDs[id],
-			ToDelete:      toDeletePodNames.Has(pod.Name),
+			ToDelete:      toDelete,
 		})
 
 		if id >= 0 {
@@ -272,6 +278,23 @@ func (r *RealSyncControl) SyncPods(
 
 		if successCount > 0 {
 			needUpdateContext = true
+		}
+	}
+
+	// 5. Reclaim podToDelete if necessary
+	if len(toDeletePodNames) > 0 {
+		var newPodToDelete []string
+		for _, podName := range instance.Spec.ScaleStrategy.PodToDelete {
+			if !toDeletePodNames.Has(podName) {
+				newPodToDelete = append(newPodToDelete, podName)
+			}
+		}
+		instance.Spec.ScaleStrategy.PodToDelete = newPodToDelete
+		// update cls.spec.scaleStrategy.podToDelete
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			return r.client.Update(ctx, instance)
+		}); err != nil {
+			return false, nil, ownedIDs, fmt.Errorf("fail to update collaset when reclaiming podToDelete: %s", err)
 		}
 	}
 
