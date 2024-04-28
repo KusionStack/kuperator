@@ -130,7 +130,7 @@ spec:
                         type: string
                     type: object
                   podToDelete:
-                    description: PodToDelete indicates the pods which will be adapted
+                    description: PodToDelete indicates the pods which will be deleted
                       by CollaSet.
                     items:
                       type: string
