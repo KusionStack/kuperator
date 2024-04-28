@@ -510,8 +510,3 @@ func match(selector *metav1.LabelSelector, lb map[string]string) bool {
 	}
 	return sel.Matches(labels.Set(lb))
 }
-
-func updatePodInfo(pod *corev1.Pod, pdName string, info *podInfo) {
-	info.revision = pod.Labels[appsv1alpha1.PodDecorationLabelPrefix+pdName]
-	info.instanceId = pod.Labels[appsv1alpha1.PodInstanceIDLabelKey]
-}
