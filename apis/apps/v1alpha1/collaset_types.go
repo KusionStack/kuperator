@@ -128,7 +128,7 @@ type ScaleStrategy struct {
 	// +optional
 	PodToInclude []string `json:"podToInclude,omitempty"`
 
-	// PodToDelete indicates the pods which will be adapted by CollaSet.
+	// PodToDelete indicates the pods which will be deleted by CollaSet.
 	// +optional
 	PodToDelete []string `json:"podToDelete,omitempty"`
 

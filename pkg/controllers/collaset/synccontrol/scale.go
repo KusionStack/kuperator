@@ -62,7 +62,7 @@ func (s ActivePodsForDeletion) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 func (s ActivePodsForDeletion) Less(i, j int) bool {
 	l, r := s[i], s[j]
 
-	// pods which are indicated by ScaleStrategy.PodToDelete be deleted before others
+	// pods which are indicated by ScaleStrategy.PodToDelete should be deleted before others
 	if l.ToDelete && !r.ToDelete {
 		return false
 	}
