@@ -44,6 +44,7 @@ jobs:
       with:
         flags: unittests
         file: cover.out
+        token: ${{ secrets.CODECOV_TOKEN }}
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     - name: Check diff
