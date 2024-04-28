@@ -1969,7 +1969,7 @@ var _ = Describe("collaset controller", func() {
 			return true
 		})).Should(BeNil())
 
-		// mark pod allowed to operate in PodOpsLifecycle
+		// mark pod allowed to operate in PodDeletePodOpsLifecycle
 		pod := &podList.Items[0]
 		Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
 			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID())
@@ -1977,7 +1977,7 @@ var _ = Describe("collaset controller", func() {
 			return true
 		})).Should(BeNil())
 
-		// there should be 2 pods eventually
+		// there should be 2 pods eventually and toDeletePod do not exist
 		Eventually(func() bool {
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 			// toDeleteName do not exist
@@ -1994,7 +1994,7 @@ var _ = Describe("collaset controller", func() {
 		Expect(len(cs.Spec.ScaleStrategy.PodToDelete)).Should(BeEquivalentTo(0))
 	})
 
-	It("[podToDelete] scale In", func() {
+	It("[podToDelete] scale", func() {
 		testcase := "test-pod-to-delete-scale"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
 
@@ -2038,7 +2038,7 @@ var _ = Describe("collaset controller", func() {
 		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
 
-		// delete 1 pod, and set replicas-1
+		// delete 1 pod, and scale in to replicas - 1
 		toDeleteName := podList.Items[0].Name
 		reservedName := podList.Items[1].Name
 		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
@@ -2049,7 +2049,7 @@ var _ = Describe("collaset controller", func() {
 			return true
 		})).Should(BeNil())
 
-		// mark pod allowed to operate in PodOpsLifecycle
+		// mark pod allowed to operate in ScaleInPodOpsLifecycle
 		pod := &podList.Items[0]
 		Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
 			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
@@ -2057,7 +2057,7 @@ var _ = Describe("collaset controller", func() {
 			return true
 		})).Should(BeNil())
 
-		// there should be 1 pod eventually
+		// there should be 1 pod eventually, and origin reserved pod exists
 		Eventually(func() bool {
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 			reserved := false
@@ -2072,6 +2072,40 @@ var _ = Describe("collaset controller", func() {
 				}
 			}
 			return len(podList.Items) == 1 && reserved
+		}, 10*time.Second, 1*time.Second).Should(BeTrue())
+
+		// cls.spec.scaleStrategy.podToDelete should be reclaimed
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(len(cs.Spec.ScaleStrategy.PodToDelete)).Should(BeEquivalentTo(0))
+
+		// delete 1 pod, and scale out to replicas + 1
+		toDeleteName = podList.Items[0].Name
+		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+			cls.Spec.Replicas = int32Pointer(3)
+			cls.Spec.ScaleStrategy = appsv1alpha1.ScaleStrategy{
+				PodToDelete: []string{toDeleteName},
+			}
+			return true
+		})).Should(BeNil())
+
+		// mark pod allowed to operate in PodDeletePodOpsLifecycle
+		pod = &podList.Items[0]
+		Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID())
+			pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+			return true
+		})).Should(BeNil())
+
+		// there should be 3 pods eventually and toDeletePod do not exist
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range podList.Items {
+				// toDeleteName do not exist
+				if podList.Items[i].Name == toDeleteName {
+					return false
+				}
+			}
+			return len(podList.Items) == 3
 		}, 10*time.Second, 1*time.Second).Should(BeTrue())
 
 		// cls.spec.scaleStrategy.podToDelete should be reclaimed
