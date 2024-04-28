@@ -30,9 +30,12 @@ func (p *sortedPodInfo) Less(i, j int) bool {
 		return imatch
 	}
 	if p.infos[i].revision != p.infos[j].revision {
+		// Move the latest version to the front,
+		//  ensuring that the Pod selected by the partition is always ahead
 		return p.infos[i].revision > p.infos[j].revision
 	}
 	// TODO: more sort method
+	// Default sort by pod instance id in ResourceContext
 	return p.infos[i].instanceId < p.infos[j].instanceId
 }
 

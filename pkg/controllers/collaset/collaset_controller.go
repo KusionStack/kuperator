@@ -93,6 +93,13 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
+
+	// Only for starting SharedStrategyController
+	err = c.Watch(strategy.SharedStrategyController, &handler.Funcs{})
+	if err != nil {
+		return err
+	}
+
 	ch := make(chan event.GenericEvent, 1<<10)
 	strategy.SharedStrategyController.RegisterGenericEventChannel(ch)
 	// Watch PodDecoration related events
@@ -177,7 +184,7 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		UpdatedRevision: updatedRevision.Name,
 	}
 
-	getter, err := utilspoddecoration.NewPodDecorationGetter(ctx, r.Client, instance.Namespace)
+	getter, err := utilspoddecoration.NewPodDecorationGetter(r.Client, instance.Namespace)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

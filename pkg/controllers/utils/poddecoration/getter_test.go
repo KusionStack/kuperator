@@ -136,7 +136,7 @@ var _ = Describe("Test PodDecoration getter", func() {
 		podDecoration.Status.UpdatedRevision = updatedRevision
 		Expect(strategy.SharedStrategyController.UpdateSelectedPods(ctx, podDecoration, nil)).Should(BeNil())
 		strategy.SharedStrategyController.Synced()
-		getter, err := NewPodDecorationGetter(ctx, c, testcase)
+		getter, err := NewPodDecorationGetter(c, testcase)
 		tu := true
 		po0 := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{

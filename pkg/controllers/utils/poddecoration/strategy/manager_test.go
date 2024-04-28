@@ -107,8 +107,9 @@ var _ = Describe("Test PodDecoration strategy manager", func() {
 		podDecoration.Status.CurrentRevision = "1"
 		podDecoration.Status.UpdatedRevision = "2"
 		Expect(c.Status().Update(ctx, podDecoration)).Should(BeNil())
-		Expect(SharedStrategyController.Start(ctx)).NotTo(HaveOccurred())
-		Expect(SharedStrategyController.WaitForSync(ctx)).Should(Equal(true))
+		SharedStrategyController.(*strategyManager).synced = false
+		Expect(SharedStrategyController.Start(ctx, nil, nil)).NotTo(HaveOccurred())
+		Expect(SharedStrategyController.WaitForSync(ctx)).Should(BeNil())
 		Expect(len(SharedStrategyController.LatestPodDecorations(testcase))).Should(Equal(1))
 		updatedRevisions, stableRevisions := SharedStrategyController.EffectivePodRevisions(pods[0])
 		Expect(len(updatedRevisions)).Should(Equal(0))
@@ -248,8 +249,9 @@ var _ = Describe("Test PodDecoration strategy manager", func() {
 		podDecoration.Status.CurrentRevision = "1"
 		podDecoration.Status.UpdatedRevision = "2"
 		Expect(c.Status().Update(ctx, podDecoration)).Should(BeNil())
-		Expect(SharedStrategyController.Start(ctx)).NotTo(HaveOccurred())
-		Expect(SharedStrategyController.WaitForSync(ctx)).Should(Equal(true))
+		SharedStrategyController.(*strategyManager).synced = false
+		Expect(SharedStrategyController.Start(ctx, nil, nil)).NotTo(HaveOccurred())
+		Expect(SharedStrategyController.WaitForSync(ctx)).Should(BeNil())
 		Expect(len(SharedStrategyController.LatestPodDecorations(testcase))).Should(Equal(1))
 		// order: [pod-1], [pod-2, pod-3]
 		updatedRevisions, stableRevisions := SharedStrategyController.EffectivePodRevisions(pods[0])

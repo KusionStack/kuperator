@@ -34,7 +34,10 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/utils"
@@ -47,15 +50,12 @@ const (
 
 var SharedStrategyController Controller
 
-var _ manager.Runnable = &strategyManager{}
+var _ inject.Client = &strategyManager{}
 
 type Controller interface {
 	Updater
 	Reader
-
-	// Start will load the PodDecoration resources in controller cache. No blocking.
-	//  It will stop running when the context is closed.
-	Start(context.Context) error
+	source.SyncingSource
 	// RegisterGenericEventChannel registers a channel to listen for changes associated with the CollaSet.
 	RegisterGenericEventChannel(chan<- event.GenericEvent)
 	// InjectClient inject manager client into Controller
@@ -73,8 +73,6 @@ type Updater interface {
 }
 
 type Reader interface {
-	// WaitForSync waits for all PodDecoration managers cache were synced.
-	WaitForSync(ctx context.Context) bool
 	// LatestPodDecorations are a set of the most recent PodDecorations in the namespace.
 	LatestPodDecorations(namespace string) []*appsv1alpha1.PodDecoration
 	// EffectivePodRevisions is used to select the suitable version from the UpdatedRevision
@@ -88,19 +86,43 @@ func init() {
 	}
 }
 
+type strategyManager struct {
+	client.Client
+	// PDNamespace:PDName:Manager
+	managers  map[string]map[string]*podDecorationManager
+	listeners []chan<- event.GenericEvent
+	synced    bool
+	mu        sync.RWMutex
+}
+
+func (m *strategyManager) Start(ctx context.Context, h handler.EventHandler, q workqueue.RateLimitingInterface, p ...predicate.Predicate) error {
+	return m.start(ctx)
+}
+
 func (m *strategyManager) RegisterGenericEventChannel(ch chan<- event.GenericEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.listeners = append(m.listeners, ch)
 }
 
-func (m *strategyManager) Start(ctx context.Context) error {
+// start load the PodDecoration resources in controller cache. No blocking.
+func (m *strategyManager) start(ctx context.Context) error {
+	if m.HasSynced() {
+		return nil
+	}
+	if err := m.syncAllPodDecorations(ctx); err != nil {
+		return err
+	}
+	m.Synced()
+	return nil
+}
+
+func (m *strategyManager) syncAllPodDecorations(ctx context.Context) error {
 	allPodDecorations := &appsv1alpha1.PodDecorationList{}
 	if err := m.List(ctx, allPodDecorations); err != nil {
 		return err
 	}
 	q := workqueue.New()
-
 	for i := range allPodDecorations.Items {
 		pd := &allPodDecorations.Items[i]
 		if pd.DeletionTimestamp != nil {
@@ -108,7 +130,6 @@ func (m *strategyManager) Start(ctx context.Context) error {
 		}
 		q.Add(types.NamespacedName{Namespace: pd.Namespace, Name: pd.Name})
 	}
-	defer m.Synced()
 	for {
 		select {
 		case <-ctx.Done():
@@ -154,15 +175,6 @@ func (m *strategyManager) Start(ctx context.Context) error {
 	return nil
 }
 
-type strategyManager struct {
-	client.Client
-	// PDNamespace:PDName:Manager
-	managers  map[string]map[string]*podDecorationManager
-	listeners []chan<- event.GenericEvent
-	synced    bool
-	mu        sync.RWMutex
-}
-
 func (m *strategyManager) HasSynced() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -180,16 +192,12 @@ func (m *strategyManager) InjectClient(c client.Client) error {
 	return nil
 }
 
-func (m *strategyManager) WaitForSync(ctx context.Context) bool {
-	err := wait.PollImmediateUntilWithContext(ctx, syncedPollPeriod,
+// WaitForSync waits for all PodDecoration managers cache were synced.
+func (m *strategyManager) WaitForSync(ctx context.Context) error {
+	return wait.PollImmediateUntilWithContext(ctx, syncedPollPeriod,
 		func(context.Context) (bool, error) {
 			return m.HasSynced(), nil
 		})
-	if err != nil {
-		klog.V(2).Infof("stop requested")
-		return false
-	}
-	return true
 }
 
 func (m *strategyManager) LatestPodDecorations(namespace string) (pds []*appsv1alpha1.PodDecoration) {

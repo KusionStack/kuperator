@@ -63,10 +63,6 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
-	// Add PodDecoration strategy manager runnable
-	if err := addRunner(mgr); err != nil {
-		return err
-	}
 	// Create a new controller
 	c, err := controller.New("poddecoration-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {

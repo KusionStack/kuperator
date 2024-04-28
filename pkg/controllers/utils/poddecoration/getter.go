@@ -47,11 +47,7 @@ type namespacedPodDecorationManager struct {
 	revisions                map[string]*appsv1alpha1.PodDecoration
 }
 
-func NewPodDecorationGetter(ctx context.Context, c client.Client, namespace string) (Getter, error) {
-	// Wait for PodDecoration strategy manager runnable started
-	if !strategy.SharedStrategyController.WaitForSync(ctx) {
-		return nil, fmt.Errorf("PodDecorationGetter WaitForCacheSync did not successfully complete")
-	}
+func NewPodDecorationGetter(c client.Client, namespace string) (Getter, error) {
 	getter := &namespacedPodDecorationManager{
 		c:                        c,
 		controller:               strategy.SharedStrategyController,
@@ -116,6 +112,11 @@ func (n *namespacedPodDecorationManager) GetEffective(ctx context.Context, pod *
 	return n.GetByRevisions(ctx, append(updatedRevisions.List(), stableRevisions.List()...)...)
 }
 
+// getEffectiveRevisions returns the revisions of the PodDecorations that are currently in effect for the pod.
+// If the Pod is selected by the spec.updateStrategy, they are placed in the updatedRevisions, representing the
+// versions that are being updated. If not selected by UpdateStrategy, it falls back to using CurrentRevision
+// and Pod’s OldRevision, and adds it to stableRevisions. If OldRevision and CurrentRevision are from the same
+// PodDecoration, the OldRevision is preferred.
 func (n *namespacedPodDecorationManager) getEffectiveRevisions(pod *corev1.Pod, oldRevMap map[string]string) (updatedRevisions, stableRevisions sets.String) {
 	// oldRevMap, PDName: revision
 	// updateRevMap, PDName: revision
