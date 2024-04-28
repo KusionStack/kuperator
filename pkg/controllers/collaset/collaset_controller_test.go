@@ -1988,6 +1988,10 @@ var _ = Describe("collaset controller", func() {
 			}
 			return len(podList.Items) == 2
 		}, 10*time.Second, 1*time.Second).Should(BeTrue())
+
+		// cls.spec.scaleStrategy.podToDelete should be reclaimed
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(len(cs.Spec.ScaleStrategy.PodToDelete)).Should(BeEquivalentTo(0))
 	})
 
 	It("[podToDelete] scale In", func() {
@@ -2069,6 +2073,10 @@ var _ = Describe("collaset controller", func() {
 			}
 			return len(podList.Items) == 1 && reserved
 		}, 10*time.Second, 1*time.Second).Should(BeTrue())
+
+		// cls.spec.scaleStrategy.podToDelete should be reclaimed
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(len(cs.Spec.ScaleStrategy.PodToDelete)).Should(BeEquivalentTo(0))
 	})
 
 })
