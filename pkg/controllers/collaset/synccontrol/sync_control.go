@@ -42,7 +42,9 @@ import (
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
 	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/operating/pkg/features"
 	commonutils "kusionstack.io/operating/pkg/utils"
+	"kusionstack.io/operating/pkg/utils/feature"
 )
 
 const (
@@ -282,19 +284,19 @@ func (r *RealSyncControl) SyncPods(
 	}
 
 	// 5. Reclaim podToDelete if necessary
-	if len(toDeletePodNames) > 0 {
+	// ReclaimPodToDelete FeatureGate defaults to true
+	// Add '--feature-gates=ReclaimPodToDelete=false' to container args, to disable reclaim of podToDelete
+	if feature.DefaultFeatureGate.Enabled(features.ReclaimPodToDelete) && len(toDeletePodNames) > 0 {
 		var newPodToDelete []string
 		for _, podName := range instance.Spec.ScaleStrategy.PodToDelete {
 			if !toDeletePodNames.Has(podName) {
 				newPodToDelete = append(newPodToDelete, podName)
 			}
 		}
-		instance.Spec.ScaleStrategy.PodToDelete = newPodToDelete
 		// update cls.spec.scaleStrategy.podToDelete
-		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			return r.client.Update(ctx, instance)
-		}); err != nil {
-			return false, nil, ownedIDs, fmt.Errorf("fail to update collaset when reclaiming podToDelete: %s", err)
+		instance.Spec.ScaleStrategy.PodToDelete = newPodToDelete
+		if err := r.updateCollaSet(ctx, instance); err != nil {
+			return false, nil, ownedIDs, err
 		}
 	}
 
@@ -404,6 +406,18 @@ func dealReplacePods(pods []*corev1.Pod, instance *appsv1alpha1.CollaSet) (needR
 	}
 
 	return
+}
+
+func (r *RealSyncControl) updateCollaSet(ctx context.Context, cls *appsv1alpha1.CollaSet) error {
+	if err := collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.CollaSet, cls.Name, cls.ResourceVersion); err != nil {
+		return err
+	}
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return r.client.Update(ctx, cls)
+	}); err != nil {
+		return fmt.Errorf("fail to update collaset when reclaiming podToDelete: %s", err)
+	}
+	return nil
 }
 
 func (r *RealSyncControl) Scale(
