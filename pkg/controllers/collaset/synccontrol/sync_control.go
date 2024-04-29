@@ -409,15 +409,12 @@ func dealReplacePods(pods []*corev1.Pod, instance *appsv1alpha1.CollaSet) (needR
 }
 
 func (r *RealSyncControl) updateCollaSet(ctx context.Context, cls *appsv1alpha1.CollaSet) error {
-	if err := collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.CollaSet, cls.Name, cls.ResourceVersion); err != nil {
-		return err
-	}
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		return r.client.Update(ctx, cls)
 	}); err != nil {
-		return fmt.Errorf("fail to update collaset when reclaiming podToDelete: %s", err)
+		return err
 	}
-	return nil
+	return collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.CollaSet, cls.Name, cls.ResourceVersion)
 }
 
 func (r *RealSyncControl) Scale(
