@@ -88,6 +88,9 @@ func (gd *GraceDelete) Validating(ctx context.Context, c client.Client, oldPod, 
 		if newPod.Labels == nil {
 			newPod.Labels = map[string]string{}
 		}
+		if newPod.Annotations == nil {
+			newPod.Annotations = map[string]string{}
+		}
 
 		// limit the AnnotationGraceDeleteTimestamp update frequency to updateGraceDeleteTimestampAnnoInterval,
 		// to avoid update conflict caused by workload delete pod constantly
