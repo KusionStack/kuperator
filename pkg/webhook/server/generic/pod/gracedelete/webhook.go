@@ -38,7 +38,7 @@ import (
 )
 
 var (
-	updatePodDeletionIndicationLabelInterval = 5 * 1000 * 1000 * 1000
+	updateGraceDeleteTimestampAnnoInterval = 5 * time.Second
 )
 
 type GraceDelete struct {
@@ -89,16 +89,19 @@ func (gd *GraceDelete) Validating(ctx context.Context, c client.Client, oldPod, 
 			newPod.Labels = map[string]string{}
 		}
 
-		// limit the PodDeletionIndicationLabel update frequency to updatePodDeletionIndicationLabelInterval,
+		// limit the AnnotationGraceDeleteTimestamp update frequency to updatePodDeletionIndicationLabelInterval,
 		// to avoid update conflict caused by workload delete pod constantly
-		if timestamp, ok := newPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; ok {
+		if timestamp, ok := newPod.Annotations[appsv1alpha1.AnnotationGraceDeleteTimestamp]; ok {
 			unixNano, err := strconv.ParseInt(timestamp, 10, 64)
-			if err == nil && time.Now().UnixNano()-unixNano < int64(updatePodDeletionIndicationLabelInterval) {
+			if err == nil && time.Now().UnixNano()-unixNano < int64(updateGraceDeleteTimestampAnnoInterval) {
 				return nil
 			}
 		}
 
-		newPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] = strconv.FormatInt(time.Now().UnixNano(), 10)
+		if _, ok := newPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; !ok {
+			newPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] = strconv.FormatInt(time.Now().UnixNano(), 10)
+		}
+		newPod.Annotations[appsv1alpha1.AnnotationGraceDeleteTimestamp] = strconv.FormatInt(time.Now().UnixNano(), 10)
 
 		return c.Update(ctx, newPod)
 	})

@@ -33,3 +33,9 @@ const (
 	// AnnotationPodDecorationRevision struct: { groupName: {name: pdName, revision: currentRevision}, groupName: {} }
 	AnnotationPodDecorationRevision = "poddecoration.kusionstack.io/revisions"
 )
+
+// GraceDelete Webhook Annotation
+const (
+	// AnnotationPodDecorationRevision struct: { groupName: {name: pdName, revision: currentRevision}, groupName: {} }
+	AnnotationGraceDeleteTimestamp = "gracedelete.kusionstack.io/delete-timestamp"
+)
