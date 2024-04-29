@@ -89,7 +89,7 @@ func (gd *GraceDelete) Validating(ctx context.Context, c client.Client, oldPod, 
 			newPod.Labels = map[string]string{}
 		}
 
-		// limit the AnnotationGraceDeleteTimestamp update frequency to updatePodDeletionIndicationLabelInterval,
+		// limit the AnnotationGraceDeleteTimestamp update frequency to updateGraceDeleteTimestampAnnoInterval,
 		// to avoid update conflict caused by workload delete pod constantly
 		if timestamp, ok := newPod.Annotations[appsv1alpha1.AnnotationGraceDeleteTimestamp]; ok {
 			unixNano, err := strconv.ParseInt(timestamp, 10, 64)
