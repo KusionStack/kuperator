@@ -37,6 +37,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+var (
+	updateGraceDeleteTimestampAnnoInterval = 5 * time.Second
+)
+
 type GraceDelete struct {
 }
 
@@ -84,7 +88,23 @@ func (gd *GraceDelete) Validating(ctx context.Context, c client.Client, oldPod, 
 		if newPod.Labels == nil {
 			newPod.Labels = map[string]string{}
 		}
-		newPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] = strconv.FormatInt(time.Now().UnixNano(), 10)
+		if newPod.Annotations == nil {
+			newPod.Annotations = map[string]string{}
+		}
+
+		// limit the AnnotationGraceDeleteTimestamp update frequency to updateGraceDeleteTimestampAnnoInterval,
+		// to avoid update conflict caused by workload delete pod constantly
+		if timestamp, ok := newPod.Annotations[appsv1alpha1.AnnotationGraceDeleteTimestamp]; ok {
+			lastDeleteTimestamp, err := strconv.ParseInt(timestamp, 10, 64)
+			if err == nil && time.Now().UnixNano()-lastDeleteTimestamp < int64(updateGraceDeleteTimestampAnnoInterval) {
+				return nil
+			}
+		}
+
+		if _, ok := newPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; !ok {
+			newPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] = strconv.FormatInt(time.Now().UnixNano(), 10)
+		}
+		newPod.Annotations[appsv1alpha1.AnnotationGraceDeleteTimestamp] = strconv.FormatInt(time.Now().UnixNano(), 10)
 
 		return c.Update(ctx, newPod)
 	})
