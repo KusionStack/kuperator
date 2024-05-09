@@ -48,6 +48,7 @@ import (
 	"kusionstack.io/operating/pkg/controllers/collaset"
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
 	"kusionstack.io/operating/pkg/controllers/poddeletion"
+	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/strategy"
 	"kusionstack.io/operating/pkg/utils/inject"
 )
 
@@ -360,7 +361,8 @@ var _ = BeforeSuite(func() {
 	r, request = testReconcile(poddeletion.NewReconciler(mgr))
 	err = poddeletion.AddToMgr(mgr, r)
 	Expect(err).NotTo(HaveOccurred())
-
+	// ignore PodDecoration SharedStrategyController
+	strategy.SharedStrategyController.Synced()
 	go func() {
 		err = mgr.Start(ctx)
 		Expect(err).NotTo(HaveOccurred())

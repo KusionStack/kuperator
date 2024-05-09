@@ -59,6 +59,9 @@ func PatchPodDecoration(pod *corev1.Pod, template *appsv1alpha1.PodDecorationPod
 
 func PatchListOfDecorations(pod *corev1.Pod, podDecorations map[string]*appsv1alpha1.PodDecoration) (err error) {
 	var pds []*appsv1alpha1.PodDecoration
+	if pod.Labels == nil {
+		pod.Labels = map[string]string{}
+	}
 	for _, pd := range podDecorations {
 		pds = append(pds, pd)
 	}

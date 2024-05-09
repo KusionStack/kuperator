@@ -42,6 +42,7 @@ import (
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
 	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration"
+	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/strategy"
 	"kusionstack.io/operating/pkg/controllers/utils/revision"
 	"kusionstack.io/operating/pkg/utils"
 )
@@ -74,10 +75,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 	managerClient := mgr.GetClient()
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.CollaSet{}}, &collaSetHandler{Client: managerClient})
-	if err != nil {
-		return err
-	}
+
 	// Watch update of Pods which can be selected by PodDecoration
 	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(func(podObject client.Object) []reconcile.Request {
 		pdList := &appsv1alpha1.PodDecorationList{}
@@ -133,11 +131,11 @@ func (r *ReconcilePodDecoration) Reconcile(ctx context.Context, request reconcil
 		return reconcile.Result{Requeue: true}, nil
 	}
 	if instance.DeletionTimestamp != nil {
-		if r.isPDEscaped(instance) {
-			statusUpToDateExpectation.DeleteExpectations(key)
-			return reconcile.Result{}, r.clearProtection(ctx, instance)
-		}
-	} else if err := r.protectPD(ctx, instance); err != nil {
+		strategy.SharedStrategyController.DeletePodDecoration(instance)
+		statusUpToDateExpectation.DeleteExpectations(key)
+		return reconcile.Result{}, r.clearProtection(ctx, instance)
+	}
+	if err := r.protectPD(ctx, instance); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -145,8 +143,22 @@ func (r *ReconcilePodDecoration) Reconcile(ctx context.Context, request reconcil
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-
-	affectedPods, affectedCollaSets, err := r.filterOutPodAndCollaSet(ctx, instance)
+	podList := &corev1.PodList{}
+	var selectedPods []*corev1.Pod
+	var sel labels.Selector
+	if instance.Spec.Selector != nil {
+		sel, _ = metav1.LabelSelectorAsSelector(instance.Spec.Selector)
+	}
+	if err = r.List(ctx, podList, &client.ListOptions{
+		Namespace:     instance.Namespace,
+		LabelSelector: sel,
+	}); err != nil {
+		return reconcile.Result{}, err
+	}
+	for i := range podList.Items {
+		selectedPods = append(selectedPods, &podList.Items[i])
+	}
+	affectedPods, affectedCollaSets, err := r.filterOutPodAndCollaSet(selectedPods)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -160,7 +172,12 @@ func (r *ReconcilePodDecoration) Reconcile(ctx context.Context, request reconcil
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	return reconcile.Result{}, r.updateStatus(ctx, instance, newStatus)
+	err = r.updateStatus(ctx, instance, newStatus)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	return reconcile.Result{}, strategy.SharedStrategyController.UpdateSelectedPods(ctx, instance, selectedPods)
 }
 
 func (r *ReconcilePodDecoration) calculateStatus(
@@ -170,7 +187,6 @@ func (r *ReconcilePodDecoration) calculateStatus(
 	affectedCollaSets sets.String,
 	disablePodDetail bool) error {
 
-	hasEffectivePods := false
 	status.MatchedPods = 0
 	status.UpdatedPods = 0
 	status.UpdatedReadyPods = 0
@@ -185,9 +201,8 @@ func (r *ReconcilePodDecoration) calculateStatus(
 		}
 		status.MatchedPods += int32(len(pods))
 		for _, pod := range pods {
-			currentRevision := utilspoddecoration.GetDecorationRevisionInfo(pod).GetRevision(instance.Name)
+			currentRevision := utilspoddecoration.CurrentRevision(pod, instance.Name)
 			if currentRevision != nil {
-				hasEffectivePods = true
 				status.InjectedPods++
 				if *currentRevision == status.UpdatedRevision {
 					status.UpdatedPods++
@@ -212,7 +227,6 @@ func (r *ReconcilePodDecoration) calculateStatus(
 		}
 		details = append(details, detail)
 	}
-	status.IsEffective = BoolPointer(instance.DeletionTimestamp == nil || hasEffectivePods)
 	if status.CurrentRevision != status.UpdatedRevision &&
 		status.UpdatedPods == status.MatchedPods &&
 		r.allCollaSetsSatisfyReplicas(affectedCollaSets, instance.Namespace) {
@@ -265,36 +279,22 @@ func (r *ReconcilePodDecoration) updateStatus(
 	})
 }
 
-func (r *ReconcilePodDecoration) filterOutPodAndCollaSet(
-	ctx context.Context,
-	instance *appsv1alpha1.PodDecoration) (
-	affectedPods map[string][]*corev1.Pod,
-	affectedCollaSets sets.String, err error) {
-	var sel labels.Selector
-	podList := &corev1.PodList{}
-	if instance.Spec.Selector != nil {
-		sel, _ = metav1.LabelSelectorAsSelector(instance.Spec.Selector)
-	}
+func (r *ReconcilePodDecoration) filterOutPodAndCollaSet(pods []*corev1.Pod) (
+	affectedPods map[string][]*corev1.Pod, affectedCollaSets sets.String, err error) {
 	affectedPods = map[string][]*corev1.Pod{}
-	if err = r.List(ctx, podList, &client.ListOptions{
-		Namespace:     instance.Namespace,
-		LabelSelector: sel,
-	}); err != nil || len(podList.Items) == 0 {
-		return
-	}
 	affectedCollaSets = sets.NewString()
-	for i := 0; i < len(podList.Items); i++ {
-		ownerRef := metav1.GetControllerOf(&podList.Items[i])
+	for i := range pods {
+		ownerRef := metav1.GetControllerOf(pods[i])
 		if ownerRef != nil && ownerRef.Kind == "CollaSet" {
-			affectedPods[ownerRef.Name] = append(affectedPods[ownerRef.Name], &podList.Items[i])
+			affectedPods[ownerRef.Name] = append(affectedPods[ownerRef.Name], pods[i])
 			affectedCollaSets.Insert(ownerRef.Name)
 		}
 	}
-	for key, pods := range affectedPods {
-		sort.Slice(pods, func(i, j int) bool {
-			return pods[i].Name < pods[j].Name
+	for key, collaSetPods := range affectedPods {
+		sort.Slice(collaSetPods, func(i, j int) bool {
+			return collaSetPods[i].Name < collaSetPods[j].Name
 		})
-		affectedPods[key] = pods
+		affectedPods[key] = collaSetPods
 	}
 	return
 }
@@ -313,12 +313,4 @@ func (r *ReconcilePodDecoration) clearProtection(ctx context.Context, pd *appsv1
 	}
 	controllerutil.RemoveFinalizer(pd, appsv1alpha1.ProtectFinalizer)
 	return r.Update(ctx, pd)
-}
-
-func (r *ReconcilePodDecoration) isPDEscaped(rd *appsv1alpha1.PodDecoration) bool {
-	return rd.Status.InjectedPods == 0
-}
-
-func BoolPointer(val bool) *bool {
-	return &val
 }

@@ -22,7 +22,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/onsi/ginkgo"
@@ -414,13 +413,6 @@ var _ = Describe("PodDecoration controller", func() {
 		}
 		Expect(PatchListOfDecorations(pod, pds)).Should(BeNil())
 		Expect(GetDecorationRevisionInfo(pod).Size()).Should(Equal(2))
-		appsv1alpha1.SchemeBuilder.AddToScheme(scheme.Scheme)
-		updatedRevisions, stableRevisions := GetEffectiveRevisionsFormLatestDecorations([]*appsv1alpha1.PodDecoration{pdA, pdB}, map[string]string{
-			"app": "foo",
-			"id":  "1",
-		})
-		Expect(updatedRevisions.Len()).Should(Equal(1))
-		Expect(stableRevisions.Len()).Should(Equal(0))
 	})
 })
 
@@ -460,13 +452,9 @@ func (*mockClient) List(ctx context.Context, list client.ObjectList, opts ...cli
 	return nil
 }
 
-var _ = BeforeSuite(func() {
-
-})
-
 func TestPodDecorationController(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "test PodDecoration patch")
+	RunSpecs(t, "test PodDecoration utils")
 }
 
 func StringPoint(str string) *string {

@@ -27,6 +27,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -40,6 +41,8 @@ import (
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
+	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration"
+	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/strategy"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/operating/pkg/controllers/utils/revision"
 	commonutils "kusionstack.io/operating/pkg/utils"
@@ -91,7 +94,16 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.PodDecoration{}}, &podDecorationHandler{})
+	// Only for starting SharedStrategyController
+	err = c.Watch(strategy.SharedStrategyController, &handler.Funcs{})
+	if err != nil {
+		return err
+	}
+
+	ch := make(chan event.GenericEvent, 1<<10)
+	strategy.SharedStrategyController.RegisterGenericEventChannel(ch)
+	// Watch PodDecoration related events
+	err = c.Watch(&source.Channel{Source: ch}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -172,23 +184,17 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		UpdatedRevision: updatedRevision.Name,
 	}
 
+	getter, err := utilspoddecoration.NewPodDecorationGetter(r.Client, instance.Namespace)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	resources := &collasetutils.RelatedResources{
 		Revisions:       revisions,
 		CurrentRevision: currentRevision,
 		UpdatedRevision: updatedRevision,
 		NewStatus:       newStatus,
+		PDGetter:        getter,
 	}
-	resources.PDGetter, err = utils.NewPodDecorationGetter(ctx, r.Client, instance.Namespace)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("fail to get effective pod decorations by CollaSet %s: %s", key, err)
-	}
-	for _, pd := range resources.PDGetter.GetLatestDecorations() {
-		if pd.Status.ObservedGeneration != pd.Generation {
-			logger.Info("wait for PodDecoration ObservedGeneration", "CollaSet", key, "PodDecoration", commonutils.ObjectKeyString(pd))
-			return ctrl.Result{}, nil
-		}
-	}
-
 	requeueAfter, newStatus, err := r.DoReconcile(ctx, instance, resources)
 	// update status anyway
 	if err := r.updateStatus(ctx, instance, newStatus); err != nil {

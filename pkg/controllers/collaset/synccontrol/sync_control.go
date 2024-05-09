@@ -226,7 +226,7 @@ func (r *RealSyncControl) SyncPods(
 		successCount, err := controllerutils.SlowStartBatch(len(needReplaceOriginPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 			originPod := needReplaceOriginPods[i]
 			ownerRef := metav1.NewControllerRef(instance, instance.GroupVersionKind())
-			updatedPDs, err := resources.PDGetter.GetUpdatedDecorationsByOldPod(ctx, originPod)
+			updatedPDs, err := resources.PDGetter.GetEffective(ctx, originPod)
 			replaceRevision := getReplaceRevision(originPod, resources)
 			if err != nil {
 				return err
@@ -439,7 +439,7 @@ func (r *RealSyncControl) Scale(
 					var pds map[string]*appsv1alpha1.PodDecoration
 					if !ok {
 						// get default PodDecorations if no revision in context
-						pds, localErr = resources.PDGetter.GetLatestDecorationsByTargetLabel(ctx, in.Labels)
+						pds, localErr = resources.PDGetter.GetEffective(ctx, in)
 						if localErr != nil {
 							return localErr
 						}
@@ -453,7 +453,7 @@ func (r *RealSyncControl) Scale(
 						for _, info := range infos {
 							revisions = append(revisions, info.Revision)
 						}
-						pds, localErr = resources.PDGetter.GetDecorationByRevisions(ctx, revisions...)
+						pds, localErr = resources.PDGetter.GetByRevisions(ctx, revisions...)
 						if localErr != nil {
 							return localErr
 						}

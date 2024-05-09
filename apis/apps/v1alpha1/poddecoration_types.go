@@ -224,9 +224,6 @@ type PodDecorationStatus struct {
 	// +optional
 	UpdatedAvailablePods int32 `json:"updatedAvailablePods,omitempty"`
 
-	// IsEffective indicates PodDecoration is the only one that takes effect in the same group
-	IsEffective *bool `json:"isEffective,omitempty"`
-
 	// Details record the update information of CollaSets and Pods
 	Details []PodDecorationWorkloadDetail `json:"details,omitempty"`
 }

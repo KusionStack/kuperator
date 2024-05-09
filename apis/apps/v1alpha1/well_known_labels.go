@@ -55,6 +55,11 @@ const (
 	CollaSetUpdateIndicateLabelKey = "collaset.kusionstack.io/update-included"
 )
 
+// PodDecoration labels
+const (
+	PodDecorationLabelPrefix = "poddecoration.kusionstack.io/pd-"
+)
+
 var (
 	WellKnownLabelPrefixesWithID = []string{PodOperatingLabelPrefix, PodOperationTypeLabelPrefix, PodPreCheckLabelPrefix, PodPreCheckedLabelPrefix,
 		PodPreparingLabelPrefix, PodDoneOperationTypeLabelPrefix, PodUndoOperationTypeLabelPrefix, PodOperateLabelPrefix, PodOperatedLabelPrefix, PodPostCheckLabelPrefix,
