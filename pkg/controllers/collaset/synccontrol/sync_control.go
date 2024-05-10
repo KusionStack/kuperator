@@ -42,7 +42,9 @@ import (
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
 	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/operating/pkg/features"
 	commonutils "kusionstack.io/operating/pkg/utils"
+	"kusionstack.io/operating/pkg/utils/feature"
 )
 
 const (
@@ -119,20 +121,8 @@ func (r *RealSyncControl) SyncPods(
 	}
 
 	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(filteredPods, instance)
-	if len(needDeletePods) > 0 {
-		_, err := controllerutils.SlowStartBatch(len(needDeletePods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
-			pod := needDeletePods[i]
-			if _, exist := pod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; !exist {
-				patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%d"}}}`, appsv1alpha1.PodDeletionIndicationLabelKey, time.Now().UnixNano())))
-				if err = r.podControl.PatchPod(pod, patch); err != nil {
-					return fmt.Errorf("failed to delete pod when syncPods %s/%s %s", pod.Namespace, pod.Name, err)
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "clean pods replace pair new id label with error: %s", err.Error())
-		}
+	if err := r.deletePodsByLabel(needDeletePods); err != nil {
+		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "clean pods replace pair new id label with error: %s", err.Error())
 	}
 
 	if len(needCleanLabelPods) > 0 {
@@ -178,9 +168,16 @@ func (r *RealSyncControl) SyncPods(
 	// stateless case
 	currentIDs := make(map[int]struct{})
 	idToReclaim := sets.Int{}
+	toDeletePodNames := sets.NewString(instance.Spec.ScaleStrategy.PodToDelete...)
 	for i := range filteredPods {
 		pod := filteredPods[i]
 		id, _ := collasetutils.GetPodInstanceID(pod)
+		toDelete := toDeletePodNames.Has(pod.Name)
+
+		if toDelete {
+			toDeletePodNames.Delete(pod.Name)
+		}
+
 		if pod.DeletionTimestamp != nil {
 			// 1. Reclaim ID from Pod which is scaling in and terminating.
 			if contextDetail, exist := ownedIDs[id]; exist && contextDetail.Contains(ScaleInContextDataKey, "true") {
@@ -200,6 +197,7 @@ func (r *RealSyncControl) SyncPods(
 			Pod:           pod,
 			ID:            id,
 			ContextDetail: ownedIDs[id],
+			ToDelete:      toDelete,
 		})
 
 		if id >= 0 {
@@ -282,6 +280,23 @@ func (r *RealSyncControl) SyncPods(
 
 		if successCount > 0 {
 			needUpdateContext = true
+		}
+	}
+
+	// 5. Reclaim podToDelete if necessary
+	// ReclaimPodToDelete FeatureGate defaults to true
+	// Add '--feature-gates=ReclaimPodToDelete=false' to container args, to disable reclaim of podToDelete
+	if feature.DefaultFeatureGate.Enabled(features.ReclaimPodToDelete) && len(toDeletePodNames) > 0 {
+		var newPodToDelete []string
+		for _, podName := range instance.Spec.ScaleStrategy.PodToDelete {
+			if !toDeletePodNames.Has(podName) {
+				newPodToDelete = append(newPodToDelete, podName)
+			}
+		}
+		// update cls.spec.scaleStrategy.podToDelete
+		instance.Spec.ScaleStrategy.PodToDelete = newPodToDelete
+		if err := r.updateCollaSet(ctx, instance); err != nil {
+			return false, nil, ownedIDs, err
 		}
 	}
 
@@ -393,6 +408,15 @@ func dealReplacePods(pods []*corev1.Pod, instance *appsv1alpha1.CollaSet) (needR
 	return
 }
 
+func (r *RealSyncControl) updateCollaSet(ctx context.Context, cls *appsv1alpha1.CollaSet) error {
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return r.client.Update(ctx, cls)
+	}); err != nil {
+		return err
+	}
+	return collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.CollaSet, cls.Name, cls.ResourceVersion)
+}
+
 func (r *RealSyncControl) Scale(
 	ctx context.Context,
 	cls *appsv1alpha1.CollaSet,
@@ -408,87 +432,93 @@ func (r *RealSyncControl) Scale(
 	diff := int(realValue(cls.Spec.Replicas)) - len(replacePodMap)
 	scaling := false
 
-	if diff > 0 {
-		// collect instance ID in used from owned Pods
-		podInstanceIDSet := collasetutils.CollectPodInstanceID(podWrappers)
-		// find IDs and their contexts which have not been used by owned Pods
-		availableContext := extractAvailableContexts(diff, ownedIDs, podInstanceIDSet)
-
-		succCount, err := controllerutils.SlowStartBatch(diff, controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) error {
-			availableIDContext := availableContext[idx]
-			// use revision recorded in Context
-			revision := resources.UpdatedRevision
-			if revisionName, exist := availableIDContext.Data[podcontext.RevisionContextDataKey]; exist && revisionName != "" {
-				for i := range resources.Revisions {
-					if resources.Revisions[i].Name == revisionName {
-						revision = resources.Revisions[i]
-						break
-					}
+	if diff >= 0 {
+		// trigger delete pods indicated in ScaleStrategy.PodToDelete by label
+		for _, podWrapper := range podWrappers {
+			if podWrapper.ToDelete {
+				err := r.deletePodsByLabel([]*corev1.Pod{podWrapper.Pod})
+				if err != nil {
+					return false, recordedRequeueAfter, err
 				}
 			}
+		}
 
-			// scale out new Pods with updatedRevision
-			// TODO use cache
-			pod, err := collasetutils.NewPodFrom(
-				cls,
-				metav1.NewControllerRef(cls, appsv1alpha1.GroupVersion.WithKind("CollaSet")),
-				revision,
-				func(in *corev1.Pod) (localErr error) {
-					in.Labels[appsv1alpha1.PodInstanceIDLabelKey] = fmt.Sprintf("%d", availableIDContext.ID)
-					revisionsInfo, ok := availableIDContext.Get(podcontext.PodDecorationRevisionKey)
-					var pds map[string]*appsv1alpha1.PodDecoration
-					if !ok {
-						// get default PodDecorations if no revision in context
-						pds, localErr = resources.PDGetter.GetEffective(ctx, in)
-						if localErr != nil {
-							return localErr
-						}
-					} else {
-						// upgrade by recreate pod case
-						infos, marshallErr := utilspoddecoration.UnmarshallFromString(revisionsInfo)
-						if marshallErr != nil {
-							return marshallErr
-						}
-						var revisions []string
-						for _, info := range infos {
-							revisions = append(revisions, info.Revision)
-						}
-						pds, localErr = resources.PDGetter.GetByRevisions(ctx, revisions...)
-						if localErr != nil {
-							return localErr
+		// scale out pods and return if diff > 0
+		if diff > 0 {
+			// collect instance ID in used from owned Pods
+			podInstanceIDSet := collasetutils.CollectPodInstanceID(podWrappers)
+			// find IDs and their contexts which have not been used by owned Pods
+			availableContext := extractAvailableContexts(diff, ownedIDs, podInstanceIDSet)
+			succCount, err := controllerutils.SlowStartBatch(diff, controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) error {
+				availableIDContext := availableContext[idx]
+				// use revision recorded in Context
+				revision := resources.UpdatedRevision
+				if revisionName, exist := availableIDContext.Data[podcontext.RevisionContextDataKey]; exist && revisionName != "" {
+					for i := range resources.Revisions {
+						if resources.Revisions[i].Name == revisionName {
+							revision = resources.Revisions[i]
+							break
 						}
 					}
-					logger.Info("get pod effective decorations before create it", "EffectivePodDecorations", utilspoddecoration.BuildInfo(pds))
-					return utilspoddecoration.PatchListOfDecorations(in, pds)
-				},
-			)
+				}
+				// scale out new Pods with updatedRevision
+				// TODO use cache
+				pod, err := collasetutils.NewPodFrom(
+					cls,
+					metav1.NewControllerRef(cls, appsv1alpha1.GroupVersion.WithKind("CollaSet")),
+					revision,
+					func(in *corev1.Pod) (localErr error) {
+						in.Labels[appsv1alpha1.PodInstanceIDLabelKey] = fmt.Sprintf("%d", availableIDContext.ID)
+						revisionsInfo, ok := availableIDContext.Get(podcontext.PodDecorationRevisionKey)
+						var pds map[string]*appsv1alpha1.PodDecoration
+						if !ok {
+							// get default PodDecorations if no revision in context
+							pds, localErr = resources.PDGetter.GetEffective(ctx, in)
+							if localErr != nil {
+								return localErr
+							}
+						} else {
+							// upgrade by recreate pod case
+							infos, marshallErr := utilspoddecoration.UnmarshallFromString(revisionsInfo)
+							if marshallErr != nil {
+								return marshallErr
+							}
+							var revisions []string
+							for _, info := range infos {
+								revisions = append(revisions, info.Revision)
+							}
+							pds, localErr = resources.PDGetter.GetByRevisions(ctx, revisions...)
+							if localErr != nil {
+								return localErr
+							}
+						}
+						logger.Info("get pod effective decorations before create it", "EffectivePodDecorations", utilspoddecoration.BuildInfo(pds))
+						return utilspoddecoration.PatchListOfDecorations(in, pds)
+					},
+				)
+				if err != nil {
+					return fmt.Errorf("fail to new Pod from revision %s: %s", revision.Name, err)
+				}
+				err = r.pvcControl.CreatePodPvcs(ctx, cls, pod, resources.ExistingPvcs)
+				if err != nil {
+					return fmt.Errorf("fail to create PVCs for pod %s: %s", pod.Name, err)
+				}
+				newPod := pod.DeepCopy()
+				logger.V(1).Info("try to create Pod with revision of collaSet", "revision", revision.Name)
+				if pod, err = r.podControl.CreatePod(newPod); err != nil {
+					return err
+				}
+				// add an expectation for this pod creation, before next reconciling
+				return collasetutils.ActiveExpectations.ExpectCreate(cls, expectations.Pod, pod.Name)
+			})
+			r.recorder.Eventf(cls, corev1.EventTypeNormal, "ScaleOut", "scale out %d Pod(s)", succCount)
 			if err != nil {
-				return fmt.Errorf("fail to new Pod from revision %s: %s", revision.Name, err)
+				collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, err, "ScaleOutFailed", err.Error())
+				return succCount > 0, recordedRequeueAfter, err
 			}
-
-			err = r.pvcControl.CreatePodPvcs(ctx, cls, pod, resources.ExistingPvcs)
-			if err != nil {
-				return fmt.Errorf("fail to create PVCs for pod %s: %s", pod.Name, err)
-			}
-
-			newPod := pod.DeepCopy()
-			logger.V(1).Info("try to create Pod with revision of collaSet", "revision", revision.Name)
-			if pod, err = r.podControl.CreatePod(newPod); err != nil {
-				return err
-			}
-
-			// add an expectation for this pod creation, before next reconciling
-			return collasetutils.ActiveExpectations.ExpectCreate(cls, expectations.Pod, pod.Name)
-		})
-
-		r.recorder.Eventf(cls, corev1.EventTypeNormal, "ScaleOut", "scale out %d Pod(s)", succCount)
-		if err != nil {
-			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, err, "ScaleOutFailed", err.Error())
+			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleOut", "")
 			return succCount > 0, recordedRequeueAfter, err
 		}
-		collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleOut", "")
-
-		return succCount > 0, recordedRequeueAfter, err
 	} else if diff < 0 {
 		// chose the pods to scale in
 		podsToScaleIn := getPodsToDelete(podWrappers, replacePodMap, diff*-1)
@@ -683,6 +713,20 @@ func extractAvailableContexts(diff int, ownedIDs map[int]*appsv1alpha1.ContextDe
 	}
 
 	return availableContexts
+}
+
+func (r *RealSyncControl) deletePodsByLabel(needDeletePods []*corev1.Pod) error {
+	_, err := controllerutils.SlowStartBatch(len(needDeletePods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+		pod := needDeletePods[i]
+		if _, exist := pod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; !exist {
+			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%d"}}}`, appsv1alpha1.PodDeletionIndicationLabelKey, time.Now().UnixNano())))
+			if err := r.podControl.PatchPod(pod, patch); err != nil {
+				return fmt.Errorf("failed to delete pod when syncPods %s/%s %s", pod.Namespace, pod.Name, err)
+			}
+		}
+		return nil
+	})
+	return err
 }
 
 func (r *RealSyncControl) Update(
