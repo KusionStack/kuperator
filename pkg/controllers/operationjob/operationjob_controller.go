@@ -133,37 +133,53 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 	}
 
 	// operate targets
-	jobStatus, err := r.doReconcile(ctx, instance, logger)
+	err := r.doReconcile(ctx, instance, logger)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
+
+	// handle timeout and TTL
+	cleaned, requeueAfter, err := r.ensureActiveDeadlineOrTTL(ctx, instance, logger)
+	if cleaned || err != nil {
+		return reconcile.Result{}, err
+	}
+
 	// update operationJob status
-	if err = r.updateStatus(ctx, instance, jobStatus); err != nil {
+	if err = r.updateStatus(ctx, instance); err != nil {
 		return reconcile.Result{}, fmt.Errorf("fail to update status of OperationJob %s: %s", req, err)
 	}
-	return ensureActiveDeadlineOrTTL(instance, logger)
+
+	if requeueAfter != nil {
+		return reconcile.Result{RequeueAfter: *requeueAfter}, nil
+	}
+	return reconcile.Result{}, nil
 }
 
 func (r *ReconcileOperationJob) doReconcile(ctx context.Context,
 	instance *appsv1alpha1.OperationJob,
-	logger logr.Logger) (jobStatus *appsv1alpha1.OperationJobStatus, err error) {
+	logger logr.Logger) error {
 	operator := r.newOperator(ctx, instance, logger)
+
 	// list operate targets
 	candidates, err := operator.ListTargets()
 	if err != nil {
-		return
+		return err
 	}
+
 	// operate targets and fulfil podOpsStatus
 	for _, candidate := range candidates {
 		if err = operator.OperateTarget(candidate); err != nil {
-			return
+			return err
 		}
 		if err = operator.FulfilPodOpsStatus(candidate); err != nil {
-			return
+			return err
 		}
 	}
+
 	// update operationJob status
-	return r.calculateStatus(instance, candidates)
+	newJobStatus, err := r.calculateStatus(instance, candidates)
+	instance.Status = *newJobStatus
+	return err
 }
 
 func (r *ReconcileOperationJob) calculateStatus(
@@ -201,7 +217,6 @@ func (r *ReconcileOperationJob) calculateStatus(
 	// set progress of the job
 	if completedReplicas == totalReplicas {
 		jobStatus.Progress = appsv1alpha1.OperationProgressCompleted
-		jobStatus.EndTimestamp = &now
 	} else if failedReplicas == totalReplicas {
 		jobStatus.Progress = appsv1alpha1.OperationProgressFailed
 	} else if totalReplicas == 0 {
@@ -209,10 +224,14 @@ func (r *ReconcileOperationJob) calculateStatus(
 	} else {
 		jobStatus.Progress = appsv1alpha1.OperationProgressProcessing
 	}
+
+	if jobStatus.EndTimestamp == nil && (completedReplicas == totalReplicas || failedReplicas == totalReplicas) {
+		jobStatus.EndTimestamp = &now
+	}
 	return
 }
 
-func (r *ReconcileOperationJob) updateStatus(ctx context.Context, instance *appsv1alpha1.OperationJob, newJobStatus *appsv1alpha1.OperationJobStatus) error {
+func (r *ReconcileOperationJob) updateStatus(ctx context.Context, instance *appsv1alpha1.OperationJob) error {
 	oldJob := &appsv1alpha1.OperationJob{}
 	if err := r.Client.Get(ctx, types.NamespacedName{
 		Namespace: instance.Namespace,
@@ -221,7 +240,8 @@ func (r *ReconcileOperationJob) updateStatus(ctx context.Context, instance *apps
 		return err
 	}
 
-	if equality.Semantic.DeepEqual(oldJob.Status, *newJobStatus) {
+	newJobStatus := instance.Status
+	if equality.Semantic.DeepEqual(oldJob.Status, newJobStatus) {
 		return nil
 	}
 
@@ -230,7 +250,7 @@ func (r *ReconcileOperationJob) updateStatus(ctx context.Context, instance *apps
 		return err
 	}
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		oldJob.Status = *newJobStatus
+		oldJob.Status = newJobStatus
 		return r.Client.Status().Update(ctx, oldJob)
 	})
 	if err != nil {
@@ -239,7 +259,7 @@ func (r *ReconcileOperationJob) updateStatus(ctx context.Context, instance *apps
 	return err
 }
 
-func ensureActiveDeadlineOrTTL(instance *appsv1alpha1.OperationJob, logger logr.Logger) (reconcile.Result, error) {
+func (r *ReconcileOperationJob) ensureActiveDeadlineOrTTL(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) (bool, *time.Duration, error) {
 	isFailed := instance.Status.Progress == appsv1alpha1.OperationProgressFailed
 	isCompleted := instance.Status.Progress == appsv1alpha1.OperationProgressCompleted
 
@@ -247,11 +267,12 @@ func ensureActiveDeadlineOrTTL(instance *appsv1alpha1.OperationJob, logger logr.
 		if !isFailed && !isCompleted {
 			leftTime := time.Duration(*instance.Spec.ActiveDeadlineSeconds)*time.Second - time.Since(instance.CreationTimestamp.Time)
 			if leftTime > 0 {
-				return reconcile.Result{RequeueAfter: leftTime}, nil
+				return false, &leftTime, nil
 			} else {
-				msg := "should end but still processing"
-				logger.Info(msg)
-				return reconcile.Result{}, fmt.Errorf(msg)
+				logger.Info("should end but still processing")
+				r.Recorder.Eventf(instance, corev1.EventTypeNormal, "Timeout", "Try to fail operationJob for timeout...")
+				ojutils.MarkOperationJobFailed(instance)
+				return false, nil, nil
 			}
 		}
 	}
@@ -260,10 +281,15 @@ func ensureActiveDeadlineOrTTL(instance *appsv1alpha1.OperationJob, logger logr.
 		if isFailed || isCompleted {
 			leftTime := time.Duration(*instance.Spec.TTLSecondsAfterFinished)*time.Second - time.Since(instance.Status.EndTimestamp.Time)
 			if leftTime > 0 {
-				return reconcile.Result{RequeueAfter: leftTime}, nil
+				return false, &leftTime, nil
+			} else {
+				logger.Info("should be deleted but still alive")
+				r.Recorder.Eventf(instance, corev1.EventTypeNormal, "TTL", "Try to delete operationJob for TTL...")
+				err := r.Client.Delete(ctx, instance)
+				return true, nil, err
 			}
 		}
 	}
 
-	return ctrl.Result{}, nil
+	return false, nil, nil
 }

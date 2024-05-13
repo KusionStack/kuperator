@@ -18,7 +18,16 @@ package utils
 
 import (
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	ctrlutils "kusionstack.io/operating/pkg/controllers/utils"
 )
+
+func MarkOperationJobFailed(instance *appsv1alpha1.OperationJob) {
+	if instance.Status.Progress != appsv1alpha1.OperationProgressCompleted {
+		now := ctrlutils.FormatTimeNow()
+		instance.Status.Progress = appsv1alpha1.OperationProgressFailed
+		instance.Status.EndTimestamp = &now
+	}
+}
 
 func GetPodOpsStatusMap(instance *appsv1alpha1.OperationJob) map[string]*appsv1alpha1.PodOpsStatus {
 	// map[podName] = *podOpsStatus
