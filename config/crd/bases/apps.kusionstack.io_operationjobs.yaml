@@ -58,16 +58,12 @@ spec:
                   it
                 format: int32
                 type: integer
-              strategy:
-                description: strategy defines strategies of operation
-                properties:
-                  partition:
-                    description: Partition controls the operation progress by indicating
-                      how many pods should be operated. Defaults to nil (all pods
-                      will be updated)
-                    format: int32
-                    type: integer
-                type: object
+              partition:
+                description: Partition controls the operation progress by indicating
+                  how many pods should be operated. Defaults to nil (all pods will
+                  be updated)
+                format: int32
+                type: integer
               targets:
                 description: Define the operation target pods
                 items:
