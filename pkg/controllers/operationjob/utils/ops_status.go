@@ -29,7 +29,7 @@ func MarkOperationJobFailed(instance *appsv1alpha1.OperationJob) {
 	}
 }
 
-func GetPodOpsStatusMap(instance *appsv1alpha1.OperationJob) map[string]*appsv1alpha1.PodOpsStatus {
+func MapOpsStatusByPod(instance *appsv1alpha1.OperationJob) map[string]*appsv1alpha1.PodOpsStatus {
 	// map[podName] = *podOpsStatus
 	opsStatusMap := make(map[string]*appsv1alpha1.PodOpsStatus)
 	for i, opsStatus := range instance.Status.PodDetails {

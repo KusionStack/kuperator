@@ -46,7 +46,7 @@ type podReplaceOperator struct {
 }
 
 func (p *podReplaceOperator) ListTargets() (candidates []*OpsCandidate, err error) {
-	podOpsStatusMap := ojutils.GetPodOpsStatusMap(p.operationJob)
+	podOpsStatusMap := ojutils.MapOpsStatusByPod(p.operationJob)
 	for _, target := range p.operationJob.Spec.Targets {
 		var candidate OpsCandidate
 		var originPod, replaceNewPod corev1.Pod

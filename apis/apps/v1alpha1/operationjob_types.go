@@ -69,9 +69,10 @@ type OperationJobSpec struct {
 	// +optional
 	Targets []PodOpsTarget `json:"targets,omitempty"`
 
-	// strategy defines strategies of operation
+	// Partition controls the operation progress by indicating how many pods should be operated.
+	// Defaults to nil (all pods will be updated)
 	// +optional
-	Strategy OperationJobStrategy `json:"strategy,omitempty"`
+	Partition *int32 `json:"partition,omitempty"`
 
 	// Specify the duration in seconds relative to the startTime
 	// that the job may be active before the system tries to terminate it
@@ -81,14 +82,6 @@ type OperationJobSpec struct {
 	// Limit the lifetime of an operation that has finished execution (either Complete or Failed)
 	// +optional
 	TTLSecondsAfterFinished *int32 `json:"TTLSecondsAfterFinished,omitempty"`
-}
-
-// OperationJobStrategy defines strategies of operation
-type OperationJobStrategy struct {
-	// Partition controls the operation progress by indicating how many pods should be operated.
-	// Defaults to nil (all pods will be updated)
-	// +optional
-	Partition *int32 `json:"partition,omitempty"`
 }
 
 // PodOpsTarget defines the target pods of the OperationJob
