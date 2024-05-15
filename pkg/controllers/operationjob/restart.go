@@ -66,7 +66,7 @@ func GetRecreateHandler() RestartHandler {
 }
 
 func (p *containerRestartOperator) ListTargets() (candidates []*OpsCandidate, err error) {
-	podOpsStatusMap := ojutils.GetPodOpsStatusMap(p.operationJob)
+	podOpsStatusMap := ojutils.MapOpsStatusByPod(p.operationJob)
 	for _, target := range p.operationJob.Spec.Targets {
 		var candidate OpsCandidate
 		var pod corev1.Pod
