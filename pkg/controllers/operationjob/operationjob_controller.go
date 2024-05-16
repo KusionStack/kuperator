@@ -206,8 +206,7 @@ func (r *ReconcileOperationJob) calculateStatus(
 			completedReplicas++
 		} else if podDetail.Phase == appsv1alpha1.PodPhaseFailed {
 			failedReplicas++
-		} else if podDetail.Phase != appsv1alpha1.PodPhaseNotStarted &&
-			podDetail.Phase != appsv1alpha1.PodPhaseStarted {
+		} else if podDetail.Phase != appsv1alpha1.PodPhaseNotStarted {
 			processingReplicas++
 		}
 	}
