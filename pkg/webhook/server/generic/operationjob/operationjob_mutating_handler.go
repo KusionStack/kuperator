@@ -18,6 +18,7 @@ package operationjob
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -26,6 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/operationjob"
+	commonutils "kusionstack.io/operating/pkg/utils"
 	"kusionstack.io/operating/pkg/utils/mixin"
 )
 
@@ -48,6 +51,12 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 	}
 
 	var instance, old appsv1alpha1.OperationJob
+
+	logger := h.Logger.WithValues(
+		"op", req.Operation,
+		"operationjob", commonutils.AdmissionRequestObjectKeyString(req),
+	)
+
 	if err := h.Decoder.Decode(req, &instance); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
@@ -75,6 +84,23 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 				return admission.Denied(fmt.Sprintf("containers list in target is immutable %v", containers))
 			}
 		}
+	}
+
+	if instance.Spec.Action != appsv1alpha1.OpsActionRestart {
+		return admission.Allowed("")
+	}
+
+	if instance.ObjectMeta.Annotations == nil {
+		instance.ObjectMeta.Annotations = make(map[string]string)
+	}
+	if _, exist := instance.ObjectMeta.Annotations[appsv1alpha1.AnnotationOperationJobRecreateMethod]; !exist {
+		instance.ObjectMeta.Annotations[appsv1alpha1.AnnotationOperationJobRecreateMethod] = operationjob.CRR
+		marshalled, err := json.Marshal(instance)
+		if err != nil {
+			logger.Error(err, "failed to marshal collaset to json")
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
 	}
 
 	return admission.Allowed("")

@@ -22,7 +22,6 @@ import (
 	"sort"
 
 	"github.com/go-logr/logr"
-	kruisev1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -62,13 +61,12 @@ func (r *ReconcileOperationJob) newOperator(ctx context.Context, instance *appsv
 
 	switch instance.Spec.Action {
 	case appsv1alpha1.OpsActionRestart:
-		if GetRecreateHandler() == nil {
+		recreateMethodAnno := instance.ObjectMeta.Annotations[appsv1alpha1.AnnotationOperationJobRecreateMethod]
+		if recreateMethodAnno == "" || GetRecreateHandler(recreateMethodAnno) == nil {
 			// use Kruise ContainerRecreateRequest to recreate container by default
-			recreateHandler := &ContainerRecreateRequestHandler{ctx: ctx, client: mixin.Client, operationJob: instance,
-				crrMap: make(map[string]*kruisev1alpha1.ContainerRecreateRequest)}
-			return &containerRestartOperator{GenericOperator: genericOperator, handler: recreateHandler}
+			return &containerRestartOperator{GenericOperator: genericOperator, handler: GetRecreateHandler(CRR)}
 		}
-		return &containerRestartOperator{GenericOperator: genericOperator, handler: GetRecreateHandler()}
+		return &containerRestartOperator{GenericOperator: genericOperator, handler: GetRecreateHandler(recreateMethodAnno)}
 	case appsv1alpha1.OpsActionReplace:
 		return &podReplaceOperator{GenericOperator: genericOperator,
 			podControl: podcontrol.NewRealPodControl(r.ReconcilerMixin.Client, r.ReconcilerMixin.Scheme)}
