@@ -723,7 +723,7 @@ var _ = Describe("PodDecoration controller", func() {
 				if len(po.Spec.Containers) != 3 {
 					continue
 				}
-				if po.Spec.Containers[2].Name == "sidecar-1" {
+				if po.Spec.Containers[2].Name == "sidecar-2" {
 					updatedCnt++
 				}
 			}
