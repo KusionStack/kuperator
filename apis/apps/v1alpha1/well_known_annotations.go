@@ -39,3 +39,9 @@ const (
 	// AnnotationPodDecorationRevision struct: { groupName: {name: pdName, revision: currentRevision}, groupName: {} }
 	AnnotationGraceDeleteTimestamp = "gracedelete.kusionstack.io/delete-timestamp"
 )
+
+// OperationJob Annotation
+const (
+	// AnnotationRecreateMethod string, e.g., ContainerRecreateRequest
+	AnnotationOperationJobRecreateMethod = "operationjob.kusionstack.io/recreate-method"
+)

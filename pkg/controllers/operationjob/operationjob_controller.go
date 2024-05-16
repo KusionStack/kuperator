@@ -58,6 +58,7 @@ func Add(mgr ctrl.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	reconcilerMixin := mixin.NewReconcilerMixin(controllerName, mgr)
+	RegisterRecreateHandler(CRR, &ContainerRecreateRequestHandler{})
 	return &ReconcileOperationJob{
 		ReconcilerMixin: reconcilerMixin,
 	}
