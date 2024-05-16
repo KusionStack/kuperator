@@ -157,7 +157,6 @@ var _ = Describe("collaset controller", func() {
 		// scale in pods with delay seconds
 		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
 			cls.Spec.Replicas = int32Pointer(1)
-			cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
 			return true
 		})).Should(BeNil())
 
@@ -1576,7 +1575,6 @@ var _ = Describe("collaset controller", func() {
 		{
 			Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
 				cls.Spec.Replicas = int32Pointer(2)
-				cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
 				return true
 			})).Should(BeNil())
 			// mock opsLifecycle webhook to allow Pod scale in
@@ -1637,7 +1635,6 @@ var _ = Describe("collaset controller", func() {
 		{
 			Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
 				cls.Spec.Replicas = int32Pointer(4)
-				cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
 				return true
 			})).Should(BeNil())
 			// there should be 4 pods
@@ -1793,7 +1790,6 @@ var _ = Describe("collaset controller", func() {
 					},
 				}
 				cls.Spec.UpdateStrategy.PodUpdatePolicy = appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType
-				cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
 				return true
 			})).Should(BeNil())
 			podList := &corev1.PodList{}
@@ -1953,7 +1949,6 @@ var _ = Describe("collaset controller", func() {
 					},
 				}
 				cls.Spec.UpdateStrategy.PodUpdatePolicy = appsv1alpha1.CollaSetReplacePodUpdateStrategyType
-				cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
 				cls.Spec.Template.Spec.Containers[0].Image = "nginx:v2"
 				return true
 			})).Should(BeNil())
@@ -2095,7 +2090,6 @@ var _ = Describe("collaset controller", func() {
 			// scale in 2 pods
 			Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
 				cls.Spec.Replicas = int32Pointer(2)
-				cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
 				cls.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy = &appsv1alpha1.PersistentVolumeClaimRetentionPolicy{
 					WhenScaled: appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType,
 				}
@@ -2149,7 +2143,6 @@ var _ = Describe("collaset controller", func() {
 			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 			Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
 				cls.Spec.Replicas = int32Pointer(4)
-				cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
 				return true
 			})).Should(BeNil())
 			// there should be 4 pods
