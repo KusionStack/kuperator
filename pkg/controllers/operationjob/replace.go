@@ -45,7 +45,8 @@ type podReplaceOperator struct {
 	podControl podcontrol.Interface
 }
 
-func (p *podReplaceOperator) ListTargets() (candidates []*OpsCandidate, err error) {
+func (p *podReplaceOperator) ListTargets() ([]*OpsCandidate, error) {
+	var candidates []*OpsCandidate
 	podOpsStatusMap := ojutils.MapOpsStatusByPod(p.operationJob)
 	for _, target := range p.operationJob.Spec.Targets {
 		var candidate OpsCandidate
@@ -54,7 +55,7 @@ func (p *podReplaceOperator) ListTargets() (candidates []*OpsCandidate, err erro
 
 		// fulfil origin pod
 		candidate.podName = target.PodName
-		err = p.client.Get(p.ctx, types.NamespacedName{Namespace: p.operationJob.Namespace, Name: target.PodName}, &originPod)
+		err := p.client.Get(p.ctx, types.NamespacedName{Namespace: p.operationJob.Namespace, Name: target.PodName}, &originPod)
 		if err == nil {
 			candidate.pod = &originPod
 		} else if errors.IsNotFound(err) {
@@ -74,9 +75,9 @@ func (p *podReplaceOperator) ListTargets() (candidates []*OpsCandidate, err erro
 		if opsStatus, exist := podOpsStatusMap[target.PodName]; exist {
 			candidate.podOpsStatus = opsStatus
 			if newPodName, exist := opsStatus.ExtraInfo[ReplacePodNameKey]; exist {
-				err = p.client.Get(p.ctx, types.NamespacedName{Namespace: p.operationJob.Namespace, Name: newPodName}, &replaceNewPod)
+				err := p.client.Get(p.ctx, types.NamespacedName{Namespace: p.operationJob.Namespace, Name: newPodName}, &replaceNewPod)
 				if err != nil {
-					return
+					return candidates, err
 				}
 				candidate.replaceNewPod = &replaceNewPod
 				replaceNewPodExists = true
@@ -101,12 +102,17 @@ func (p *podReplaceOperator) ListTargets() (candidates []*OpsCandidate, err erro
 
 		candidates = append(candidates, &candidate)
 	}
+
 	return candidates, nil
 }
 
 func (p *podReplaceOperator) OperateTarget(candidate *OpsCandidate) error {
 	if isCandidateOpsFinished(candidate) {
 		return nil
+	}
+
+	if isCandidateOpsNotStarted(candidate) {
+		candidate.podOpsStatus.Phase = appsv1alpha1.PodPhaseStarted
 	}
 
 	// label pod to trigger replace if not started

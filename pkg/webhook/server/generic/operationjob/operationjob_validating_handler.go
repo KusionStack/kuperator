@@ -91,21 +91,31 @@ func (h *ValidatingHandler) validateOpsTarget(ctx context.Context, instance *app
 
 	podSets := sets.String{}
 	for podIdx, target := range instance.Spec.Targets {
-		if instance.Spec.Action != appsv1alpha1.OpsActionRestart {
-			if len(target.Containers) != 0 {
-				allErrors = append(allErrors, field.Invalid(fldPath, target.PodName, "containerNames should be empty"))
-			}
-			continue
-		}
-
 		pod := corev1.Pod{}
 		podFldPath := fldPath.Index(podIdx).Child("podName")
-		if err := h.Client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: target.PodName}, &pod); err != nil {
-			if errors.IsNotFound(err) {
-				allErrors = append(allErrors, field.Invalid(podFldPath, target.PodName, fmt.Sprintf("not found Pod named %s", target.PodName)))
-			} else {
-				allErrors = append(allErrors, field.Invalid(podFldPath, target.PodName, fmt.Sprintf("failed to find Pod named %s: %v", target.PodName, err)))
+		if instance.Spec.Action == appsv1alpha1.OpsActionRestart {
+			if err := h.Client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: target.PodName}, &pod); err != nil {
+				if errors.IsNotFound(err) {
+					allErrors = append(allErrors, field.Invalid(podFldPath, target.PodName, fmt.Sprintf("not found Pod named %s", target.PodName)))
+				} else {
+					allErrors = append(allErrors, field.Invalid(podFldPath, target.PodName, fmt.Sprintf("failed to find Pod named %s: %v", target.PodName, err)))
+				}
 			}
+
+			cntSets := sets.String{}
+			for ctnIdx, containerName := range target.Containers {
+				containerFldPath := fldPath.Index(podIdx).Child("containerName").Index(ctnIdx)
+				if cntSets.Has(containerName) {
+					allErrors = append(allErrors, field.Invalid(containerFldPath, containerName, fmt.Sprintf("container named %s exists multiple times", containerName)))
+				}
+				cntSets.Insert(containerName)
+				container := getContainer(&pod, containerName)
+				if container == nil {
+					allErrors = append(allErrors, field.Invalid(containerFldPath, containerName, fmt.Sprintf("container %s not found", containerName)))
+				}
+			}
+		} else if len(target.Containers) != 0 {
+			allErrors = append(allErrors, field.Invalid(fldPath, target.PodName, "containerNames should be empty"))
 		}
 
 		if podSets.Has(target.PodName) {
@@ -113,19 +123,8 @@ func (h *ValidatingHandler) validateOpsTarget(ctx context.Context, instance *app
 		}
 		podSets.Insert(target.PodName)
 
-		cntSets := sets.String{}
-		for ctnIdx, containerName := range target.Containers {
-			containerFldPath := fldPath.Index(podIdx).Child("containerName").Index(ctnIdx)
-			if cntSets.Has(containerName) {
-				allErrors = append(allErrors, field.Invalid(containerFldPath, containerName, fmt.Sprintf("container named %s exists multiple times", containerName)))
-			}
-			cntSets.Insert(containerName)
-			container := getContainer(&pod, containerName)
-			if container == nil {
-				allErrors = append(allErrors, field.Invalid(containerFldPath, containerName, fmt.Sprintf("container %s not found", containerName)))
-			}
-		}
 	}
+
 	return allErrors
 }
 
