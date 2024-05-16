@@ -65,7 +65,8 @@ func GetRecreateHandler() RestartHandler {
 	return registry
 }
 
-func (p *containerRestartOperator) ListTargets() (candidates []*OpsCandidate, err error) {
+func (p *containerRestartOperator) ListTargets() ([]*OpsCandidate, error) {
+	var candidates []*OpsCandidate
 	podOpsStatusMap := ojutils.MapOpsStatusByPod(p.operationJob)
 	for _, target := range p.operationJob.Spec.Targets {
 		var candidate OpsCandidate
@@ -73,9 +74,9 @@ func (p *containerRestartOperator) ListTargets() (candidates []*OpsCandidate, er
 
 		// fulfil pod
 		candidate.podName = target.PodName
-		err = p.client.Get(p.ctx, types.NamespacedName{Namespace: p.operationJob.Namespace, Name: target.PodName}, &pod)
+		err := p.client.Get(p.ctx, types.NamespacedName{Namespace: p.operationJob.Namespace, Name: target.PodName}, &pod)
 		if err != nil {
-			return
+			return candidates, err
 		}
 		candidate.pod = &pod
 
@@ -112,12 +113,16 @@ func (p *containerRestartOperator) ListTargets() (candidates []*OpsCandidate, er
 
 		candidates = append(candidates, &candidate)
 	}
-	return
+	return candidates, nil
 }
 
 func (p *containerRestartOperator) OperateTarget(candidate *OpsCandidate) (err error) {
 	if isCandidateOpsFinished(candidate) {
 		return nil
+	}
+
+	if isCandidateOpsNotStarted(candidate) {
+		candidate.podOpsStatus.Phase = appsv1alpha1.PodPhaseStarted
 	}
 
 	// if Pod is not begin a Recreate PodOpsLifecycle, trigger it

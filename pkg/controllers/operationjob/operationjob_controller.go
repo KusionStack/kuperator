@@ -167,7 +167,8 @@ func (r *ReconcileOperationJob) doReconcile(ctx context.Context,
 	}
 
 	// operate targets and fulfil podOpsStatus
-	for _, candidate := range candidates {
+	filteredCandidates := decideCandidateByPartition(instance, candidates)
+	for _, candidate := range filteredCandidates {
 		if err = operator.OperateTarget(candidate); err != nil {
 			return err
 		}
@@ -205,7 +206,8 @@ func (r *ReconcileOperationJob) calculateStatus(
 			completedReplicas++
 		} else if podDetail.Phase == appsv1alpha1.PodPhaseFailed {
 			failedReplicas++
-		} else {
+		} else if podDetail.Phase != appsv1alpha1.PodPhaseNotStarted &&
+			podDetail.Phase != appsv1alpha1.PodPhaseStarted {
 			processingReplicas++
 		}
 	}

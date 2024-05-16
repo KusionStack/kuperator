@@ -19,6 +19,7 @@ package operationjob
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/go-logr/logr"
 	kruisev1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -74,6 +75,47 @@ func (r *ReconcileOperationJob) newOperator(ctx context.Context, instance *appsv
 	default:
 		panic(fmt.Errorf("unsupported operation type %s", instance.Spec.Action))
 	}
+}
+
+func decideCandidateByPartition(instance *appsv1alpha1.OperationJob, candidates []*OpsCandidate) []*OpsCandidate {
+	if instance.Spec.Partition == nil {
+		return candidates
+	}
+	ordered := activeCandidateToStart(candidates)
+	sort.Sort(ordered)
+
+	partition := int(*instance.Spec.Partition)
+	if partition >= len(candidates) {
+		return candidates
+	}
+	return candidates[:partition]
+}
+
+type activeCandidateToStart []*OpsCandidate
+
+func (o activeCandidateToStart) Len() int {
+	return len(o)
+}
+
+func (o activeCandidateToStart) Swap(i, j int) {
+	o[i], o[j] = o[j], o[i]
+}
+
+func (o activeCandidateToStart) Less(i, j int) bool {
+	l, r := o[i], o[j]
+	lNotStarted := isCandidateOpsNotStarted(l)
+	rNotStarted := isCandidateOpsNotStarted(r)
+	if lNotStarted != rNotStarted {
+		return rNotStarted
+	}
+	return true
+}
+
+func isCandidateOpsNotStarted(candidate *OpsCandidate) bool {
+	if candidate.podOpsStatus == nil || candidate.podOpsStatus.Phase == "" {
+		return true
+	}
+	return candidate.podOpsStatus.Phase == appsv1alpha1.PodPhaseNotStarted
 }
 
 func isCandidateOpsFinished(candidate *OpsCandidate) bool {
