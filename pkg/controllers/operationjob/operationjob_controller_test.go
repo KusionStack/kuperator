@@ -217,7 +217,6 @@ var _ = Describe("operationjob controller", func() {
 			if partition < 3 {
 				assertJobProgressProcessing(oj, time.Second*5)
 			}
-
 		}
 
 		// wait for restart completed
@@ -271,14 +270,14 @@ var _ = Describe("operationjob controller", func() {
 		// allow origin pod to be deleted
 		for i := range podList.Items {
 			pod := &podList.Items[i]
-			Expect(updatePodWithRetry(pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID())
-				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
-				if _, exist := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
+			if _, exist := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
+				Expect(updatePodWithRetry(pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID())
+					pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 					pod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] = fmt.Sprintf("%d", time.Now().UnixNano())
-				}
-				return true
-			})).Should(BeNil())
+					return true
+				})).Should(BeNil())
+			}
 		}
 
 		// wait for replace completed
@@ -327,17 +326,23 @@ var _ = Describe("operationjob controller", func() {
 
 			// wait for new pod created
 			podList := &corev1.PodList{}
-			Eventually(func() bool {
-				Expect(c.List(ctx, podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-				Expect(c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)).Should(BeNil())
-				replacingPod := 0
-				for i := range podList.Items {
-					if _, exist := podList.Items[i].Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
-						replacingPod++
+			if partition > 0 {
+				Eventually(func() int32 {
+					Expect(c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)).Should(BeNil())
+					return oj.Status.ProcessingReplicas
+				}, time.Second*10, time.Second).Should(BeEquivalentTo(1))
+				Eventually(func() bool {
+					Expect(c.List(ctx, podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+					Expect(c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)).Should(BeNil())
+					replacingPod := 0
+					for i := range podList.Items {
+						if _, exist := podList.Items[i].Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
+							replacingPod++
+						}
 					}
-				}
-				return oj.Status.ProcessingReplicas == int32(replacingPod)
-			}, time.Second*10, time.Second).Should(BeTrue())
+					return oj.Status.ProcessingReplicas == int32(replacingPod)
+				}, time.Second*10, time.Second).Should(BeTrue())
+			}
 
 			// mock new pods serviceAvailable
 			Expect(c.List(ctx, podList, client.InNamespace(cs.Namespace))).Should(BeNil())
@@ -351,16 +356,17 @@ var _ = Describe("operationjob controller", func() {
 			}
 
 			// allow origin pod to be deleted
+			Expect(c.List(ctx, podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 			for i := range podList.Items {
 				pod := &podList.Items[i]
-				Expect(updatePodWithRetry(pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID())
-					pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
-					if _, exist := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
+				if _, exist := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
+					Expect(updatePodWithRetry(pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+						labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID())
+						pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 						pod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] = fmt.Sprintf("%d", time.Now().UnixNano())
-					}
-					return true
-				})).Should(BeNil())
+						return true
+					})).Should(BeNil())
+				}
 			}
 
 			// assert completed replicas
