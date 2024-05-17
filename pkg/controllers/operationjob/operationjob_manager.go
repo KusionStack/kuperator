@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -28,12 +29,14 @@ import (
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
+	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 )
 
 type TargetOperator interface {
 	ListTargets() ([]*OpsCandidate, error)
 	OperateTarget(*OpsCandidate) error
 	FulfilPodOpsStatus(*OpsCandidate) error
+	ReleaseTarget(*OpsCandidate) (*time.Duration, error)
 }
 
 type GenericOperator struct {
@@ -73,6 +76,67 @@ func (r *ReconcileOperationJob) newOperator(ctx context.Context, instance *appsv
 	default:
 		panic(fmt.Errorf("unsupported operation type %s", instance.Spec.Action))
 	}
+}
+
+func (r *ReconcileOperationJob) ensureActiveDeadlineOrTTL(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) (bool, *time.Duration, error) {
+	isFailed := instance.Status.Progress == appsv1alpha1.OperationProgressFailed
+	isCompleted := instance.Status.Progress == appsv1alpha1.OperationProgressCompleted
+
+	if instance.Spec.ActiveDeadlineSeconds != nil {
+		if !isFailed && !isCompleted {
+			leftTime := time.Duration(*instance.Spec.ActiveDeadlineSeconds)*time.Second - time.Since(instance.CreationTimestamp.Time)
+			if leftTime > 0 {
+				return false, &leftTime, nil
+			} else {
+				logger.Info("should end but still processing")
+				r.Recorder.Eventf(instance, corev1.EventTypeNormal, "Timeout", "Try to fail operationJob for timeout...")
+				ojutils.MarkOperationJobFailed(instance)
+				return false, nil, nil
+			}
+		}
+	}
+
+	if instance.Spec.TTLSecondsAfterFinished != nil {
+		if isFailed || isCompleted {
+			leftTime := time.Duration(*instance.Spec.TTLSecondsAfterFinished)*time.Second - time.Since(instance.Status.EndTimestamp.Time)
+			if leftTime > 0 {
+				return false, &leftTime, nil
+			} else {
+				logger.Info("should be deleted but still alive")
+				r.Recorder.Eventf(instance, corev1.EventTypeNormal, "TTL", "Try to delete operationJob for TTL...")
+				err := r.Client.Delete(ctx, instance)
+				return true, nil, err
+			}
+		}
+	}
+
+	return false, nil, nil
+}
+
+func (r *ReconcileOperationJob) ReleaseTargetsForDeletion(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) (*time.Duration, error) {
+	ojutils.MarkOperationJobFailed(instance)
+	operator := r.newOperator(ctx, instance, logger)
+	candidates, err := operator.ListTargets()
+	if err != nil {
+		return nil, err
+	}
+
+	var requeueAfter *time.Duration
+	for _, candidate := range candidates {
+		duration, err := operator.ReleaseTarget(candidate)
+		if duration != nil {
+			if requeueAfter == nil {
+				requeueAfter = duration
+			} else if *duration < *requeueAfter {
+				requeueAfter = duration
+			}
+		}
+		if err != nil {
+			return requeueAfter, err
+		}
+	}
+	return requeueAfter, nil
+
 }
 
 func decideCandidateByPartition(instance *appsv1alpha1.OperationJob, candidates []*OpsCandidate) []*OpsCandidate {

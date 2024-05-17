@@ -19,6 +19,7 @@ package operationjob
 import (
 	"context"
 	"fmt"
+	"time"
 
 	kruisev1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -237,6 +238,10 @@ func (p *containerRestartOperator) FulfilPodOpsStatus(candidate *OpsCandidate) e
 	candidate.podOpsStatus.Phase = phase
 
 	return nil
+}
+
+func (p *containerRestartOperator) ReleaseTarget(candidate *OpsCandidate) (*time.Duration, error) {
+	return nil, nil
 }
 
 type ContainerRecreateRequestHandler struct {

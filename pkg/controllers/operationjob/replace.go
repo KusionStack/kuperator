@@ -19,6 +19,7 @@ package operationjob
 import (
 	"context"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -163,6 +164,10 @@ func (p *podReplaceOperator) FulfilPodOpsStatus(candidate *OpsCandidate) error {
 	}
 
 	return nil
+}
+
+func (p *podReplaceOperator) ReleaseTarget(candidate *OpsCandidate) (*time.Duration, error) {
+	return nil, nil
 }
 
 func getCollaSetByPod(ctx context.Context, client client.Client, instance *appsv1alpha1.OperationJob, candidate *OpsCandidate) (*appsv1alpha1.CollaSet, error) {
