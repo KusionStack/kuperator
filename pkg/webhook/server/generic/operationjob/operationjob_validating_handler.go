@@ -49,18 +49,26 @@ func NewValidatingHandler() *ValidatingHandler {
 }
 
 func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
-	var obj appsv1alpha1.OperationJob
+	var obj, old appsv1alpha1.OperationJob
 	var allErrors field.ErrorList
 	if req.Operation == admissionv1.Delete {
 		return admission.ValidationResponse(true, "")
 	}
+
+	if req.Operation == admissionv1.Update {
+		err := h.Decoder.DecodeRaw(req.OldObject, &old)
+		if err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+	}
+
 	if err := h.Decoder.Decode(req, &obj); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
 	fldPath := field.NewPath("spec")
 	allErrors = append(allErrors, h.validateOpsType(&obj, fldPath)...)
-	allErrors = append(allErrors, h.validatePartition(&obj, fldPath)...)
+	allErrors = append(allErrors, h.validatePartition(&obj, &old, fldPath)...)
 	allErrors = append(allErrors, h.validateTTLAndActiveDeadline(&obj, fldPath)...)
 	allErrors = append(allErrors, h.validateOpsTarget(ctx, &obj, fldPath.Child("targets"))...)
 	if len(allErrors) > 0 {
@@ -128,25 +136,31 @@ func (h *ValidatingHandler) validateOpsTarget(ctx context.Context, instance *app
 	return allErrors
 }
 
-func getContainer(pod *corev1.Pod, containerName string) *corev1.Container {
-	if pod == nil {
-		return nil
-	}
-	for i := range pod.Spec.Containers {
-		v := &pod.Spec.Containers[i]
-		if v.Name == containerName {
-			return v
-		}
-	}
-	return nil
-}
-
-func (h *ValidatingHandler) validatePartition(instance *appsv1alpha1.OperationJob, fldPath *field.Path) field.ErrorList {
+func (h *ValidatingHandler) validatePartition(instance, old *appsv1alpha1.OperationJob, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
-	partition := instance.Spec.Partition
-	if partition != nil && *partition < 0 {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("partition"), partition, "should not be negative"))
+	var currPartition, oldPartition int32
+	var currTotalReplicas, oldTotalReplicas int32
+
+	currTotalReplicas = int32(len(instance.Spec.Targets))
+	if instance.Spec.Partition == nil {
+		currPartition = currTotalReplicas
+	} else {
+		currPartition = minInt32(*instance.Spec.Partition, currTotalReplicas)
 	}
+
+	oldTotalReplicas = int32(len(old.Spec.Targets))
+	if old.Spec.Partition == nil {
+		oldPartition = oldTotalReplicas
+	} else {
+		oldPartition = minInt32(*old.Spec.Partition, oldTotalReplicas)
+	}
+
+	if currPartition < 0 {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("partition"), currPartition, "should not be negative"))
+	} else if currPartition < oldPartition {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("partition"), currPartition, fmt.Sprintf("should not be decreased (from %d to %d)", oldPartition, currPartition)))
+	}
+
 	return allErrors
 }
 
@@ -161,4 +175,24 @@ func (h *ValidatingHandler) validateTTLAndActiveDeadline(instance *appsv1alpha1.
 		allErrors = append(allErrors, field.Invalid(fldPath.Child("TTLSecondsAfterFinished"), ttlSecondsAfterFinished, "should be larger than 0"))
 	}
 	return allErrors
+}
+
+func getContainer(pod *corev1.Pod, containerName string) *corev1.Container {
+	if pod == nil {
+		return nil
+	}
+	for i := range pod.Spec.Containers {
+		v := &pod.Spec.Containers[i]
+		if v.Name == containerName {
+			return v
+		}
+	}
+	return nil
+}
+
+func minInt32(a, b int32) int32 {
+	if a < b {
+		return a
+	}
+	return b
 }
