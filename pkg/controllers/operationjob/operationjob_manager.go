@@ -19,60 +19,34 @@ package operationjob
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
+	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
+	"kusionstack.io/operating/pkg/controllers/operationjob/recreate"
+	"kusionstack.io/operating/pkg/controllers/operationjob/replace"
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 )
 
-type TargetOperator interface {
-	ListTargets() ([]*OpsCandidate, error)
-	OperateTarget(*OpsCandidate) error
-	FulfilPodOpsStatus(*OpsCandidate) error
-	ReleaseTarget(*OpsCandidate) (*time.Duration, error)
-}
-
-type GenericOperator struct {
-	ctx          context.Context
-	logger       logr.Logger
-	client       client.Client
-	recorder     record.EventRecorder
-	operationJob *appsv1alpha1.OperationJob
-}
-
-type OpsCandidate struct {
-	pod          *corev1.Pod
-	podName      string
-	containers   []string
-	podOpsStatus *appsv1alpha1.PodOpsStatus
-
-	replaceTriggered bool
-	replaceNewPod    *corev1.Pod
-	collaSet         *appsv1alpha1.CollaSet
-}
-
-func (r *ReconcileOperationJob) newOperator(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) TargetOperator {
+func (r *ReconcileOperationJob) newOperator(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) ActionOperator {
 	mixin := r.ReconcilerMixin
-	genericOperator := &GenericOperator{client: mixin.Client, ctx: ctx, operationJob: instance, logger: logger, recorder: mixin.Recorder}
+	operateInfo := &OperateInfo{Client: mixin.Client, Context: ctx, OperationJob: instance, Logger: logger, Recorder: mixin.Recorder}
 
 	switch instance.Spec.Action {
 	case appsv1alpha1.ActionRecreate:
 		recreateMethodAnno := instance.ObjectMeta.Annotations[appsv1alpha1.AnnotationOperationJobRecreateMethod]
-		if recreateMethodAnno == "" || GetRecreateHandler(recreateMethodAnno) == nil {
+		if recreateMethodAnno == "" || recreate.GetRecreateHandler(recreateMethodAnno) == nil {
 			// use Kruise ContainerRecreateRequest to recreate container by default
-			return &containerRestartOperator{GenericOperator: genericOperator, handler: GetRecreateHandler(string(appsv1alpha1.CRRKey))}
+			return &recreate.ContainerRestartOperator{OperateInfo: operateInfo, Handler: recreate.GetRecreateHandler(string(appsv1alpha1.CRRKey))}
 		}
-		return &containerRestartOperator{GenericOperator: genericOperator, handler: GetRecreateHandler(recreateMethodAnno)}
+		return &recreate.ContainerRestartOperator{OperateInfo: operateInfo, Handler: recreate.GetRecreateHandler(recreateMethodAnno)}
 	case appsv1alpha1.OpsActionReplace:
-		return &podReplaceOperator{GenericOperator: genericOperator,
-			podControl: podcontrol.NewRealPodControl(r.ReconcilerMixin.Client, r.ReconcilerMixin.Scheme)}
+		return &replace.PodReplaceOperator{OperateInfo: operateInfo,
+			PodControl: podcontrol.NewRealPodControl(r.ReconcilerMixin.Client, r.ReconcilerMixin.Scheme)}
 	default:
 		panic(fmt.Errorf("unsupported operation type %s", instance.Spec.Action))
 	}
@@ -89,7 +63,7 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineOrTTL(ctx context.Context, i
 				return false, &leftTime, nil
 			} else {
 				logger.Info("should end but still processing")
-				r.Recorder.Eventf(instance, corev1.EventTypeNormal, "Timeout", "Try to fail operationJob for timeout...")
+				r.Recorder.Eventf(instance, corev1.EventTypeNormal, "Timeout", "Try to fail OperationJob for timeout...")
 				ojutils.MarkOperationJobFailed(instance)
 				return false, nil, nil
 			}
@@ -103,7 +77,7 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineOrTTL(ctx context.Context, i
 				return false, &leftTime, nil
 			} else {
 				logger.Info("should be deleted but still alive")
-				r.Recorder.Eventf(instance, corev1.EventTypeNormal, "TTL", "Try to delete operationJob for TTL...")
+				r.Recorder.Eventf(instance, corev1.EventTypeNormal, "TTL", "Try to delete OperationJob for TTL...")
 				err := r.Client.Delete(ctx, instance)
 				return true, nil, err
 			}
@@ -137,53 +111,4 @@ func (r *ReconcileOperationJob) ReleaseTargetsForDeletion(ctx context.Context, i
 	}
 	return requeueAfter, nil
 
-}
-
-func decideCandidateByPartition(instance *appsv1alpha1.OperationJob, candidates []*OpsCandidate) []*OpsCandidate {
-	if instance.Spec.Partition == nil {
-		return candidates
-	}
-	ordered := activeCandidateToStart(candidates)
-	sort.Sort(ordered)
-
-	partition := int(*instance.Spec.Partition)
-	if partition >= len(candidates) {
-		return candidates
-	}
-	return candidates[:partition]
-}
-
-type activeCandidateToStart []*OpsCandidate
-
-func (o activeCandidateToStart) Len() int {
-	return len(o)
-}
-
-func (o activeCandidateToStart) Swap(i, j int) {
-	o[i], o[j] = o[j], o[i]
-}
-
-func (o activeCandidateToStart) Less(i, j int) bool {
-	l, r := o[i], o[j]
-	lNotStarted := isCandidateOpsNotStarted(l)
-	rNotStarted := isCandidateOpsNotStarted(r)
-	if lNotStarted != rNotStarted {
-		return rNotStarted
-	}
-	return true
-}
-
-func isCandidateOpsNotStarted(candidate *OpsCandidate) bool {
-	if candidate.podOpsStatus == nil || candidate.podOpsStatus.Phase == "" {
-		return true
-	}
-	return candidate.podOpsStatus.Phase == appsv1alpha1.PodPhaseNotStarted
-}
-
-func isCandidateOpsFinished(candidate *OpsCandidate) bool {
-	if candidate.podOpsStatus == nil || candidate.podOpsStatus.Phase == "" {
-		return false
-	}
-	return candidate.podOpsStatus.Phase == appsv1alpha1.PodPhaseCompleted ||
-		candidate.podOpsStatus.Phase == appsv1alpha1.PodPhaseFailed
 }
