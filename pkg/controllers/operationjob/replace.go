@@ -31,10 +31,6 @@ import (
 )
 
 const (
-	ReplacePodNameKey string = "ReplaceNewPodName"
-)
-
-const (
 	PodPhaseNewPodCreating       appsv1alpha1.PodPhase = "NewPodCreating"
 	PodPhaseNewPodStarted        appsv1alpha1.PodPhase = "NewPodStarted"
 	PodPhaseOriginPodTerminating appsv1alpha1.PodPhase = "OriginPodTerminating"
@@ -74,7 +70,7 @@ func (p *podReplaceOperator) ListTargets() ([]*OpsCandidate, error) {
 		// fulfil or initialize opsStatus and replaceNewPod
 		if opsStatus, exist := podOpsStatusMap[target.PodName]; exist {
 			candidate.podOpsStatus = opsStatus
-			if newPodName, exist := opsStatus.ExtraInfo[ReplacePodNameKey]; exist {
+			if newPodName, exist := opsStatus.ExtraInfo[appsv1alpha1.ReplacePodNameKey]; exist {
 				err := p.client.Get(p.ctx, types.NamespacedName{Namespace: p.operationJob.Namespace, Name: newPodName}, &replaceNewPod)
 				if err != nil {
 					return candidates, err
@@ -86,7 +82,7 @@ func (p *podReplaceOperator) ListTargets() ([]*OpsCandidate, error) {
 			candidate.podOpsStatus = &appsv1alpha1.PodOpsStatus{
 				PodName:   target.PodName,
 				Phase:     appsv1alpha1.PodPhaseNotStarted,
-				ExtraInfo: map[string]string{},
+				ExtraInfo: map[appsv1alpha1.ExtraInfoKey]string{},
 			}
 		}
 
@@ -130,7 +126,7 @@ func (p *podReplaceOperator) FulfilPodOpsStatus(candidate *OpsCandidate) error {
 	// try to fulfil ExtraInfo["ReplaceNewPodName"]
 	if candidate.pod != nil && candidate.collaSet != nil {
 		newPodId, exist := candidate.pod.Labels[appsv1alpha1.PodReplacePairNewId]
-		if exist && candidate.podOpsStatus.ExtraInfo[ReplacePodNameKey] == "" {
+		if exist && candidate.podOpsStatus.ExtraInfo[appsv1alpha1.ReplacePodNameKey] == "" {
 			filteredPods, err := p.podControl.GetFilteredPods(candidate.collaSet.Spec.Selector, candidate.collaSet)
 			if err != nil {
 				return err
@@ -138,10 +134,10 @@ func (p *podReplaceOperator) FulfilPodOpsStatus(candidate *OpsCandidate) error {
 			for _, pod := range filteredPods {
 				if newPodId == pod.Labels[appsv1alpha1.PodInstanceIDLabelKey] {
 					if candidate.podOpsStatus.ExtraInfo == nil {
-						candidate.podOpsStatus.ExtraInfo = make(map[string]string)
+						candidate.podOpsStatus.ExtraInfo = make(map[appsv1alpha1.ExtraInfoKey]string)
 					}
 					candidate.replaceNewPod = pod
-					candidate.podOpsStatus.ExtraInfo[ReplacePodNameKey] = pod.Name
+					candidate.podOpsStatus.ExtraInfo[appsv1alpha1.ReplacePodNameKey] = pod.Name
 				}
 			}
 		}

@@ -62,8 +62,8 @@ var (
 
 var _ = Describe("operationjob controller", func() {
 
-	It("[restart] reconcile", func() {
-		testcase := "test-restart"
+	It("[recreate] reconcile", func() {
+		testcase := "test-recreate"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
 		cs := createCollaSetWithReplicas("foo", testcase, 2)
 		podNames := getPodNamesFromCollaSet(cs)
@@ -74,7 +74,7 @@ var _ = Describe("operationjob controller", func() {
 				Name:      "foo",
 			},
 			Spec: appsv1alpha1.OperationJobSpec{
-				Action: appsv1alpha1.OpsActionRestart,
+				Action: appsv1alpha1.ActionRecreate,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
 						PodName: podNames[0],
@@ -132,8 +132,8 @@ var _ = Describe("operationjob controller", func() {
 		assertJobProgressCompleted(oj, time.Second*5)
 	})
 
-	It("[restart] by partition", func() {
-		testcase := "test-restart-by-partition"
+	It("[recreate] by partition", func() {
+		testcase := "test-recreate-by-partition"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
 		cs := createCollaSetWithReplicas("foo", testcase, 3)
 		podNames := getPodNamesFromCollaSet(cs)
@@ -144,7 +144,7 @@ var _ = Describe("operationjob controller", func() {
 				Name:      "foo",
 			},
 			Spec: appsv1alpha1.OperationJobSpec{
-				Action:    appsv1alpha1.OpsActionRestart,
+				Action:    appsv1alpha1.ActionRecreate,
 				Partition: int32Pointer(0),
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
@@ -219,8 +219,33 @@ var _ = Describe("operationjob controller", func() {
 			}
 		}
 
-		// wait for restart completed
+		// wait for recreate completed
 		assertJobProgressCompleted(oj, time.Second*5)
+	})
+
+	It("[recreate] non-exist pod", func() {
+		testcase := "test-recreate-non-exist-pod"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+
+		oj := &appsv1alpha1.OperationJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.OperationJobSpec{
+				Action: appsv1alpha1.ActionRecreate,
+				Targets: []appsv1alpha1.PodOpsTarget{
+					{
+						PodName: "non-exist",
+					},
+				},
+			},
+		}
+
+		Expect(c.Create(ctx, oj)).Should(BeNil())
+
+		// wait for replace completed
+		assertJobProgressFailed(oj, time.Second*5)
 	})
 
 	It("[replace] reconcile", func() {
@@ -495,6 +520,19 @@ func assertJobProgressProcessing(oj *appsv1alpha1.OperationJob, timeout time.Dur
 		return oj.Status.Progress == appsv1alpha1.OperationProgressProcessing
 	}, timeout, time.Second).Should(BeTrue())
 }
+
+func assertJobProgressFailed(oj *appsv1alpha1.OperationJob, timeout time.Duration) {
+	Eventually(func() bool {
+		err := c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
+		if errors.IsNotFound(err) {
+			return false
+		} else {
+			Expect(err).Should(BeNil())
+		}
+		return oj.Status.Progress == appsv1alpha1.OperationProgressFailed
+	}, timeout, time.Second).Should(BeTrue())
+}
+
 func assertJobProgressCompleted(oj *appsv1alpha1.OperationJob, timeout time.Duration) {
 	Eventually(func() bool {
 		err := c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)

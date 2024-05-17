@@ -886,7 +886,7 @@ func (in *PodOpsStatus) DeepCopyInto(out *PodOpsStatus) {
 	*out = *in
 	if in.ExtraInfo != nil {
 		in, out := &in.ExtraInfo, &out.ExtraInfo
-		*out = make(map[string]string, len(*in))
+		*out = make(map[ExtraInfoKey]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}

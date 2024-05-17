@@ -58,7 +58,7 @@ func Add(mgr ctrl.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	reconcilerMixin := mixin.NewReconcilerMixin(controllerName, mgr)
-	RegisterRecreateHandler(CRR, &ContainerRecreateRequestHandler{})
+	RegisterRecreateHandler(string(appsv1alpha1.CRRKey), &ContainerRecreateRequestHandler{})
 	return &ReconcileOperationJob{
 		ReconcilerMixin: reconcilerMixin,
 	}
@@ -217,10 +217,12 @@ func (r *ReconcileOperationJob) calculateStatus(
 	jobStatus.FailedReplicas = failedReplicas
 
 	// set progress of the job
-	if completedReplicas == totalReplicas {
-		jobStatus.Progress = appsv1alpha1.OperationProgressCompleted
-	} else if failedReplicas == totalReplicas {
-		jobStatus.Progress = appsv1alpha1.OperationProgressFailed
+	if completedReplicas+failedReplicas == totalReplicas {
+		if failedReplicas > 0 {
+			jobStatus.Progress = appsv1alpha1.OperationProgressFailed
+		} else {
+			jobStatus.Progress = appsv1alpha1.OperationProgressCompleted
+		}
 	} else if totalReplicas == 0 {
 		jobStatus.Progress = appsv1alpha1.OperationProgressPending
 	} else {

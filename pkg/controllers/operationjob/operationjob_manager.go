@@ -60,11 +60,11 @@ func (r *ReconcileOperationJob) newOperator(ctx context.Context, instance *appsv
 	genericOperator := &GenericOperator{client: mixin.Client, ctx: ctx, operationJob: instance, logger: logger, recorder: mixin.Recorder}
 
 	switch instance.Spec.Action {
-	case appsv1alpha1.OpsActionRestart:
+	case appsv1alpha1.ActionRecreate:
 		recreateMethodAnno := instance.ObjectMeta.Annotations[appsv1alpha1.AnnotationOperationJobRecreateMethod]
 		if recreateMethodAnno == "" || GetRecreateHandler(recreateMethodAnno) == nil {
 			// use Kruise ContainerRecreateRequest to recreate container by default
-			return &containerRestartOperator{GenericOperator: genericOperator, handler: GetRecreateHandler(CRR)}
+			return &containerRestartOperator{GenericOperator: genericOperator, handler: GetRecreateHandler(string(appsv1alpha1.CRRKey))}
 		}
 		return &containerRestartOperator{GenericOperator: genericOperator, handler: GetRecreateHandler(recreateMethodAnno)}
 	case appsv1alpha1.OpsActionReplace:
