@@ -17,11 +17,17 @@ limitations under the License.
 package utils
 
 import (
+	"context"
+	"fmt"
+
 	kruisev1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
 	ctrlutils "kusionstack.io/operating/pkg/controllers/utils"
 )
 
@@ -72,4 +78,36 @@ func ParsePhaseByCrrPhase(phase kruisev1alpha1.ContainerRecreateRequestPhase) ap
 	default:
 		return appsv1alpha1.ContainerPhasePending
 	}
+}
+
+func GetCollaSetByPod(ctx context.Context, client client.Client, instance *appsv1alpha1.OperationJob, candidate *OpsCandidate) (*appsv1alpha1.CollaSet, error) {
+	var collaSet appsv1alpha1.CollaSet
+	ownedByCollaSet := false
+
+	pod := candidate.Pod
+	if pod == nil {
+		if candidate.ReplaceNewPod != nil {
+			pod = candidate.ReplaceNewPod
+		} else {
+			// pod is deleted by others or not exist, just ignore
+			return nil, nil
+		}
+	}
+
+	for _, ownerRef := range pod.OwnerReferences {
+		if ownerRef.Kind != "CollaSet" {
+			continue
+		}
+		ownedByCollaSet = true
+		err := client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: ownerRef.Name}, &collaSet)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if !ownedByCollaSet {
+		return nil, fmt.Errorf("target %s/%s is not owned by collaSet", pod.Namespace, pod.Name)
+	}
+
+	return &collaSet, nil
 }

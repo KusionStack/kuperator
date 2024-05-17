@@ -35,6 +35,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
+	"kusionstack.io/operating/pkg/controllers/operationjob/recreate"
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 	ctrlutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/utils"
@@ -57,7 +59,7 @@ func Add(mgr ctrl.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	reconcilerMixin := mixin.NewReconcilerMixin(controllerName, mgr)
-	RegisterRecreateHandler(string(appsv1alpha1.CRRKey), &ContainerRecreateRequestHandler{})
+	recreate.RegisterRecreateHandler(string(appsv1alpha1.CRRKey), &recreate.ContainerRecreateRequestHandler{})
 	return &ReconcileOperationJob{
 		ReconcilerMixin: reconcilerMixin,
 	}
@@ -171,7 +173,7 @@ func (r *ReconcileOperationJob) doReconcile(ctx context.Context,
 	}
 
 	// operate targets and fulfil podOpsStatus
-	filteredCandidates := decideCandidateByPartition(instance, candidates)
+	filteredCandidates := DecideCandidateByPartition(instance, candidates)
 	for _, candidate := range filteredCandidates {
 		if err = operator.OperateTarget(candidate); err != nil {
 			return err
@@ -199,7 +201,7 @@ func (r *ReconcileOperationJob) calculateStatus(
 
 	// set target ops details
 	for _, candidate := range candidates {
-		jobStatus.PodDetails = append(jobStatus.PodDetails, *candidate.podOpsStatus)
+		jobStatus.PodDetails = append(jobStatus.PodDetails, *candidate.PodOpsStatus)
 	}
 
 	// set replicas info
