@@ -14,8 +14,8 @@ Install the latest ControllerMesh.
    $helm install ctrlmesh kusionstack/ctrlmesh --version 0.1.2
 
 If ControllerMesh is already installed, you can enable ShardingConfig with 
-  $helm install operating kusionstack/operating --version 0.3.0 --set sharding.enabled=true
+  $helm install operating kusionstack/operating --version 0.4.0 --set sharding.enabled=true
 
 
-KusionStack Operating v0.3.0 installed successfully.
+KusionStack Operating v0.4.0 installed successfully.
 Welcome! ^_^
