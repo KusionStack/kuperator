@@ -91,7 +91,7 @@ func controlledByOperationJob(c client.Client, pod *corev1.Pod) (sets.String, bo
 			}
 		}
 		for _, status := range oj.Status.PodDetails {
-			if status.ExtraInfo != nil && status.ExtraInfo[ReplacePodNameKey] == pod.Name {
+			if status.ExtraInfo != nil && status.ExtraInfo[appsv1alpha1.ReplacePodNameKey] == pod.Name {
 				ojNames.Insert(oj.Name)
 				break
 			}

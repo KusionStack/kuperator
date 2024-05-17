@@ -23,9 +23,6 @@ import (
 	"strings"
 
 	admissionv1 "k8s.io/api/admission/v1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
@@ -70,7 +67,7 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 	allErrors = append(allErrors, h.validateOpsType(&obj, fldPath)...)
 	allErrors = append(allErrors, h.validatePartition(&obj, &old, fldPath)...)
 	allErrors = append(allErrors, h.validateTTLAndActiveDeadline(&obj, fldPath)...)
-	allErrors = append(allErrors, h.validateOpsTarget(ctx, &obj, fldPath.Child("targets"))...)
+	allErrors = append(allErrors, h.validateOpsTarget(&obj, fldPath.Child("targets"))...)
 	if len(allErrors) > 0 {
 		return admission.ValidationResponse(false, allErrors.ToAggregate().Error())
 	}
@@ -79,18 +76,18 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 
 func (h *ValidatingHandler) validateOpsType(instance *appsv1alpha1.OperationJob, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
-	if instance.Spec.Action != appsv1alpha1.OpsActionRestart &&
+	if instance.Spec.Action != appsv1alpha1.ActionRecreate &&
 		instance.Spec.Action != appsv1alpha1.OpsActionReplace {
 		allErrors = append(allErrors, field.Invalid(fldPath.Child("action"), instance.Spec.Action,
 			fmt.Sprintf("should be one of: %s", strings.Join([]string{
-				string(appsv1alpha1.OpsActionRestart),
+				string(appsv1alpha1.ActionRecreate),
 				string(appsv1alpha1.OpsActionReplace),
 			}, ","))))
 	}
 	return allErrors
 }
 
-func (h *ValidatingHandler) validateOpsTarget(ctx context.Context, instance *appsv1alpha1.OperationJob, fldPath *field.Path) field.ErrorList {
+func (h *ValidatingHandler) validateOpsTarget(instance *appsv1alpha1.OperationJob, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 	if len(instance.Spec.Targets) == 0 {
 		allErrors = append(allErrors, field.Invalid(fldPath, instance.Spec.Targets, "target can not be empty"))
@@ -99,17 +96,9 @@ func (h *ValidatingHandler) validateOpsTarget(ctx context.Context, instance *app
 
 	podSets := sets.String{}
 	for podIdx, target := range instance.Spec.Targets {
-		pod := corev1.Pod{}
 		podFldPath := fldPath.Index(podIdx).Child("podName")
-		if instance.Spec.Action == appsv1alpha1.OpsActionRestart {
-			if err := h.Client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: target.PodName}, &pod); err != nil {
-				if errors.IsNotFound(err) {
-					allErrors = append(allErrors, field.Invalid(podFldPath, target.PodName, fmt.Sprintf("not found Pod named %s", target.PodName)))
-				} else {
-					allErrors = append(allErrors, field.Invalid(podFldPath, target.PodName, fmt.Sprintf("failed to find Pod named %s: %v", target.PodName, err)))
-				}
-			}
 
+		if instance.Spec.Action == appsv1alpha1.ActionRecreate {
 			cntSets := sets.String{}
 			for ctnIdx, containerName := range target.Containers {
 				containerFldPath := fldPath.Index(podIdx).Child("containerName").Index(ctnIdx)
@@ -117,20 +106,15 @@ func (h *ValidatingHandler) validateOpsTarget(ctx context.Context, instance *app
 					allErrors = append(allErrors, field.Invalid(containerFldPath, containerName, fmt.Sprintf("container named %s exists multiple times", containerName)))
 				}
 				cntSets.Insert(containerName)
-				container := getContainer(&pod, containerName)
-				if container == nil {
-					allErrors = append(allErrors, field.Invalid(containerFldPath, containerName, fmt.Sprintf("container %s not found", containerName)))
-				}
 			}
 		} else if len(target.Containers) != 0 {
-			allErrors = append(allErrors, field.Invalid(fldPath, target.PodName, "containerNames should be empty"))
+			allErrors = append(allErrors, field.Invalid(fldPath, target.PodName, fmt.Sprintf("containerNames should be empty for %s action", instance.Spec.Action)))
 		}
 
 		if podSets.Has(target.PodName) {
 			allErrors = append(allErrors, field.Invalid(podFldPath, target.PodName, fmt.Sprintf("pod named %s exists multiple times", target.PodName)))
 		}
 		podSets.Insert(target.PodName)
-
 	}
 
 	return allErrors
@@ -175,19 +159,6 @@ func (h *ValidatingHandler) validateTTLAndActiveDeadline(instance *appsv1alpha1.
 		allErrors = append(allErrors, field.Invalid(fldPath.Child("TTLSecondsAfterFinished"), ttlSecondsAfterFinished, "should be larger than 0"))
 	}
 	return allErrors
-}
-
-func getContainer(pod *corev1.Pod, containerName string) *corev1.Container {
-	if pod == nil {
-		return nil
-	}
-	for i := range pod.Spec.Containers {
-		v := &pod.Spec.Containers[i]
-		if v.Name == containerName {
-			return v
-		}
-	}
-	return nil
 }
 
 func minInt32(a, b int32) int32 {

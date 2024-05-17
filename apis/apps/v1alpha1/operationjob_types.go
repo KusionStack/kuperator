@@ -24,8 +24,17 @@ import (
 type OpsAction string
 
 const (
-	OpsActionRestart OpsAction = "Restart"
+	ActionRecreate   OpsAction = "Recreate"
 	OpsActionReplace OpsAction = "Replace"
+)
+
+// ExtraInfoKey defines the extra info keys in pod ops status
+type ExtraInfoKey string
+
+const (
+	ReplacePodNameKey ExtraInfoKey = "ReplaceNewPodName"
+	CRRKey            ExtraInfoKey = "ContainerRecreateRequest"
+	Reason            ExtraInfoKey = "Reason"
 )
 
 // OperationJobProgress indicates the progress of operationJob
@@ -141,7 +150,7 @@ type PodOpsStatus struct {
 
 	// Extra info of the target pod
 	// +optional
-	ExtraInfo map[string]string `json:"extraInfo,omitempty"`
+	ExtraInfo map[ExtraInfoKey]string `json:"extraInfo,omitempty"`
 
 	// the target container to restart
 	// +optional
