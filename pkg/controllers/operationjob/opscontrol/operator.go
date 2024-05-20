@@ -18,7 +18,6 @@ package opscontrol
 
 import (
 	"context"
-	"time"
 
 	"github.com/go-logr/logr"
 	"k8s.io/client-go/tools/record"
@@ -31,7 +30,7 @@ type ActionOperator interface {
 	ListTargets() ([]*OpsCandidate, error)
 	OperateTarget(*OpsCandidate) error
 	FulfilPodOpsStatus(*OpsCandidate) error
-	ReleaseTarget(*OpsCandidate) (*time.Duration, error)
+	ReleaseTarget(*OpsCandidate) error
 }
 
 type OperateInfo struct {

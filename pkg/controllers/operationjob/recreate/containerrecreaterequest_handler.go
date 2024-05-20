@@ -21,13 +21,13 @@ import (
 	"fmt"
 
 	kruisev1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 )
 
@@ -36,9 +36,11 @@ type ContainerRecreateRequestHandler struct {
 
 func (h *ContainerRecreateRequestHandler) DoRestartContainers(
 	ctx context.Context, client client.Client,
-	instance *appsv1alpha1.OperationJob, pod *corev1.Pod, containers []string) error {
+	instance *appsv1alpha1.OperationJob,
+	candidate *opscontrol.OpsCandidate, containers []string) error {
 	crr := &kruisev1alpha1.ContainerRecreateRequest{}
-	crrName := fmt.Sprintf("%s-%s", instance.Name, pod.Name)
+	crrName := fmt.Sprintf("%s-%s", instance.Name, candidate.PodName)
+
 	err := client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: crrName}, crr)
 	if errors.IsNotFound(err) {
 		var crrContainers []kruisev1alpha1.ContainerRecreateRequestContainer
@@ -52,13 +54,13 @@ func (h *ContainerRecreateRequestHandler) DoRestartContainers(
 		crr = &kruisev1alpha1.ContainerRecreateRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: instance.Namespace,
-				Name:      fmt.Sprintf("%s-%s", instance.Name, pod.Name),
+				Name:      fmt.Sprintf("%s-%s", instance.Name, candidate.PodName),
 				OwnerReferences: []metav1.OwnerReference{
 					*metav1.NewControllerRef(instance, appsv1alpha1.GroupVersion.WithKind("OperationJob")),
 				},
 			},
 			Spec: kruisev1alpha1.ContainerRecreateRequestSpec{
-				PodName:    pod.Name,
+				PodName:    candidate.PodName,
 				Containers: crrContainers,
 			},
 		}
@@ -75,9 +77,10 @@ func (h *ContainerRecreateRequestHandler) DoRestartContainers(
 
 func (h *ContainerRecreateRequestHandler) IsRestartFinished(
 	ctx context.Context, client client.Client,
-	instance *appsv1alpha1.OperationJob, pod *corev1.Pod) bool {
+	instance *appsv1alpha1.OperationJob, candidate *opscontrol.OpsCandidate) bool {
 	crr := &kruisev1alpha1.ContainerRecreateRequest{}
-	crrName := fmt.Sprintf("%s-%s", instance.Name, pod.Name)
+	crrName := fmt.Sprintf("%s-%s", instance.Name, candidate.PodName)
+
 	err := client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: crrName}, crr)
 	if err != nil {
 		return false
@@ -88,9 +91,10 @@ func (h *ContainerRecreateRequestHandler) IsRestartFinished(
 func (h *ContainerRecreateRequestHandler) GetContainerOpsPhase(
 	ctx context.Context, client client.Client,
 	instance *appsv1alpha1.OperationJob,
-	pod *corev1.Pod, container string) appsv1alpha1.ContainerPhase {
+	candidate *opscontrol.OpsCandidate, container string) appsv1alpha1.ContainerPhase {
 	crr := &kruisev1alpha1.ContainerRecreateRequest{}
-	crrName := fmt.Sprintf("%s-%s", instance.Name, pod.Name)
+	crrName := fmt.Sprintf("%s-%s", instance.Name, candidate.PodName)
+
 	err := client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: crrName}, crr)
 	if err != nil {
 		return appsv1alpha1.ContainerPhasePending
@@ -107,12 +111,30 @@ func (h *ContainerRecreateRequestHandler) GetContainerOpsPhase(
 func (h *ContainerRecreateRequestHandler) FulfilExtraInfo(
 	ctx context.Context, client client.Client,
 	instance *appsv1alpha1.OperationJob,
-	pod *corev1.Pod, extraInfo *map[appsv1alpha1.ExtraInfoKey]string) {
+	candidate *opscontrol.OpsCandidate, extraInfo *map[appsv1alpha1.ExtraInfoKey]string) {
 	crr := &kruisev1alpha1.ContainerRecreateRequest{}
-	crrName := fmt.Sprintf("%s-%s", instance.Name, pod.Name)
+	crrName := fmt.Sprintf("%s-%s", instance.Name, candidate.PodName)
+
 	err := client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: crrName}, crr)
 	if err != nil {
 		return
 	}
 	(*extraInfo)[appsv1alpha1.CRRKey] = crr.Name
+}
+
+func (h *ContainerRecreateRequestHandler) ReleasePod(
+	ctx context.Context, client client.Client,
+	instance *appsv1alpha1.OperationJob,
+	candidate *opscontrol.OpsCandidate) error {
+	crr := &kruisev1alpha1.ContainerRecreateRequest{}
+	crrName := fmt.Sprintf("%s-%s", instance.Name, candidate.PodName)
+
+	err := client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: crrName}, crr)
+	if errors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	return client.Delete(ctx, crr)
 }

@@ -83,3 +83,11 @@ func IsCandidateOpsFinished(candidate *OpsCandidate) bool {
 	return candidate.PodOpsStatus.Phase == appsv1alpha1.PodPhaseCompleted ||
 		candidate.PodOpsStatus.Phase == appsv1alpha1.PodPhaseFailed
 }
+
+func MarkCandidateAsFailed(candidate *OpsCandidate, reason string) {
+	if candidate.PodOpsStatus.ExtraInfo == nil {
+		candidate.PodOpsStatus.ExtraInfo = make(map[appsv1alpha1.ExtraInfoKey]string)
+	}
+	candidate.PodOpsStatus.Phase = appsv1alpha1.PodPhaseFailed
+	candidate.PodOpsStatus.ExtraInfo[appsv1alpha1.Reason] = reason
+}

@@ -29,6 +29,8 @@ import (
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
 	ctrlutils "kusionstack.io/operating/pkg/controllers/utils"
+	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
+	operatingutils "kusionstack.io/operating/pkg/utils"
 )
 
 func MarkOperationJobFailed(instance *appsv1alpha1.OperationJob) {
@@ -110,4 +112,42 @@ func GetCollaSetByPod(ctx context.Context, client client.Client, instance *appsv
 	}
 
 	return &collaSet, nil
+}
+
+func CancelOpsLifecycle(ctx context.Context, client client.Client, adapter podopslifecycle.LifecycleAdapter, pod *corev1.Pod) error {
+	if pod == nil {
+		return nil
+	}
+	labelUndo := fmt.Sprintf("%s/%s", appsv1alpha1.PodUndoOperationTypeLabelPrefix, adapter.GetID())
+	if pod.Labels == nil {
+		pod.Labels = make(map[string]string)
+	}
+	pod.Labels[labelUndo] = string(adapter.GetType())
+	return client.Update(ctx, pod)
+}
+
+func BeginRecreateLifecycle(client client.Client, adapter podopslifecycle.LifecycleAdapter, pod *corev1.Pod) error {
+	if updated, err := podopslifecycle.Begin(client, adapter, pod); err != nil {
+		return fmt.Errorf("fail to begin PodOpsLifecycle for %s %s/%s: %s", adapter.GetType(), pod.Namespace, pod.Name, err)
+	} else if updated {
+		if err := StatusUpToDateExpectation.ExpectUpdate(operatingutils.ObjectKeyString(pod), pod.ResourceVersion); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func FinishRecreateLifecycle(client client.Client, adapter podopslifecycle.LifecycleAdapter, pod *corev1.Pod) error {
+	if pod == nil {
+		return nil
+	}
+	if updated, err := podopslifecycle.Finish(client, adapter, pod); err != nil {
+		return fmt.Errorf("failed to finish PodOpsLifecycle for %s %s/%s: %s", adapter.GetType(), pod.Namespace, pod.Name, err)
+	} else if updated {
+		// add an expectation for this pod update, before next reconciling
+		if err := StatusUpToDateExpectation.ExpectUpdate(operatingutils.ObjectKeyString(pod), pod.ResourceVersion); err != nil {
+			return err
+		}
+	}
+	return nil
 }
