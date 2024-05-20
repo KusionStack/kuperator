@@ -495,6 +495,49 @@ var _ = Describe("operationjob controller", func() {
 		assertJobProgressCompleted(oj2, time.Second*5)
 	})
 
+	It("deadline and ttl", func() {
+		testcase := "test-deadline-ttl"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+		cs := createCollaSetWithReplicas("foo", testcase, 2)
+		podNames := getPodNamesFromCollaSet(cs)
+
+		oj := &appsv1alpha1.OperationJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.OperationJobSpec{
+				Action: appsv1alpha1.ActionRecreate,
+				Targets: []appsv1alpha1.PodOpsTarget{
+					{
+						PodName: podNames[0],
+					},
+					{
+						PodName: podNames[1],
+					},
+				},
+				ActiveDeadlineSeconds:   int32Pointer(5),
+				TTLSecondsAfterFinished: int32Pointer(10),
+			},
+		}
+
+		Expect(c.Create(ctx, oj)).Should(BeNil())
+
+		// wait for replace failed after ActiveDeadlineSeconds
+		assertJobProgressFailed(oj, time.Second*10)
+
+		// wait for operationJob deleted after TTL
+		Eventually(func() bool {
+			err := c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
+			if errors.IsNotFound(err) {
+				return true
+			} else {
+				Expect(err).Should(BeNil())
+			}
+			return false
+		}, time.Second*20, time.Second).Should(BeTrue())
+	})
+
 })
 
 func assertCompletedReplicas(oj *appsv1alpha1.OperationJob, completedReplicas int32, timeout time.Duration) {
