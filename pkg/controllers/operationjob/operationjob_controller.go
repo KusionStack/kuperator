@@ -195,7 +195,7 @@ func (r *ReconcileOperationJob) calculateStatus(
 	jobStatus = &appsv1alpha1.OperationJobStatus{
 		StartTimestamp: instance.Status.StartTimestamp,
 		EndTimestamp:   instance.Status.EndTimestamp,
-		Progress:       appsv1alpha1.OperationProgressProcessing,
+		Progress:       instance.Status.Progress,
 	}
 
 	// set target ops details
@@ -219,6 +219,12 @@ func (r *ReconcileOperationJob) calculateStatus(
 	jobStatus.CompletedReplicas = completedReplicas
 	jobStatus.ProcessingReplicas = processingReplicas
 	jobStatus.FailedReplicas = failedReplicas
+
+	// skip if ops finished
+	if jobStatus.Progress == appsv1alpha1.OperationProgressCompleted ||
+		jobStatus.Progress == appsv1alpha1.OperationProgressFailed {
+		return
+	}
 
 	// set progress of the job
 	if completedReplicas+failedReplicas == totalReplicas {
