@@ -18,7 +18,6 @@ package replace
 
 import (
 	"fmt"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -37,12 +36,12 @@ const (
 	PodPhaseOriginPodTerminating appsv1alpha1.PodPhase = "OriginPodTerminating"
 )
 
-type PodReplaceOperator struct {
+type PodReplaceControl struct {
 	*OperateInfo
 	PodControl podcontrol.Interface
 }
 
-func (p *PodReplaceOperator) ListTargets() ([]*OpsCandidate, error) {
+func (p *PodReplaceControl) ListTargets() ([]*OpsCandidate, error) {
 	var candidates []*OpsCandidate
 	podOpsStatusMap := ojutils.MapOpsStatusByPod(p.OperationJob)
 	for _, target := range p.OperationJob.Spec.Targets {
@@ -103,13 +102,15 @@ func (p *PodReplaceOperator) ListTargets() ([]*OpsCandidate, error) {
 	return candidates, nil
 }
 
-func (p *PodReplaceOperator) OperateTarget(candidate *OpsCandidate) error {
-	if IsCandidateOpsFinished(candidate) {
-		return nil
-	}
-
+func (p *PodReplaceControl) OperateTarget(candidate *OpsCandidate) error {
+	// mark candidate ops started is not started
 	if IsCandidateOpsNotStarted(candidate) {
 		candidate.PodOpsStatus.Phase = appsv1alpha1.PodPhaseStarted
+	}
+
+	// skip if candidate ops finished
+	if IsCandidateOpsFinished(candidate) {
+		return nil
 	}
 
 	// label pod to trigger replace if not started
@@ -123,7 +124,7 @@ func (p *PodReplaceOperator) OperateTarget(candidate *OpsCandidate) error {
 	return nil
 }
 
-func (p *PodReplaceOperator) FulfilPodOpsStatus(candidate *OpsCandidate) error {
+func (p *PodReplaceControl) FulfilPodOpsStatus(candidate *OpsCandidate) error {
 	// try to fulfil ExtraInfo["ReplaceNewPodName"]
 	if candidate.Pod != nil && candidate.CollaSet != nil {
 		newPodId, exist := candidate.Pod.Labels[appsv1alpha1.PodReplacePairNewId]
@@ -166,6 +167,6 @@ func (p *PodReplaceOperator) FulfilPodOpsStatus(candidate *OpsCandidate) error {
 	return nil
 }
 
-func (p *PodReplaceOperator) ReleaseTarget(candidate *OpsCandidate) (*time.Duration, error) {
-	return nil, nil
+func (p *PodReplaceControl) ReleaseTarget(candidate *OpsCandidate) error {
+	return nil
 }

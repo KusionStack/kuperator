@@ -41,11 +41,11 @@ func (r *ReconcileOperationJob) newOperator(ctx context.Context, instance *appsv
 		recreateMethodAnno := instance.ObjectMeta.Annotations[appsv1alpha1.AnnotationOperationJobRecreateMethod]
 		if recreateMethodAnno == "" || recreate.GetRecreateHandler(recreateMethodAnno) == nil {
 			// use Kruise ContainerRecreateRequest to recreate container by default
-			return &recreate.ContainerRestartOperator{OperateInfo: operateInfo, Handler: recreate.GetRecreateHandler(string(appsv1alpha1.CRRKey))}
+			return &recreate.ContainerRecreateControl{OperateInfo: operateInfo, Handler: recreate.GetRecreateHandler(string(appsv1alpha1.CRRKey))}
 		}
-		return &recreate.ContainerRestartOperator{OperateInfo: operateInfo, Handler: recreate.GetRecreateHandler(recreateMethodAnno)}
+		return &recreate.ContainerRecreateControl{OperateInfo: operateInfo, Handler: recreate.GetRecreateHandler(recreateMethodAnno)}
 	case appsv1alpha1.OpsActionReplace:
-		return &replace.PodReplaceOperator{OperateInfo: operateInfo,
+		return &replace.PodReplaceControl{OperateInfo: operateInfo,
 			PodControl: podcontrol.NewRealPodControl(r.ReconcilerMixin.Client, r.ReconcilerMixin.Scheme)}
 	default:
 		panic(fmt.Errorf("unsupported operation type %s", instance.Spec.Action))
@@ -87,28 +87,18 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineOrTTL(ctx context.Context, i
 	return false, nil, nil
 }
 
-func (r *ReconcileOperationJob) ReleaseTargetsForDeletion(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) (*time.Duration, error) {
+func (r *ReconcileOperationJob) ReleaseTargetsForDeletion(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) error {
 	ojutils.MarkOperationJobFailed(instance)
 	operator := r.newOperator(ctx, instance, logger)
 	candidates, err := operator.ListTargets()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var requeueAfter *time.Duration
 	for _, candidate := range candidates {
-		duration, err := operator.ReleaseTarget(candidate)
-		if duration != nil {
-			if requeueAfter == nil {
-				requeueAfter = duration
-			} else if *duration < *requeueAfter {
-				requeueAfter = duration
-			}
-		}
-		if err != nil {
-			return requeueAfter, err
+		if err := operator.ReleaseTarget(candidate); err != nil {
+			return err
 		}
 	}
-	return requeueAfter, nil
-
+	return nil
 }
