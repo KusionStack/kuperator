@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package operationjob
+package podoperation
 
 import (
 	"context"
@@ -46,7 +46,7 @@ func NewValidatingHandler() *ValidatingHandler {
 }
 
 func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
-	var obj, old appsv1alpha1.OperationJob
+	var obj, old appsv1alpha1.PodOperation
 	var allErrors field.ErrorList
 	if req.Operation == admissionv1.Delete {
 		return admission.ValidationResponse(true, "")
@@ -74,7 +74,7 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 	return admission.ValidationResponse(true, "")
 }
 
-func (h *ValidatingHandler) validateOpsType(instance *appsv1alpha1.OperationJob, fldPath *field.Path) field.ErrorList {
+func (h *ValidatingHandler) validateOpsType(instance *appsv1alpha1.PodOperation, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 	if instance.Spec.Action != appsv1alpha1.ActionRecreate &&
 		instance.Spec.Action != appsv1alpha1.OpsActionReplace {
@@ -87,7 +87,7 @@ func (h *ValidatingHandler) validateOpsType(instance *appsv1alpha1.OperationJob,
 	return allErrors
 }
 
-func (h *ValidatingHandler) validateOpsTarget(instance *appsv1alpha1.OperationJob, fldPath *field.Path) field.ErrorList {
+func (h *ValidatingHandler) validateOpsTarget(instance *appsv1alpha1.PodOperation, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 	if len(instance.Spec.Targets) == 0 {
 		allErrors = append(allErrors, field.Invalid(fldPath, instance.Spec.Targets, "target can not be empty"))
@@ -120,7 +120,7 @@ func (h *ValidatingHandler) validateOpsTarget(instance *appsv1alpha1.OperationJo
 	return allErrors
 }
 
-func (h *ValidatingHandler) validatePartition(instance, old *appsv1alpha1.OperationJob, fldPath *field.Path) field.ErrorList {
+func (h *ValidatingHandler) validatePartition(instance, old *appsv1alpha1.PodOperation, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 	var currPartition, oldPartition int32
 	var currTotalReplicas, oldTotalReplicas int32
@@ -148,7 +148,7 @@ func (h *ValidatingHandler) validatePartition(instance, old *appsv1alpha1.Operat
 	return allErrors
 }
 
-func (h *ValidatingHandler) validateTTLAndActiveDeadline(instance *appsv1alpha1.OperationJob, fldPath *field.Path) field.ErrorList {
+func (h *ValidatingHandler) validateTTLAndActiveDeadline(instance *appsv1alpha1.PodOperation, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 	activeDeadlineSeconds := instance.Spec.ActiveDeadlineSeconds
 	ttlSecondsAfterFinished := instance.Spec.TTLSecondsAfterFinished

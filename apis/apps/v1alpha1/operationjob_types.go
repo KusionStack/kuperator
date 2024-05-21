@@ -37,14 +37,14 @@ const (
 	Reason            ExtraInfoKey = "Reason"
 )
 
-// OperationJobProgress indicates the progress of operationJob
-type OperationJobProgress string
+// PodOperationProgress indicates the progress of podOperation
+type PodOperationProgress string
 
 const (
-	OperationProgressPending    OperationJobProgress = "Pending"
-	OperationProgressProcessing OperationJobProgress = "Processing"
-	OperationProgressFailed     OperationJobProgress = "Failed"
-	OperationProgressCompleted  OperationJobProgress = "Completed"
+	OperationProgressPending    PodOperationProgress = "Pending"
+	OperationProgressProcessing PodOperationProgress = "Processing"
+	OperationProgressFailed     PodOperationProgress = "Failed"
+	OperationProgressCompleted  PodOperationProgress = "Completed"
 )
 
 // PodPhase indicates operation progress of pod
@@ -68,8 +68,8 @@ const (
 	ContainerPhaseCompleted  ContainerPhase = "Completed"
 )
 
-// OperationJobSpec defines the desired state of OperationJob
-type OperationJobSpec struct {
+// PodOperationSpec defines the desired state of PodOperation
+type PodOperationSpec struct {
 	// Specify the operation actions including: Restart, Replace
 	// +optional
 	Action OpsAction `json:"action,omitempty"`
@@ -93,7 +93,7 @@ type OperationJobSpec struct {
 	TTLSecondsAfterFinished *int32 `json:"TTLSecondsAfterFinished,omitempty"`
 }
 
-// PodOpsTarget defines the target pods of the OperationJob
+// PodOpsTarget defines the target pods of the PodOperation
 type PodOpsTarget struct {
 	// Specify the operation target pods
 	// +optional
@@ -104,11 +104,11 @@ type PodOpsTarget struct {
 	Containers []string `json:"containers,omitempty"`
 }
 
-// OperationJobStatus defines the observed state of OperationJob
-type OperationJobStatus struct {
-	// Phase indicates the of the OperationJob
+// PodOperationStatus defines the observed state of PodOperation
+type PodOperationStatus struct {
+	// Phase indicates the of the PodOperation
 	// +optional
-	Progress OperationJobProgress `json:"progress,omitempty"`
+	Progress PodOperationProgress `json:"progress,omitempty"`
 
 	// Operation start time
 	// +optional
@@ -118,19 +118,19 @@ type OperationJobStatus struct {
 	// +optional
 	EndTimestamp *metav1.Time `json:"endTimestamp,omitempty"`
 
-	// Replicas of the pods involved in the OperationJob
+	// Replicas of the pods involved in the PodOperation
 	// +optional
 	TotalReplicas int32 `json:"totalReplicas,omitempty"`
 
-	// Completed replicas of the pods involved in the OperationJob
+	// Completed replicas of the pods involved in the PodOperation
 	// +optional
 	CompletedReplicas int32 `json:"completedReplicas,omitempty"`
 
-	// Processing replicas of the pods involved in the OperationJob
+	// Processing replicas of the pods involved in the PodOperation
 	// +optional
 	ProcessingReplicas int32 `json:"processingReplicas,omitempty"`
 
-	// failed replicas of the pods involved in the OperationJob
+	// failed replicas of the pods involved in the PodOperation
 	// +optional
 	FailedReplicas int32 `json:"failedReplicas,omitempty"`
 
@@ -172,29 +172,29 @@ type ContainerOpsStatus struct {
 
 // +k8s:openapi-gen=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:resource:shortName=oj
+// +kubebuilder:resource:shortName=poo
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="PROGRESS",type="string",JSONPath=".status.progress"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// OperationJob is the Schema for the operationjobs API
-type OperationJob struct {
+// PodOperation is the Schema for the podoperations API
+type PodOperation struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   OperationJobSpec   `json:"spec,omitempty"`
-	Status OperationJobStatus `json:"status,omitempty"`
+	Spec   PodOperationSpec   `json:"spec,omitempty"`
+	Status PodOperationStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// OperationJobList contains a list of OperationJob
-type OperationJobList struct {
+// PodOperationList contains a list of PodOperation
+type PodOperationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []OperationJob `json:"items"`
+	Items           []PodOperation `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&OperationJob{}, &OperationJobList{})
+	SchemeBuilder.Register(&PodOperation{}, &PodOperationList{})
 }

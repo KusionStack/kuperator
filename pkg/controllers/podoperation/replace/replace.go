@@ -26,8 +26,8 @@ import (
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
-	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
-	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
+	. "kusionstack.io/operating/pkg/controllers/podoperation/opscontrol"
+	podoperationutils "kusionstack.io/operating/pkg/controllers/podoperation/utils"
 )
 
 const (
@@ -43,15 +43,15 @@ type PodReplaceControl struct {
 
 func (p *PodReplaceControl) ListTargets() ([]*OpsCandidate, error) {
 	var candidates []*OpsCandidate
-	podOpsStatusMap := ojutils.MapOpsStatusByPod(p.OperationJob)
-	for _, target := range p.OperationJob.Spec.Targets {
+	podOpsStatusMap := podoperationutils.MapOpsStatusByPod(p.PodOperation)
+	for _, target := range p.PodOperation.Spec.Targets {
 		var candidate OpsCandidate
 		var originPod, replaceNewPod corev1.Pod
 		var replaceIndicated, replaceByReplaceUpdate, replaceNewPodExists bool
 
 		// fulfil origin pod
 		candidate.PodName = target.PodName
-		err := p.Client.Get(p.Context, types.NamespacedName{Namespace: p.OperationJob.Namespace, Name: target.PodName}, &originPod)
+		err := p.Client.Get(p.Context, types.NamespacedName{Namespace: p.PodOperation.Namespace, Name: target.PodName}, &originPod)
 		if err == nil {
 			candidate.Pod = &originPod
 		} else if errors.IsNotFound(err) {
@@ -71,7 +71,7 @@ func (p *PodReplaceControl) ListTargets() ([]*OpsCandidate, error) {
 		if opsStatus, exist := podOpsStatusMap[target.PodName]; exist {
 			candidate.PodOpsStatus = opsStatus
 			if newPodName, exist := opsStatus.ExtraInfo[appsv1alpha1.ReplacePodNameKey]; exist {
-				err := p.Client.Get(p.Context, types.NamespacedName{Namespace: p.OperationJob.Namespace, Name: newPodName}, &replaceNewPod)
+				err := p.Client.Get(p.Context, types.NamespacedName{Namespace: p.PodOperation.Namespace, Name: newPodName}, &replaceNewPod)
 				if err != nil {
 					return candidates, err
 				}
@@ -87,7 +87,7 @@ func (p *PodReplaceControl) ListTargets() ([]*OpsCandidate, error) {
 		}
 
 		// fulfil Collaset
-		collaset, err := ojutils.GetCollaSetByPod(p.Context, p.Client, p.OperationJob, &candidate)
+		collaset, err := podoperationutils.GetCollaSetByPod(p.Context, p.Client, p.PodOperation, &candidate)
 		if err != nil {
 			return candidates, err
 		}

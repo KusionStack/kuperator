@@ -40,8 +40,8 @@ const (
 	AnnotationGraceDeleteTimestamp = "gracedelete.kusionstack.io/delete-timestamp"
 )
 
-// OperationJob Annotation
+// PodOperation Annotation
 const (
 	// AnnotationRecreateMethod string, e.g., ContainerRecreateRequest
-	AnnotationOperationJobRecreateMethod = "operationjob.kusionstack.io/recreate-method"
+	AnnotationPodOperationRecreateMethod = "podoperation.kusionstack.io/recreate-method"
 )

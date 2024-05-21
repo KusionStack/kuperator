@@ -74,34 +74,6 @@ rules:
 - apiGroups:
   - apps.kusionstack.io
   resources:
-  - operationjobs
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kusionstack.io
-  resources:
-  - operationjobs/finalizers
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kusionstack.io
-  resources:
-  - operationjobs/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kusionstack.io
-  resources:
   - poddecorations
   verbs:
   - create
@@ -123,6 +95,34 @@ rules:
   - apps.kusionstack.io
   resources:
   - poddecorations/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kusionstack.io
+  resources:
+  - podoperations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kusionstack.io
+  resources:
+  - podoperations/finalizers
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kusionstack.io
+  resources:
+  - podoperations/status
   verbs:
   - get
   - patch

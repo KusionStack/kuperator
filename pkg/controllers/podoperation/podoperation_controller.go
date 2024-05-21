@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package operationjob
+package podoperation
 
 import (
 	"context"
@@ -35,20 +35,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
-	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
-	"kusionstack.io/operating/pkg/controllers/operationjob/recreate"
-	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
+	. "kusionstack.io/operating/pkg/controllers/podoperation/opscontrol"
+	"kusionstack.io/operating/pkg/controllers/podoperation/recreate"
+	podoperationutils "kusionstack.io/operating/pkg/controllers/podoperation/utils"
 	ctrlutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/utils"
 	"kusionstack.io/operating/pkg/utils/mixin"
 )
 
-const controllerName = "operationjob-controller"
+const controllerName = "podoperation-controller"
 
-var _ reconcile.Reconciler = &ReconcileOperationJob{}
+var _ reconcile.Reconciler = &ReconcilePodOperation{}
 
-// ReconcileOperationJob reconciles a OperationJob object
-type ReconcileOperationJob struct {
+// ReconcilePodOperation reconciles a PodOperation object
+type ReconcilePodOperation struct {
 	*mixin.ReconcilerMixin
 }
 
@@ -60,7 +60,7 @@ func Add(mgr ctrl.Manager) error {
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	reconcilerMixin := mixin.NewReconcilerMixin(controllerName, mgr)
 	recreate.RegisterRecreateHandler(string(appsv1alpha1.CRRKey), &recreate.ContainerRecreateRequestHandler{})
-	return &ReconcileOperationJob{
+	return &ReconcilePodOperation{
 		ReconcilerMixin: reconcilerMixin,
 	}
 }
@@ -75,8 +75,8 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to OperationJob
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.OperationJob{}}, &handler.EnqueueRequestForObject{})
+	// Watch for changes to PodOperation
+	err = c.Watch(&source.Kind{Type: &appsv1alpha1.PodOperation{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to ContainerRecreateRequest
 	err = c.Watch(&source.Kind{Type: &kruisev1alpha1.ContainerRecreateRequest{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &appsv1alpha1.OperationJob{},
+		OwnerType:    &appsv1alpha1.PodOperation{},
 	})
 	if err != nil {
 		return err
@@ -100,9 +100,9 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 	return nil
 }
 
-// +kubebuilder:rbac:groups=apps.kusionstack.io,resources=operationjobs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps.kusionstack.io,resources=operationjobs/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=apps.kusionstack.io,resources=operationjobs/finalizers,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kusionstack.io,resources=podoperations,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.kusionstack.io,resources=podoperations/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kusionstack.io,resources=podoperations/finalizers,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=containerrecreaterequests,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=containerrecreaterequests/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=containerrecreaterequests/finalizers,verbs=get;update;patch
@@ -110,30 +110,30 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch
 
-// Reconcile reads that state of the cluster for a OperationJob object and makes changes based on the state read
-// and what is in the OperationJob.Spec
-func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-	logger := r.Logger.WithValues("operationjob", req.String())
-	instance := &appsv1alpha1.OperationJob{}
+// Reconcile reads that state of the cluster for a PodOperation object and makes changes based on the state read
+// and what is in the PodOperation.Spec
+func (r *ReconcilePodOperation) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+	logger := r.Logger.WithValues("podoperation", req.String())
+	instance := &appsv1alpha1.PodOperation{}
 	if err := r.Client.Get(ctx, req.NamespacedName, instance); err != nil {
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 
 	key := utils.ObjectKeyString(instance)
-	if !ojutils.StatusUpToDateExpectation.SatisfiedExpectations(key, instance.ResourceVersion) {
-		logger.Info("OperationJob's resourceVersion is too old, retry later", "resourceVersion.now", instance.ResourceVersion)
+	if !podoperationutils.StatusUpToDateExpectation.SatisfiedExpectations(key, instance.ResourceVersion) {
+		logger.Info("PodOperation's resourceVersion is too old, retry later", "resourceVersion.now", instance.ResourceVersion)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	if instance.DeletionTimestamp != nil {
-		ojutils.StatusUpToDateExpectation.DeleteExpectations(key)
+		podoperationutils.StatusUpToDateExpectation.DeleteExpectations(key)
 		if err := r.ReleaseTargetsForDeletion(ctx, instance, logger); err != nil {
 			return reconcile.Result{}, err
 		}
-		// remove finalizer from operationJob
-		return reconcile.Result{}, ojutils.ClearProtection(ctx, r.Client, instance)
-	} else if err := ojutils.ProtectOperationJob(ctx, r.Client, instance); err != nil {
-		// add finalizer on operationJob
+		// remove finalizer from podOperation
+		return reconcile.Result{}, podoperationutils.ClearProtection(ctx, r.Client, instance)
+	} else if err := podoperationutils.ProtectPodOperation(ctx, r.Client, instance); err != nil {
+		// add finalizer on podOperation
 		return reconcile.Result{}, err
 	}
 
@@ -149,9 +149,9 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 		return reconcile.Result{}, err
 	}
 
-	// update operationJob status
+	// update podOperation status
 	if err = r.updateStatus(ctx, instance); err != nil {
-		return reconcile.Result{}, fmt.Errorf("fail to update status of OperationJob %s: %s", req, err)
+		return reconcile.Result{}, fmt.Errorf("fail to update status of PodOperation %s: %s", req, err)
 	}
 
 	if requeueAfter != nil {
@@ -160,8 +160,8 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileOperationJob) doReconcile(ctx context.Context,
-	instance *appsv1alpha1.OperationJob,
+func (r *ReconcilePodOperation) doReconcile(ctx context.Context,
+	instance *appsv1alpha1.PodOperation,
 	logger logr.Logger) error {
 	operator := r.newOperator(ctx, instance, logger)
 
@@ -182,17 +182,17 @@ func (r *ReconcileOperationJob) doReconcile(ctx context.Context,
 		}
 	}
 
-	// update operationJob status
-	newJobStatus, err := r.calculateStatus(instance, candidates)
-	instance.Status = *newJobStatus
+	// update podOperation status
+	newStatus, err := r.calculateStatus(instance, candidates)
+	instance.Status = *newStatus
 	return err
 }
 
-func (r *ReconcileOperationJob) calculateStatus(
-	instance *appsv1alpha1.OperationJob,
-	candidates []*OpsCandidate) (jobStatus *appsv1alpha1.OperationJobStatus, err error) {
+func (r *ReconcilePodOperation) calculateStatus(
+	instance *appsv1alpha1.PodOperation,
+	candidates []*OpsCandidate) (newStatus *appsv1alpha1.PodOperationStatus, err error) {
 	now := ctrlutils.FormatTimeNow()
-	jobStatus = &appsv1alpha1.OperationJobStatus{
+	newStatus = &appsv1alpha1.PodOperationStatus{
 		StartTimestamp: instance.Status.StartTimestamp,
 		EndTimestamp:   instance.Status.EndTimestamp,
 		Progress:       instance.Status.Progress,
@@ -200,12 +200,12 @@ func (r *ReconcileOperationJob) calculateStatus(
 
 	// set target ops details
 	for _, candidate := range candidates {
-		jobStatus.PodDetails = append(jobStatus.PodDetails, *candidate.PodOpsStatus)
+		newStatus.PodDetails = append(newStatus.PodDetails, *candidate.PodOpsStatus)
 	}
 
 	// set replicas info
 	var totalReplicas, completedReplicas, processingReplicas, failedReplicas int32
-	for _, podDetail := range jobStatus.PodDetails {
+	for _, podDetail := range newStatus.PodDetails {
 		totalReplicas++
 		if podDetail.Phase == appsv1alpha1.PodPhaseCompleted {
 			completedReplicas++
@@ -215,60 +215,60 @@ func (r *ReconcileOperationJob) calculateStatus(
 			processingReplicas++
 		}
 	}
-	jobStatus.TotalReplicas = totalReplicas
-	jobStatus.CompletedReplicas = completedReplicas
-	jobStatus.ProcessingReplicas = processingReplicas
-	jobStatus.FailedReplicas = failedReplicas
+	newStatus.TotalReplicas = totalReplicas
+	newStatus.CompletedReplicas = completedReplicas
+	newStatus.ProcessingReplicas = processingReplicas
+	newStatus.FailedReplicas = failedReplicas
 
 	// skip if ops finished
-	if jobStatus.Progress == appsv1alpha1.OperationProgressCompleted ||
-		jobStatus.Progress == appsv1alpha1.OperationProgressFailed {
+	if newStatus.Progress == appsv1alpha1.OperationProgressCompleted ||
+		newStatus.Progress == appsv1alpha1.OperationProgressFailed {
 		return
 	}
 
-	// set progress of the job
+	// set progress of the new
 	if completedReplicas+failedReplicas == totalReplicas {
 		if failedReplicas > 0 {
-			jobStatus.Progress = appsv1alpha1.OperationProgressFailed
+			newStatus.Progress = appsv1alpha1.OperationProgressFailed
 		} else {
-			jobStatus.Progress = appsv1alpha1.OperationProgressCompleted
+			newStatus.Progress = appsv1alpha1.OperationProgressCompleted
 		}
 	} else if totalReplicas == 0 {
-		jobStatus.Progress = appsv1alpha1.OperationProgressPending
+		newStatus.Progress = appsv1alpha1.OperationProgressPending
 	} else {
-		jobStatus.Progress = appsv1alpha1.OperationProgressProcessing
+		newStatus.Progress = appsv1alpha1.OperationProgressProcessing
 	}
 
-	if jobStatus.EndTimestamp == nil && (completedReplicas == totalReplicas || failedReplicas == totalReplicas) {
-		jobStatus.EndTimestamp = &now
+	if newStatus.EndTimestamp == nil && (completedReplicas == totalReplicas || failedReplicas == totalReplicas) {
+		newStatus.EndTimestamp = &now
 	}
 	return
 }
 
-func (r *ReconcileOperationJob) updateStatus(ctx context.Context, instance *appsv1alpha1.OperationJob) error {
-	oldJob := &appsv1alpha1.OperationJob{}
+func (r *ReconcilePodOperation) updateStatus(ctx context.Context, instance *appsv1alpha1.PodOperation) error {
+	oldObj := &appsv1alpha1.PodOperation{}
 	if err := r.Client.Get(ctx, types.NamespacedName{
 		Namespace: instance.Namespace,
 		Name:      instance.Name,
-	}, oldJob); err != nil {
+	}, oldObj); err != nil {
 		return err
 	}
 
-	newJobStatus := instance.Status
-	if equality.Semantic.DeepEqual(oldJob.Status, newJobStatus) {
+	newStatus := instance.Status
+	if equality.Semantic.DeepEqual(oldObj.Status, newStatus) {
 		return nil
 	}
 
-	err := ojutils.StatusUpToDateExpectation.ExpectUpdate(utils.ObjectKeyString(instance), instance.ResourceVersion)
+	err := podoperationutils.StatusUpToDateExpectation.ExpectUpdate(utils.ObjectKeyString(instance), instance.ResourceVersion)
 	if err != nil {
 		return err
 	}
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		oldJob.Status = newJobStatus
-		return r.Client.Status().Update(ctx, oldJob)
+		oldObj.Status = newStatus
+		return r.Client.Status().Update(ctx, oldObj)
 	})
 	if err != nil {
-		ojutils.StatusUpToDateExpectation.DeleteExpectations(utils.ObjectKeyString(instance))
+		podoperationutils.StatusUpToDateExpectation.DeleteExpectations(utils.ObjectKeyString(instance))
 	}
 	return err
 }

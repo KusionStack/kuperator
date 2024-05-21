@@ -20,9 +20,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"kusionstack.io/operating/pkg/webhook/server/generic/collaset"
-	"kusionstack.io/operating/pkg/webhook/server/generic/operationjob"
 	"kusionstack.io/operating/pkg/webhook/server/generic/persistentvolumeclaim"
 	"kusionstack.io/operating/pkg/webhook/server/generic/poddecoration"
+	"kusionstack.io/operating/pkg/webhook/server/generic/podoperation"
 
 	webhookdmission "kusionstack.io/operating/pkg/webhook/admission"
 	"kusionstack.io/operating/pkg/webhook/server/generic/pod"
@@ -58,6 +58,6 @@ func init() {
 	MutatingTypeHandlerMap["PersistentVolumeClaim"] = persistentvolumeclaim.NewMutatingHandler()
 	ValidatingTypeHandlerMap["PersistentVolumeClaim"] = persistentvolumeclaim.NewValidatingHandler()
 
-	MutatingTypeHandlerMap["OperationJob"] = operationjob.NewMutatingHandler()
-	ValidatingTypeHandlerMap["OperationJob"] = operationjob.NewValidatingHandler()
+	MutatingTypeHandlerMap["PodOperation"] = podoperation.NewMutatingHandler()
+	ValidatingTypeHandlerMap["PodOperation"] = podoperation.NewValidatingHandler()
 }

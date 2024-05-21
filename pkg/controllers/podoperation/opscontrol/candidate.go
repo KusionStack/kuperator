@@ -35,7 +35,7 @@ type OpsCandidate struct {
 	*appsv1alpha1.CollaSet
 }
 
-func DecideCandidateByPartition(instance *appsv1alpha1.OperationJob, candidates []*OpsCandidate) []*OpsCandidate {
+func DecideCandidateByPartition(instance *appsv1alpha1.PodOperation, candidates []*OpsCandidate) []*OpsCandidate {
 	if instance.Spec.Partition == nil {
 		return candidates
 	}

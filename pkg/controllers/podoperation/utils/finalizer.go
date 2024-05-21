@@ -25,7 +25,7 @@ import (
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
-func ClearProtection(ctx context.Context, client client.Client, instance *appsv1alpha1.OperationJob) error {
+func ClearProtection(ctx context.Context, client client.Client, instance *appsv1alpha1.PodOperation) error {
 	if !controllerutil.ContainsFinalizer(instance, appsv1alpha1.ProtectFinalizer) {
 		return nil
 	}
@@ -33,7 +33,7 @@ func ClearProtection(ctx context.Context, client client.Client, instance *appsv1
 	return client.Update(ctx, instance)
 }
 
-func ProtectOperationJob(ctx context.Context, client client.Client, instance *appsv1alpha1.OperationJob) error {
+func ProtectPodOperation(ctx context.Context, client client.Client, instance *appsv1alpha1.PodOperation) error {
 	if controllerutil.ContainsFinalizer(instance, appsv1alpha1.ProtectFinalizer) {
 		return nil
 	}

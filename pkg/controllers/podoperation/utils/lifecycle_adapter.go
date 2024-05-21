@@ -31,7 +31,7 @@ type ContainerRecreateOpsLifecycleAdapter struct{}
 
 // GetID indicates ID of one PodOpsLifecycle
 func (a *ContainerRecreateOpsLifecycleAdapter) GetID() string {
-	return "operationjob"
+	return "podoperation"
 }
 
 // GetType indicates type for an Operator
