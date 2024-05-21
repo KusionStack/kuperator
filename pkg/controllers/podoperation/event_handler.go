@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package operationjob
+package podoperation
 
 import (
 	"context"
@@ -55,23 +55,23 @@ func (p *PodHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInt
 }
 
 func enqueueForObject(c client.Client, pod *corev1.Pod, q *workqueue.RateLimitingInterface) {
-	if ojNames, owned := controlledByOperationJob(c, pod); owned {
-		for ojName := range ojNames {
+	if pooNames, owned := controlledByPodOperation(c, pod); owned {
+		for pooName := range pooNames {
 			(*q).Add(reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: pod.Namespace,
-					Name:      ojName,
+					Name:      pooName,
 				},
 			})
 		}
 	}
 }
 
-func controlledByOperationJob(c client.Client, pod *corev1.Pod) (sets.String, bool) {
-	ojNames := sets.String{}
-	ojList := &appsv1alpha1.OperationJobList{}
-	if listErr := c.List(context.TODO(), ojList, client.InNamespace(pod.Namespace)); listErr != nil {
-		return ojNames, false
+func controlledByPodOperation(c client.Client, pod *corev1.Pod) (sets.String, bool) {
+	pooNames := sets.String{}
+	pooList := &appsv1alpha1.PodOperationList{}
+	if listErr := c.List(context.TODO(), pooList, client.InNamespace(pod.Namespace)); listErr != nil {
+		return pooNames, false
 	}
 
 	if pod.Labels == nil {
@@ -79,24 +79,24 @@ func controlledByOperationJob(c client.Client, pod *corev1.Pod) (sets.String, bo
 	}
 	originPodName := pod.Labels[appsv1alpha1.PodReplacePairOriginName]
 
-	for _, oj := range ojList.Items {
-		for _, target := range oj.Spec.Targets {
+	for _, poo := range pooList.Items {
+		for _, target := range poo.Spec.Targets {
 			if pod.Name == target.PodName {
-				ojNames.Insert(oj.Name)
+				pooNames.Insert(poo.Name)
 				break
 			}
 			if originPodName == target.PodName {
-				ojNames.Insert(oj.Name)
+				pooNames.Insert(poo.Name)
 				break
 			}
 		}
-		for _, status := range oj.Status.PodDetails {
+		for _, status := range poo.Status.PodDetails {
 			if status.ExtraInfo != nil && status.ExtraInfo[appsv1alpha1.ReplacePodNameKey] == pod.Name {
-				ojNames.Insert(oj.Name)
+				pooNames.Insert(poo.Name)
 				break
 			}
 		}
 	}
 
-	return ojNames, ojNames.Len() > 0
+	return pooNames, pooNames.Len() > 0
 }

@@ -27,13 +27,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
-	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
+	. "kusionstack.io/operating/pkg/controllers/podoperation/opscontrol"
 	ctrlutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 	operatingutils "kusionstack.io/operating/pkg/utils"
 )
 
-func MarkOperationJobFailed(instance *appsv1alpha1.OperationJob) {
+func MarkPodOperationFailed(instance *appsv1alpha1.PodOperation) {
 	if instance.Status.Progress != appsv1alpha1.OperationProgressCompleted {
 		now := ctrlutils.FormatTimeNow()
 		instance.Status.Progress = appsv1alpha1.OperationProgressFailed
@@ -41,7 +41,7 @@ func MarkOperationJobFailed(instance *appsv1alpha1.OperationJob) {
 	}
 }
 
-func MapOpsStatusByPod(instance *appsv1alpha1.OperationJob) map[string]*appsv1alpha1.PodOpsStatus {
+func MapOpsStatusByPod(instance *appsv1alpha1.PodOperation) map[string]*appsv1alpha1.PodOpsStatus {
 	opsStatusMap := make(map[string]*appsv1alpha1.PodOpsStatus)
 	for i, opsStatus := range instance.Status.PodDetails {
 		opsStatusMap[opsStatus.PodName] = &instance.Status.PodDetails[i]
@@ -82,7 +82,7 @@ func ParsePhaseByCrrPhase(phase kruisev1alpha1.ContainerRecreateRequestPhase) ap
 	}
 }
 
-func GetCollaSetByPod(ctx context.Context, client client.Client, instance *appsv1alpha1.OperationJob, candidate *OpsCandidate) (*appsv1alpha1.CollaSet, error) {
+func GetCollaSetByPod(ctx context.Context, client client.Client, instance *appsv1alpha1.PodOperation, candidate *OpsCandidate) (*appsv1alpha1.CollaSet, error) {
 	var collaSet appsv1alpha1.CollaSet
 	ownedByCollaSet := false
 

@@ -23,8 +23,8 @@ import (
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
-	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
-	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
+	. "kusionstack.io/operating/pkg/controllers/podoperation/opscontrol"
+	podoperationutils "kusionstack.io/operating/pkg/controllers/podoperation/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 )
 
@@ -41,14 +41,14 @@ type ContainerRecreateControl struct {
 
 func (p *ContainerRecreateControl) ListTargets() ([]*OpsCandidate, error) {
 	var candidates []*OpsCandidate
-	podOpsStatusMap := ojutils.MapOpsStatusByPod(p.OperationJob)
-	for _, target := range p.OperationJob.Spec.Targets {
+	podOpsStatusMap := podoperationutils.MapOpsStatusByPod(p.PodOperation)
+	for _, target := range p.PodOperation.Spec.Targets {
 		var candidate OpsCandidate
 		var pod corev1.Pod
 
 		// fulfil pod
 		candidate.PodName = target.PodName
-		err := p.Client.Get(p.Context, types.NamespacedName{Namespace: p.OperationJob.Namespace, Name: target.PodName}, &pod)
+		err := p.Client.Get(p.Context, types.NamespacedName{Namespace: p.PodOperation.Namespace, Name: target.PodName}, &pod)
 		if err == nil {
 			candidate.Pod = &pod
 		} else if errors.IsNotFound(err) {
@@ -100,25 +100,25 @@ func (p *ContainerRecreateControl) OperateTarget(candidate *OpsCandidate) error 
 	}
 
 	// skip if candidate ops finished, or pod and containers do not exist
-	if IsCandidateOpsFinished(candidate) || candidate.Pod == nil || !ojutils.ContainerExistsInPod(candidate.Pod, candidate.Containers) {
+	if IsCandidateOpsFinished(candidate) || candidate.Pod == nil || !podoperationutils.ContainerExistsInPod(candidate.Pod, candidate.Containers) {
 		return nil
 	}
 
 	isDuringUpdatingOps := podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, candidate.Pod)
-	isDuringRecreateOps := podopslifecycle.IsDuringOps(ojutils.RecreateOpsLifecycleAdapter, candidate.Pod)
+	isDuringRecreateOps := podopslifecycle.IsDuringOps(podoperationutils.RecreateOpsLifecycleAdapter, candidate.Pod)
 
 	// if Pod is during UpdateOpsLifecycle, fail this recreation
 	if isDuringUpdatingOps {
 		MarkCandidateAsFailed(candidate, "Pod is during update")
-		ojutils.MarkOperationJobFailed(p.OperationJob)
+		podoperationutils.MarkPodOperationFailed(p.PodOperation)
 		// release target and cancel RecreateOpsLifecycle if during RecreateOpsLifecycle
 		if isDuringRecreateOps {
-			err := p.Handler.ReleasePod(p.Context, p.Client, p.OperationJob, candidate)
+			err := p.Handler.ReleasePod(p.Context, p.Client, p.PodOperation, candidate)
 			if err != nil {
 				return err
 			}
 			p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "CancelContainerRecreate", "try to cancel PodOpsLifecycle for recreating Container of Pod")
-			return ojutils.CancelOpsLifecycle(p.Context, p.Client, ojutils.RecreateOpsLifecycleAdapter, candidate.Pod)
+			return podoperationutils.CancelOpsLifecycle(p.Context, p.Client, podoperationutils.RecreateOpsLifecycleAdapter, candidate.Pod)
 		}
 		return nil
 	}
@@ -126,24 +126,24 @@ func (p *ContainerRecreateControl) OperateTarget(candidate *OpsCandidate) error 
 	// if Pod is not during RecreateOpsLifecycle, trigger it
 	if !isDuringRecreateOps {
 		p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "ConainerRecreateLifecycle", "try to begin PodOpsLifecycle for recreating Container of Pod")
-		if err := ojutils.BeginRecreateLifecycle(p.Client, ojutils.RecreateOpsLifecycleAdapter, candidate.Pod); err != nil {
+		if err := podoperationutils.BeginRecreateLifecycle(p.Client, podoperationutils.RecreateOpsLifecycleAdapter, candidate.Pod); err != nil {
 			return err
 		}
 	}
 
 	// if Pod is allowed to recreate, try to do restart
-	_, allowed := podopslifecycle.AllowOps(ojutils.RecreateOpsLifecycleAdapter, 0, candidate.Pod)
+	_, allowed := podopslifecycle.AllowOps(podoperationutils.RecreateOpsLifecycleAdapter, 0, candidate.Pod)
 	if allowed {
-		err := p.Handler.DoRestartContainers(p.Context, p.Client, p.OperationJob, candidate, candidate.Containers)
+		err := p.Handler.DoRestartContainers(p.Context, p.Client, p.PodOperation, candidate, candidate.Containers)
 		if err != nil {
 			return err
 		}
 	}
 
 	// if CRR completed or during updating opsLifecycle, try to finish Recreate PodOpsLifeCycle
-	finished := p.Handler.IsRestartFinished(p.Context, p.Client, p.OperationJob, candidate)
+	finished := p.Handler.IsRestartFinished(p.Context, p.Client, p.PodOperation, candidate)
 	if finished && isDuringRecreateOps {
-		if err := ojutils.FinishRecreateLifecycle(p.Client, ojutils.RecreateOpsLifecycleAdapter, candidate.Pod); err != nil {
+		if err := podoperationutils.FinishRecreateLifecycle(p.Client, podoperationutils.RecreateOpsLifecycleAdapter, candidate.Pod); err != nil {
 			return err
 		}
 		p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "RecreateFinished", "pod %s/%s recreate finished", candidate.Pod.Namespace, candidate.Pod.Name)
@@ -168,13 +168,13 @@ func (p *ContainerRecreateControl) FulfilPodOpsStatus(candidate *OpsCandidate) e
 		return nil
 	}
 
-	if !ojutils.ContainerExistsInPod(candidate.Pod, candidate.Containers) {
+	if !podoperationutils.ContainerExistsInPod(candidate.Pod, candidate.Containers) {
 		MarkCandidateAsFailed(candidate, "Container not found")
 		return nil
 	}
 
 	// fulfil extraInfo
-	p.Handler.FulfilExtraInfo(p.Context, p.Client, p.OperationJob, candidate, &candidate.PodOpsStatus.ExtraInfo)
+	p.Handler.FulfilExtraInfo(p.Context, p.Client, p.PodOperation, candidate, &candidate.PodOpsStatus.ExtraInfo)
 
 	// calculate restart progress of containerOpsStatus
 	recreatingCount := 0
@@ -184,7 +184,7 @@ func (p *ContainerRecreateControl) FulfilPodOpsStatus(candidate *OpsCandidate) e
 	var containerDetails []appsv1alpha1.ContainerOpsStatus
 	for i := range candidate.PodOpsStatus.ContainerDetails {
 		containerDetail := candidate.PodOpsStatus.ContainerDetails[i]
-		containerDetail.Phase = p.Handler.GetContainerOpsPhase(p.Context, p.Client, p.OperationJob, candidate, containerDetail.ContainerName)
+		containerDetail.Phase = p.Handler.GetContainerOpsPhase(p.Context, p.Client, p.PodOperation, candidate, containerDetail.ContainerName)
 		if containerDetail.Phase == appsv1alpha1.ContainerPhaseRecreating {
 			recreatingCount++
 		} else if containerDetail.Phase == appsv1alpha1.ContainerPhaseSucceed {
@@ -217,13 +217,13 @@ func (p *ContainerRecreateControl) FulfilPodOpsStatus(candidate *OpsCandidate) e
 
 func (p *ContainerRecreateControl) ReleaseTarget(candidate *OpsCandidate) error {
 	// 1. release target
-	if err := p.Handler.ReleasePod(p.Context, p.Client, p.OperationJob, candidate); err != nil {
+	if err := p.Handler.ReleasePod(p.Context, p.Client, p.PodOperation, candidate); err != nil {
 		return err
 	}
 
 	// 2. cancel lifecycle if pod is during recreate lifecycle
-	if candidate.Pod != nil && podopslifecycle.IsDuringOps(ojutils.RecreateOpsLifecycleAdapter, candidate.Pod) {
-		return ojutils.CancelOpsLifecycle(p.Context, p.Client, ojutils.RecreateOpsLifecycleAdapter, candidate.Pod)
+	if candidate.Pod != nil && podopslifecycle.IsDuringOps(podoperationutils.RecreateOpsLifecycleAdapter, candidate.Pod) {
+		return podoperationutils.CancelOpsLifecycle(p.Context, p.Client, podoperationutils.RecreateOpsLifecycleAdapter, candidate.Pod)
 	}
 	return nil
 }

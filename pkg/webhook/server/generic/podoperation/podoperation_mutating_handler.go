@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package operationjob
+package podoperation
 
 import (
 	"context"
@@ -49,11 +49,11 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 		return admission.Allowed("")
 	}
 
-	var instance, old appsv1alpha1.OperationJob
+	var instance, old appsv1alpha1.PodOperation
 
 	logger := h.Logger.WithValues(
 		"op", req.Operation,
-		"operationjob", commonutils.AdmissionRequestObjectKeyString(req),
+		"podoperation", commonutils.AdmissionRequestObjectKeyString(req),
 	)
 
 	if err := h.Decoder.Decode(req, &instance); err != nil {
@@ -92,8 +92,8 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 	if instance.ObjectMeta.Annotations == nil {
 		instance.ObjectMeta.Annotations = make(map[string]string)
 	}
-	if _, exist := instance.ObjectMeta.Annotations[appsv1alpha1.AnnotationOperationJobRecreateMethod]; !exist {
-		instance.ObjectMeta.Annotations[appsv1alpha1.AnnotationOperationJobRecreateMethod] = string(appsv1alpha1.CRRKey)
+	if _, exist := instance.ObjectMeta.Annotations[appsv1alpha1.AnnotationPodOperationRecreateMethod]; !exist {
+		instance.ObjectMeta.Annotations[appsv1alpha1.AnnotationPodOperationRecreateMethod] = string(appsv1alpha1.CRRKey)
 		marshalled, err := json.Marshal(instance)
 		if err != nil {
 			logger.Error(err, "failed to marshal collaset to json")

@@ -22,15 +22,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
+	"kusionstack.io/operating/pkg/controllers/podoperation/opscontrol"
 )
 
 type RestartHandler interface {
-	DoRestartContainers(context.Context, client.Client, *appsv1alpha1.OperationJob, *opscontrol.OpsCandidate, []string) error
-	IsRestartFinished(context.Context, client.Client, *appsv1alpha1.OperationJob, *opscontrol.OpsCandidate) bool
-	GetContainerOpsPhase(context.Context, client.Client, *appsv1alpha1.OperationJob, *opscontrol.OpsCandidate, string) appsv1alpha1.ContainerPhase
-	FulfilExtraInfo(context.Context, client.Client, *appsv1alpha1.OperationJob, *opscontrol.OpsCandidate, *map[appsv1alpha1.ExtraInfoKey]string)
-	ReleasePod(context.Context, client.Client, *appsv1alpha1.OperationJob, *opscontrol.OpsCandidate) error
+	DoRestartContainers(context.Context, client.Client, *appsv1alpha1.PodOperation, *opscontrol.OpsCandidate, []string) error
+	IsRestartFinished(context.Context, client.Client, *appsv1alpha1.PodOperation, *opscontrol.OpsCandidate) bool
+	GetContainerOpsPhase(context.Context, client.Client, *appsv1alpha1.PodOperation, *opscontrol.OpsCandidate, string) appsv1alpha1.ContainerPhase
+	FulfilExtraInfo(context.Context, client.Client, *appsv1alpha1.PodOperation, *opscontrol.OpsCandidate, *map[appsv1alpha1.ExtraInfoKey]string)
+	ReleasePod(context.Context, client.Client, *appsv1alpha1.PodOperation, *opscontrol.OpsCandidate) error
 }
 
 var registry map[string]RestartHandler

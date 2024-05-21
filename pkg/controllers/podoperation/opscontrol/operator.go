@@ -14,12 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package opscontrol
 
 import (
-	"kusionstack.io/operating/pkg/controllers/operationjob"
+	"context"
+
+	"github.com/go-logr/logr"
+	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
-func init() {
-	AddToManagerFuncs = append(AddToManagerFuncs, operationjob.Add)
+type ActionOperator interface {
+	ListTargets() ([]*OpsCandidate, error)
+	OperateTarget(*OpsCandidate) error
+	FulfilPodOpsStatus(*OpsCandidate) error
+	ReleaseTarget(*OpsCandidate) error
+}
+
+type OperateInfo struct {
+	Context  context.Context
+	Logger   logr.Logger
+	Client   client.Client
+	Recorder record.EventRecorder
+	*appsv1alpha1.PodOperation
 }

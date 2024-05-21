@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package operationjob
+package podoperation
 
 import (
 	"context"
@@ -45,8 +45,8 @@ import (
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset"
-	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 	"kusionstack.io/operating/pkg/controllers/poddeletion"
+	pooutils "kusionstack.io/operating/pkg/controllers/podoperation/utils"
 	"kusionstack.io/operating/pkg/utils/inject"
 )
 
@@ -60,7 +60,7 @@ var (
 	c      client.Client
 )
 
-var _ = Describe("operationjob controller", func() {
+var _ = Describe("podoperation controller", func() {
 
 	It("[recreate] reconcile", func() {
 		testcase := "test-recreate"
@@ -68,12 +68,12 @@ var _ = Describe("operationjob controller", func() {
 		cs := createCollaSetWithReplicas("foo", testcase, 2)
 		podNames := getPodNamesFromCollaSet(cs)
 
-		oj := &appsv1alpha1.OperationJob{
+		poo := &appsv1alpha1.PodOperation{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testcase,
 				Name:      "foo",
 			},
-			Spec: appsv1alpha1.OperationJobSpec{
+			Spec: appsv1alpha1.PodOperationSpec{
 				Action: appsv1alpha1.ActionRecreate,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
@@ -86,7 +86,7 @@ var _ = Describe("operationjob controller", func() {
 			},
 		}
 
-		Expect(c.Create(ctx, oj)).Should(BeNil())
+		Expect(c.Create(ctx, poo)).Should(BeNil())
 
 		// mock lifecycle pod is allowed to recreate
 		podList := &corev1.PodList{}
@@ -97,7 +97,7 @@ var _ = Describe("operationjob controller", func() {
 		for i := range podList.Items {
 			pod := podList.Items[i]
 			Expect(updatePodWithRetry(pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, ojutils.RecreateOpsLifecycleAdapter.GetID())
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, pooutils.RecreateOpsLifecycleAdapter.GetID())
 				pod.Labels[labelOperate] = "true"
 				return true
 			})).Should(BeNil())
@@ -106,7 +106,7 @@ var _ = Describe("operationjob controller", func() {
 		// wait for crr created
 		var crrList kruisev1alpha1.ContainerRecreateRequestList
 		Eventually(func() int {
-			Expect(c.List(ctx, &crrList, client.InNamespace(oj.Namespace))).Should(BeNil())
+			Expect(c.List(ctx, &crrList, client.InNamespace(poo.Namespace))).Should(BeNil())
 			return len(crrList.Items)
 		}, time.Second*10, time.Second).Should(BeEquivalentTo(2))
 
@@ -129,7 +129,7 @@ var _ = Describe("operationjob controller", func() {
 		}
 
 		// wait for replace completed
-		assertJobProgressCompleted(oj, time.Second*5)
+		assertPodOperationProgressCompleted(poo, time.Second*5)
 	})
 
 	It("[recreate] by partition", func() {
@@ -138,12 +138,12 @@ var _ = Describe("operationjob controller", func() {
 		cs := createCollaSetWithReplicas("foo", testcase, 3)
 		podNames := getPodNamesFromCollaSet(cs)
 
-		oj := &appsv1alpha1.OperationJob{
+		poo := &appsv1alpha1.PodOperation{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testcase,
 				Name:      "foo",
 			},
-			Spec: appsv1alpha1.OperationJobSpec{
+			Spec: appsv1alpha1.PodOperationSpec{
 				Action:    appsv1alpha1.ActionRecreate,
 				Partition: int32Pointer(0),
 				Targets: []appsv1alpha1.PodOpsTarget{
@@ -160,7 +160,7 @@ var _ = Describe("operationjob controller", func() {
 			},
 		}
 
-		Expect(c.Create(ctx, oj)).Should(BeNil())
+		Expect(c.Create(ctx, poo)).Should(BeNil())
 
 		// mock lifecycle pod is allowed to recreate
 		podList := &corev1.PodList{}
@@ -171,7 +171,7 @@ var _ = Describe("operationjob controller", func() {
 		for i := range podList.Items {
 			pod := podList.Items[i]
 			Expect(updatePodWithRetry(pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, ojutils.RecreateOpsLifecycleAdapter.GetID())
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, pooutils.RecreateOpsLifecycleAdapter.GetID())
 				pod.Labels[labelOperate] = "true"
 				return true
 			})).Should(BeNil())
@@ -180,17 +180,17 @@ var _ = Describe("operationjob controller", func() {
 		for _, partition := range []int32{0, 1, 2, 3} {
 			// update partition
 			Eventually(func() error {
-				return c.Get(context.TODO(), types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
+				return c.Get(context.TODO(), types.NamespacedName{Namespace: poo.Namespace, Name: poo.Name}, poo)
 			}, time.Second*5, time.Second).Should(BeNil())
-			Expect(updateOperationJobWithRetry(oj.Namespace, oj.Name, func(job *appsv1alpha1.OperationJob) bool {
-				job.Spec.Partition = &partition
+			Expect(updatePodOperationWithRetry(poo.Namespace, poo.Name, func(podOperation *appsv1alpha1.PodOperation) bool {
+				podOperation.Spec.Partition = &partition
 				return true
 			})).Should(BeNil())
 
 			// wait for crr created
 			var crrList kruisev1alpha1.ContainerRecreateRequestList
 			Eventually(func() int {
-				Expect(c.List(ctx, &crrList, client.InNamespace(oj.Namespace))).Should(BeNil())
+				Expect(c.List(ctx, &crrList, client.InNamespace(poo.Namespace))).Should(BeNil())
 				return len(crrList.Items)
 			}, time.Second*10, time.Second).Should(BeEquivalentTo(partition))
 
@@ -213,26 +213,26 @@ var _ = Describe("operationjob controller", func() {
 			}
 
 			// assert completed replicas
-			assertCompletedReplicas(oj, partition, time.Second*5)
+			assertCompletedReplicas(poo, partition, time.Second*5)
 			if partition < 3 {
-				assertJobProgressProcessing(oj, time.Second*5)
+				assertPodOperationProgressProcessing(poo, time.Second*5)
 			}
 		}
 
 		// wait for recreate completed
-		assertJobProgressCompleted(oj, time.Second*5)
+		assertPodOperationProgressCompleted(poo, time.Second*5)
 	})
 
 	It("[recreate] non-exist pod", func() {
 		testcase := "test-recreate-non-exist-pod"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
 
-		oj := &appsv1alpha1.OperationJob{
+		poo := &appsv1alpha1.PodOperation{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testcase,
 				Name:      "foo",
 			},
-			Spec: appsv1alpha1.OperationJobSpec{
+			Spec: appsv1alpha1.PodOperationSpec{
 				Action: appsv1alpha1.ActionRecreate,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
@@ -242,10 +242,10 @@ var _ = Describe("operationjob controller", func() {
 			},
 		}
 
-		Expect(c.Create(ctx, oj)).Should(BeNil())
+		Expect(c.Create(ctx, poo)).Should(BeNil())
 
 		// wait for replace completed
-		assertJobProgressFailed(oj, time.Second*5)
+		assertPodOperationProgressFailed(poo, time.Second*5)
 	})
 
 	It("[replace] reconcile", func() {
@@ -254,12 +254,12 @@ var _ = Describe("operationjob controller", func() {
 		cs := createCollaSetWithReplicas("foo", testcase, 2)
 		podNames := getPodNamesFromCollaSet(cs)
 
-		oj := &appsv1alpha1.OperationJob{
+		poo := &appsv1alpha1.PodOperation{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testcase,
 				Name:      "foo",
 			},
-			Spec: appsv1alpha1.OperationJobSpec{
+			Spec: appsv1alpha1.PodOperationSpec{
 				Action: appsv1alpha1.OpsActionReplace,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
@@ -272,7 +272,7 @@ var _ = Describe("operationjob controller", func() {
 			},
 		}
 
-		Expect(c.Create(ctx, oj)).Should(BeNil())
+		Expect(c.Create(ctx, poo)).Should(BeNil())
 
 		// wait for new pod created
 		podList := &corev1.PodList{}
@@ -306,7 +306,7 @@ var _ = Describe("operationjob controller", func() {
 		}
 
 		// wait for replace completed
-		assertJobProgressCompleted(oj, time.Second*5)
+		assertPodOperationProgressCompleted(poo, time.Second*5)
 	})
 
 	It("[replace] by partition", func() {
@@ -315,12 +315,12 @@ var _ = Describe("operationjob controller", func() {
 		cs := createCollaSetWithReplicas("foo", testcase, 3)
 		podNames := getPodNamesFromCollaSet(cs)
 
-		oj := &appsv1alpha1.OperationJob{
+		poo := &appsv1alpha1.PodOperation{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testcase,
 				Name:      "foo",
 			},
-			Spec: appsv1alpha1.OperationJobSpec{
+			Spec: appsv1alpha1.PodOperationSpec{
 				Action:    appsv1alpha1.OpsActionReplace,
 				Partition: int32Pointer(0),
 				Targets: []appsv1alpha1.PodOpsTarget{
@@ -337,15 +337,15 @@ var _ = Describe("operationjob controller", func() {
 			},
 		}
 
-		Expect(c.Create(ctx, oj)).Should(BeNil())
+		Expect(c.Create(ctx, poo)).Should(BeNil())
 
 		for _, partition := range []int32{0, 1, 2, 3} {
 			// update partition
 			Eventually(func() error {
-				return c.Get(context.TODO(), types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
+				return c.Get(context.TODO(), types.NamespacedName{Namespace: poo.Namespace, Name: poo.Name}, poo)
 			}, time.Second*5, time.Second).Should(BeNil())
-			Expect(updateOperationJobWithRetry(oj.Namespace, oj.Name, func(job *appsv1alpha1.OperationJob) bool {
-				job.Spec.Partition = &partition
+			Expect(updatePodOperationWithRetry(poo.Namespace, poo.Name, func(podOperation *appsv1alpha1.PodOperation) bool {
+				podOperation.Spec.Partition = &partition
 				return true
 			})).Should(BeNil())
 
@@ -353,19 +353,19 @@ var _ = Describe("operationjob controller", func() {
 			podList := &corev1.PodList{}
 			if partition > 0 {
 				Eventually(func() int32 {
-					Expect(c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)).Should(BeNil())
-					return oj.Status.ProcessingReplicas
+					Expect(c.Get(ctx, types.NamespacedName{Namespace: poo.Namespace, Name: poo.Name}, poo)).Should(BeNil())
+					return poo.Status.ProcessingReplicas
 				}, time.Second*10, time.Second).Should(BeEquivalentTo(1))
 				Eventually(func() bool {
 					Expect(c.List(ctx, podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-					Expect(c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)).Should(BeNil())
+					Expect(c.Get(ctx, types.NamespacedName{Namespace: poo.Namespace, Name: poo.Name}, poo)).Should(BeNil())
 					replacingPod := 0
 					for i := range podList.Items {
 						if _, exist := podList.Items[i].Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
 							replacingPod++
 						}
 					}
-					return oj.Status.ProcessingReplicas == int32(replacingPod)
+					return poo.Status.ProcessingReplicas == int32(replacingPod)
 				}, time.Second*10, time.Second).Should(BeTrue())
 			}
 
@@ -395,26 +395,26 @@ var _ = Describe("operationjob controller", func() {
 			}
 
 			// assert completed replicas
-			assertCompletedReplicas(oj, partition, 5*time.Second)
+			assertCompletedReplicas(poo, partition, 5*time.Second)
 			if partition < 3 {
-				assertJobProgressProcessing(oj, time.Second*5)
+				assertPodOperationProgressProcessing(poo, time.Second*5)
 			}
 		}
 
 		// wait for replace completed
-		assertJobProgressCompleted(oj, time.Second*5)
+		assertPodOperationProgressCompleted(poo, time.Second*5)
 	})
 
 	It("[replace] non-exist pod", func() {
 		testcase := "test-replace-non-exist-pod"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
 
-		oj := &appsv1alpha1.OperationJob{
+		poo := &appsv1alpha1.PodOperation{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testcase,
 				Name:      "foo",
 			},
-			Spec: appsv1alpha1.OperationJobSpec{
+			Spec: appsv1alpha1.PodOperationSpec{
 				Action: appsv1alpha1.OpsActionReplace,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
@@ -424,9 +424,9 @@ var _ = Describe("operationjob controller", func() {
 			},
 		}
 
-		Expect(c.Create(ctx, oj)).Should(BeNil())
+		Expect(c.Create(ctx, poo)).Should(BeNil())
 
-		assertJobProgressCompleted(oj, time.Second*5)
+		assertPodOperationProgressCompleted(poo, time.Second*5)
 	})
 
 	It("[replace] parallel", func() {
@@ -435,12 +435,12 @@ var _ = Describe("operationjob controller", func() {
 		cs := createCollaSetWithReplicas("foo", testcase, 2)
 		podNames := getPodNamesFromCollaSet(cs)
 
-		oj1 := &appsv1alpha1.OperationJob{
+		poo1 := &appsv1alpha1.PodOperation{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testcase,
 				Name:      "foo",
 			},
-			Spec: appsv1alpha1.OperationJobSpec{
+			Spec: appsv1alpha1.PodOperationSpec{
 				Action: appsv1alpha1.OpsActionReplace,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
@@ -453,11 +453,11 @@ var _ = Describe("operationjob controller", func() {
 			},
 		}
 
-		oj2 := oj1.DeepCopy()
-		oj2.Name = "foo-copy"
+		poo2 := poo1.DeepCopy()
+		poo2.Name = "foo-copy"
 
-		Expect(c.Create(ctx, oj1)).Should(BeNil())
-		Expect(c.Create(ctx, oj2)).Should(BeNil())
+		Expect(c.Create(ctx, poo1)).Should(BeNil())
+		Expect(c.Create(ctx, poo2)).Should(BeNil())
 
 		// wait for new pod created
 		podList := &corev1.PodList{}
@@ -490,9 +490,9 @@ var _ = Describe("operationjob controller", func() {
 			})).Should(BeNil())
 		}
 
-		// wait for oj1 and oj2 both completed
-		assertJobProgressCompleted(oj1, time.Second*5)
-		assertJobProgressCompleted(oj2, time.Second*5)
+		// wait for poo1 and poo2 both completed
+		assertPodOperationProgressCompleted(poo1, time.Second*5)
+		assertPodOperationProgressCompleted(poo2, time.Second*5)
 	})
 
 	It("deadline and ttl", func() {
@@ -501,12 +501,12 @@ var _ = Describe("operationjob controller", func() {
 		cs := createCollaSetWithReplicas("foo", testcase, 2)
 		podNames := getPodNamesFromCollaSet(cs)
 
-		oj := &appsv1alpha1.OperationJob{
+		poo := &appsv1alpha1.PodOperation{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testcase,
 				Name:      "foo",
 			},
-			Spec: appsv1alpha1.OperationJobSpec{
+			Spec: appsv1alpha1.PodOperationSpec{
 				Action: appsv1alpha1.ActionRecreate,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
@@ -521,14 +521,14 @@ var _ = Describe("operationjob controller", func() {
 			},
 		}
 
-		Expect(c.Create(ctx, oj)).Should(BeNil())
+		Expect(c.Create(ctx, poo)).Should(BeNil())
 
 		// wait for replace failed after ActiveDeadlineSeconds
-		assertJobProgressFailed(oj, time.Second*10)
+		assertPodOperationProgressFailed(poo, time.Second*10)
 
-		// wait for operationJob deleted after TTL
+		// wait for operationPodOperation deleted after TTL
 		Eventually(func() bool {
-			err := c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
+			err := c.Get(ctx, types.NamespacedName{Namespace: poo.Namespace, Name: poo.Name}, poo)
 			if errors.IsNotFound(err) {
 				return true
 			} else {
@@ -540,66 +540,66 @@ var _ = Describe("operationjob controller", func() {
 
 })
 
-func assertCompletedReplicas(oj *appsv1alpha1.OperationJob, completedReplicas int32, timeout time.Duration) {
+func assertCompletedReplicas(poo *appsv1alpha1.PodOperation, completedReplicas int32, timeout time.Duration) {
 	Eventually(func() bool {
-		err := c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
+		err := c.Get(ctx, types.NamespacedName{Namespace: poo.Namespace, Name: poo.Name}, poo)
 		if errors.IsNotFound(err) {
 			return false
 		} else {
 			Expect(err).Should(BeNil())
 		}
-		return oj.Status.CompletedReplicas == completedReplicas
+		return poo.Status.CompletedReplicas == completedReplicas
 	}, timeout, time.Second).Should(BeTrue())
 }
 
-func assertJobProgressProcessing(oj *appsv1alpha1.OperationJob, timeout time.Duration) {
+func assertPodOperationProgressProcessing(poo *appsv1alpha1.PodOperation, timeout time.Duration) {
 	Eventually(func() bool {
-		err := c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
+		err := c.Get(ctx, types.NamespacedName{Namespace: poo.Namespace, Name: poo.Name}, poo)
 		if errors.IsNotFound(err) {
 			return false
 		} else {
 			Expect(err).Should(BeNil())
 		}
-		return oj.Status.Progress == appsv1alpha1.OperationProgressProcessing
+		return poo.Status.Progress == appsv1alpha1.OperationProgressProcessing
 	}, timeout, time.Second).Should(BeTrue())
 }
 
-func assertJobProgressFailed(oj *appsv1alpha1.OperationJob, timeout time.Duration) {
+func assertPodOperationProgressFailed(poo *appsv1alpha1.PodOperation, timeout time.Duration) {
 	Eventually(func() bool {
-		err := c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
+		err := c.Get(ctx, types.NamespacedName{Namespace: poo.Namespace, Name: poo.Name}, poo)
 		if errors.IsNotFound(err) {
 			return false
 		} else {
 			Expect(err).Should(BeNil())
 		}
-		return oj.Status.Progress == appsv1alpha1.OperationProgressFailed
+		return poo.Status.Progress == appsv1alpha1.OperationProgressFailed
 	}, timeout, time.Second).Should(BeTrue())
 }
 
-func assertJobProgressCompleted(oj *appsv1alpha1.OperationJob, timeout time.Duration) {
+func assertPodOperationProgressCompleted(poo *appsv1alpha1.PodOperation, timeout time.Duration) {
 	Eventually(func() bool {
-		err := c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
+		err := c.Get(ctx, types.NamespacedName{Namespace: poo.Namespace, Name: poo.Name}, poo)
 		if errors.IsNotFound(err) {
 			return false
 		} else {
 			Expect(err).Should(BeNil())
 		}
-		return oj.Status.Progress == appsv1alpha1.OperationProgressCompleted
+		return poo.Status.Progress == appsv1alpha1.OperationProgressCompleted
 	}, timeout, time.Second).Should(BeTrue())
 }
 
-func updateOperationJobWithRetry(namespace, name string, updateFn func(*appsv1alpha1.OperationJob) bool) error {
+func updatePodOperationWithRetry(namespace, name string, updateFn func(*appsv1alpha1.PodOperation) bool) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		operationJob := &appsv1alpha1.OperationJob{}
-		if err := c.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: name}, operationJob); err != nil {
+		operationPodOperation := &appsv1alpha1.PodOperation{}
+		if err := c.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: name}, operationPodOperation); err != nil {
 			return err
 		}
 
-		if !updateFn(operationJob) {
+		if !updateFn(operationPodOperation) {
 			return nil
 		}
 
-		return c.Update(ctx, operationJob)
+		return c.Update(ctx, operationPodOperation)
 	})
 }
 
@@ -727,9 +727,9 @@ func expectedStatusReplicas(c client.Client, cls *appsv1alpha1.CollaSet, schedul
 	return nil
 }
 
-func TestOperationJobController(t *testing.T) {
+func TestPodOperationController(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "OperationJobController Test Suite")
+	RunSpecs(t, "PodOperationController Test Suite")
 }
 
 func testReconcile(inner reconcile.Reconciler) (reconcile.Reconciler, chan reconcile.Request) {
@@ -780,7 +780,7 @@ var _ = BeforeSuite(func() {
 
 	var r reconcile.Reconciler
 
-	// operationJob controller
+	// operationPodOperation controller
 	r, request = testReconcile(NewReconciler(mgr))
 	err = AddToMgr(mgr, r)
 	Expect(err).NotTo(HaveOccurred())

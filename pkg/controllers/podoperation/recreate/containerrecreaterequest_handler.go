@@ -27,8 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
-	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
+	"kusionstack.io/operating/pkg/controllers/podoperation/opscontrol"
+	podoperationutils "kusionstack.io/operating/pkg/controllers/podoperation/utils"
 )
 
 type ContainerRecreateRequestHandler struct {
@@ -36,7 +36,7 @@ type ContainerRecreateRequestHandler struct {
 
 func (h *ContainerRecreateRequestHandler) DoRestartContainers(
 	ctx context.Context, client client.Client,
-	instance *appsv1alpha1.OperationJob,
+	instance *appsv1alpha1.PodOperation,
 	candidate *opscontrol.OpsCandidate, containers []string) error {
 	crr := &kruisev1alpha1.ContainerRecreateRequest{}
 	crrName := fmt.Sprintf("%s-%s", instance.Name, candidate.PodName)
@@ -56,7 +56,7 @@ func (h *ContainerRecreateRequestHandler) DoRestartContainers(
 				Namespace: instance.Namespace,
 				Name:      fmt.Sprintf("%s-%s", instance.Name, candidate.PodName),
 				OwnerReferences: []metav1.OwnerReference{
-					*metav1.NewControllerRef(instance, appsv1alpha1.GroupVersion.WithKind("OperationJob")),
+					*metav1.NewControllerRef(instance, appsv1alpha1.GroupVersion.WithKind("PodOperation")),
 				},
 			},
 			Spec: kruisev1alpha1.ContainerRecreateRequestSpec{
@@ -77,7 +77,7 @@ func (h *ContainerRecreateRequestHandler) DoRestartContainers(
 
 func (h *ContainerRecreateRequestHandler) IsRestartFinished(
 	ctx context.Context, client client.Client,
-	instance *appsv1alpha1.OperationJob, candidate *opscontrol.OpsCandidate) bool {
+	instance *appsv1alpha1.PodOperation, candidate *opscontrol.OpsCandidate) bool {
 	crr := &kruisev1alpha1.ContainerRecreateRequest{}
 	crrName := fmt.Sprintf("%s-%s", instance.Name, candidate.PodName)
 
@@ -90,7 +90,7 @@ func (h *ContainerRecreateRequestHandler) IsRestartFinished(
 
 func (h *ContainerRecreateRequestHandler) GetContainerOpsPhase(
 	ctx context.Context, client client.Client,
-	instance *appsv1alpha1.OperationJob,
+	instance *appsv1alpha1.PodOperation,
 	candidate *opscontrol.OpsCandidate, container string) appsv1alpha1.ContainerPhase {
 	crr := &kruisev1alpha1.ContainerRecreateRequest{}
 	crrName := fmt.Sprintf("%s-%s", instance.Name, candidate.PodName)
@@ -102,7 +102,7 @@ func (h *ContainerRecreateRequestHandler) GetContainerOpsPhase(
 
 	for _, state := range crr.Status.ContainerRecreateStates {
 		if state.Name == container {
-			return ojutils.ParsePhaseByCrrPhase(crr.Status.Phase)
+			return podoperationutils.ParsePhaseByCrrPhase(crr.Status.Phase)
 		}
 	}
 	return appsv1alpha1.ContainerPhasePending
@@ -110,7 +110,7 @@ func (h *ContainerRecreateRequestHandler) GetContainerOpsPhase(
 
 func (h *ContainerRecreateRequestHandler) FulfilExtraInfo(
 	ctx context.Context, client client.Client,
-	instance *appsv1alpha1.OperationJob,
+	instance *appsv1alpha1.PodOperation,
 	candidate *opscontrol.OpsCandidate, extraInfo *map[appsv1alpha1.ExtraInfoKey]string) {
 	crr := &kruisev1alpha1.ContainerRecreateRequest{}
 	crrName := fmt.Sprintf("%s-%s", instance.Name, candidate.PodName)
@@ -124,7 +124,7 @@ func (h *ContainerRecreateRequestHandler) FulfilExtraInfo(
 
 func (h *ContainerRecreateRequestHandler) ReleasePod(
 	ctx context.Context, client client.Client,
-	instance *appsv1alpha1.OperationJob,
+	instance *appsv1alpha1.PodOperation,
 	candidate *opscontrol.OpsCandidate) error {
 	crr := &kruisev1alpha1.ContainerRecreateRequest{}
 	crrName := fmt.Sprintf("%s-%s", instance.Name, candidate.PodName)

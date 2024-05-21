@@ -5,16 +5,16 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
-  name: operationjobs.apps.kusionstack.io
+  name: podoperations.apps.kusionstack.io
 spec:
   group: apps.kusionstack.io
   names:
-    kind: OperationJob
-    listKind: OperationJobList
-    plural: operationjobs
+    kind: PodOperation
+    listKind: PodOperationList
+    plural: podoperations
     shortNames:
-    - oj
-    singular: operationjob
+    - poo
+    singular: podoperation
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -27,7 +27,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: OperationJob is the Schema for the operationjobs API
+        description: PodOperation is the Schema for the podoperations API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -42,7 +42,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: OperationJobSpec defines the desired state of OperationJob
+            description: PodOperationSpec defines the desired state of PodOperation
             properties:
               TTLSecondsAfterFinished:
                 description: Limit the lifetime of an operation that has finished
@@ -67,7 +67,7 @@ spec:
               targets:
                 description: Define the operation target pods
                 items:
-                  description: PodOpsTarget defines the target pods of the OperationJob
+                  description: PodOpsTarget defines the target pods of the PodOperation
                   properties:
                     containers:
                       description: Specify the containers to restart
@@ -81,10 +81,10 @@ spec:
                 type: array
             type: object
           status:
-            description: OperationJobStatus defines the observed state of OperationJob
+            description: PodOperationStatus defines the observed state of PodOperation
             properties:
               completedReplicas:
-                description: Completed replicas of the pods involved in the OperationJob
+                description: Completed replicas of the pods involved in the PodOperation
                 format: int32
                 type: integer
               endTimestamp:
@@ -92,15 +92,15 @@ spec:
                 format: date-time
                 type: string
               failedReplicas:
-                description: failed replicas of the pods involved in the OperationJob
+                description: failed replicas of the pods involved in the PodOperation
                 format: int32
                 type: integer
               processingReplicas:
-                description: Processing replicas of the pods involved in the OperationJob
+                description: Processing replicas of the pods involved in the PodOperation
                 format: int32
                 type: integer
               progress:
-                description: Phase indicates the of the OperationJob
+                description: Phase indicates the of the PodOperation
                 type: string
               startTimestamp:
                 description: Operation start time
@@ -136,7 +136,7 @@ spec:
                   type: object
                 type: array
               totalReplicas:
-                description: Replicas of the pods involved in the OperationJob
+                description: Replicas of the pods involved in the PodOperation
                 format: int32
                 type: integer
             type: object
