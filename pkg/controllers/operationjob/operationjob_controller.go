@@ -126,10 +126,10 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 	}
 
 	if instance.DeletionTimestamp != nil {
-		ojutils.StatusUpToDateExpectation.DeleteExpectations(key)
 		if err := r.ReleaseTargetsForDeletion(ctx, instance, logger); err != nil {
 			return reconcile.Result{}, err
 		}
+		ojutils.StatusUpToDateExpectation.DeleteExpectations(key)
 		// remove finalizer from operationJob
 		return reconcile.Result{}, ojutils.ClearProtection(ctx, r.Client, instance)
 	} else if err := ojutils.ProtectOperationJob(ctx, r.Client, instance); err != nil {
