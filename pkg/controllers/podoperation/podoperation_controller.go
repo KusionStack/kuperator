@@ -126,10 +126,10 @@ func (r *ReconcilePodOperation) Reconcile(ctx context.Context, req reconcile.Req
 	}
 
 	if instance.DeletionTimestamp != nil {
-		podoperationutils.StatusUpToDateExpectation.DeleteExpectations(key)
 		if err := r.ReleaseTargetsForDeletion(ctx, instance, logger); err != nil {
 			return reconcile.Result{}, err
 		}
+		podoperationutils.StatusUpToDateExpectation.DeleteExpectations(key)
 		// remove finalizer from podOperation
 		return reconcile.Result{}, podoperationutils.ClearProtection(ctx, r.Client, instance)
 	} else if err := podoperationutils.ProtectPodOperation(ctx, r.Client, instance); err != nil {
