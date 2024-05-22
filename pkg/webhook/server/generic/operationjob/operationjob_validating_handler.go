@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
@@ -67,7 +68,7 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 	allErrors = append(allErrors, h.validateOpsType(&obj, fldPath)...)
 	allErrors = append(allErrors, h.validatePartition(&obj, &old, fldPath)...)
 	allErrors = append(allErrors, h.validateTTLAndActiveDeadline(&obj, fldPath)...)
-	allErrors = append(allErrors, h.validateOpsTarget(&obj, fldPath.Child("targets"))...)
+	allErrors = append(allErrors, h.validateOpsTarget(&obj, &old, fldPath.Child("targets"))...)
 	if len(allErrors) > 0 {
 		return admission.ValidationResponse(false, allErrors.ToAggregate().Error())
 	}
@@ -87,7 +88,7 @@ func (h *ValidatingHandler) validateOpsType(instance *appsv1alpha1.OperationJob,
 	return allErrors
 }
 
-func (h *ValidatingHandler) validateOpsTarget(instance *appsv1alpha1.OperationJob, fldPath *field.Path) field.ErrorList {
+func (h *ValidatingHandler) validateOpsTarget(instance, old *appsv1alpha1.OperationJob, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 	if len(instance.Spec.Targets) == 0 {
 		allErrors = append(allErrors, field.Invalid(fldPath, instance.Spec.Targets, "target can not be empty"))
@@ -115,6 +116,10 @@ func (h *ValidatingHandler) validateOpsTarget(instance *appsv1alpha1.OperationJo
 			allErrors = append(allErrors, field.Invalid(podFldPath, target.PodName, fmt.Sprintf("pod named %s exists multiple times", target.PodName)))
 		}
 		podSets.Insert(target.PodName)
+	}
+
+	if len(old.Spec.Targets) > 0 && !equality.Semantic.DeepEqual(instance.Spec.Targets, old.Spec.Targets) {
+		allErrors = append(allErrors, field.Invalid(fldPath, instance.Spec.Targets, "spec.targets filed is immutable"))
 	}
 
 	return allErrors
