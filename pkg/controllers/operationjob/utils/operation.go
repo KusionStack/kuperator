@@ -130,3 +130,8 @@ func FinishRecreateLifecycle(client client.Client, adapter podopslifecycle.Lifec
 	}
 	return nil
 }
+
+func IsJobFinished(instance *appsv1alpha1.OperationJob) bool {
+	return instance.Status.Progress == appsv1alpha1.OperationProgressSucceeded ||
+		instance.Status.Progress == appsv1alpha1.OperationProgressFailed
+}

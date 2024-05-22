@@ -91,6 +91,12 @@ spec:
                 description: failed pod count of the pods involved in the OperationJob
                 format: int32
                 type: integer
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed
+                  for this OperationJob. It corresponds to the OperationJob's generation,
+                  which is updated on mutation by the API Server.
+                format: int64
+                type: integer
               progress:
                 description: Phase indicates the of the OperationJob
                 type: string

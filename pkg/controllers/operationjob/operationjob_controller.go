@@ -130,27 +130,23 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 			return reconcile.Result{}, err
 		}
 		ojutils.StatusUpToDateExpectation.DeleteExpectations(key)
-		// remove finalizer from operationJob
 		return reconcile.Result{}, ojutils.ClearProtection(ctx, r.Client, instance)
 	} else if err := ojutils.ProtectOperationJob(ctx, r.Client, instance); err != nil {
 		// add finalizer on operationJob
 		return reconcile.Result{}, err
 	}
 
-	// operate targets
-	err := r.doReconcile(ctx, instance, logger)
-	if err != nil {
+	if err := r.doReconcile(ctx, instance, logger); err != nil {
 		return reconcile.Result{}, err
 	}
 
 	// handle timeout and TTL
-	cleaned, requeueAfter, err := r.ensureActiveDeadlineOrTTL(ctx, instance, logger)
-	if cleaned || err != nil {
+	jobDeleted, requeueAfter, err := r.ensureActiveDeadlineOrTTL(ctx, instance, logger)
+	if jobDeleted || err != nil {
 		return reconcile.Result{}, err
 	}
 
-	// update operationJob status
-	if err = r.updateStatus(ctx, instance); err != nil {
+	if err := r.updateStatus(ctx, instance); err != nil {
 		return reconcile.Result{}, fmt.Errorf("fail to update status of OperationJob %s: %s", req, err)
 	}
 
@@ -164,14 +160,11 @@ func (r *ReconcileOperationJob) doReconcile(ctx context.Context,
 	instance *appsv1alpha1.OperationJob,
 	logger logr.Logger) error {
 	operator := r.newOperator(ctx, instance, logger)
-
-	// list operate targets
 	candidates, err := operator.ListTargets()
 	if err != nil {
 		return err
 	}
 
-	// operate targets and fulfil podOpsStatus
 	filteredCandidates := DecideCandidateByPartition(instance, candidates)
 	for _, candidate := range filteredCandidates {
 		if err = operator.OperateTarget(candidate); err != nil {
@@ -182,92 +175,90 @@ func (r *ReconcileOperationJob) doReconcile(ctx context.Context,
 		}
 	}
 
-	// update operationJob status
-	newJobStatus, err := r.calculateStatus(instance, candidates)
-	instance.Status = *newJobStatus
-	return err
+	instance.Status = r.calculateStatus(instance, candidates)
+	return nil
 }
 
 func (r *ReconcileOperationJob) calculateStatus(
 	instance *appsv1alpha1.OperationJob,
-	candidates []*OpsCandidate) (jobStatus *appsv1alpha1.OperationJobStatus, err error) {
+	candidates []*OpsCandidate) (jobStatus appsv1alpha1.OperationJobStatus) {
 	now := ctrlutils.FormatTimeNow()
-	jobStatus = &appsv1alpha1.OperationJobStatus{
-		StartTimestamp: instance.Status.StartTimestamp,
-		EndTimestamp:   instance.Status.EndTimestamp,
-		Progress:       instance.Status.Progress,
+	jobStatus = appsv1alpha1.OperationJobStatus{
+		StartTimestamp:     instance.Status.StartTimestamp,
+		EndTimestamp:       instance.Status.EndTimestamp,
+		Progress:           instance.Status.Progress,
+		ObservedGeneration: instance.Generation,
 	}
 
-	// set target ops details
 	for _, candidate := range candidates {
 		jobStatus.PodDetails = append(jobStatus.PodDetails, *candidate.PodOpsStatus)
 	}
 
-	// set replicas info
 	var totalPodCount, succeededPodCount, failedPodCount, pendingPodCount int32
 	for _, podDetail := range jobStatus.PodDetails {
 		totalPodCount++
+
 		if podDetail.Progress == appsv1alpha1.OperationProgressFailed {
 			failedPodCount++
-		} else if podDetail.Progress == appsv1alpha1.OperationProgressSucceeded {
+		}
+
+		if podDetail.Progress == appsv1alpha1.OperationProgressSucceeded {
 			succeededPodCount++
-		} else if podDetail.Progress == appsv1alpha1.OperationProgressPending {
+		}
+
+		if podDetail.Progress == appsv1alpha1.OperationProgressPending {
 			pendingPodCount++
 		}
+
 	}
+
+	if !ojutils.IsJobFinished(&appsv1alpha1.OperationJob{Status: jobStatus}) {
+		jobStatus.Progress = appsv1alpha1.OperationProgressProcessing
+
+		if pendingPodCount == totalPodCount {
+			jobStatus.Progress = appsv1alpha1.OperationProgressPending
+		}
+
+		if succeededPodCount+failedPodCount == totalPodCount {
+			if failedPodCount > 0 {
+				jobStatus.Progress = appsv1alpha1.OperationProgressFailed
+			} else {
+				jobStatus.Progress = appsv1alpha1.OperationProgressSucceeded
+			}
+
+			if jobStatus.EndTimestamp == nil {
+				jobStatus.EndTimestamp = &now
+			}
+		}
+	}
+
 	jobStatus.TotalPodCount = totalPodCount
 	jobStatus.FailedPodCount = failedPodCount
 	jobStatus.SucceededPodCount = succeededPodCount
-
-	// skip if ops finished
-	if jobStatus.Progress == appsv1alpha1.OperationProgressSucceeded ||
-		jobStatus.Progress == appsv1alpha1.OperationProgressFailed {
-		return
-	}
-
-	// set progress of the job
-	if succeededPodCount+failedPodCount == totalPodCount {
-		if failedPodCount > 0 {
-			jobStatus.Progress = appsv1alpha1.OperationProgressFailed
-		} else {
-			jobStatus.Progress = appsv1alpha1.OperationProgressSucceeded
-		}
-	} else if pendingPodCount == totalPodCount {
-		jobStatus.Progress = appsv1alpha1.OperationProgressPending
-	} else {
-		jobStatus.Progress = appsv1alpha1.OperationProgressProcessing
-	}
-
-	if jobStatus.EndTimestamp == nil && (succeededPodCount+failedPodCount == totalPodCount) {
-		jobStatus.EndTimestamp = &now
-	}
 	return
 }
 
-func (r *ReconcileOperationJob) updateStatus(ctx context.Context, instance *appsv1alpha1.OperationJob) error {
+func (r *ReconcileOperationJob) updateStatus(ctx context.Context, newJob *appsv1alpha1.OperationJob) error {
 	oldJob := &appsv1alpha1.OperationJob{}
-	if err := r.Client.Get(ctx, types.NamespacedName{
-		Namespace: instance.Namespace,
-		Name:      instance.Name,
-	}, oldJob); err != nil {
+	if err := r.Client.Get(ctx, types.NamespacedName{Namespace: newJob.Namespace, Name: newJob.Name}, oldJob); err != nil {
 		return err
 	}
 
-	newJobStatus := instance.Status
-	if equality.Semantic.DeepEqual(oldJob.Status, newJobStatus) {
+	if equality.Semantic.DeepEqual(oldJob.Status, newJob.Status) {
 		return nil
 	}
 
-	err := ojutils.StatusUpToDateExpectation.ExpectUpdate(utils.ObjectKeyString(instance), instance.ResourceVersion)
-	if err != nil {
+	if err := ojutils.StatusUpToDateExpectation.ExpectUpdate(utils.ObjectKeyString(newJob), newJob.ResourceVersion); err != nil {
 		return err
 	}
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		oldJob.Status = newJobStatus
+
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		oldJob.Status = newJob.Status
 		return r.Client.Status().Update(ctx, oldJob)
-	})
-	if err != nil {
-		ojutils.StatusUpToDateExpectation.DeleteExpectations(utils.ObjectKeyString(instance))
+	}); err != nil {
+		ojutils.StatusUpToDateExpectation.DeleteExpectations(utils.ObjectKeyString(newJob))
+		return err
 	}
-	return err
+
+	return nil
 }

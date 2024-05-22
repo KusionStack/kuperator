@@ -84,6 +84,11 @@ type PodOpsTarget struct {
 
 // OperationJobStatus defines the observed state of OperationJob
 type OperationJobStatus struct {
+	// ObservedGeneration is the most recent generation observed for this OperationJob. It corresponds to the
+	// OperationJob's generation, which is updated on mutation by the API Server.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// Phase indicates the of the OperationJob
 	// +optional
 	Progress OperationProgress `json:"progress,omitempty"`
