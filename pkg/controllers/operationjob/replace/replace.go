@@ -40,8 +40,7 @@ func (p *PodReplaceControl) ListTargets() ([]*OpsCandidate, error) {
 	podOpsStatusMap := ojutils.MapOpsStatusByPod(p.OperationJob)
 	for _, target := range p.OperationJob.Spec.Targets {
 		var candidate OpsCandidate
-		var originPod, replaceNewPod corev1.Pod
-		var replaceIndicated, replaceByReplaceUpdate, replaceNewPodExists bool
+		var originPod corev1.Pod
 
 		// fulfil origin pod
 		candidate.PodName = target.PodName
@@ -54,29 +53,13 @@ func (p *PodReplaceControl) ListTargets() ([]*OpsCandidate, error) {
 			return candidates, err
 		}
 
-		// parse replace information from origin pod
-		if candidate.Pod != nil {
-			_, replaceIndicated = candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
-			_, replaceByReplaceUpdate = candidate.Pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
-			_, replaceNewPodExists = candidate.Pod.Labels[appsv1alpha1.PodReplacePairNewId]
-		}
-
 		// fulfil or initialize opsStatus and replaceNewPod
 		if opsStatus, exist := podOpsStatusMap[target.PodName]; exist {
 			candidate.PodOpsStatus = opsStatus
-			if newPodName, exist := opsStatus.ExtraInfo[appsv1alpha1.ReplacePodNameKey]; exist {
-				err := p.Client.Get(p.Context, types.NamespacedName{Namespace: p.OperationJob.Namespace, Name: newPodName}, &replaceNewPod)
-				if err != nil {
-					return candidates, err
-				}
-				candidate.ReplaceNewPod = &replaceNewPod
-				replaceNewPodExists = true
-			}
 		} else {
 			candidate.PodOpsStatus = &appsv1alpha1.PodOpsStatus{
-				PodName:   target.PodName,
-				Progress:  appsv1alpha1.OperationProgressPending,
-				ExtraInfo: map[appsv1alpha1.ExtraInfoKey]string{},
+				PodName:  target.PodName,
+				Progress: appsv1alpha1.OperationProgressPending,
 			}
 		}
 
@@ -86,9 +69,6 @@ func (p *PodReplaceControl) ListTargets() ([]*OpsCandidate, error) {
 			return candidates, err
 		}
 		candidate.CollaSet = collaset
-
-		// fulfil ReplaceTriggered
-		candidate.ReplaceTriggered = replaceIndicated || replaceByReplaceUpdate || replaceNewPodExists
 
 		candidates = append(candidates, &candidate)
 	}
@@ -107,8 +87,19 @@ func (p *PodReplaceControl) OperateTarget(candidate *OpsCandidate) error {
 		return nil
 	}
 
-	// label pod to trigger replace if not started
-	if !candidate.ReplaceTriggered && candidate.Pod != nil {
+	if candidate.Pod == nil {
+		return nil
+	}
+
+	// parse replace information from origin pod
+	var replaceIndicated, replaceByReplaceUpdate, replaceNewPodExists bool
+	_, replaceIndicated = candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
+	_, replaceByReplaceUpdate = candidate.Pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
+	_, replaceNewPodExists = candidate.Pod.Labels[appsv1alpha1.PodReplacePairNewId]
+
+	// label pod to trigger replace
+	replaceTriggered := replaceIndicated || replaceByReplaceUpdate || replaceNewPodExists
+	if !replaceTriggered {
 		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, true)))
 		if err := p.Client.Patch(p.Context, candidate.Pod, patch); err != nil {
 			return fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %s", candidate.Pod.Namespace, candidate.Pod.Name, err)
@@ -123,27 +114,24 @@ func (p *PodReplaceControl) FulfilPodOpsStatus(candidate *OpsCandidate) error {
 		return nil
 	}
 
-	// try to fulfil ExtraInfo["ReplaceNewPodName"]
+	// try to find replaceNewPod
 	if candidate.Pod != nil && candidate.CollaSet != nil {
 		newPodId, exist := candidate.Pod.Labels[appsv1alpha1.PodReplacePairNewId]
-		if exist && candidate.PodOpsStatus.ExtraInfo[appsv1alpha1.ReplacePodNameKey] == "" {
+		if exist {
 			filteredPods, err := p.PodControl.GetFilteredPods(candidate.CollaSet.Spec.Selector, candidate.CollaSet)
 			if err != nil {
 				return err
 			}
-			for _, pod := range filteredPods {
-				if newPodId == pod.Labels[appsv1alpha1.PodInstanceIDLabelKey] {
-					if candidate.PodOpsStatus.ExtraInfo == nil {
-						candidate.PodOpsStatus.ExtraInfo = make(map[appsv1alpha1.ExtraInfoKey]string)
-					}
-					candidate.ReplaceNewPod = pod
-					candidate.PodOpsStatus.ExtraInfo[appsv1alpha1.ReplacePodNameKey] = pod.Name
+			for _, newPod := range filteredPods {
+				if newPodId == newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] {
+					p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "ReplaceNewPod", "replace by pod %s with operationjob %s", candidate.PodName, p.OperationJob.Name)
+					p.Recorder.Eventf(newPod, corev1.EventTypeNormal, "ReplaceOriginPod", "replace pod %s with operationjob %s", newPod.Name, p.OperationJob.Name)
 				}
 			}
 		}
 	}
 
-	// pod is deleted by others or not exist, mark as completed
+	// origin pod is deleted not exist, mark as succeeded
 	if candidate.Pod == nil {
 		candidate.PodOpsStatus.Progress = appsv1alpha1.OperationProgressSucceeded
 	} else {

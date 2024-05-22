@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/operationjob/recreate"
 	commonutils "kusionstack.io/operating/pkg/utils"
 	"kusionstack.io/operating/pkg/utils/mixin"
 )
@@ -78,14 +79,14 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 		if _, exist := currDetailMap[podName]; !exist {
 			return admission.Denied(fmt.Sprintf("not allowed to remove pod target %s", podName))
 		}
-		if instance.Spec.Action == appsv1alpha1.ActionRecreate {
+		if instance.Spec.Action == appsv1alpha1.OpsActionRecreate {
 			if !stringArrayEqual(currDetailMap[podName], containers) {
 				return admission.Denied(fmt.Sprintf("containers list in target is immutable %v", containers))
 			}
 		}
 	}
 
-	if instance.Spec.Action != appsv1alpha1.ActionRecreate {
+	if instance.Spec.Action != appsv1alpha1.OpsActionRecreate {
 		return admission.Allowed("")
 	}
 
@@ -93,7 +94,7 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 		instance.ObjectMeta.Annotations = make(map[string]string)
 	}
 	if _, exist := instance.ObjectMeta.Annotations[appsv1alpha1.AnnotationOperationJobRecreateMethod]; !exist {
-		instance.ObjectMeta.Annotations[appsv1alpha1.AnnotationOperationJobRecreateMethod] = string(appsv1alpha1.CRRKey)
+		instance.ObjectMeta.Annotations[appsv1alpha1.AnnotationOperationJobRecreateMethod] = recreate.KruiseCcontainerRecreateRequest
 		marshalled, err := json.Marshal(instance)
 		if err != nil {
 			logger.Error(err, "failed to marshal collaset to json")

@@ -28,7 +28,6 @@ import (
 type RestartHandler interface {
 	DoRestartContainers(context.Context, client.Client, *appsv1alpha1.OperationJob, *opscontrol.OpsCandidate, []string) error
 	GetRestartProgress(context.Context, client.Client, *appsv1alpha1.OperationJob, *opscontrol.OpsCandidate) appsv1alpha1.OperationProgress
-	FulfilExtraInfo(context.Context, client.Client, *appsv1alpha1.OperationJob, *opscontrol.OpsCandidate, *map[appsv1alpha1.ExtraInfoKey]string)
 	ReleasePod(context.Context, client.Client, *appsv1alpha1.OperationJob, *opscontrol.OpsCandidate) error
 }
 

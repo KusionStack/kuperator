@@ -90,12 +90,6 @@ func controlledByOperationJob(c client.Client, pod *corev1.Pod) (sets.String, bo
 				break
 			}
 		}
-		for _, status := range oj.Status.PodDetails {
-			if status.ExtraInfo != nil && status.ExtraInfo[appsv1alpha1.ReplacePodNameKey] == pod.Name {
-				ojNames.Insert(oj.Name)
-				break
-			}
-		}
 	}
 
 	return ojNames, ojNames.Len() > 0

@@ -26,13 +26,10 @@ import (
 
 type OpsCandidate struct {
 	*corev1.Pod
-	PodName      string
-	Containers   []string
-	PodOpsStatus *appsv1alpha1.PodOpsStatus
-
-	ReplaceTriggered bool
-	ReplaceNewPod    *corev1.Pod
+	PodName    string
+	Containers []string
 	*appsv1alpha1.CollaSet
+	PodOpsStatus *appsv1alpha1.PodOpsStatus
 }
 
 func DecideCandidateByPartition(instance *appsv1alpha1.OperationJob, candidates []*OpsCandidate) []*OpsCandidate {
@@ -84,10 +81,8 @@ func IsCandidateOpsFinished(candidate *OpsCandidate) bool {
 		candidate.PodOpsStatus.Progress == appsv1alpha1.OperationProgressSucceeded
 }
 
-func MarkCandidateAsFailed(candidate *OpsCandidate, reason string) {
-	if candidate.PodOpsStatus.ExtraInfo == nil {
-		candidate.PodOpsStatus.ExtraInfo = make(map[appsv1alpha1.ExtraInfoKey]string)
-	}
+func MarkCandidateAsFailed(candidate *OpsCandidate, reason appsv1alpha1.ReasonForOpsProgress, message string) {
 	candidate.PodOpsStatus.Progress = appsv1alpha1.OperationProgressFailed
-	candidate.PodOpsStatus.ExtraInfo[appsv1alpha1.Reason] = reason
+	candidate.PodOpsStatus.Reason = reason
+	candidate.PodOpsStatus.Message = message
 }

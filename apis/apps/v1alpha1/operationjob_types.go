@@ -24,17 +24,16 @@ import (
 type OpsAction string
 
 const (
-	ActionRecreate   OpsAction = "Recreate"
-	OpsActionReplace OpsAction = "Replace"
+	OpsActionRecreate OpsAction = "Recreate"
+	OpsActionReplace  OpsAction = "Replace"
 )
 
-// ExtraInfoKey defines the extra info keys in pod ops status
-type ExtraInfoKey string
+// ReasonForOpsProgress defines the reason of pod operation progress
+type ReasonForOpsProgress string
 
 const (
-	ReplacePodNameKey ExtraInfoKey = "ReplaceNewPodName"
-	CRRKey            ExtraInfoKey = "ContainerRecreateRequest"
-	Reason            ExtraInfoKey = "Reason"
+	ReasonPodNotFound       ReasonForOpsProgress = "PodNotFound"
+	ReasonContainerNotFound ReasonForOpsProgress = "ContainerNotFound"
 )
 
 // OperationProgress indicates operation progress of pod
@@ -99,15 +98,15 @@ type OperationJobStatus struct {
 
 	// Replicas of the pods involved in the OperationJob
 	// +optional
-	TotalPodCount int32 `json:"totalReplicas,omitempty"`
+	TotalPodCount int32 `json:"totalPodCount,omitempty"`
 
 	// Succeeded replicas of the pods involved in the OperationJob
 	// +optional
-	SucceededPodCount int32 `json:"processingReplicas,omitempty"`
+	SucceededPodCount int32 `json:"succeededPodCount,omitempty"`
 
-	// failed replicas of the pods involved in the OperationJob
+	// failed pod count of the pods involved in the OperationJob
 	// +optional
-	FailedPodCount int32 `json:"failedReplicas,omitempty"`
+	FailedPodCount int32 `json:"failedPodCount,omitempty"`
 
 	// Operation details of the target pods
 	// +optional
@@ -115,17 +114,21 @@ type OperationJobStatus struct {
 }
 
 type PodOpsStatus struct {
-	// Name of the target pod
+	// name of the target pod
 	// +optional
 	PodName string `json:"podName,omitempty"`
 
-	// progress of target pod
+	// operation progress of target pod
 	// +optional
 	Progress OperationProgress `json:"progress,omitempty"`
 
-	// Extra info of the target pod
+	// reason for current operation progress
 	// +optional
-	ExtraInfo map[ExtraInfoKey]string `json:"extraInfo,omitempty"`
+	Reason ReasonForOpsProgress `json:"reason,omitempty"`
+
+	// message displays detail of reason
+	// +optional
+	Message string `json:"message,omitempty"`
 }
 
 // +kubebuilder:object:root=true

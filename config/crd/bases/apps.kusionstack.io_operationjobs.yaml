@@ -87,12 +87,8 @@ spec:
                 description: Operation end time
                 format: date-time
                 type: string
-              failedReplicas:
-                description: failed replicas of the pods involved in the OperationJob
-                format: int32
-                type: integer
-              processingReplicas:
-                description: Succeeded replicas of the pods involved in the OperationJob
+              failedPodCount:
+                description: failed pod count of the pods involved in the OperationJob
                 format: int32
                 type: integer
               progress:
@@ -102,24 +98,29 @@ spec:
                 description: Operation start time
                 format: date-time
                 type: string
+              succeededPodCount:
+                description: Succeeded replicas of the pods involved in the OperationJob
+                format: int32
+                type: integer
               targetDetails:
                 description: Operation details of the target pods
                 items:
                   properties:
-                    extraInfo:
-                      additionalProperties:
-                        type: string
-                      description: Extra info of the target pod
-                      type: object
+                    message:
+                      description: message displays detail of reason
+                      type: string
                     podName:
-                      description: Name of the target pod
+                      description: name of the target pod
                       type: string
                     progress:
-                      description: progress of target pod
+                      description: operation progress of target pod
+                      type: string
+                    reason:
+                      description: reason for current operation progress
                       type: string
                   type: object
                 type: array
-              totalReplicas:
+              totalPodCount:
                 description: Replicas of the pods involved in the OperationJob
                 format: int32
                 type: integer

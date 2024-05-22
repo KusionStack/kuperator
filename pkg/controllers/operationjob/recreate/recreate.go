@@ -17,6 +17,8 @@ limitations under the License.
 package recreate
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -67,9 +69,8 @@ func (p *ContainerRecreateControl) ListTargets() ([]*OpsCandidate, error) {
 			candidate.PodOpsStatus = opsStatus
 		} else {
 			candidate.PodOpsStatus = &appsv1alpha1.PodOpsStatus{
-				PodName:   target.PodName,
-				Progress:  appsv1alpha1.OperationProgressPending,
-				ExtraInfo: map[appsv1alpha1.ExtraInfoKey]string{},
+				PodName:  target.PodName,
+				Progress: appsv1alpha1.OperationProgressPending,
 			}
 		}
 
@@ -85,7 +86,8 @@ func (p *ContainerRecreateControl) OperateTarget(candidate *OpsCandidate) error 
 	}
 
 	// skip if candidate ops finished, or pod and containers do not exist
-	if IsCandidateOpsFinished(candidate) || candidate.Pod == nil || !ojutils.ContainerExistsInPod(candidate.Pod, candidate.Containers) {
+	_, notFound := ojutils.ContainersNotFoundInPod(candidate.Pod, candidate.Containers)
+	if IsCandidateOpsFinished(candidate) || candidate.Pod == nil || notFound {
 		return nil
 	}
 
@@ -94,7 +96,6 @@ func (p *ContainerRecreateControl) OperateTarget(candidate *OpsCandidate) error 
 
 	// if Pod is during UpdateOpsLifecycle, fail this recreation
 	if isDuringUpdatingOps {
-		MarkCandidateAsFailed(candidate, "Pod is during update")
 		ojutils.MarkOperationJobFailed(p.OperationJob)
 		// release target and cancel RecreateOpsLifecycle if during RecreateOpsLifecycle
 		if isDuringRecreateOps {
@@ -144,22 +145,15 @@ func (p *ContainerRecreateControl) FulfilPodOpsStatus(candidate *OpsCandidate) e
 		return nil
 	}
 
-	if candidate.PodOpsStatus.ExtraInfo == nil {
-		candidate.PodOpsStatus.ExtraInfo = make(map[appsv1alpha1.ExtraInfoKey]string)
-	}
-
 	if candidate.Pod == nil {
-		MarkCandidateAsFailed(candidate, "Pod not found")
+		MarkCandidateAsFailed(candidate, appsv1alpha1.ReasonPodNotFound, fmt.Sprintf("pod named %s not found", candidate.PodName))
 		return nil
 	}
 
-	if !ojutils.ContainerExistsInPod(candidate.Pod, candidate.Containers) {
-		MarkCandidateAsFailed(candidate, "Container not found")
+	if containers, notFound := ojutils.ContainersNotFoundInPod(candidate.Pod, candidate.Containers); notFound {
+		MarkCandidateAsFailed(candidate, appsv1alpha1.ReasonContainerNotFound, fmt.Sprintf("Container named %v not found", containers))
 		return nil
 	}
-
-	// fulfil extraInfo
-	p.Handler.FulfilExtraInfo(p.Context, p.Client, p.OperationJob, candidate, &candidate.PodOpsStatus.ExtraInfo)
 
 	// calculate restart progress of podOpsStatus
 	candidate.PodOpsStatus.Progress = p.Handler.GetRestartProgress(p.Context, p.Client, p.OperationJob, candidate)

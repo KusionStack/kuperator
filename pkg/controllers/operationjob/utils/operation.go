@@ -48,9 +48,10 @@ func MapOpsStatusByPod(instance *appsv1alpha1.OperationJob) map[string]*appsv1al
 	return opsStatusMap
 }
 
-func ContainerExistsInPod(pod *corev1.Pod, containers []string) bool {
+func ContainersNotFoundInPod(pod *corev1.Pod, containers []string) ([]string, bool) {
+	var containersNotFound []string
 	if pod == nil {
-		return false
+		return containersNotFound, false
 	}
 	cntSets := sets.String{}
 	for i := range pod.Spec.Containers {
@@ -58,10 +59,10 @@ func ContainerExistsInPod(pod *corev1.Pod, containers []string) bool {
 	}
 	for _, container := range containers {
 		if !cntSets.Has(container) {
-			return false
+			containersNotFound = append(containersNotFound, container)
 		}
 	}
-	return true
+	return containersNotFound, len(containersNotFound) > 0
 }
 
 func GetCollaSetByPod(ctx context.Context, client client.Client, instance *appsv1alpha1.OperationJob, candidate *OpsCandidate) (*appsv1alpha1.CollaSet, error) {
@@ -70,12 +71,8 @@ func GetCollaSetByPod(ctx context.Context, client client.Client, instance *appsv
 
 	pod := candidate.Pod
 	if pod == nil {
-		if candidate.ReplaceNewPod != nil {
-			pod = candidate.ReplaceNewPod
-		} else {
-			// pod is deleted by others or not exist, just ignore
-			return nil, nil
-		}
+		// replace completed, just ignore
+		return nil, nil
 	}
 
 	for _, ownerRef := range pod.OwnerReferences {

@@ -37,11 +37,11 @@ func (r *ReconcileOperationJob) newOperator(ctx context.Context, instance *appsv
 	operateInfo := &OperateInfo{Client: mixin.Client, Context: ctx, OperationJob: instance, Logger: logger, Recorder: mixin.Recorder}
 
 	switch instance.Spec.Action {
-	case appsv1alpha1.ActionRecreate:
+	case appsv1alpha1.OpsActionRecreate:
 		recreateMethodAnno := instance.ObjectMeta.Annotations[appsv1alpha1.AnnotationOperationJobRecreateMethod]
 		if recreateMethodAnno == "" || recreate.GetRecreateHandler(recreateMethodAnno) == nil {
 			// use Kruise ContainerRecreateRequest to recreate container by default
-			return &recreate.ContainerRecreateControl{OperateInfo: operateInfo, Handler: recreate.GetRecreateHandler(string(appsv1alpha1.CRRKey))}
+			return &recreate.ContainerRecreateControl{OperateInfo: operateInfo, Handler: recreate.GetRecreateHandler(recreate.KruiseCcontainerRecreateRequest)}
 		}
 		return &recreate.ContainerRecreateControl{OperateInfo: operateInfo, Handler: recreate.GetRecreateHandler(recreateMethodAnno)}
 	case appsv1alpha1.OpsActionReplace:

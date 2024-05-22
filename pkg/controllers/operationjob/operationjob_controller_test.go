@@ -74,7 +74,7 @@ var _ = Describe("operationjob controller", func() {
 				Name:      "foo",
 			},
 			Spec: appsv1alpha1.OperationJobSpec{
-				Action: appsv1alpha1.ActionRecreate,
+				Action: appsv1alpha1.OpsActionRecreate,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
 						PodName: podNames[0],
@@ -144,7 +144,7 @@ var _ = Describe("operationjob controller", func() {
 				Name:      "foo",
 			},
 			Spec: appsv1alpha1.OperationJobSpec{
-				Action:    appsv1alpha1.ActionRecreate,
+				Action:    appsv1alpha1.OpsActionRecreate,
 				Partition: int32Pointer(0),
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
@@ -234,7 +234,7 @@ var _ = Describe("operationjob controller", func() {
 				Name:      "foo",
 			},
 			Spec: appsv1alpha1.OperationJobSpec{
-				Action: appsv1alpha1.ActionRecreate,
+				Action: appsv1alpha1.OpsActionRecreate,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
 						PodName: "non-exist",
@@ -512,7 +512,7 @@ var _ = Describe("operationjob controller", func() {
 				Name:      "foo",
 			},
 			Spec: appsv1alpha1.OperationJobSpec{
-				Action: appsv1alpha1.ActionRecreate,
+				Action: appsv1alpha1.OpsActionRecreate,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
 						PodName: podNames[0],

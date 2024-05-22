@@ -30,6 +30,10 @@ import (
 	"kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
 )
 
+const (
+	KruiseCcontainerRecreateRequest string = "kruise-containerrecreaterequest"
+)
+
 type ContainerRecreateRequestHandler struct {
 }
 
@@ -95,20 +99,6 @@ func (h *ContainerRecreateRequestHandler) GetRestartProgress(
 	} else {
 		return appsv1alpha1.OperationProgressProcessing
 	}
-}
-
-func (h *ContainerRecreateRequestHandler) FulfilExtraInfo(
-	ctx context.Context, client client.Client,
-	instance *appsv1alpha1.OperationJob,
-	candidate *opscontrol.OpsCandidate, extraInfo *map[appsv1alpha1.ExtraInfoKey]string) {
-	crr := &kruisev1alpha1.ContainerRecreateRequest{}
-	crrName := fmt.Sprintf("%s-%s", instance.Name, candidate.PodName)
-
-	err := client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: crrName}, crr)
-	if err != nil {
-		return
-	}
-	(*extraInfo)[appsv1alpha1.CRRKey] = crr.Name
 }
 
 func (h *ContainerRecreateRequestHandler) ReleasePod(
