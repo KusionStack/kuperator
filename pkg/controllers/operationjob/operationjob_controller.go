@@ -18,7 +18,6 @@ package operationjob
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-logr/logr"
 	kruisev1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -132,22 +131,22 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 		ojutils.StatusUpToDateExpectation.DeleteExpectations(key)
 		return reconcile.Result{}, ojutils.ClearProtection(ctx, r.Client, instance)
 	} else if err := ojutils.ProtectOperationJob(ctx, r.Client, instance); err != nil {
-		// add finalizer on operationJob
 		return reconcile.Result{}, err
 	}
 
-	if err := r.doReconcile(ctx, instance, logger); err != nil {
-		return reconcile.Result{}, err
+	if !ojutils.IsJobFinished(instance) {
+		if err := r.doReconcile(ctx, instance, logger); err != nil {
+			return reconcile.Result{}, err
+		}
 	}
 
-	// handle timeout and TTL
 	jobDeleted, requeueAfter, err := r.ensureActiveDeadlineOrTTL(ctx, instance, logger)
 	if jobDeleted || err != nil {
 		return reconcile.Result{}, err
 	}
 
 	if err := r.updateStatus(ctx, instance); err != nil {
-		return reconcile.Result{}, fmt.Errorf("fail to update status of OperationJob %s: %s", req, err)
+		return reconcile.Result{}, err
 	}
 
 	if requeueAfter != nil {
