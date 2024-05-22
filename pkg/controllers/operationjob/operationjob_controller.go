@@ -204,42 +204,41 @@ func (r *ReconcileOperationJob) calculateStatus(
 	}
 
 	// set replicas info
-	var totalReplicas, completedReplicas, processingReplicas, failedReplicas int32
+	var totalPodCount, succeededPodCount, failedPodCount, pendingPodCount int32
 	for _, podDetail := range jobStatus.PodDetails {
-		totalReplicas++
-		if podDetail.Phase == appsv1alpha1.PodPhaseCompleted {
-			completedReplicas++
-		} else if podDetail.Phase == appsv1alpha1.PodPhaseFailed {
-			failedReplicas++
-		} else if podDetail.Phase != appsv1alpha1.PodPhaseNotStarted {
-			processingReplicas++
+		totalPodCount++
+		if podDetail.Progress == appsv1alpha1.OperationProgressFailed {
+			failedPodCount++
+		} else if podDetail.Progress == appsv1alpha1.OperationProgressSucceeded {
+			succeededPodCount++
+		} else if podDetail.Progress == appsv1alpha1.OperationProgressPending {
+			pendingPodCount++
 		}
 	}
-	jobStatus.TotalReplicas = totalReplicas
-	jobStatus.CompletedReplicas = completedReplicas
-	jobStatus.ProcessingReplicas = processingReplicas
-	jobStatus.FailedReplicas = failedReplicas
+	jobStatus.TotalPodCount = totalPodCount
+	jobStatus.FailedPodCount = failedPodCount
+	jobStatus.SucceededPodCount = succeededPodCount
 
 	// skip if ops finished
-	if jobStatus.Progress == appsv1alpha1.OperationProgressCompleted ||
+	if jobStatus.Progress == appsv1alpha1.OperationProgressSucceeded ||
 		jobStatus.Progress == appsv1alpha1.OperationProgressFailed {
 		return
 	}
 
 	// set progress of the job
-	if completedReplicas+failedReplicas == totalReplicas {
-		if failedReplicas > 0 {
+	if succeededPodCount+failedPodCount == totalPodCount {
+		if failedPodCount > 0 {
 			jobStatus.Progress = appsv1alpha1.OperationProgressFailed
 		} else {
-			jobStatus.Progress = appsv1alpha1.OperationProgressCompleted
+			jobStatus.Progress = appsv1alpha1.OperationProgressSucceeded
 		}
-	} else if totalReplicas == 0 {
+	} else if pendingPodCount == totalPodCount {
 		jobStatus.Progress = appsv1alpha1.OperationProgressPending
 	} else {
 		jobStatus.Progress = appsv1alpha1.OperationProgressProcessing
 	}
 
-	if jobStatus.EndTimestamp == nil && (completedReplicas == totalReplicas || failedReplicas == totalReplicas) {
+	if jobStatus.EndTimestamp == nil && (succeededPodCount+failedPodCount == totalPodCount) {
 		jobStatus.EndTimestamp = &now
 	}
 	return

@@ -37,35 +37,14 @@ const (
 	Reason            ExtraInfoKey = "Reason"
 )
 
-// OperationJobProgress indicates the progress of operationJob
-type OperationJobProgress string
+// OperationProgress indicates operation progress of pod
+type OperationProgress string
 
 const (
-	OperationProgressPending    OperationJobProgress = "Pending"
-	OperationProgressProcessing OperationJobProgress = "Processing"
-	OperationProgressFailed     OperationJobProgress = "Failed"
-	OperationProgressCompleted  OperationJobProgress = "Completed"
-)
-
-// PodPhase indicates operation progress of pod
-type PodPhase string
-
-const (
-	PodPhaseNotStarted PodPhase = "NotStarted"
-	PodPhaseStarted    PodPhase = "Started"
-	PodPhaseFailed     PodPhase = "Failed"
-	PodPhaseCompleted  PodPhase = "Completed"
-)
-
-// ContainerPhase indicates recreate progress of container
-type ContainerPhase string
-
-const (
-	ContainerPhasePending    ContainerPhase = "Pending"
-	ContainerPhaseRecreating ContainerPhase = "Recreating"
-	ContainerPhaseFailed     ContainerPhase = "Failed"
-	ContainerPhaseSucceed    ContainerPhase = "Succeed"
-	ContainerPhaseCompleted  ContainerPhase = "Completed"
+	OperationProgressPending    OperationProgress = "Pending"
+	OperationProgressProcessing OperationProgress = "Processing"
+	OperationProgressFailed     OperationProgress = "Failed"
+	OperationProgressSucceeded  OperationProgress = "Succeeded"
 )
 
 // OperationJobSpec defines the desired state of OperationJob
@@ -108,7 +87,7 @@ type PodOpsTarget struct {
 type OperationJobStatus struct {
 	// Phase indicates the of the OperationJob
 	// +optional
-	Progress OperationJobProgress `json:"progress,omitempty"`
+	Progress OperationProgress `json:"progress,omitempty"`
 
 	// Operation start time
 	// +optional
@@ -120,19 +99,15 @@ type OperationJobStatus struct {
 
 	// Replicas of the pods involved in the OperationJob
 	// +optional
-	TotalReplicas int32 `json:"totalReplicas,omitempty"`
+	TotalPodCount int32 `json:"totalReplicas,omitempty"`
 
-	// Completed replicas of the pods involved in the OperationJob
+	// Succeeded replicas of the pods involved in the OperationJob
 	// +optional
-	CompletedReplicas int32 `json:"completedReplicas,omitempty"`
-
-	// Processing replicas of the pods involved in the OperationJob
-	// +optional
-	ProcessingReplicas int32 `json:"processingReplicas,omitempty"`
+	SucceededPodCount int32 `json:"processingReplicas,omitempty"`
 
 	// failed replicas of the pods involved in the OperationJob
 	// +optional
-	FailedReplicas int32 `json:"failedReplicas,omitempty"`
+	FailedPodCount int32 `json:"failedReplicas,omitempty"`
 
 	// Operation details of the target pods
 	// +optional
@@ -146,25 +121,11 @@ type PodOpsStatus struct {
 
 	// progress of target pod
 	// +optional
-	Phase PodPhase `json:"phase,omitempty"`
+	Progress OperationProgress `json:"progress,omitempty"`
 
 	// Extra info of the target pod
 	// +optional
 	ExtraInfo map[ExtraInfoKey]string `json:"extraInfo,omitempty"`
-
-	// the target container to restart
-	// +optional
-	ContainerDetails []ContainerOpsStatus `json:"containers,omitempty"`
-}
-
-type ContainerOpsStatus struct {
-	// Name of the container
-	// +optional
-	ContainerName string `json:"name,omitempty"`
-
-	// Phase indicates recreate progress of container
-	// +optional
-	Phase ContainerPhase `json:"phase,omitempty"`
 }
 
 // +kubebuilder:object:root=true

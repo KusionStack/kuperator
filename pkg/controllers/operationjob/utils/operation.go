@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	kruisev1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -34,7 +33,7 @@ import (
 )
 
 func MarkOperationJobFailed(instance *appsv1alpha1.OperationJob) {
-	if instance.Status.Progress != appsv1alpha1.OperationProgressCompleted {
+	if instance.Status.Progress != appsv1alpha1.OperationProgressSucceeded {
 		now := ctrlutils.FormatTimeNow()
 		instance.Status.Progress = appsv1alpha1.OperationProgressFailed
 		instance.Status.EndTimestamp = &now
@@ -63,23 +62,6 @@ func ContainerExistsInPod(pod *corev1.Pod, containers []string) bool {
 		}
 	}
 	return true
-}
-
-func ParsePhaseByCrrPhase(phase kruisev1alpha1.ContainerRecreateRequestPhase) appsv1alpha1.ContainerPhase {
-	switch phase {
-	case kruisev1alpha1.ContainerRecreateRequestPending:
-		return appsv1alpha1.ContainerPhasePending
-	case kruisev1alpha1.ContainerRecreateRequestRecreating:
-		return appsv1alpha1.ContainerPhaseRecreating
-	case kruisev1alpha1.ContainerRecreateRequestSucceeded:
-		return appsv1alpha1.ContainerPhaseSucceed
-	case kruisev1alpha1.ContainerRecreateRequestFailed:
-		return appsv1alpha1.ContainerPhaseFailed
-	case kruisev1alpha1.ContainerRecreateRequestCompleted:
-		return appsv1alpha1.ContainerPhaseCompleted
-	default:
-		return appsv1alpha1.ContainerPhasePending
-	}
 }
 
 func GetCollaSetByPod(ctx context.Context, client client.Client, instance *appsv1alpha1.OperationJob, candidate *OpsCandidate) (*appsv1alpha1.CollaSet, error) {

@@ -28,12 +28,6 @@ import (
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 )
 
-const (
-	PodPhasePending    appsv1alpha1.PodPhase = "Pending"
-	PodPhaseRecreating appsv1alpha1.PodPhase = "Recreating"
-	PodPhaseSucceeded  appsv1alpha1.PodPhase = "Succeeded"
-)
-
 type ContainerRecreateControl struct {
 	*OperateInfo
 	Handler RestartHandler
@@ -74,18 +68,9 @@ func (p *ContainerRecreateControl) ListTargets() ([]*OpsCandidate, error) {
 		} else {
 			candidate.PodOpsStatus = &appsv1alpha1.PodOpsStatus{
 				PodName:   target.PodName,
-				Phase:     appsv1alpha1.PodPhaseNotStarted,
+				Progress:  appsv1alpha1.OperationProgressPending,
 				ExtraInfo: map[appsv1alpha1.ExtraInfoKey]string{},
 			}
-			var containerDetails []appsv1alpha1.ContainerOpsStatus
-			for _, cName := range candidate.Containers {
-				containerDetail := appsv1alpha1.ContainerOpsStatus{
-					ContainerName: cName,
-					Phase:         appsv1alpha1.ContainerPhasePending,
-				}
-				containerDetails = append(containerDetails, containerDetail)
-			}
-			candidate.PodOpsStatus.ContainerDetails = containerDetails
 		}
 
 		candidates = append(candidates, &candidate)
@@ -95,8 +80,8 @@ func (p *ContainerRecreateControl) ListTargets() ([]*OpsCandidate, error) {
 
 func (p *ContainerRecreateControl) OperateTarget(candidate *OpsCandidate) error {
 	// mark candidate ops started is not started
-	if IsCandidateOpsNotStarted(candidate) {
-		candidate.PodOpsStatus.Phase = appsv1alpha1.PodPhaseStarted
+	if IsCandidateOpsPending(candidate) {
+		candidate.PodOpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 	}
 
 	// skip if candidate ops finished, or pod and containers do not exist
@@ -141,8 +126,8 @@ func (p *ContainerRecreateControl) OperateTarget(candidate *OpsCandidate) error 
 	}
 
 	// if CRR completed or during updating opsLifecycle, try to finish Recreate PodOpsLifeCycle
-	finished := p.Handler.IsRestartFinished(p.Context, p.Client, p.OperationJob, candidate)
-	if finished && isDuringRecreateOps {
+	candidate.PodOpsStatus.Progress = p.Handler.GetRestartProgress(p.Context, p.Client, p.OperationJob, candidate)
+	if IsCandidateOpsFinished(candidate) && isDuringRecreateOps {
 		if err := ojutils.FinishRecreateLifecycle(p.Client, ojutils.RecreateOpsLifecycleAdapter, candidate.Pod); err != nil {
 			return err
 		}
@@ -176,42 +161,8 @@ func (p *ContainerRecreateControl) FulfilPodOpsStatus(candidate *OpsCandidate) e
 	// fulfil extraInfo
 	p.Handler.FulfilExtraInfo(p.Context, p.Client, p.OperationJob, candidate, &candidate.PodOpsStatus.ExtraInfo)
 
-	// calculate restart progress of containerOpsStatus
-	recreatingCount := 0
-	succeedCount := 0
-	completedCount := 0
-	failedCount := 0
-	var containerDetails []appsv1alpha1.ContainerOpsStatus
-	for i := range candidate.PodOpsStatus.ContainerDetails {
-		containerDetail := candidate.PodOpsStatus.ContainerDetails[i]
-		containerDetail.Phase = p.Handler.GetContainerOpsPhase(p.Context, p.Client, p.OperationJob, candidate, containerDetail.ContainerName)
-		if containerDetail.Phase == appsv1alpha1.ContainerPhaseRecreating {
-			recreatingCount++
-		} else if containerDetail.Phase == appsv1alpha1.ContainerPhaseSucceed {
-			succeedCount++
-		} else if containerDetail.Phase == appsv1alpha1.ContainerPhaseCompleted {
-			completedCount++
-		} else if containerDetail.Phase == appsv1alpha1.ContainerPhaseFailed {
-			failedCount++
-		}
-		containerDetails = append(containerDetails, containerDetail)
-	}
-	candidate.PodOpsStatus.ContainerDetails = containerDetails
-
 	// calculate restart progress of podOpsStatus
-	phase := PodPhasePending
-	containerCount := len(candidate.Containers)
-	if failedCount == containerCount {
-		phase = appsv1alpha1.PodPhaseFailed
-	} else if completedCount == containerCount {
-		phase = appsv1alpha1.PodPhaseCompleted
-	} else if succeedCount == containerCount {
-		phase = PodPhaseSucceeded
-	} else if recreatingCount > 0 {
-		phase = PodPhaseRecreating
-	}
-	candidate.PodOpsStatus.Phase = phase
-
+	candidate.PodOpsStatus.Progress = p.Handler.GetRestartProgress(p.Context, p.Client, p.OperationJob, candidate)
 	return nil
 }
 

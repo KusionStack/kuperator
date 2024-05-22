@@ -30,12 +30,6 @@ import (
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 )
 
-const (
-	PodPhaseNewPodCreating       appsv1alpha1.PodPhase = "NewPodCreating"
-	PodPhaseNewPodStarted        appsv1alpha1.PodPhase = "NewPodStarted"
-	PodPhaseOriginPodTerminating appsv1alpha1.PodPhase = "OriginPodTerminating"
-)
-
 type PodReplaceControl struct {
 	*OperateInfo
 	PodControl podcontrol.Interface
@@ -81,7 +75,7 @@ func (p *PodReplaceControl) ListTargets() ([]*OpsCandidate, error) {
 		} else {
 			candidate.PodOpsStatus = &appsv1alpha1.PodOpsStatus{
 				PodName:   target.PodName,
-				Phase:     appsv1alpha1.PodPhaseNotStarted,
+				Progress:  appsv1alpha1.OperationProgressPending,
 				ExtraInfo: map[appsv1alpha1.ExtraInfoKey]string{},
 			}
 		}
@@ -104,8 +98,8 @@ func (p *PodReplaceControl) ListTargets() ([]*OpsCandidate, error) {
 
 func (p *PodReplaceControl) OperateTarget(candidate *OpsCandidate) error {
 	// mark candidate ops started is not started
-	if IsCandidateOpsNotStarted(candidate) {
-		candidate.PodOpsStatus.Phase = appsv1alpha1.PodPhaseStarted
+	if IsCandidateOpsPending(candidate) {
+		candidate.PodOpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 	}
 
 	// skip if candidate ops finished
@@ -125,6 +119,10 @@ func (p *PodReplaceControl) OperateTarget(candidate *OpsCandidate) error {
 }
 
 func (p *PodReplaceControl) FulfilPodOpsStatus(candidate *OpsCandidate) error {
+	if IsCandidateOpsFinished(candidate) {
+		return nil
+	}
+
 	// try to fulfil ExtraInfo["ReplaceNewPodName"]
 	if candidate.Pod != nil && candidate.CollaSet != nil {
 		newPodId, exist := candidate.Pod.Labels[appsv1alpha1.PodReplacePairNewId]
@@ -145,23 +143,11 @@ func (p *PodReplaceControl) FulfilPodOpsStatus(candidate *OpsCandidate) error {
 		}
 	}
 
-	// calculate replace progress
-	if candidate.ReplaceNewPod != nil {
-		if candidate.ReplaceNewPod.Status.Phase == corev1.PodRunning {
-			candidate.PodOpsStatus.Phase = PodPhaseNewPodStarted
-		} else {
-			candidate.PodOpsStatus.Phase = PodPhaseNewPodCreating
-		}
-		if candidate.Pod == nil {
-			candidate.PodOpsStatus.Phase = appsv1alpha1.PodPhaseCompleted
-		} else if candidate.Pod.DeletionTimestamp != nil {
-			candidate.PodOpsStatus.Phase = PodPhaseOriginPodTerminating
-		}
-	}
-
 	// pod is deleted by others or not exist, mark as completed
-	if candidate.Pod == nil && candidate.ReplaceNewPod == nil {
-		candidate.PodOpsStatus.Phase = appsv1alpha1.PodPhaseCompleted
+	if candidate.Pod == nil {
+		candidate.PodOpsStatus.Progress = appsv1alpha1.OperationProgressSucceeded
+	} else {
+		candidate.PodOpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 	}
 
 	return nil

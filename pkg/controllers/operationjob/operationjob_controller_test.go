@@ -129,7 +129,7 @@ var _ = Describe("operationjob controller", func() {
 		}
 
 		// wait for replace completed
-		assertJobProgressCompleted(oj, time.Second*5)
+		assertJobProgressSucceeded(oj, time.Second*5)
 	})
 
 	It("[recreate] by partition", func() {
@@ -212,15 +212,16 @@ var _ = Describe("operationjob controller", func() {
 				})).Should(BeNil())
 			}
 
-			// assert completed replicas
-			assertCompletedReplicas(oj, partition, time.Second*5)
-			if partition < 3 {
+			// assert operation progress
+			assertSucceededReplicas(oj, partition, time.Second*5)
+			if partition == 0 {
+				assertJobProgressPending(oj, time.Second*5)
+			} else if partition < 3 {
 				assertJobProgressProcessing(oj, time.Second*5)
+			} else {
+				assertJobProgressSucceeded(oj, time.Second*5)
 			}
 		}
-
-		// wait for recreate completed
-		assertJobProgressCompleted(oj, time.Second*5)
 	})
 
 	It("[recreate] non-exist pod", func() {
@@ -306,7 +307,7 @@ var _ = Describe("operationjob controller", func() {
 		}
 
 		// wait for replace completed
-		assertJobProgressCompleted(oj, time.Second*5)
+		assertJobProgressSucceeded(oj, time.Second*5)
 	})
 
 	It("[replace] by partition", func() {
@@ -354,7 +355,8 @@ var _ = Describe("operationjob controller", func() {
 			if partition > 0 {
 				Eventually(func() int32 {
 					Expect(c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)).Should(BeNil())
-					return oj.Status.ProcessingReplicas
+					processingPodCount := *oj.Spec.Partition - oj.Status.SucceededPodCount - oj.Status.FailedPodCount
+					return processingPodCount
 				}, time.Second*10, time.Second).Should(BeEquivalentTo(1))
 				Eventually(func() bool {
 					Expect(c.List(ctx, podList, client.InNamespace(cs.Namespace))).Should(BeNil())
@@ -365,7 +367,8 @@ var _ = Describe("operationjob controller", func() {
 							replacingPod++
 						}
 					}
-					return oj.Status.ProcessingReplicas == int32(replacingPod)
+					processingPodCount := *oj.Spec.Partition - oj.Status.SucceededPodCount - oj.Status.FailedPodCount
+					return processingPodCount == int32(replacingPod)
 				}, time.Second*10, time.Second).Should(BeTrue())
 			}
 
@@ -394,15 +397,17 @@ var _ = Describe("operationjob controller", func() {
 				}
 			}
 
-			// assert completed replicas
-			assertCompletedReplicas(oj, partition, 5*time.Second)
-			if partition < 3 {
+			// assert operation progress
+			assertSucceededReplicas(oj, partition, time.Second*5)
+			if partition == 0 {
+				assertJobProgressPending(oj, time.Second*5)
+			} else if partition < 3 {
 				assertJobProgressProcessing(oj, time.Second*5)
+			} else {
+				assertJobProgressSucceeded(oj, time.Second*5)
 			}
 		}
 
-		// wait for replace completed
-		assertJobProgressCompleted(oj, time.Second*5)
 	})
 
 	It("[replace] non-exist pod", func() {
@@ -426,7 +431,7 @@ var _ = Describe("operationjob controller", func() {
 
 		Expect(c.Create(ctx, oj)).Should(BeNil())
 
-		assertJobProgressCompleted(oj, time.Second*5)
+		assertJobProgressSucceeded(oj, time.Second*5)
 	})
 
 	It("[replace] parallel", func() {
@@ -491,8 +496,8 @@ var _ = Describe("operationjob controller", func() {
 		}
 
 		// wait for oj1 and oj2 both completed
-		assertJobProgressCompleted(oj1, time.Second*5)
-		assertJobProgressCompleted(oj2, time.Second*5)
+		assertJobProgressSucceeded(oj1, time.Second*5)
+		assertJobProgressSucceeded(oj2, time.Second*5)
 	})
 
 	It("deadline and ttl", func() {
@@ -540,7 +545,7 @@ var _ = Describe("operationjob controller", func() {
 
 })
 
-func assertCompletedReplicas(oj *appsv1alpha1.OperationJob, completedReplicas int32, timeout time.Duration) {
+func assertSucceededReplicas(oj *appsv1alpha1.OperationJob, succeededPodCount int32, timeout time.Duration) {
 	Eventually(func() bool {
 		err := c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
 		if errors.IsNotFound(err) {
@@ -548,7 +553,19 @@ func assertCompletedReplicas(oj *appsv1alpha1.OperationJob, completedReplicas in
 		} else {
 			Expect(err).Should(BeNil())
 		}
-		return oj.Status.CompletedReplicas == completedReplicas
+		return oj.Status.SucceededPodCount == succeededPodCount
+	}, timeout, time.Second).Should(BeTrue())
+}
+
+func assertJobProgressPending(oj *appsv1alpha1.OperationJob, timeout time.Duration) {
+	Eventually(func() bool {
+		err := c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
+		if errors.IsNotFound(err) {
+			return false
+		} else {
+			Expect(err).Should(BeNil())
+		}
+		return oj.Status.Progress == appsv1alpha1.OperationProgressPending
 	}, timeout, time.Second).Should(BeTrue())
 }
 
@@ -576,7 +593,7 @@ func assertJobProgressFailed(oj *appsv1alpha1.OperationJob, timeout time.Duratio
 	}, timeout, time.Second).Should(BeTrue())
 }
 
-func assertJobProgressCompleted(oj *appsv1alpha1.OperationJob, timeout time.Duration) {
+func assertJobProgressSucceeded(oj *appsv1alpha1.OperationJob, timeout time.Duration) {
 	Eventually(func() bool {
 		err := c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
 		if errors.IsNotFound(err) {
@@ -584,7 +601,7 @@ func assertJobProgressCompleted(oj *appsv1alpha1.OperationJob, timeout time.Dura
 		} else {
 			Expect(err).Should(BeNil())
 		}
-		return oj.Status.Progress == appsv1alpha1.OperationProgressCompleted
+		return oj.Status.Progress == appsv1alpha1.OperationProgressSucceeded
 	}, timeout, time.Second).Should(BeTrue())
 }
 

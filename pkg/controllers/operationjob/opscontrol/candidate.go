@@ -61,33 +61,33 @@ func (o activeCandidateToStart) Swap(i, j int) {
 
 func (o activeCandidateToStart) Less(i, j int) bool {
 	l, r := o[i], o[j]
-	lNotStarted := IsCandidateOpsNotStarted(l)
-	rNotStarted := IsCandidateOpsNotStarted(r)
+	lNotStarted := IsCandidateOpsPending(l)
+	rNotStarted := IsCandidateOpsPending(r)
 	if lNotStarted != rNotStarted {
 		return rNotStarted
 	}
 	return true
 }
 
-func IsCandidateOpsNotStarted(candidate *OpsCandidate) bool {
-	if candidate.PodOpsStatus == nil || candidate.PodOpsStatus.Phase == "" {
+func IsCandidateOpsPending(candidate *OpsCandidate) bool {
+	if candidate.PodOpsStatus == nil || candidate.PodOpsStatus.Progress == "" {
 		return true
 	}
-	return candidate.PodOpsStatus.Phase == appsv1alpha1.PodPhaseNotStarted
+	return candidate.PodOpsStatus.Progress == appsv1alpha1.OperationProgressPending
 }
 
 func IsCandidateOpsFinished(candidate *OpsCandidate) bool {
-	if candidate.PodOpsStatus == nil || candidate.PodOpsStatus.Phase == "" {
+	if candidate.PodOpsStatus == nil || candidate.PodOpsStatus.Progress == "" {
 		return false
 	}
-	return candidate.PodOpsStatus.Phase == appsv1alpha1.PodPhaseCompleted ||
-		candidate.PodOpsStatus.Phase == appsv1alpha1.PodPhaseFailed
+	return candidate.PodOpsStatus.Progress == appsv1alpha1.OperationProgressFailed ||
+		candidate.PodOpsStatus.Progress == appsv1alpha1.OperationProgressSucceeded
 }
 
 func MarkCandidateAsFailed(candidate *OpsCandidate, reason string) {
 	if candidate.PodOpsStatus.ExtraInfo == nil {
 		candidate.PodOpsStatus.ExtraInfo = make(map[appsv1alpha1.ExtraInfoKey]string)
 	}
-	candidate.PodOpsStatus.Phase = appsv1alpha1.PodPhaseFailed
+	candidate.PodOpsStatus.Progress = appsv1alpha1.OperationProgressFailed
 	candidate.PodOpsStatus.ExtraInfo[appsv1alpha1.Reason] = reason
 }

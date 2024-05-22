@@ -28,7 +28,6 @@ import (
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
-	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 )
 
 type ContainerRecreateRequestHandler struct {
@@ -75,37 +74,27 @@ func (h *ContainerRecreateRequestHandler) DoRestartContainers(
 	return nil
 }
 
-func (h *ContainerRecreateRequestHandler) IsRestartFinished(
+func (h *ContainerRecreateRequestHandler) GetRestartProgress(
 	ctx context.Context, client client.Client,
-	instance *appsv1alpha1.OperationJob, candidate *opscontrol.OpsCandidate) bool {
+	instance *appsv1alpha1.OperationJob, candidate *opscontrol.OpsCandidate) appsv1alpha1.OperationProgress {
 	crr := &kruisev1alpha1.ContainerRecreateRequest{}
 	crrName := fmt.Sprintf("%s-%s", instance.Name, candidate.PodName)
 
 	err := client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: crrName}, crr)
-	if err != nil {
-		return false
-	}
-	return crr.Status.Phase == kruisev1alpha1.ContainerRecreateRequestCompleted
-}
-
-func (h *ContainerRecreateRequestHandler) GetContainerOpsPhase(
-	ctx context.Context, client client.Client,
-	instance *appsv1alpha1.OperationJob,
-	candidate *opscontrol.OpsCandidate, container string) appsv1alpha1.ContainerPhase {
-	crr := &kruisev1alpha1.ContainerRecreateRequest{}
-	crrName := fmt.Sprintf("%s-%s", instance.Name, candidate.PodName)
-
-	err := client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: crrName}, crr)
-	if err != nil {
-		return appsv1alpha1.ContainerPhasePending
+	if errors.IsNotFound(err) {
+		return appsv1alpha1.OperationProgressPending
+	} else if err != nil {
+		return appsv1alpha1.OperationProgressFailed
 	}
 
-	for _, state := range crr.Status.ContainerRecreateStates {
-		if state.Name == container {
-			return ojutils.ParsePhaseByCrrPhase(crr.Status.Phase)
-		}
+	if crr.Status.Phase == kruisev1alpha1.ContainerRecreateRequestCompleted ||
+		crr.Status.Phase == kruisev1alpha1.ContainerRecreateRequestSucceeded {
+		return appsv1alpha1.OperationProgressSucceeded
+	} else if crr.Status.Phase == kruisev1alpha1.ContainerRecreateRequestFailed {
+		return appsv1alpha1.OperationProgressFailed
+	} else {
+		return appsv1alpha1.OperationProgressProcessing
 	}
-	return appsv1alpha1.ContainerPhasePending
 }
 
 func (h *ContainerRecreateRequestHandler) FulfilExtraInfo(

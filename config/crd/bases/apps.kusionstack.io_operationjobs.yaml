@@ -83,10 +83,6 @@ spec:
           status:
             description: OperationJobStatus defines the observed state of OperationJob
             properties:
-              completedReplicas:
-                description: Completed replicas of the pods involved in the OperationJob
-                format: int32
-                type: integer
               endTimestamp:
                 description: Operation end time
                 format: date-time
@@ -96,7 +92,7 @@ spec:
                 format: int32
                 type: integer
               processingReplicas:
-                description: Processing replicas of the pods involved in the OperationJob
+                description: Succeeded replicas of the pods involved in the OperationJob
                 format: int32
                 type: integer
               progress:
@@ -110,28 +106,16 @@ spec:
                 description: Operation details of the target pods
                 items:
                   properties:
-                    containers:
-                      description: the target container to restart
-                      items:
-                        properties:
-                          name:
-                            description: Name of the container
-                            type: string
-                          phase:
-                            description: Phase indicates recreate progress of container
-                            type: string
-                        type: object
-                      type: array
                     extraInfo:
                       additionalProperties:
                         type: string
                       description: Extra info of the target pod
                       type: object
-                    phase:
-                      description: progress of target pod
-                      type: string
                     podName:
                       description: Name of the target pod
+                      type: string
+                    progress:
+                      description: progress of target pod
                       type: string
                   type: object
                 type: array

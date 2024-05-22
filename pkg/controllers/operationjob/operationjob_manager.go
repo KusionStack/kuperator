@@ -54,10 +54,10 @@ func (r *ReconcileOperationJob) newOperator(ctx context.Context, instance *appsv
 
 func (r *ReconcileOperationJob) ensureActiveDeadlineOrTTL(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) (bool, *time.Duration, error) {
 	isFailed := instance.Status.Progress == appsv1alpha1.OperationProgressFailed
-	isCompleted := instance.Status.Progress == appsv1alpha1.OperationProgressCompleted
+	isSucceeded := instance.Status.Progress == appsv1alpha1.OperationProgressSucceeded
 
 	if instance.Spec.ActiveDeadlineSeconds != nil {
-		if !isFailed && !isCompleted {
+		if !isFailed && !isSucceeded {
 			leftTime := time.Duration(*instance.Spec.ActiveDeadlineSeconds)*time.Second - time.Since(instance.CreationTimestamp.Time)
 			if leftTime > 0 {
 				return false, &leftTime, nil
@@ -71,7 +71,7 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineOrTTL(ctx context.Context, i
 	}
 
 	if instance.Spec.TTLSecondsAfterFinished != nil {
-		if isFailed || isCompleted {
+		if isFailed || isSucceeded {
 			leftTime := time.Duration(*instance.Spec.TTLSecondsAfterFinished)*time.Second - time.Since(instance.Status.EndTimestamp.Time)
 			if leftTime > 0 {
 				return false, &leftTime, nil
