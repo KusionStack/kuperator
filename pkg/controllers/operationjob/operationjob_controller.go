@@ -37,6 +37,7 @@ import (
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
 	"kusionstack.io/operating/pkg/controllers/operationjob/recreate"
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
+	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	ctrlutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/utils"
 	"kusionstack.io/operating/pkg/utils/mixin"
@@ -129,8 +130,8 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 			return reconcile.Result{}, err
 		}
 		ojutils.StatusUpToDateExpectation.DeleteExpectations(key)
-		return reconcile.Result{}, ojutils.ClearProtection(ctx, r.Client, instance)
-	} else if err := ojutils.ProtectOperationJob(ctx, r.Client, instance); err != nil {
+		return reconcile.Result{}, controllerutils.RemoveFinalizer(ctx, r.Client, instance, appsv1alpha1.ProtectFinalizer)
+	} else if err := controllerutils.AddFinalizer(ctx, r.Client, instance, appsv1alpha1.ProtectFinalizer); err != nil {
 		return reconcile.Result{}, err
 	}
 
