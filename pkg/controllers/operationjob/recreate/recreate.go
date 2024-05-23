@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
-	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
@@ -86,30 +85,13 @@ func (p *ContainerRecreateControl) OperateTarget(candidate *OpsCandidate) error 
 	}
 
 	// skip if candidate ops finished, or pod and containers do not exist
-	_, notFound := ojutils.ContainersNotFoundInPod(candidate.Pod, candidate.Containers)
-	if IsCandidateOpsFinished(candidate) || candidate.Pod == nil || notFound {
-		return nil
-	}
-
-	isDuringUpdatingOps := podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, candidate.Pod)
-	isDuringRecreateOps := podopslifecycle.IsDuringOps(ojutils.RecreateOpsLifecycleAdapter, candidate.Pod)
-
-	// if Pod is during UpdateOpsLifecycle, fail this recreation
-	if isDuringUpdatingOps {
-		ojutils.MarkOperationJobFailed(p.OperationJob)
-		// release target and cancel RecreateOpsLifecycle if during RecreateOpsLifecycle
-		if isDuringRecreateOps {
-			err := p.Handler.ReleasePod(p.Context, p.Client, p.OperationJob, candidate)
-			if err != nil {
-				return err
-			}
-			p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "CancelContainerRecreate", "try to cancel PodOpsLifecycle for recreating Container of Pod")
-			return ojutils.CancelOpsLifecycle(p.Context, p.Client, ojutils.RecreateOpsLifecycleAdapter, candidate.Pod)
-		}
+	_, containerNotFound := ojutils.ContainersNotFoundInPod(candidate.Pod, candidate.Containers)
+	if IsCandidateOpsFinished(candidate) || candidate.Pod == nil || containerNotFound {
 		return nil
 	}
 
 	// if Pod is not during RecreateOpsLifecycle, trigger it
+	isDuringRecreateOps := podopslifecycle.IsDuringOps(ojutils.RecreateOpsLifecycleAdapter, candidate.Pod)
 	if !isDuringRecreateOps {
 		p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "ConainerRecreateLifecycle", "try to begin PodOpsLifecycle for recreating Container of Pod")
 		if err := ojutils.BeginRecreateLifecycle(p.Client, ojutils.RecreateOpsLifecycleAdapter, candidate.Pod); err != nil {

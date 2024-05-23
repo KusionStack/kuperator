@@ -23,33 +23,33 @@ import (
 )
 
 var (
-	RecreateOpsLifecycleAdapter = &ContainerRecreateOpsLifecycleAdapter{}
+	RecreateOpsLifecycleAdapter = &OperationJobRecreateOpsLifecycleAdapter{}
 )
 
-// ContainerRecreateOpsLifecycleAdapter tells PodOpsLifecycle the container recreate ops info
-type ContainerRecreateOpsLifecycleAdapter struct{}
+// OperationJobRecreateOpsLifecycleAdapter tells PodOpsLifecycle the container recreate ops info
+type OperationJobRecreateOpsLifecycleAdapter struct{}
 
 // GetID indicates ID of one PodOpsLifecycle
-func (a *ContainerRecreateOpsLifecycleAdapter) GetID() string {
+func (a *OperationJobRecreateOpsLifecycleAdapter) GetID() string {
 	return "operationjob"
 }
 
 // GetType indicates type for an Operator
-func (a *ContainerRecreateOpsLifecycleAdapter) GetType() podopslifecycle.OperationType {
+func (a *OperationJobRecreateOpsLifecycleAdapter) GetType() podopslifecycle.OperationType {
 	return podopslifecycle.OpsLifecycleTypeRecreate
 }
 
 // AllowMultiType indicates whether multiple IDs which have the same Type are allowed
-func (a *ContainerRecreateOpsLifecycleAdapter) AllowMultiType() bool {
+func (a *OperationJobRecreateOpsLifecycleAdapter) AllowMultiType() bool {
 	return true
 }
 
 // WhenBegin will be executed when begin a lifecycle
-func (a *ContainerRecreateOpsLifecycleAdapter) WhenBegin(_ client.Object) (bool, error) {
+func (a *OperationJobRecreateOpsLifecycleAdapter) WhenBegin(_ client.Object) (bool, error) {
 	return false, nil
 }
 
 // WhenFinish will be executed when finish a lifecycle
-func (a *ContainerRecreateOpsLifecycleAdapter) WhenFinish(_ client.Object) (bool, error) {
+func (a *OperationJobRecreateOpsLifecycleAdapter) WhenFinish(_ client.Object) (bool, error) {
 	return false, nil
 }
