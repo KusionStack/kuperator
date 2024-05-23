@@ -125,7 +125,6 @@ func Finish(c client.Client, adapter LifecycleAdapter, obj client.Object, update
 	if hasID || hasType {
 		needUpdate = true
 		deleteOperatingID(adapter, obj)
-		deleteOperationType(adapter, obj)
 	}
 
 	updated, err = DefaultUpdateAll(obj, append(updateFunc, adapter.WhenFinish)...)

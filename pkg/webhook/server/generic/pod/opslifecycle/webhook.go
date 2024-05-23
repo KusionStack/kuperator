@@ -29,9 +29,6 @@ import (
 var (
 	// Some labels must exist together and have the same ID
 	pairLabelPrefixesMap = map[string]string{
-		v1alpha1.PodOperatingLabelPrefix:     v1alpha1.PodOperationTypeLabelPrefix,
-		v1alpha1.PodOperationTypeLabelPrefix: v1alpha1.PodOperatingLabelPrefix,
-
 		v1alpha1.PodOperatedLabelPrefix:          v1alpha1.PodDoneOperationTypeLabelPrefix,
 		v1alpha1.PodDoneOperationTypeLabelPrefix: v1alpha1.PodOperatedLabelPrefix,
 	}
