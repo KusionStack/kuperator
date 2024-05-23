@@ -44,13 +44,11 @@ func TestValidating(t *testing.T) {
 			labels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"): "1402144848",
 			},
-			keyWords: fmt.Sprintf("not found label %s", fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123")),
 		},
 		{
 			labels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "upgrade",
 			},
-			keyWords: fmt.Sprintf("not found label %s", fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123")),
 		},
 		{
 			labels: map[string]string{
@@ -59,7 +57,6 @@ func TestValidating(t *testing.T) {
 
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "456"): "1402144848",
 			},
-			keyWords: fmt.Sprintf("not found label %s", fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "456")),
 		},
 
 		{

@@ -26,6 +26,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"kusionstack.io/operating/apis/apps/v1alpha1"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/utils"
 )
@@ -49,7 +50,7 @@ func (lc *OpsLifecycle) Validating(ctx context.Context, c client.Client, oldPod,
 	expectedLabels := make(map[string]struct{})
 	foundLabels := make(map[string]struct{})
 	for label := range newPod.Labels {
-		for _, v := range pairLabelPrefixesMap { // Labels must exist together and have the same ID
+		for _, v := range v1alpha1.WellKnownLabelPrefixesWithID { // Validate well known lifecycle Labels format
 			if !strings.HasPrefix(label, v) {
 				continue
 			}
@@ -59,6 +60,14 @@ func (lc *OpsLifecycle) Validating(ctx context.Context, c client.Client, oldPod,
 				err = fmt.Errorf("invalid label %s", label)
 				return
 			}
+		}
+
+		for _, v := range pairLabelPrefixesMap { // Labels must exist together and have the same ID
+			if !strings.HasPrefix(label, v) {
+				continue
+			}
+
+			s := strings.Split(label, "/")
 			id := s[1]
 
 			if id != "" {
