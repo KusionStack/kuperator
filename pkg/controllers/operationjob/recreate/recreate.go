@@ -100,7 +100,7 @@ func (p *ContainerRecreateControl) OperateTarget(candidate *OpsCandidate) error 
 	}
 
 	// if Pod is allowed to recreate, try to do restart
-	_, allowed := podopslifecycle.AllowOps(ojutils.RecreateOpsLifecycleAdapter, 0, candidate.Pod)
+	_, allowed := podopslifecycle.AllowOps(ojutils.RecreateOpsLifecycleAdapter, realValue(p.OperationJob.Spec.OperationDelaySeconds), candidate.Pod)
 	if allowed {
 		err := p.Handler.DoRestartContainers(p.Context, p.Client, p.OperationJob, candidate, candidate.Containers)
 		if err != nil {
@@ -153,4 +153,12 @@ func (p *ContainerRecreateControl) ReleaseTarget(candidate *OpsCandidate) error 
 		return ojutils.CancelOpsLifecycle(p.Context, p.Client, ojutils.RecreateOpsLifecycleAdapter, candidate.Pod)
 	}
 	return nil
+}
+
+func realValue(val *int32) int32 {
+	if val == nil {
+		return 0
+	}
+
+	return *val
 }

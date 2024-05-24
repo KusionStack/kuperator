@@ -61,6 +61,10 @@ type OperationJobSpec struct {
 	// +optional
 	Partition *int32 `json:"partition,omitempty"`
 
+	// OperationDelaySeconds indicates how many seconds it should delay before operating update.
+	// +optional
+	OperationDelaySeconds *int32 `json:"operationDelaySeconds,omitempty"`
+
 	// Specify the duration in seconds relative to the startTime
 	// that the job may be active before the system tries to terminate it
 	// +optional

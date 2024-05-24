@@ -58,6 +58,11 @@ spec:
                   it
                 format: int32
                 type: integer
+              operationDelaySeconds:
+                description: OperationDelaySeconds indicates how many seconds it should
+                  delay before operating update.
+                format: int32
+                type: integer
               partition:
                 description: Partition controls the operation progress by indicating
                   how many pods should be operated. Defaults to nil (all pods will

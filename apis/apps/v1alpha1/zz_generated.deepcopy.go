@@ -377,6 +377,11 @@ func (in *OperationJobSpec) DeepCopyInto(out *OperationJobSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.OperationDelaySeconds != nil {
+		in, out := &in.OperationDelaySeconds, &out.OperationDelaySeconds
+		*out = new(int32)
+		**out = **in
+	}
 	if in.ActiveDeadlineSeconds != nil {
 		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
 		*out = new(int32)
