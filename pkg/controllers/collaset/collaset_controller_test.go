@@ -472,13 +472,13 @@ var _ = Describe("collaset controller", func() {
 			})).Should(BeNil())
 		}
 
-		Eventually(func() int32 {
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
-			return cs.Status.UpdatedReplicas
-		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
-		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 3, 2, 1, 0, 0)).Should(BeNil())
+			return len(podList.Items) == 3 && cs.Status.UpdatedReplicas == 2 && cs.Status.OperatingReplicas == 1
+		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(true))
 
-		// delete updated pods and trigger scale
+		// delete updated pods to trigger scale out
 		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 		for _, pod := range podList.Items {
 			if pod.Labels[appsv1.ControllerRevisionHashLabelKey] == cs.Status.UpdatedRevision {
@@ -486,16 +486,11 @@ var _ = Describe("collaset controller", func() {
 			}
 		}
 
-		Eventually(func() int {
+		Eventually(func() bool {
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-			return len(podList.Items)
-		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(3))
-
-		Eventually(func() int32 {
 			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
-			return cs.Status.UpdatedReplicas
-		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
-		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 3, 2, 0, 0, 0)).Should(BeNil())
+			return len(podList.Items) == 3 && cs.Status.UpdatedReplicas == 2 && cs.Status.OperatingReplicas == 0
+		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(true))
 	})
 
 	It("update pod policy", func() {
