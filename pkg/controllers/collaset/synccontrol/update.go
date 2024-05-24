@@ -216,7 +216,12 @@ func decidePodToUpdateByPartition(cls *appsv1alpha1.CollaSet, podInfos []*PodUpd
 	ordered := orderByDefault(filteredPodInfos)
 	sort.Sort(ordered)
 
-	partition := int(*cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition)
+	diff := int(realValue(cls.Spec.Replicas)) - len(podInfos)
+	if diff < 0 { // pods during scaleIn will be filtered out by IsDuringOps, just ignore
+		diff = 0
+	}
+
+	partition := int(*cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition) - diff
 	if partition >= len(filteredPodInfos) {
 		return filteredPodInfos
 	}
