@@ -449,8 +449,11 @@ func (r *RealSyncControl) Scale(
 			podInstanceIDSet := collasetutils.CollectPodInstanceID(podWrappers)
 			// find IDs and their contexts which have not been used by owned Pods
 			availableContext := extractAvailableContexts(diff, ownedIDs, podInstanceIDSet)
-			succCount, err := controllerutils.SlowStartBatch(diff, controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) error {
+			// reclaim IDs for pods which are failed to create
+			createFailedIDs := sets.Int{}
+			succCount, err := controllerutils.SlowStartBatch(diff, controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) (err error) {
 				availableIDContext := availableContext[idx]
+				createFailedIDs.Insert(availableIDContext.ID)
 				// use revision recorded in Context
 				revision := resources.UpdatedRevision
 				if revisionName, exist := availableIDContext.Data[podcontext.RevisionContextDataKey]; exist && revisionName != "" {
@@ -508,12 +511,24 @@ func (r *RealSyncControl) Scale(
 				if pod, err = r.podControl.CreatePod(newPod); err != nil {
 					return err
 				}
+				createFailedIDs.Delete(availableIDContext.ID)
 				// add an expectation for this pod creation, before next reconciling
 				return collasetutils.ActiveExpectations.ExpectCreate(cls, expectations.Pod, pod.Name)
 			})
 			r.recorder.Eventf(cls, corev1.EventTypeNormal, "ScaleOut", "scale out %d Pod(s)", succCount)
 			if err != nil {
 				collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, err, "ScaleOutFailed", err.Error())
+				if createFailedIDs.Len() > 0 {
+					for _, id := range createFailedIDs.List() {
+						delete(ownedIDs, id)
+					}
+					logger.V(1).Info("try to update ResourceContext for CollaSet after scaling out")
+					if updateContextErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+						return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
+					}); updateContextErr != nil {
+						err = controllerutils.AggregateErrors([]error{updateContextErr, err})
+					}
+				}
 				return succCount > 0, recordedRequeueAfter, err
 			}
 			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleOut", "")
