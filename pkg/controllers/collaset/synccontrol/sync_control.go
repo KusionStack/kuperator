@@ -450,10 +450,14 @@ func (r *RealSyncControl) Scale(
 			// find IDs and their contexts which have not been used by owned Pods
 			availableContext := extractAvailableContexts(diff, ownedIDs, podInstanceIDSet)
 			// reclaim IDs for pods which are failed to create
-			createFailedIDs := sets.Int{}
+			createFailedIDs := make(chan int, diff)
 			succCount, err := controllerutils.SlowStartBatch(diff, controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) (err error) {
 				availableIDContext := availableContext[idx]
-				createFailedIDs.Insert(availableIDContext.ID)
+				defer func() {
+					if err != nil {
+						createFailedIDs <- availableIDContext.ID
+					}
+				}()
 				// use revision recorded in Context
 				revision := resources.UpdatedRevision
 				if revisionName, exist := availableIDContext.Data[podcontext.RevisionContextDataKey]; exist && revisionName != "" {
@@ -511,18 +515,18 @@ func (r *RealSyncControl) Scale(
 				if pod, err = r.podControl.CreatePod(newPod); err != nil {
 					return err
 				}
-				createFailedIDs.Delete(availableIDContext.ID)
 				// add an expectation for this pod creation, before next reconciling
 				return collasetutils.ActiveExpectations.ExpectCreate(cls, expectations.Pod, pod.Name)
 			})
 			r.recorder.Eventf(cls, corev1.EventTypeNormal, "ScaleOut", "scale out %d Pod(s)", succCount)
 			if err != nil {
 				collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, err, "ScaleOutFailed", err.Error())
-				if createFailedIDs.Len() > 0 {
-					for _, id := range createFailedIDs.List() {
+				if len(createFailedIDs) > 0 {
+					for len(createFailedIDs) > 0 {
+						id := <-createFailedIDs
 						delete(ownedIDs, id)
 					}
-					logger.V(1).Info("try to update ResourceContext for CollaSet after scaling out")
+					logger.V(1).Info("try to update ResourceContext for CollaSet after scaling out failed")
 					if updateContextErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 						return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
 					}); updateContextErr != nil {
