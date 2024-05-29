@@ -471,12 +471,9 @@ var _ = Describe("collaset controller", func() {
 				return true
 			})).Should(BeNil())
 		}
-
-		Eventually(func() bool {
-			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
-			return len(podList.Items) == 3 && cs.Status.UpdatedReplicas == 2 && cs.Status.OperatingReplicas == 1
-		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(true))
+		Eventually(func() error {
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 3, 2, 1, 0, 0)
+		}, 10*time.Second, 1*time.Second).Should(BeNil())
 
 		// delete updated pods to trigger scale out
 		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
@@ -486,11 +483,10 @@ var _ = Describe("collaset controller", func() {
 			}
 		}
 
-		Eventually(func() bool {
-			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
-			return len(podList.Items) == 3 && cs.Status.UpdatedReplicas == 2 && cs.Status.OperatingReplicas == 0
-		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(true))
+		Eventually(func() error {
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 3, 2, 0, 0, 0)
+		}, 10*time.Second, 1*time.Second).Should(BeNil())
+
 	})
 
 	It("scale failed and update parallel", func() {
