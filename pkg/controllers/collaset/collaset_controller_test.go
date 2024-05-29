@@ -975,7 +975,7 @@ var _ = Describe("collaset controller", func() {
 		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 
 		replacePod := podList.Items[0]
-		// label pod to trigger update
+		// label pod to trigger replace
 		Expect(updatePodWithRetry(c, replacePod.Namespace, replacePod.Name, func(pod *corev1.Pod) bool {
 			if pod.Labels == nil {
 				pod.Labels = map[string]string{}
@@ -1035,6 +1035,148 @@ var _ = Describe("collaset controller", func() {
 				Expect(exist).Should(BeTrue())
 			}
 		}
+	})
+
+	It("replace pod by label and replace update", func() {
+		testcase := "test-replace-pod-and-replace-update"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+
+		cs := &appsv1alpha1.CollaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.CollaSetSpec{
+				Replicas: int32Pointer(1),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "foo",
+								Image: "nginx:v1",
+							},
+						},
+					},
+				},
+				UpdateStrategy: appsv1alpha1.UpdateStrategy{
+					OperationDelaySeconds: int32Pointer(1),
+					PodUpdatePolicy:       appsv1alpha1.CollaSetReplacePodUpdateStrategyType,
+				},
+			},
+		}
+
+		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
+		var originPodName, replaceNewPodName, replaceNewUpdatedPodName string
+
+		podList := &corev1.PodList{}
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 1
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 1, 1, 0, 0, 0)).Should(BeNil())
+
+		// label pod to trigger replace
+		originPod := podList.Items[0]
+		originPodName = originPod.Name
+		Expect(updatePodWithRetry(c, originPod.Namespace, originPodName, func(pod *corev1.Pod) bool {
+			if pod.Labels == nil {
+				pod.Labels = map[string]string{}
+			}
+			pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] = "true"
+			return true
+		})).Should(BeNil())
+		Eventually(func() error {
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
+
+		// update collaset with replace update
+		observedGeneration := cs.Status.ObservedGeneration
+		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+			cls.Spec.UpdateStrategy.PodUpdatePolicy = appsv1alpha1.CollaSetReplacePodUpdateStrategyType
+			cls.Spec.Template.Spec.Containers[0].Image = "nginx:v2"
+			return true
+		})).Should(BeNil())
+		Expect(observedGeneration != cs.Status.ObservedGeneration)
+		Eventually(func() error {
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 0, 0, 0, 0)
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
+
+		// mock replaceNewPod pod service available
+		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+		for _, pod := range podList.Items {
+			if pod.Labels[appsv1alpha1.PodReplacePairOriginName] == originPodName {
+				replaceNewPodName = pod.Name
+				Expect(pod.Spec.Containers[0].Image).Should(BeEquivalentTo("nginx:v1"))
+				Expect(updatePodWithRetry(c, pod.Namespace, replaceNewPodName, func(pod *corev1.Pod) bool {
+					pod.Labels[appsv1alpha1.PodServiceAvailableLabel] = "true"
+					return true
+				})).Should(BeNil())
+			}
+		}
+
+		// wait for originPod is replaced and newReplaceUpdatedPod created
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for _, pod := range podList.Items {
+				if pod.Name == originPodName {
+					// allow origin pod to be deleted
+					Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+						labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID())
+						pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+						return true
+					})).Should(BeNil())
+					return false
+				}
+			}
+			return true
+		}, 5*time.Second, time.Second).Should(BeTrue())
+		Eventually(func() error {
+			return expectedStatusReplicas(c, cs, 0, 0, 1, 2, 1, 0, 0, 0)
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
+
+		// mock replaceNewUpdatedPod pod service available
+		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+		for _, pod := range podList.Items {
+			if pod.Labels[appsv1alpha1.PodReplacePairOriginName] == replaceNewPodName {
+				replaceNewUpdatedPodName = pod.Name
+				Expect(pod.Spec.Containers[0].Image).Should(BeEquivalentTo("nginx:v2"))
+				Expect(updatePodWithRetry(c, pod.Namespace, replaceNewUpdatedPodName, func(pod *corev1.Pod) bool {
+					pod.Labels[appsv1alpha1.PodServiceAvailableLabel] = "true"
+					return true
+				})).Should(BeNil())
+			}
+		}
+
+		// wait for replaceNewPod is deleted
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for _, pod := range podList.Items {
+				if pod.Name == replaceNewPodName {
+					// allow replaceNewPod pod to be deleted
+					Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+						labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID())
+						pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+						return true
+					})).Should(BeNil())
+					return false
+				}
+			}
+			return true
+		}, 5*time.Second, time.Second).Should(BeTrue())
+		Eventually(func() error {
+			return expectedStatusReplicas(c, cs, 0, 0, 1, 1, 1, 0, 0, 1)
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
 	})
 
 	It("replace update change to inplaceUpdate", func() {

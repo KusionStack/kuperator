@@ -693,20 +693,12 @@ func (u *replaceUpdatePodUpdater) BeginUpdatePod(resources *collasetutils.Relate
 			if exist && newPodRevision == resources.UpdatedRevision.Name {
 				return nil
 			}
-			u.recorder.Eventf(podInfo.Pod,
+			u.recorder.Eventf(podInfo.replacePairNewPodInfo.Pod,
 				corev1.EventTypeNormal,
 				"ReplaceUpdatePod",
-				"label to-delete on new pair pod %s/%s because it is not updated revision, current revision: %s, updated revision: %s",
-				replacePairNewPod.Namespace,
-				replacePairNewPod.Name,
-				newPodRevision,
-				resources.UpdatedRevision.Name)
-			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%d"}}}`, appsv1alpha1.PodDeletionIndicationLabelKey, time.Now().UnixNano())))
-			if patchErr := u.Patch(u.ctx, podInfo.replacePairNewPodInfo.Pod, patch); patchErr != nil {
-				err := fmt.Errorf("failed to delete replace pair new pod %s/%s %s",
-					podInfo.replacePairNewPodInfo.Namespace, podInfo.replacePairNewPodInfo.Name, patchErr)
-				return err
-			}
+				"wait for origin pod %s/%s replaced by label finished",
+				podInfo.Namespace,
+				podInfo.Name)
 		}
 		return nil
 	})
