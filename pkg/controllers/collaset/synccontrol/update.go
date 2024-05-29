@@ -491,7 +491,9 @@ func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(
 }
 
 func (u *inPlaceIfPossibleUpdater) UpgradePod(podInfo *PodUpdateInfo) error {
-	if podInfo.OnlyMetadataChanged || podInfo.InPlaceUpdateSupport {
+	if podInfo.isInReplacing {
+		return nil
+	} else if podInfo.OnlyMetadataChanged || podInfo.InPlaceUpdateSupport {
 		// if pod template changes only include metadata or support in-place update, just apply these changes to pod directly
 		if err := u.podControl.UpdatePod(podInfo.UpdatedPod); err != nil {
 			return fmt.Errorf("fail to update Pod %s/%s when updating by in-place: %s", podInfo.Namespace, podInfo.Name, err)
@@ -668,6 +670,9 @@ func (u *recreatePodUpdater) FulfillPodUpdatedInfo(_ *appsv1.ControllerRevision,
 }
 
 func (u *recreatePodUpdater) UpgradePod(podInfo *PodUpdateInfo) error {
+	if podInfo.isInReplacing {
+		return nil
+	}
 	return recreatePod(u.collaSet, podInfo, u.podControl, u.recorder)
 }
 
@@ -723,7 +728,7 @@ func (u *replaceUpdatePodUpdater) FulfillPodUpdatedInfo(_ *appsv1.ControllerRevi
 
 func (u *replaceUpdatePodUpdater) UpgradePod(podInfo *PodUpdateInfo) error {
 	// add replace indicate label only and wait to replace when syncPods
-	if _, exist := podInfo.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist {
+	if !podInfo.isInReplacing {
 		// need replace pod, label pod with replace-indicate
 		now := time.Now().UnixNano()
 		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v", "%s": "%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, now, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey, true)))
