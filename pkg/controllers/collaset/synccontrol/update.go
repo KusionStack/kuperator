@@ -259,6 +259,10 @@ func (o orderByDefault) Less(i, j int) bool {
 		return l.isDuringOps
 	}
 
+	if l.isInReplacing != r.isInReplacing {
+		return r.isInReplacing
+	}
+
 	if controllerutils.BeforeReady(l.Pod) == controllerutils.BeforeReady(r.Pod) &&
 		l.PodDecorationChanged != r.PodDecorationChanged {
 		return l.PodDecorationChanged
