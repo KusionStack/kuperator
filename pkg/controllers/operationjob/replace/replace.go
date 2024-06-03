@@ -126,6 +126,8 @@ func (p *PodReplaceControl) FulfilPodOpsStatus(candidate *OpsCandidate) error {
 				if newPodId == newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] {
 					p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "ReplaceNewPod", "replace by pod %s with operationjob %s", candidate.PodName, p.OperationJob.Name)
 					p.Recorder.Eventf(newPod, corev1.EventTypeNormal, "ReplaceOriginPod", "replace pod %s with operationjob %s", newPod.Name, p.OperationJob.Name)
+					candidate.PodOpsStatus.Reason = appsv1alpha1.ReasonReplacedByNewPod
+					candidate.PodOpsStatus.Message = newPod.Name
 				}
 			}
 		}
@@ -134,6 +136,9 @@ func (p *PodReplaceControl) FulfilPodOpsStatus(candidate *OpsCandidate) error {
 	// origin pod is deleted not exist, mark as succeeded
 	if candidate.Pod == nil {
 		candidate.PodOpsStatus.Progress = appsv1alpha1.OperationProgressSucceeded
+		if candidate.PodOpsStatus.Reason != appsv1alpha1.ReasonReplacedByNewPod {
+			candidate.PodOpsStatus.Reason = appsv1alpha1.ReasonPodNotFound
+		}
 	} else {
 		candidate.PodOpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 	}

@@ -34,6 +34,7 @@ type ReasonForOpsProgress string
 const (
 	ReasonPodNotFound       ReasonForOpsProgress = "PodNotFound"
 	ReasonContainerNotFound ReasonForOpsProgress = "ContainerNotFound"
+	ReasonReplacedByNewPod  ReasonForOpsProgress = "ReplacedByNewPod"
 )
 
 // OperationProgress indicates operation progress of pod
