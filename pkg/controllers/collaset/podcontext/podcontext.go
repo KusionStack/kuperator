@@ -144,9 +144,6 @@ func doCreatePodContext(c client.Client, instance *appsv1alpha1.CollaSet, ownerI
 func doUpdatePodContext(c client.Client, instance client.Object, ownedIDs map[int]*appsv1alpha1.ContextDetail, podContext *appsv1alpha1.ResourceContext) error {
 	// store all IDs crossing all workload
 	existingIDs := map[int]*appsv1alpha1.ContextDetail{}
-	for k, detail := range ownedIDs {
-		existingIDs[k] = detail
-	}
 
 	for i := range podContext.Spec.Contexts {
 		detail := podContext.Spec.Contexts[i]
@@ -157,8 +154,23 @@ func doUpdatePodContext(c client.Client, instance client.Object, ownedIDs map[in
 		existingIDs[detail.ID] = &detail
 	}
 
-	podContext.Spec.Contexts = make([]appsv1alpha1.ContextDetail, len(existingIDs))
+	for _, contextDetail := range ownedIDs {
+		existingIDs[contextDetail.ID] = contextDetail
+	}
 
+	// delete PodContext if it is empty
+	if len(existingIDs) == 0 {
+		err := c.Delete(context.TODO(), podContext)
+		if err != nil {
+			if err := utils.ActiveExpectations.ExpectDelete(instance, expectations.ResourceContext, podContext.Name); err != nil {
+				return err
+			}
+		}
+
+		return err
+	}
+
+	podContext.Spec.Contexts = make([]appsv1alpha1.ContextDetail, len(existingIDs))
 	idx := 0
 	for _, contextDetail := range existingIDs {
 		podContext.Spec.Contexts[idx] = *contextDetail
