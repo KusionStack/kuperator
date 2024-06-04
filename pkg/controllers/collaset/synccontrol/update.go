@@ -173,12 +173,17 @@ func attachPodUpdateInfo(ctx context.Context, cls *appsv1alpha1.CollaSet, pods [
 	return podUpdateInfoList, nil
 }
 
-func decidePodToUpdate(cls *appsv1alpha1.CollaSet, podInfos []*PodUpdateInfo) []*PodUpdateInfo {
+func decidePodToUpdate(
+	cls *appsv1alpha1.CollaSet,
+	podInfos []*PodUpdateInfo,
+	ownedIDs map[int]*appsv1alpha1.ContextDetail,
+	resources *collasetutils.RelatedResources) []*PodUpdateInfo {
+
 	if cls.Spec.UpdateStrategy.RollingUpdate != nil && cls.Spec.UpdateStrategy.RollingUpdate.ByLabel != nil {
 		return decidePodToUpdateByLabel(cls, podInfos)
 	}
 
-	return decidePodToUpdateByPartition(cls, podInfos)
+	return decidePodToUpdateByPartition(cls, podInfos, ownedIDs, resources)
 }
 
 func decidePodToUpdateByLabel(_ *appsv1alpha1.CollaSet, podInfos []*PodUpdateInfo) (podToUpdate []*PodUpdateInfo) {
@@ -207,7 +212,12 @@ func decidePodToUpdateByLabel(_ *appsv1alpha1.CollaSet, podInfos []*PodUpdateInf
 	return podToUpdate
 }
 
-func decidePodToUpdateByPartition(cls *appsv1alpha1.CollaSet, podInfos []*PodUpdateInfo) (podToUpdate []*PodUpdateInfo) {
+func decidePodToUpdateByPartition(
+	cls *appsv1alpha1.CollaSet,
+	podInfos []*PodUpdateInfo,
+	ownedIDs map[int]*appsv1alpha1.ContextDetail,
+	resources *collasetutils.RelatedResources) (podToUpdate []*PodUpdateInfo) {
+
 	filteredPodInfos := filterReplacingNewCreatedPod(podInfos)
 	if cls.Spec.UpdateStrategy.RollingUpdate == nil ||
 		cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition == nil {
@@ -216,20 +226,58 @@ func decidePodToUpdateByPartition(cls *appsv1alpha1.CollaSet, podInfos []*PodUpd
 	ordered := orderByDefault(filteredPodInfos)
 	sort.Sort(ordered)
 
-	// pods during scaleIn will be filtered out by IsDuringOps, just ignore
-	diff := maxInt(int(realValue(cls.Spec.Replicas))-len(podInfos), 0)
-	partition := maxInt(int(*cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition)-diff, 0)
+	scaleOutUpdatedReplicas := decideUpdatedScalingOutReplicas(cls, podInfos, ownedIDs, resources)
+	partition := int(*cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition) - scaleOutUpdatedReplicas
 
 	if partition >= len(filteredPodInfos) {
 		return filteredPodInfos
 	}
-	podToUpdate = filteredPodInfos[:partition]
-	for i := partition; i < len(filteredPodInfos); i++ {
+	podToUpdate = ordered[:partition]
+	for i := partition; i < len(ordered); i++ {
 		if podInfos[i].PodDecorationChanged {
 			podToUpdate = append(podToUpdate, podInfos[i])
 		}
 	}
 	return podToUpdate
+}
+
+func decideUpdatedScalingOutReplicas(
+	cls *appsv1alpha1.CollaSet,
+	podInfos []*PodUpdateInfo,
+	ownedIDs map[int]*appsv1alpha1.ContextDetail,
+	resources *collasetutils.RelatedResources) int {
+
+	diff := int(realValue(cls.Spec.Replicas)) - len(podInfos)
+	if diff <= 0 {
+		return 0
+	}
+
+	scaleOutIDs := make(map[int]*appsv1alpha1.ContextDetail, diff)
+	for id, contextDetail := range ownedIDs {
+		// filter out scaleIn ID
+		if contextDetail.Contains(ScaleInContextDataKey, "true") {
+			continue
+		}
+		// filter out ReplaceOriginPodID ID
+		if _, exist := contextDetail.Data[ReplaceOriginPodID]; exist {
+			continue
+		}
+		scaleOutIDs[id] = contextDetail
+	}
+	for _, podInfo := range podInfos {
+		// filter out reconciling pod's ID
+		delete(scaleOutIDs, podInfo.ID)
+	}
+
+	scaleOutFailedCount := maxInt(diff-len(scaleOutIDs), 0)
+	scaleOutSucceededUpdatedCount := 0
+	for _, contextDetail := range scaleOutIDs {
+		revision, exist := contextDetail.Data[podcontext.RevisionContextDataKey]
+		if exist && revision == resources.UpdatedRevision.Name {
+			scaleOutSucceededUpdatedCount++
+		}
+	}
+	return minInt(diff, scaleOutSucceededUpdatedCount+scaleOutFailedCount)
 }
 
 // filter these pods in replacing and is new created pod
