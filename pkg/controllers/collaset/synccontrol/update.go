@@ -226,8 +226,8 @@ func decidePodToUpdateByPartition(
 	ordered := orderByDefault(filteredPodInfos)
 	sort.Sort(ordered)
 
-	scaleOutUpdatedReplicas := decideUpdatedScalingOutReplicas(cls, podInfos, ownedIDs, resources)
-	partition := int(*cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition) - scaleOutUpdatedReplicas
+	scaleOutUpdatedAndFailedReplicas := decideUpdatedScalingOutReplicas(cls, podInfos, ownedIDs, resources)
+	partition := maxInt(int(*cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition)-scaleOutUpdatedAndFailedReplicas, 0)
 
 	if partition >= len(filteredPodInfos) {
 		return filteredPodInfos
@@ -259,7 +259,7 @@ func decideUpdatedScalingOutReplicas(
 			continue
 		}
 		// filter out ReplaceOriginPodID ID
-		if _, exist := contextDetail.Data[ReplaceOriginPodID]; exist {
+		if _, exist := contextDetail.Data[ReplaceOriginPodIDContextDataKey]; exist {
 			continue
 		}
 		scaleOutIDs[id] = contextDetail
@@ -269,15 +269,17 @@ func decideUpdatedScalingOutReplicas(
 		delete(scaleOutIDs, podInfo.ID)
 	}
 
-	scaleOutFailedCount := maxInt(diff-len(scaleOutIDs), 0)
-	scaleOutSucceededUpdatedCount := 0
+	scaleOutUpdatedReplicas := 0
+	scaleOutFailedReplicas := 0
 	for _, contextDetail := range scaleOutIDs {
 		revision, exist := contextDetail.Data[podcontext.RevisionContextDataKey]
 		if exist && revision == resources.UpdatedRevision.Name {
-			scaleOutSucceededUpdatedCount++
+			scaleOutUpdatedReplicas++
+		} else if !exist {
+			scaleOutFailedReplicas++
 		}
 	}
-	return minInt(diff, scaleOutSucceededUpdatedCount+scaleOutFailedCount)
+	return minInt(diff, scaleOutUpdatedReplicas+scaleOutFailedReplicas)
 }
 
 // filter these pods in replacing and is new created pod
