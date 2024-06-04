@@ -227,7 +227,7 @@ func (r *ReconcilePodOpsLifecycle) addServiceAvailable(pod *corev1.Pod) (bool, e
 	}
 
 	podLabelsToAdd := map[string]string{
-		v1alpha1.PodServiceAvailableLabel: strconv.FormatInt(time.Now().Unix(), 10),
+		v1alpha1.PodServiceAvailableLabel: strconv.FormatInt(time.Now().UnixNano(), 10),
 	}
 	return true, r.addLabels(context.Background(), pod, podLabelsToAdd)
 }
@@ -387,7 +387,7 @@ func (r *ReconcilePodOpsLifecycle) setServiceReadiness(pod *corev1.Pod, isReady 
 
 func (r *ReconcilePodOpsLifecycle) preCheckStage(pod *corev1.Pod, idToLabelsMap map[string]map[string]string) (labels map[string]string, err error) {
 	labels = map[string]string{}
-	currentTime := strconv.FormatInt(time.Now().Unix(), 10)
+	currentTime := strconv.FormatInt(time.Now().UnixNano(), 10)
 	for k, v := range idToLabelsMap {
 		t, ok := v[v1alpha1.PodOperationTypeLabelPrefix]
 		if !ok {
@@ -410,7 +410,7 @@ func (r *ReconcilePodOpsLifecycle) preCheckStage(pod *corev1.Pod, idToLabelsMap 
 
 func (r *ReconcilePodOpsLifecycle) postCheckStage(pod *corev1.Pod, idToLabelsMap map[string]map[string]string) (labels map[string]string, err error) {
 	labels = map[string]string{}
-	currentTime := strconv.FormatInt(time.Now().Unix(), 10)
+	currentTime := strconv.FormatInt(time.Now().UnixNano(), 10)
 	for k := range idToLabelsMap {
 		key := fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, k)
 		if _, ok := pod.Labels[key]; !ok {
