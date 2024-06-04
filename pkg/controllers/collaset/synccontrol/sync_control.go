@@ -124,7 +124,7 @@ func (r *RealSyncControl) SyncPods(
 	}
 
 	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods, replaceIndicatedCount := dealReplacePods(filteredPods, instance)
-	if err = r.deletePodsByLabel(needDeletePods); err != nil {
+	if err := r.deletePodsByLabel(needDeletePods); err != nil {
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "delete pods by label with error: %s", err.Error())
 	}
 
@@ -794,7 +794,7 @@ func (r *RealSyncControl) Update(
 	}
 
 	// 2. decide Pod update candidates
-	podToUpdate := decidePodToUpdate(cls, podUpdateInfos)
+	podToUpdate := decidePodToUpdate(cls, podUpdateInfos, ownedIDs, resources)
 	podCh := make(chan *PodUpdateInfo, len(podToUpdate))
 	updater := newPodUpdater(ctx, r.client, cls, r.podControl, r.recorder)
 	updating := false
@@ -905,6 +905,13 @@ func realValue(val *int32) int32 {
 
 func maxInt(a, b int) int {
 	if a > b {
+		return a
+	}
+	return b
+}
+
+func minInt(a, b int) int {
+	if a < b {
 		return a
 	}
 	return b
