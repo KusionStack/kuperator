@@ -49,9 +49,9 @@ import (
 )
 
 const (
-	ScaleInContextDataKey = "ScaleIn"
-	ReplaceNewPodID       = "ReplaceNewPodID"
-	ReplaceOriginPodID    = "ReplaceOriginPodID"
+	ScaleInContextDataKey            = "ScaleIn"
+	ReplaceNewPodIDContextDataKey    = "ReplaceNewPodID"
+	ReplaceOriginPodIDContextDataKey = "ReplaceOriginPodID"
 )
 
 type Interface interface {
@@ -132,7 +132,7 @@ func (r *RealSyncControl) SyncPods(
 	var ownedIDs map[int]*appsv1alpha1.ContextDetail
 	if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		needAllocateReplicas := int(realValue(instance.Spec.Replicas)) + replaceIndicatedCount
-		ownedIDs, err = podcontext.AllocateID(r.client, instance, resources.UpdatedRevision.Name, needAllocateReplicas)
+		ownedIDs, err = podcontext.AllocateID(r.client, instance, needAllocateReplicas)
 		return err
 	}); err != nil {
 		return false, nil, ownedIDs, fmt.Errorf("fail to allocate %d IDs using context when sync Pods: %s", instance.Spec.Replicas, err)
@@ -198,9 +198,9 @@ func (r *RealSyncControl) SyncPods(
 				if labelKey == appsv1alpha1.PodReplacePairOriginName {
 					needUpdateContext = true
 					id, _ := collasetutils.GetPodInstanceID(pod)
-					if val, exist := ownedIDs[id].Data[ReplaceOriginPodID]; exist {
+					if val, exist := ownedIDs[id].Data[ReplaceOriginPodIDContextDataKey]; exist {
 						needDeleteOriginPodsIDs.Insert(val)
-						ownedIDs[id].Remove(ReplaceOriginPodID)
+						ownedIDs[id].Remove(ReplaceOriginPodIDContextDataKey)
 					}
 				}
 			}
@@ -251,7 +251,7 @@ func (r *RealSyncControl) SyncPods(
 			}
 			// add instance id and replace pair label
 			instanceId := fmt.Sprintf("%d", availableContexts[i].ID)
-			if val, exist := ownedIDs[originPodId].Data[ReplaceNewPodID]; exist {
+			if val, exist := ownedIDs[originPodId].Data[ReplaceNewPodIDContextDataKey]; exist {
 				id, _ := strconv.ParseInt(val, 10, 32)
 				if ownedIDs[int(id)] != nil {
 					instanceId = val
@@ -261,14 +261,15 @@ func (r *RealSyncControl) SyncPods(
 			newPod.Labels[appsv1alpha1.PodReplacePairOriginName] = originPod.GetName()
 			newPodId, _ := collasetutils.GetPodInstanceID(newPod)
 			// add replace pair-relation to IDs for originPod and newPod
-			ownedIDs[originPodId].Put(ReplaceNewPodID, strconv.Itoa(newPodId))
-			ownedIDs[newPodId].Put(ReplaceOriginPodID, strconv.Itoa(originPodId))
+			ownedIDs[originPodId].Put(ReplaceNewPodIDContextDataKey, strconv.Itoa(newPodId))
+			ownedIDs[newPodId].Put(ReplaceOriginPodIDContextDataKey, strconv.Itoa(originPodId))
 			// create pvcs for new pod
 			err = r.pvcControl.CreatePodPvcs(ctx, instance, newPod, resources.ExistingPvcs)
 			if err != nil {
 				return fmt.Errorf("fail to migrate PVCs from origin pod %s to replace pod %s: %s", originPod.Name, newPod.Name, err)
 			}
 			if newCreatedPod, err := r.podControl.CreatePod(newPod); err == nil {
+				availableContexts[i].Put(podcontext.RevisionContextDataKey, replaceRevision.Name)
 				r.recorder.Eventf(originPod,
 					corev1.EventTypeNormal,
 					"CreatePairPod",
@@ -544,24 +545,25 @@ func (r *RealSyncControl) Scale(
 				if pod, err = r.podControl.CreatePod(newPod); err != nil {
 					return err
 				}
+				availableIDContext.Put(podcontext.RevisionContextDataKey, revision.Name)
 				// add an expectation for this pod creation, before next reconciling
 				return collasetutils.ActiveExpectations.ExpectCreate(cls, expectations.Pod, pod.Name)
 			})
+			if len(createFailedIDs) > 0 || succCount > 0 {
+				for len(createFailedIDs) > 0 {
+					id := <-createFailedIDs
+					ownedIDs[id].Remove(podcontext.RevisionContextDataKey)
+				}
+				logger.V(1).Info("try to update ResourceContext for CollaSet after scaling out")
+				if updateContextErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+					return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
+				}); updateContextErr != nil {
+					err = controllerutils.AggregateErrors([]error{updateContextErr, err})
+				}
+			}
 			r.recorder.Eventf(cls, corev1.EventTypeNormal, "ScaleOut", "scale out %d Pod(s)", succCount)
 			if err != nil {
 				collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, err, "ScaleOutFailed", err.Error())
-				if len(createFailedIDs) > 0 {
-					for len(createFailedIDs) > 0 {
-						id := <-createFailedIDs
-						delete(ownedIDs, id)
-					}
-					logger.V(1).Info("try to update ResourceContext for CollaSet after scaling out failed")
-					if updateContextErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-						return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
-					}); updateContextErr != nil {
-						err = controllerutils.AggregateErrors([]error{updateContextErr, err})
-					}
-				}
 				return succCount > 0, recordedRequeueAfter, err
 			}
 			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleOut", "")
