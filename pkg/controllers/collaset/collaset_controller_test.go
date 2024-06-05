@@ -2113,6 +2113,72 @@ var _ = Describe("collaset controller", func() {
 		Expect(len(cs.Spec.ScaleStrategy.PodToDelete)).Should(BeEquivalentTo(0))
 	})
 
+	It("clean up CollaSet", func() {
+		testcase := "test-collaset-cleanup"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+
+		cs := &appsv1alpha1.CollaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.CollaSetSpec{
+				Replicas: int32Pointer(2),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "foo",
+								Image: "nginx:v1",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
+
+		podList := &corev1.PodList{}
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 2
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
+
+		resourceContextList := &appsv1alpha1.ResourceContextList{}
+		Expect(c.List(context.TODO(), resourceContextList, client.InNamespace(testcase))).Should(BeNil())
+		Expect(len(resourceContextList.Items)).Should(BeEquivalentTo(1))
+		Expect(len(resourceContextList.Items[0].Spec.Contexts)).Should(BeEquivalentTo(2))
+
+		// delete this CollaSet
+		Expect(c.Delete(context.TODO(), cs)).Should(BeNil())
+		Eventually(func() bool {
+			if err := c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs); err != nil && errors.IsNotFound(err) {
+				return true
+			}
+
+			return false
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+
+		rc := &resourceContextList.Items[0]
+		Eventually(func() bool {
+			err := c.Get(context.TODO(), types.NamespacedName{Namespace: rc.Namespace, Name: rc.Name}, rc)
+			return errors.IsNotFound(err)
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+	})
+
 })
 
 func expectedStatusReplicas(c client.Client, cls *appsv1alpha1.CollaSet, scheduledReplicas, readyReplicas, availableReplicas, replicas, updatedReplicas, operatingReplicas,
