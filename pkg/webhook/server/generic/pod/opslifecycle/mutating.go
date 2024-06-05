@@ -76,6 +76,8 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 			operatingCount++
 
 			if _, ok := labels[v1alpha1.PodPreCheckedLabelPrefix]; ok { // pre-checked
+				delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckLabelPrefix, id))
+
 				_, hasPreparing := labels[v1alpha1.PodPreparingLabelPrefix]
 				_, hasOperate := labels[v1alpha1.PodOperateLabelPrefix]
 
@@ -98,6 +100,8 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 		}
 
 		if _, ok := labels[v1alpha1.PodPostCheckedLabelPrefix]; ok { // post-checked
+			delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, id))
+
 			if _, ok := labels[v1alpha1.PodCompletingLabelPrefix]; !ok {
 				lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodCompletingLabelPrefix, id)) // complete
 			}
@@ -153,11 +157,11 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 		}
 
 		for id, labels := range newIDToLabelsMap {
-			for _, v := range []string{v1alpha1.PodPreCheckLabelPrefix, v1alpha1.PodPreCheckedLabelPrefix} {
-				delete(newPod.Labels, fmt.Sprintf("%s/%s", v, id))
-			}
+			delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodPreCheckedLabelPrefix, id))
 
 			if _, ok := labels[v1alpha1.PodOperatedLabelPrefix]; !ok {
+				delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id))
+
 				lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, id)) // operated
 				operatedCount++
 			}
@@ -174,7 +178,9 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 
 	if operatedCount == numOfIDs { // All operations are done
 		for id, labels := range newIDToLabelsMap {
-			if _, ok := labels[v1alpha1.PodPostCheckLabelPrefix]; !ok {
+			_, hasPostCheck := labels[v1alpha1.PodPostCheckLabelPrefix]
+			_, hasPostChecked := labels[v1alpha1.PodPostCheckedLabelPrefix]
+			if !hasPostCheck && !hasPostChecked {
 				lc.addLabelWithTime(newPod, fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, id)) // post-check
 			}
 		}

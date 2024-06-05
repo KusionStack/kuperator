@@ -120,7 +120,7 @@ var _ = Describe("PodOpsLifecycle controller", func() {
 		name      = "test"
 		namespace = "default"
 		id        = "123"
-		timestamp = "1402144848"
+		timestamp = "1717505885197871195"
 	)
 
 	AfterEach(func() {
@@ -351,7 +351,7 @@ var _ = Describe("Stage processing", func() {
 				Name:      name,
 				Namespace: namespace,
 				Labels: map[string]string{
-					fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):     "1402144848",
+					fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):     "1717505885197871195",
 					fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "abc",
 
 					fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "456"):     "1402144849",
@@ -389,7 +389,7 @@ var _ = Describe("Stage processing", func() {
 				Name:      name,
 				Namespace: namespace,
 				Labels: map[string]string{
-					fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "123"): "1402144848",
+					fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "123"): "1717505885197871195",
 
 					fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, "456"): "1402144849",
 				},
