@@ -61,7 +61,7 @@ func TestPodIDAndTypesMap(t *testing.T) {
 		},
 
 		{
-			keyWords: "A pod with normal labels",
+			keyWords: "A pod with normal operating labels",
 			labels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, "123"):     "1402144848",
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, "123"): "abc",
@@ -71,6 +71,25 @@ func TestPodIDAndTypesMap(t *testing.T) {
 				"123": {
 					v1alpha1.PodOperatingLabelPrefix:     "1402144848",
 					v1alpha1.PodOperationTypeLabelPrefix: "abc",
+				},
+			},
+			typeToNumsMap: map[string]int{
+				"abc": 1,
+			},
+			err: nil,
+		},
+
+		{
+			keyWords: "A pod with normal operated labels",
+			labels: map[string]string{
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1402144848",
+				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "123"): "abc",
+			},
+
+			idToLabelsMap: map[string]map[string]string{
+				"123": {
+					v1alpha1.PodOperatedLabelPrefix:          "1402144848",
+					v1alpha1.PodDoneOperationTypeLabelPrefix: "abc",
 				},
 			},
 			typeToNumsMap: map[string]int{
