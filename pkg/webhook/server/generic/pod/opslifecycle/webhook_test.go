@@ -18,6 +18,7 @@ package opslifecycle
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -118,13 +119,24 @@ func TestValidating(t *testing.T) {
 }
 
 func TestMutating(t *testing.T) {
+	expectedFinalizer := "finalizer1"
+	availableConditions := &v1alpha1.PodAvailableConditions{
+		ExpectedFinalizers: map[string]string{
+			"a.b.c/1": expectedFinalizer,
+		},
+	}
+	s, _ := json.Marshal(availableConditions)
+	availableConditionsAnnotationVal := string(s)
+
 	inputs := []struct {
 		note     string
 		keyWords string // Used to check the error message
 
-		oldPodLabels   map[string]string
-		newPodLabels   map[string]string
-		expectedLabels map[string]string
+		oldPodLabels      map[string]string
+		newPodLabels      map[string]string
+		newPodAnnotations map[string]string
+		newPodFinalizers  []string
+		expectedLabels    map[string]string
 
 		readyToOperate ReadyToOperate
 	}{
@@ -399,19 +411,49 @@ func TestMutating(t *testing.T) {
 		},
 
 		{
-			note: "wait for removing finalizers",
+			note: "all expected finalizers satisfied",
 			newPodLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1717505885197871195",
 				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "123"): "upgrade",
-				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "123"):         "1717505885197871195",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, "123"):       "1717505885197871195",
 
 				fmt.Sprintf("%s/%s", v1alpha1.PodCompletingLabelPrefix, "123"): "1717505885197871195",
 			},
+			expectedLabels: map[string]string{},
+		},
+
+		{
+			note:             "all expected finalizers satisfied",
+			newPodFinalizers: []string{expectedFinalizer},
+			newPodLabels: map[string]string{
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1717505885197871195",
+				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "123"): "upgrade",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, "123"):       "1717505885197871195",
+
+				fmt.Sprintf("%s/%s", v1alpha1.PodCompletingLabelPrefix, "123"): "1717505885197871195",
+			},
+			newPodAnnotations: map[string]string{
+				v1alpha1.PodAvailableConditionsAnnotation: availableConditionsAnnotationVal,
+			},
+			expectedLabels: map[string]string{},
+		},
+
+		{
+			note:             "not all expected finalizers satisfied",
+			newPodFinalizers: []string{},
+			newPodLabels: map[string]string{
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1717505885197871195",
+				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "123"): "upgrade",
+				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, "123"):       "1717505885197871195",
+
+				fmt.Sprintf("%s/%s", v1alpha1.PodCompletingLabelPrefix, "123"): "1717505885197871195",
+			},
+			newPodAnnotations: map[string]string{
+				v1alpha1.PodAvailableConditionsAnnotation: availableConditionsAnnotationVal,
+			},
 			expectedLabels: map[string]string{
 				fmt.Sprintf("%s/%s", v1alpha1.PodOperatedLabelPrefix, "123"):          "1717505885197871195",
 				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, "123"): "upgrade",
-				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckLabelPrefix, "123"):         "1717505885197871195",
 				fmt.Sprintf("%s/%s", v1alpha1.PodPostCheckedLabelPrefix, "123"):       "1717505885197871195",
 
 				fmt.Sprintf("%s/%s", v1alpha1.PodCompletingLabelPrefix, "123"): "1717505885197871195",
@@ -458,9 +500,11 @@ func TestMutating(t *testing.T) {
 		}
 		newPod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "new",
-				Namespace: "operating",
-				Labels:    v.newPodLabels,
+				Name:        "new",
+				Namespace:   "operating",
+				Labels:      v.newPodLabels,
+				Annotations: v.newPodAnnotations,
+				Finalizers:  v.newPodFinalizers,
 			},
 		}
 

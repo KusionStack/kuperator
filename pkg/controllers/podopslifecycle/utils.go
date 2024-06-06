@@ -33,7 +33,7 @@ func PodIDAndTypesMap(pod *corev1.Pod) (map[string]map[string]string, map[string
 
 	ids := sets.String{}
 	for k := range pod.Labels {
-		if strings.HasPrefix(k, v1alpha1.PodOperatingLabelPrefix) || strings.HasPrefix(k, v1alpha1.PodOperateLabelPrefix) {
+		if strings.HasPrefix(k, v1alpha1.PodOperatingLabelPrefix) || strings.HasPrefix(k, v1alpha1.PodOperateLabelPrefix) || strings.HasPrefix(k, v1alpha1.PodOperatedLabelPrefix) {
 			s := strings.Split(k, "/")
 			if len(s) < 2 {
 				return nil, nil, fmt.Errorf("invalid label %s", k)
@@ -43,13 +43,18 @@ func PodIDAndTypesMap(pod *corev1.Pod) (map[string]map[string]string, map[string
 	}
 
 	for id := range ids {
-		operationType, ok := pod.Labels[fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, id)]
-		if ok {
+		for _, val := range []string{v1alpha1.PodOperationTypeLabelPrefix, v1alpha1.PodDoneOperationTypeLabelPrefix} {
+			operationType, ok := pod.Labels[fmt.Sprintf("%s/%s", val, id)]
+			if !ok {
+				continue
+			}
+
 			if _, ok := typeToNumsMap[operationType]; !ok {
 				typeToNumsMap[operationType] = 1
 			} else {
 				typeToNumsMap[operationType] = typeToNumsMap[operationType] + 1
 			}
+			break
 		}
 
 		for _, prefix := range v1alpha1.WellKnownLabelPrefixesWithID {
