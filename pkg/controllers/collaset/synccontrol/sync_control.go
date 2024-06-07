@@ -198,6 +198,7 @@ func (r *RealSyncControl) SyncPods(
 			ID:            id,
 			ContextDetail: ownedIDs[id],
 			ToDelete:      toDelete,
+			IsUpdated:     collasetutils.IsPodUpdatedRevision(pod, resources.UpdatedRevision.Name),
 		})
 
 		if id >= 0 {

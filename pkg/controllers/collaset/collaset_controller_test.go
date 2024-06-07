@@ -249,7 +249,7 @@ var _ = Describe("collaset controller", func() {
 		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 4, 4, 0, 0, 0)).Should(BeNil())
 
 		// test update ByPartition
-		for _, partition := range []int32{0, 1, 2, 3, 4} {
+		for _, partition := range []int32{4, 3, 2, 1, 0} {
 			observedGeneration := cs.Status.ObservedGeneration
 
 			// update CollaSet image and partition
@@ -288,7 +288,7 @@ var _ = Describe("collaset controller", func() {
 			}
 			// check updated pod replicas by CollaSet status
 			Eventually(func() error {
-				return expectedStatusReplicas(c, cs, 0, 0, 0, 4, partition, partition, 0, 0)
+				return expectedStatusReplicas(c, cs, 0, 0, 0, 4, 4-partition, 4-partition, 0, 0)
 			}, 5*time.Second, 1*time.Second).Should(BeNil())
 
 			// double check updated pod replicas
@@ -306,7 +306,7 @@ var _ = Describe("collaset controller", func() {
 					Expect(podStatus.ContainerStates["foo"].LatestImage).Should(BeEquivalentTo("nginx:v2"))
 				}
 			}
-			Expect(updatedReplicas).Should(BeEquivalentTo(partition))
+			Expect(updatedReplicas).Should(BeEquivalentTo(4 - partition))
 		}
 
 		// mock Pods updated by kubelet
@@ -669,7 +669,7 @@ var _ = Describe("collaset controller", func() {
 		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 4, 4, 0, 0, 0)).Should(BeNil())
 
 		// test update ByPartition
-		for _, partition := range []int32{0, 1, 2, 3, 4} {
+		for _, partition := range []int32{4, 3, 2, 1, 0} {
 			observedGeneration := cs.Status.ObservedGeneration
 
 			// update CollaSet image and partition
@@ -690,7 +690,7 @@ var _ = Describe("collaset controller", func() {
 
 			// check updated pod replicas by CollaSet status
 			Eventually(func() error {
-				return expectedStatusReplicas(c, cs, 0, 0, 0, 4+partition, partition, 0, 0, 0)
+				return expectedStatusReplicas(c, cs, 0, 0, 0, 8-partition, 4-partition, 0, 0, 0)
 			}, 30*time.Second, 1*time.Second).Should(BeNil())
 
 			// double check updated pod replicas
@@ -703,7 +703,7 @@ var _ = Describe("collaset controller", func() {
 					Expect(pod.Labels[appsv1.ControllerRevisionHashLabelKey]).Should(BeEquivalentTo(cs.Status.UpdatedRevision))
 				}
 			}
-			Expect(updatedReplicas).Should(BeEquivalentTo(partition))
+			Expect(updatedReplicas).Should(BeEquivalentTo(4 - partition))
 		}
 
 		// mock Pods updated by kubelet
@@ -1630,7 +1630,7 @@ var _ = Describe("collaset controller", func() {
 		}, 5*time.Second, 1*time.Second).Should(BeTrue())
 		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 3, 3, 0, 0, 0)).Should(BeNil())
-		for _, partition := range []int32{0, 1, 2, 3} {
+		for _, partition := range []int32{3, 2, 1, 0} {
 			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 			Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
 				cls.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateCollaSetStrategy{
@@ -1647,7 +1647,7 @@ var _ = Describe("collaset controller", func() {
 			Eventually(func() int32 {
 				Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 				return cs.Status.UpdatedReplicas
-			}, time.Second*10, time.Second).Should(BeEquivalentTo(partition))
+			}, time.Second*10, time.Second).Should(BeEquivalentTo(3 - partition))
 			// allow Pod to do replace
 			podList := &corev1.PodList{}
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())

@@ -41,7 +41,8 @@ type PodWrapper struct {
 	ContextDetail *appsv1alpha1.ContextDetail
 
 	// TODO ToExclude
-	ToDelete bool
+	ToDelete  bool
+	IsUpdated bool
 }
 
 func CollectPodInstanceID(pods []*PodWrapper) map[int]struct{} {

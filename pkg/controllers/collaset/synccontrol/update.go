@@ -217,11 +217,11 @@ func decidePodToUpdateByPartition(cls *appsv1alpha1.CollaSet, podInfos []*PodUpd
 	sort.Sort(ordered)
 
 	partition := int(*cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition)
-	if partition >= len(filteredPodInfos) {
-		return filteredPodInfos
+	if partition >= len(ordered) {
+		return podToUpdate
 	}
-	podToUpdate = filteredPodInfos[:partition]
-	for i := partition; i < len(filteredPodInfos); i++ {
+	podToUpdate = ordered[partition:]
+	for i := partition; i < len(ordered); i++ {
 		if podInfos[i].PodDecorationChanged {
 			podToUpdate = append(podToUpdate, podInfos[i])
 		}
@@ -252,11 +252,11 @@ func (o orderByDefault) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 func (o orderByDefault) Less(i, j int) bool {
 	l, r := o[i], o[j]
 	if l.IsUpdatedRevision != r.IsUpdatedRevision {
-		return l.IsUpdatedRevision
+		return r.IsUpdatedRevision
 	}
 
 	if l.isDuringOps != r.isDuringOps {
-		return l.isDuringOps
+		return r.isDuringOps
 	}
 
 	if controllerutils.BeforeReady(l.Pod) == controllerutils.BeforeReady(r.Pod) &&
