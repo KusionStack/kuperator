@@ -174,6 +174,7 @@ func (r *RealSyncControl) SyncPods(
 			ID:            id,
 			ContextDetail: ownedIDs[id],
 			ToDelete:      toDelete,
+			IsUpdated:     collasetutils.IsPodUpdatedRevision(pod, resources.UpdatedRevision.Name),
 		})
 
 		if id >= 0 {
@@ -796,7 +797,7 @@ func (r *RealSyncControl) Update(
 	}
 
 	// 2. decide Pod update candidates
-	podToUpdate := decidePodToUpdate(cls, podUpdateInfos, ownedIDs, resources)
+	podToUpdate := decidePodToUpdate(cls, podUpdateInfos)
 	podCh := make(chan *PodUpdateInfo, len(podToUpdate))
 	updater := newPodUpdater(ctx, r.client, cls, r.podControl, r.recorder)
 	updating := false

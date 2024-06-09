@@ -407,7 +407,7 @@ var _ = Describe("collaset controller", func() {
 				UpdateStrategy: appsv1alpha1.UpdateStrategy{
 					RollingUpdate: &appsv1alpha1.RollingUpdateCollaSetStrategy{
 						ByPartition: &appsv1alpha1.ByPartition{
-							Partition: int32Pointer(2),
+							Partition: int32Pointer(1),
 						},
 					},
 				},
@@ -532,12 +532,12 @@ var _ = Describe("collaset controller", func() {
 		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(3))
 		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 3, 3, 0, 0, 0)).Should(BeNil())
 
-		// update collaset with non-exist pvc by partition=2
+		// update collaset with non-exist pvc by partition=1
 		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
 			cls.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateCollaSetStrategy{
 				ByPartition: &appsv1alpha1.ByPartition{
-					Partition: int32Pointer(2),
+					Partition: int32Pointer(1),
 				},
 			}
 			cls.Spec.Template.Spec.Containers = []corev1.Container{
@@ -602,7 +602,7 @@ var _ = Describe("collaset controller", func() {
 		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
 			cls.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateCollaSetStrategy{
 				ByPartition: &appsv1alpha1.ByPartition{
-					Partition: int32Pointer(2),
+					Partition: int32Pointer(1),
 				},
 			}
 			cls.Spec.Template.Spec.Containers = []corev1.Container{
@@ -1669,7 +1669,7 @@ var _ = Describe("collaset controller", func() {
 		}, 5*time.Second, 1*time.Second).Should(BeTrue())
 		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 3, 3, 0, 0, 0)).Should(BeNil())
-		for _, partition := range []int32{0, 1, 2, 3} {
+		for _, partition := range []int32{3, 2, 1, 0} {
 			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 			Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
 				cls.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
