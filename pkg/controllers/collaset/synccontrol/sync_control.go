@@ -545,6 +545,7 @@ func (r *RealSyncControl) Scale(
 				if pod, err = r.podControl.CreatePod(newPod); err != nil {
 					return err
 				}
+				// add revision to resourceContext ID if create pod succeeded
 				availableIDContext.Put(podcontext.RevisionContextDataKey, revision.Name)
 				// add an expectation for this pod creation, before next reconciling
 				return collasetutils.ActiveExpectations.ExpectCreate(cls, expectations.Pod, pod.Name)
@@ -552,6 +553,7 @@ func (r *RealSyncControl) Scale(
 			if len(createFailedIDs) > 0 || succCount > 0 {
 				for len(createFailedIDs) > 0 {
 					id := <-createFailedIDs
+					// clear revision from resourceContext ID if create failed
 					ownedIDs[id].Remove(podcontext.RevisionContextDataKey)
 				}
 				logger.V(1).Info("try to update ResourceContext for CollaSet after scaling out")
@@ -796,7 +798,7 @@ func (r *RealSyncControl) Update(
 	}
 
 	// 2. decide Pod update candidates
-	podToUpdate := decidePodToUpdate(cls, podUpdateInfos)
+	podToUpdate := decidePodToUpdate(cls, podUpdateInfos, ownedIDs, resources.UpdatedRevision)
 	podCh := make(chan *PodUpdateInfo, len(podToUpdate))
 	updater := newPodUpdater(ctx, r.client, cls, r.podControl, r.recorder)
 	updating := false

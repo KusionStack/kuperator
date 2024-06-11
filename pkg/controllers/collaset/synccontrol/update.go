@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -173,12 +174,17 @@ func attachPodUpdateInfo(ctx context.Context, cls *appsv1alpha1.CollaSet, pods [
 	return podUpdateInfoList, nil
 }
 
-func decidePodToUpdate(cls *appsv1alpha1.CollaSet, podInfos []*PodUpdateInfo) []*PodUpdateInfo {
+func decidePodToUpdate(
+	cls *appsv1alpha1.CollaSet,
+	podInfos []*PodUpdateInfo,
+	ownedIDs map[int]*appsv1alpha1.ContextDetail,
+	updatedRevision *appsv1.ControllerRevision) []*PodUpdateInfo {
+
 	if cls.Spec.UpdateStrategy.RollingUpdate != nil && cls.Spec.UpdateStrategy.RollingUpdate.ByLabel != nil {
 		return decidePodToUpdateByLabel(cls, podInfos)
 	}
 
-	return decidePodToUpdateByPartition(cls, podInfos)
+	return decidePodToUpdateByPartition(cls, podInfos, ownedIDs, updatedRevision)
 }
 
 func decidePodToUpdateByLabel(_ *appsv1alpha1.CollaSet, podInfos []*PodUpdateInfo) (podToUpdate []*PodUpdateInfo) {
@@ -207,7 +213,12 @@ func decidePodToUpdateByLabel(_ *appsv1alpha1.CollaSet, podInfos []*PodUpdateInf
 	return podToUpdate
 }
 
-func decidePodToUpdateByPartition(cls *appsv1alpha1.CollaSet, podInfos []*PodUpdateInfo) (podToUpdate []*PodUpdateInfo) {
+func decidePodToUpdateByPartition(
+	cls *appsv1alpha1.CollaSet,
+	podInfos []*PodUpdateInfo,
+	ownedIDs map[int]*appsv1alpha1.ContextDetail,
+	updatedRevision *appsv1.ControllerRevision) (podToUpdate []*PodUpdateInfo) {
+
 	filteredPodInfos := filterReplacingNewCreatedPod(podInfos)
 	if cls.Spec.UpdateStrategy.RollingUpdate == nil ||
 		cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition == nil {
@@ -221,13 +232,53 @@ func decidePodToUpdateByPartition(cls *appsv1alpha1.CollaSet, podInfos []*PodUpd
 	if partition >= podsNum {
 		return podToUpdate
 	}
-	podToUpdate = ordered[:podsNum-partition]
+
+	notCreatedOld := minInt(partition, decideNotCreatedOldPods(podInfos, ownedIDs, updatedRevision))
+	podToUpdate = ordered[:podsNum-partition+notCreatedOld]
 	for i := podsNum - partition; i < podsNum; i++ {
 		if podInfos[i].PodDecorationChanged {
 			podToUpdate = append(podToUpdate, podInfos[i])
 		}
 	}
 	return podToUpdate
+}
+
+func decideNotCreatedOldPods(
+	podInfos []*PodUpdateInfo,
+	ownedIDs map[int]*appsv1alpha1.ContextDetail,
+	updatedRevision *appsv1.ControllerRevision) int {
+
+	mapIDToPod := make(map[string]*PodUpdateInfo)
+	for _, pod := range podInfos {
+		id, exist := pod.Labels[appsv1alpha1.PodInstanceIDLabelKey]
+		if !exist {
+			return 0
+		}
+		mapIDToPod[id] = pod
+	}
+
+	var idToUpdate []*appsv1alpha1.ContextDetail
+	for _, contextDetail := range ownedIDs {
+		revision, exist := contextDetail.Data[podcontext.RevisionContextDataKey]
+		if !exist || revision == updatedRevision.Name {
+			continue
+		}
+		if _, exist := contextDetail.Data[ScaleInContextDataKey]; exist {
+			continue
+		}
+		if _, exist := contextDetail.Data[ReplaceOriginPodIDContextDataKey]; exist {
+			continue
+		}
+		idToUpdate = append(idToUpdate, contextDetail)
+	}
+
+	notCreated := 0
+	for _, contextDetail := range idToUpdate {
+		if _, exist := mapIDToPod[strconv.Itoa(contextDetail.ID)]; !exist {
+			notCreated++
+		}
+	}
+	return notCreated
 }
 
 // filter these pods in replacing and is new created pod
