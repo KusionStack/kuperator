@@ -220,7 +220,7 @@ func decidePodToUpdateByPartition(cls *appsv1alpha1.CollaSet, podInfos []*PodUpd
 	if partition >= len(ordered) {
 		return podToUpdate
 	}
-	podToUpdate = ordered[partition:]
+	podToUpdate = ordered[:len(ordered)-partition]
 	for i := partition; i < len(ordered); i++ {
 		if podInfos[i].PodDecorationChanged {
 			podToUpdate = append(podToUpdate, podInfos[i])
@@ -252,11 +252,11 @@ func (o orderByDefault) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 func (o orderByDefault) Less(i, j int) bool {
 	l, r := o[i], o[j]
 	if l.IsUpdatedRevision != r.IsUpdatedRevision {
-		return r.IsUpdatedRevision
+		return l.IsUpdatedRevision
 	}
 
 	if l.isDuringOps != r.isDuringOps {
-		return r.isDuringOps
+		return l.isDuringOps
 	}
 
 	if controllerutils.BeforeReady(l.Pod) == controllerutils.BeforeReady(r.Pod) &&
