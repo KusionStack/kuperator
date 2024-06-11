@@ -218,7 +218,7 @@ func decidePodToUpdateByPartition(cls *appsv1alpha1.CollaSet, podInfos []*PodUpd
 	sort.Sort(ordered)
 
 	partition := int(*cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition)
-	if partition >= len(ordered) {
+	if partition >= podsNum {
 		return podToUpdate
 	}
 	podToUpdate = ordered[:podsNum-partition]
