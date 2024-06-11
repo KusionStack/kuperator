@@ -213,6 +213,7 @@ func decidePodToUpdateByPartition(cls *appsv1alpha1.CollaSet, podInfos []*PodUpd
 		cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition == nil {
 		return filteredPodInfos
 	}
+	podsNum := len(filteredPodInfos)
 	ordered := orderByDefault(filteredPodInfos)
 	sort.Sort(ordered)
 
@@ -220,8 +221,8 @@ func decidePodToUpdateByPartition(cls *appsv1alpha1.CollaSet, podInfos []*PodUpd
 	if partition >= len(ordered) {
 		return podToUpdate
 	}
-	podToUpdate = ordered[:len(ordered)-partition]
-	for i := partition; i < len(ordered); i++ {
+	podToUpdate = ordered[:podsNum-partition]
+	for i := podsNum - partition; i < podsNum; i++ {
 		if podInfos[i].PodDecorationChanged {
 			podToUpdate = append(podToUpdate, podInfos[i])
 		}
