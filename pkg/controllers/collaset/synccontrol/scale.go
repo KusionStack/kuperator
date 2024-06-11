@@ -67,11 +67,6 @@ func (s ActivePodsForDeletion) Less(i, j int) bool {
 		return r.ToDelete
 	}
 
-	// pods which are updated should be scaled in before not updated
-	if l.IsUpdated != r.IsUpdated {
-		return r.IsUpdated
-	}
-
 	// pods which are during scaleInOps should be deleted before those not during
 	lDuringScaleIn := podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, l)
 	rDuringScaleIn := podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, r)
