@@ -17,22 +17,31 @@ limitations under the License.
 package utils
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 )
 
 func TestError(t *testing.T) {
 	var errs []error
-	var nilErr error
+	err1 := fmt.Errorf("error 1")
+	err2 := fmt.Errorf("error 2")
 
-	errs = append(errs, nilErr)
-	errs = append(errs, fmt.Errorf("error 1"))
-	errs = append(errs, fmt.Errorf("error 2"))
-
-	expected := fmt.Errorf("%v; %v", errs[1], errs[2])
 	actual := AggregateErrors(errs)
-	if errors.Is(expected, actual) {
+	if actual != nil {
+		t.Fatalf("expect %v equal to nil", actual)
+	}
+
+	errs = append(errs, err1)
+	actual = AggregateErrors(errs)
+	if actual.Error() != err1.Error() {
+		t.Fatalf("expect %v equal to %v", actual, err1)
+	}
+
+	errs = append(errs, err2)
+	actual = AggregateErrors(errs)
+	expected := fmt.Errorf("%v; %v", errs[0], errs[1])
+	if actual.Error() != expected.Error() {
 		t.Fatalf("expect %v equal to %v", actual, expected)
 	}
+
 }
