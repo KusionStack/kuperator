@@ -484,6 +484,7 @@ func (r *RealSyncControl) Scale(
 				availableIDContext := availableContext[idx]
 				defer func() {
 					if err != nil {
+						// TODO: do not clear RevisionContextDataKey if errors from webhook
 						createFailedIDs <- availableIDContext.ID
 					}
 				}()
