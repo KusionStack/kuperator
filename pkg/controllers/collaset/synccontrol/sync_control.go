@@ -123,7 +123,7 @@ func (r *RealSyncControl) SyncPods(
 		resources.ExistingPvcs = append(resources.ExistingPvcs, adoptedPvcs...)
 	}
 
-	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods, replaceIndicatedCount := dealReplacePods(filteredPods, instance)
+	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(filteredPods, instance)
 	if err := r.deletePodsByLabel(needDeletePods); err != nil {
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "delete pods by label with error: %s", err.Error())
 	}
@@ -131,7 +131,7 @@ func (r *RealSyncControl) SyncPods(
 	// get owned IDs
 	var ownedIDs map[int]*appsv1alpha1.ContextDetail
 	if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		needAllocateReplicas := int(realValue(instance.Spec.Replicas)) + replaceIndicatedCount
+		needAllocateReplicas := maxInt(len(filteredPods), int(realValue(instance.Spec.Replicas))) + len(needReplaceOriginPods)
 		ownedIDs, err = podcontext.AllocateID(r.client, instance, needAllocateReplicas)
 		return err
 	}); err != nil {
@@ -363,7 +363,7 @@ func getReplaceRevision(originPod *corev1.Pod, resources *collasetutils.RelatedR
 	return resources.CurrentRevision
 }
 
-func dealReplacePods(pods []*corev1.Pod, instance *appsv1alpha1.CollaSet) (needReplacePods []*corev1.Pod, needCleanLabelPods []*corev1.Pod, podNeedCleanLabels [][]string, needDeletePods []*corev1.Pod, replaceIndicatedCount int) {
+func dealReplacePods(pods []*corev1.Pod, instance *appsv1alpha1.CollaSet) (needReplacePods []*corev1.Pod, needCleanLabelPods []*corev1.Pod, podNeedCleanLabels [][]string, needDeletePods []*corev1.Pod) {
 	var podInstanceIdMap = make(map[string]*corev1.Pod)
 	var podNameMap = make(map[string]*corev1.Pod)
 	for _, pod := range pods {
@@ -379,7 +379,6 @@ func dealReplacePods(pods []*corev1.Pod, instance *appsv1alpha1.CollaSet) (needR
 		if _, exist := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist {
 			continue
 		}
-		replaceIndicatedCount++
 
 		// pod is replace new created pod, skip replace
 		if originPodName, exist := pod.Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
