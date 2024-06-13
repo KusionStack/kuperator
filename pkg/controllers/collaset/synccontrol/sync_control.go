@@ -484,7 +484,7 @@ func (r *RealSyncControl) Scale(
 			succCount, err := controllerutils.SlowStartBatch(diff, controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) (err error) {
 				availableIDContext := availableContext[idx]
 				defer func() {
-					decideContextRevision(availableIDContext, resources.CurrentRevision, resources.UpdatedRevision, err == nil)
+					decideContextRevision(availableIDContext, resources.UpdatedRevision, err == nil)
 				}()
 				// use revision recorded in Context
 				revision := resources.UpdatedRevision
@@ -773,11 +773,11 @@ func (r *RealSyncControl) deletePodsByLabel(needDeletePods []*corev1.Pod) error 
 }
 
 // decide revision for 3 pod create types: (1) just create, (2) upgrade by recreate, (3) delete and recreate
-func decideContextRevision(contextDetail *appsv1alpha1.ContextDetail, currentRevision, updatedRevision *appsv1.ControllerRevision, createSucceeded bool) {
+func decideContextRevision(contextDetail *appsv1alpha1.ContextDetail, updatedRevision *appsv1.ControllerRevision, createSucceeded bool) {
 	if !createSucceeded {
 		if contextDetail.Contains(podcontext.PodJustCreateContextDataKey, "true") {
-			// TODO choose revision according to scaleStrategy
-			contextDetail.Put(podcontext.RevisionContextDataKey, currentRevision.Name)
+			// TODO choose just create pods' revision according to scaleStrategy
+			contextDetail.Put(podcontext.RevisionContextDataKey, updatedRevision.Name)
 		} else if contextDetail.Contains(podcontext.PodUpgradeContextDataKey, "true") {
 			contextDetail.Put(podcontext.RevisionContextDataKey, updatedRevision.Name)
 		}
