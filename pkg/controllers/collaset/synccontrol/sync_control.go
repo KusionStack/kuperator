@@ -123,7 +123,7 @@ func (r *RealSyncControl) SyncPods(
 		resources.ExistingPvcs = append(resources.ExistingPvcs, adoptedPvcs...)
 	}
 
-	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(filteredPods, instance)
+	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods, replaceIndicateCount := dealReplacePods(filteredPods, instance)
 	if err := r.deletePodsByLabel(needDeletePods); err != nil {
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "delete pods by label with error: %s", err.Error())
 	}
@@ -131,8 +131,7 @@ func (r *RealSyncControl) SyncPods(
 	// get owned IDs
 	var ownedIDs map[int]*appsv1alpha1.ContextDetail
 	if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		needAllocateReplicas := maxInt(len(filteredPods), int(realValue(instance.Spec.Replicas))) + len(needReplaceOriginPods)
-		// TODO choose revision according to scaleStrategy
+		needAllocateReplicas := int(realValue(instance.Spec.Replicas)) + replaceIndicateCount
 		ownedIDs, err = podcontext.AllocateID(r.client, instance, resources.UpdatedRevision.Name, needAllocateReplicas)
 		return err
 	}); err != nil {
@@ -365,7 +364,7 @@ func getReplaceRevision(originPod *corev1.Pod, resources *collasetutils.RelatedR
 	return resources.CurrentRevision
 }
 
-func dealReplacePods(pods []*corev1.Pod, instance *appsv1alpha1.CollaSet) (needReplacePods []*corev1.Pod, needCleanLabelPods []*corev1.Pod, podNeedCleanLabels [][]string, needDeletePods []*corev1.Pod) {
+func dealReplacePods(pods []*corev1.Pod, instance *appsv1alpha1.CollaSet) (needReplacePods []*corev1.Pod, needCleanLabelPods []*corev1.Pod, podNeedCleanLabels [][]string, needDeletePods []*corev1.Pod, replaceIndicateCount int) {
 	var podInstanceIdMap = make(map[string]*corev1.Pod)
 	var podNameMap = make(map[string]*corev1.Pod)
 	for _, pod := range pods {
@@ -381,6 +380,7 @@ func dealReplacePods(pods []*corev1.Pod, instance *appsv1alpha1.CollaSet) (needR
 		if _, exist := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist {
 			continue
 		}
+		replaceIndicateCount++
 
 		// pod is replace new created pod, skip replace
 		if originPodName, exist := pod.Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
@@ -771,7 +771,7 @@ func (r *RealSyncControl) deletePodsByLabel(needDeletePods []*corev1.Pod) error 
 	return err
 }
 
-// decide revision: (1) just create, (2) upgrade, (3) delete
+// decide revision for 3 pod create types: (1) just create, (2) upgrade by recreate, (3) delete and recreate
 func decideContextRevision(contextDetail *appsv1alpha1.ContextDetail, currentRevision, updatedRevision *appsv1.ControllerRevision, createSucceeded bool) {
 	if !createSucceeded {
 		if contextDetail.Contains(podcontext.PodJustCreateContextDataKey, "true") {
@@ -780,7 +780,7 @@ func decideContextRevision(contextDetail *appsv1alpha1.ContextDetail, currentRev
 		} else if contextDetail.Contains(podcontext.PodUpgradeContextDataKey, "true") {
 			contextDetail.Put(podcontext.RevisionContextDataKey, updatedRevision.Name)
 		}
-		// if delete, don't change revisionKey
+		// if pod is delete and recreate, never change revisionKey
 	} else {
 		// TODO delete ID if create succeeded
 		contextDetail.Remove(podcontext.PodJustCreateContextDataKey)

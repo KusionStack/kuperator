@@ -86,6 +86,7 @@ func AllocateID(c client.Client, instance *appsv1alpha1.CollaSet, defaultRevisio
 
 		detail := &appsv1alpha1.ContextDetail{
 			ID: candidateID,
+			// TODO choose just create pods' revision according to scaleStrategy
 			Data: map[string]string{
 				OwnerContextKey:             instance.Name,
 				RevisionContextDataKey:      defaultRevision,
