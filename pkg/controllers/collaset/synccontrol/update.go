@@ -233,9 +233,10 @@ func decidePodToUpdateByPartition(
 		return podToUpdate
 	}
 
-	notCreatedOld := minInt(partition, decideNotCreatedOldPods(podInfos, ownedIDs, updatedRevision))
-	podToUpdate = ordered[:podsNum-partition+notCreatedOld]
-	for i := podsNum - partition; i < podsNum; i++ {
+	moreToUpdate := minInt(partition, decideNeedUpdateButNotCreate(podInfos, ownedIDs, updatedRevision))
+	updateNum := podsNum - partition + moreToUpdate
+	podToUpdate = ordered[:updateNum]
+	for i := updateNum; i < podsNum; i++ {
 		if podInfos[i].PodDecorationChanged {
 			podToUpdate = append(podToUpdate, podInfos[i])
 		}
@@ -243,7 +244,7 @@ func decidePodToUpdateByPartition(
 	return podToUpdate
 }
 
-func decideNotCreatedOldPods(
+func decideNeedUpdateButNotCreate(
 	podInfos []*PodUpdateInfo,
 	ownedIDs map[int]*appsv1alpha1.ContextDetail,
 	updatedRevision *appsv1.ControllerRevision) int {
@@ -257,21 +258,26 @@ func decideNotCreatedOldPods(
 		mapIDToPod[id] = pod
 	}
 
-	var idToUpdate []*appsv1alpha1.ContextDetail
+	var needUpdatePodsId []*appsv1alpha1.ContextDetail
 	for _, contextDetail := range ownedIDs {
 		revision, exist := contextDetail.Data[podcontext.RevisionContextDataKey]
-		if exist && revision != updatedRevision.Name {
-			idToUpdate = append(idToUpdate, contextDetail)
+		if !exist || revision == updatedRevision.Name {
+			continue
 		}
+		// never update replaceNew and scaleIn pod
+		if contextDetail.Data[ReplaceOriginPodIDContextDataKey] != "" || contextDetail.Data[ScaleInContextDataKey] != "" {
+			continue
+		}
+		needUpdatePodsId = append(needUpdatePodsId, contextDetail)
 	}
 
-	notCreated := 0
-	for _, contextDetail := range idToUpdate {
+	needUpdateButNotCreate := 0
+	for _, contextDetail := range needUpdatePodsId {
 		if _, exist := mapIDToPod[strconv.Itoa(contextDetail.ID)]; !exist {
-			notCreated++
+			needUpdateButNotCreate++
 		}
 	}
-	return notCreated
+	return needUpdateButNotCreate
 }
 
 // filter these pods in replacing and is new created pod
