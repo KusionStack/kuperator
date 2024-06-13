@@ -132,7 +132,8 @@ func (r *RealSyncControl) SyncPods(
 	var ownedIDs map[int]*appsv1alpha1.ContextDetail
 	if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		needAllocateReplicas := maxInt(len(filteredPods), int(realValue(instance.Spec.Replicas))) + len(needReplaceOriginPods)
-		ownedIDs, err = podcontext.AllocateID(r.client, instance, needAllocateReplicas)
+		// TODO choose revision according to scaleStrategy
+		ownedIDs, err = podcontext.AllocateID(r.client, instance, resources.UpdatedRevision.Name, needAllocateReplicas)
 		return err
 	}); err != nil {
 		return false, nil, ownedIDs, fmt.Errorf("fail to allocate %d IDs using context when sync Pods: %s", instance.Spec.Replicas, err)
@@ -252,6 +253,7 @@ func (r *RealSyncControl) SyncPods(
 			// add instance id and replace pair label
 			instanceId := fmt.Sprintf("%d", availableContexts[i].ID)
 			if val, exist := ownedIDs[originPodId].Data[ReplaceNewPodIDContextDataKey]; exist {
+				// reuse new pod ID if pair-relation exists
 				id, _ := strconv.ParseInt(val, 10, 32)
 				if ownedIDs[int(id)] != nil {
 					instanceId = val
@@ -259,8 +261,8 @@ func (r *RealSyncControl) SyncPods(
 			}
 			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
 			newPod.Labels[appsv1alpha1.PodReplacePairOriginName] = originPod.GetName()
-			newPodId, _ := collasetutils.GetPodInstanceID(newPod)
 			// add replace pair-relation to IDs for originPod and newPod
+			newPodId, _ := collasetutils.GetPodInstanceID(newPod)
 			ownedIDs[originPodId].Put(ReplaceNewPodIDContextDataKey, strconv.Itoa(newPodId))
 			ownedIDs[newPodId].Put(ReplaceOriginPodIDContextDataKey, strconv.Itoa(originPodId))
 			// create pvcs for new pod
@@ -478,15 +480,10 @@ func (r *RealSyncControl) Scale(
 			podInstanceIDSet := collasetutils.CollectPodInstanceID(podWrappers)
 			// find IDs and their contexts which have not been used by owned Pods
 			availableContext := extractAvailableContexts(diff, ownedIDs, podInstanceIDSet)
-			// reclaim IDs for pods which are failed to create
-			createFailedIDs := make(chan int, diff)
 			succCount, err := controllerutils.SlowStartBatch(diff, controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) (err error) {
 				availableIDContext := availableContext[idx]
 				defer func() {
-					if err != nil {
-						// TODO 1. only clear revisionKey from id if error is invalid or forbidden; 2. delete id if create succeeded
-						createFailedIDs <- availableIDContext.ID
-					}
+					decideContextRevision(availableIDContext, resources.CurrentRevision, resources.UpdatedRevision, err == nil)
 				}()
 				// use revision recorded in Context
 				revision := resources.UpdatedRevision
@@ -545,17 +542,10 @@ func (r *RealSyncControl) Scale(
 				if pod, err = r.podControl.CreatePod(newPod); err != nil {
 					return err
 				}
-				// add revision to resourceContext ID if create pod succeeded
-				availableIDContext.Put(podcontext.RevisionContextDataKey, revision.Name)
 				// add an expectation for this pod creation, before next reconciling
 				return collasetutils.ActiveExpectations.ExpectCreate(cls, expectations.Pod, pod.Name)
 			})
-			if len(createFailedIDs) > 0 || succCount > 0 {
-				for len(createFailedIDs) > 0 {
-					id := <-createFailedIDs
-					// clear revision from resourceContext ID if create failed
-					ownedIDs[id].Remove(podcontext.RevisionContextDataKey)
-				}
+			if err != nil || succCount > 0 {
 				logger.V(1).Info("try to update ResourceContext for CollaSet after scaling out")
 				if updateContextErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 					return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
@@ -779,6 +769,23 @@ func (r *RealSyncControl) deletePodsByLabel(needDeletePods []*corev1.Pod) error 
 		return nil
 	})
 	return err
+}
+
+// decide revision: (1) just create, (2) upgrade, (3) delete
+func decideContextRevision(contextDetail *appsv1alpha1.ContextDetail, currentRevision, updatedRevision *appsv1.ControllerRevision, createSucceeded bool) {
+	if !createSucceeded {
+		if contextDetail.Contains(podcontext.PodJustCreateContextDataKey, "true") {
+			// TODO choose revision according to scaleStrategy
+			contextDetail.Put(podcontext.RevisionContextDataKey, currentRevision.Name)
+		} else if contextDetail.Contains(podcontext.PodUpgradeContextDataKey, "true") {
+			contextDetail.Put(podcontext.RevisionContextDataKey, updatedRevision.Name)
+		}
+		// if delete, don't change revisionKey
+	} else {
+		// TODO delete ID if create succeeded
+		contextDetail.Remove(podcontext.PodJustCreateContextDataKey)
+		contextDetail.Remove(podcontext.PodUpgradeContextDataKey)
+	}
 }
 
 func (r *RealSyncControl) Update(

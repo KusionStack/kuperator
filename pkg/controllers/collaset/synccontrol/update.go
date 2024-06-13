@@ -260,16 +260,9 @@ func decideNotCreatedOldPods(
 	var idToUpdate []*appsv1alpha1.ContextDetail
 	for _, contextDetail := range ownedIDs {
 		revision, exist := contextDetail.Data[podcontext.RevisionContextDataKey]
-		if !exist || revision == updatedRevision.Name {
-			continue
+		if exist && revision != updatedRevision.Name {
+			idToUpdate = append(idToUpdate, contextDetail)
 		}
-		if _, exist := contextDetail.Data[ScaleInContextDataKey]; exist {
-			continue
-		}
-		if _, exist := contextDetail.Data[ReplaceOriginPodIDContextDataKey]; exist {
-			continue
-		}
-		idToUpdate = append(idToUpdate, contextDetail)
 	}
 
 	notCreated := 0
@@ -388,6 +381,7 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(podToUpdate []*PodUpdateInfo, own
 		if !ownedIDs[podInfo.ID].Contains(podcontext.RevisionContextDataKey, resources.UpdatedRevision.Name) {
 			needUpdateContext = true
 			ownedIDs[podInfo.ID].Put(podcontext.RevisionContextDataKey, resources.UpdatedRevision.Name)
+			ownedIDs[podInfo.ID].Put(podcontext.PodUpgradeContextDataKey, "true")
 		}
 		if podInfo.PodDecorationChanged {
 			decorationStr := utilspoddecoration.GetDecorationInfoString(podInfo.UpdatedPodDecorations)

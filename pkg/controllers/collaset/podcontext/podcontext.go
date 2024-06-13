@@ -32,12 +32,14 @@ import (
 )
 
 const (
-	OwnerContextKey          = "Owner"
-	RevisionContextDataKey   = "Revision"
-	PodDecorationRevisionKey = "PodDecorationRevisions"
+	OwnerContextKey             = "Owner"
+	RevisionContextDataKey      = "Revision"
+	PodDecorationRevisionKey    = "PodDecorationRevisions"
+	PodJustCreateContextDataKey = "PodJustCreate"
+	PodUpgradeContextDataKey    = "PodUpgrade"
 )
 
-func AllocateID(c client.Client, instance *appsv1alpha1.CollaSet, replicas int) (map[int]*appsv1alpha1.ContextDetail, error) {
+func AllocateID(c client.Client, instance *appsv1alpha1.CollaSet, defaultRevision string, replicas int) (map[int]*appsv1alpha1.ContextDetail, error) {
 	contextName := getContextName(instance)
 	podContext := &appsv1alpha1.ResourceContext{}
 	notFound := false
@@ -85,7 +87,9 @@ func AllocateID(c client.Client, instance *appsv1alpha1.CollaSet, replicas int) 
 		detail := &appsv1alpha1.ContextDetail{
 			ID: candidateID,
 			Data: map[string]string{
-				OwnerContextKey: instance.Name,
+				OwnerContextKey:             instance.Name,
+				RevisionContextDataKey:      defaultRevision,
+				PodJustCreateContextDataKey: "true",
 			},
 		}
 		existingIDs[candidateID] = detail

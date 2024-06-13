@@ -69,7 +69,7 @@ var _ = Describe("ResourceContext allocation", func() {
 			},
 		}
 
-		ownedIDs, err := AllocateID(c, instance1, 10)
+		ownedIDs, err := AllocateID(c, instance1, "", 10)
 		Expect(err).Should(BeNil())
 		Expect(len(ownedIDs)).Should(BeEquivalentTo(10))
 		for i := 0; i < 10; i++ {
@@ -77,7 +77,7 @@ var _ = Describe("ResourceContext allocation", func() {
 			Expect(exist).Should(BeTrue())
 		}
 
-		ownedIDs, err = AllocateID(c, instance2, 4)
+		ownedIDs, err = AllocateID(c, instance2, "", 4)
 		Expect(err).Should(BeNil())
 		Expect(len(ownedIDs)).Should(BeEquivalentTo(4))
 		for i := 10; i < 14; i++ {
@@ -85,12 +85,12 @@ var _ = Describe("ResourceContext allocation", func() {
 			Expect(exist).Should(BeTrue())
 		}
 
-		ownedIDs, err = AllocateID(c, instance1, 10)
+		ownedIDs, err = AllocateID(c, instance1, "", 10)
 		delete(ownedIDs, 4)
 		delete(ownedIDs, 6)
 		Expect(UpdateToPodContext(c, instance1, ownedIDs)).Should(BeNil())
 
-		ownedIDs, err = AllocateID(c, instance2, 7)
+		ownedIDs, err = AllocateID(c, instance2, "", 7)
 		Expect(err).Should(BeNil())
 		Expect(len(ownedIDs)).Should(BeEquivalentTo(7))
 		for _, i := range []int{4, 6, 10, 11, 12, 13, 14} {
@@ -98,7 +98,7 @@ var _ = Describe("ResourceContext allocation", func() {
 			Expect(exist).Should(BeTrue())
 		}
 
-		ownedIDs, err = AllocateID(c, instance1, 12)
+		ownedIDs, err = AllocateID(c, instance1, "", 12)
 		Expect(err).Should(BeNil())
 		Expect(len(ownedIDs)).Should(BeEquivalentTo(12))
 		for _, i := range []int{0, 1, 2, 3, 5, 7, 8, 9, 15, 16, 17, 18} {
