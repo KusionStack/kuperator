@@ -264,8 +264,13 @@ func decideNeedUpdateButNotCreate(
 		if !exist || revision == updatedRevision.Name {
 			continue
 		}
-		// never update replaceNew and scaleIn pod
-		if contextDetail.Data[ReplaceOriginPodIDContextDataKey] != "" || contextDetail.Data[ScaleInContextDataKey] != "" {
+		// skip the following 3 types ID:
+		// (1) replaceOriginPod is terminating but its ID may still exist
+		// (2) replaceNewPod's revision is decided by replace type
+		// (3) scaleInPod's ID will be deleted
+		if contextDetail.Data[ReplaceOriginPodIDContextDataKey] != "" ||
+			contextDetail.Data[ReplaceNewPodIDContextDataKey] != "" ||
+			contextDetail.Data[ScaleInContextDataKey] != "" {
 			continue
 		}
 		needUpdatePodsId = append(needUpdatePodsId, contextDetail)
