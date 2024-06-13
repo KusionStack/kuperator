@@ -264,6 +264,7 @@ func (r *RealSyncControl) SyncPods(
 			newPodId, _ := collasetutils.GetPodInstanceID(newPod)
 			ownedIDs[originPodId].Put(ReplaceNewPodIDContextDataKey, strconv.Itoa(newPodId))
 			ownedIDs[newPodId].Put(ReplaceOriginPodIDContextDataKey, strconv.Itoa(originPodId))
+			ownedIDs[newPodId].Remove(podcontext.PodJustCreateContextDataKey)
 			// create pvcs for new pod
 			err = r.pvcControl.CreatePodPvcs(ctx, instance, newPod, resources.ExistingPvcs)
 			if err != nil {
