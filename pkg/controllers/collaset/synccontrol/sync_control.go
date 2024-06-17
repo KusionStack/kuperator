@@ -481,10 +481,11 @@ func (r *RealSyncControl) Scale(
 			podInstanceIDSet := collasetutils.CollectPodInstanceID(podWrappers)
 			// find IDs and their contexts which have not been used by owned Pods
 			availableContext := extractAvailableContexts(diff, ownedIDs, podInstanceIDSet)
+			needUpdateContext := false
 			succCount, err := controllerutils.SlowStartBatch(diff, controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) (err error) {
 				availableIDContext := availableContext[idx]
 				defer func() {
-					decideContextRevision(availableIDContext, resources.UpdatedRevision, err == nil)
+					needUpdateContext = decideContextRevision(availableIDContext, resources.UpdatedRevision, err == nil)
 				}()
 				// use revision recorded in Context
 				revision := resources.UpdatedRevision
@@ -546,13 +547,15 @@ func (r *RealSyncControl) Scale(
 				// add an expectation for this pod creation, before next reconciling
 				return collasetutils.ActiveExpectations.ExpectCreate(cls, expectations.Pod, pod.Name)
 			})
-			if err != nil || succCount > 0 {
+			if needUpdateContext {
 				logger.V(1).Info("try to update ResourceContext for CollaSet after scaling out")
 				if updateContextErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 					return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
 				}); updateContextErr != nil {
 					err = controllerutils.AggregateErrors([]error{updateContextErr, err})
 				}
+			} else {
+				println("needUpdateContext=false")
 			}
 			r.recorder.Eventf(cls, corev1.EventTypeNormal, "ScaleOut", "scale out %d Pod(s)", succCount)
 			if err != nil {
@@ -773,20 +776,25 @@ func (r *RealSyncControl) deletePodsByLabel(needDeletePods []*corev1.Pod) error 
 }
 
 // decide revision for 3 pod create types: (1) just create, (2) upgrade by recreate, (3) delete and recreate
-func decideContextRevision(contextDetail *appsv1alpha1.ContextDetail, updatedRevision *appsv1.ControllerRevision, createSucceeded bool) {
+func decideContextRevision(contextDetail *appsv1alpha1.ContextDetail, updatedRevision *appsv1.ControllerRevision, createSucceeded bool) bool {
+	needUpdateContext := false
 	if !createSucceeded {
 		if contextDetail.Contains(podcontext.PodJustCreateContextDataKey, "true") {
 			// TODO choose just create pods' revision according to scaleStrategy
 			contextDetail.Put(podcontext.RevisionContextDataKey, updatedRevision.Name)
+			needUpdateContext = true
 		} else if contextDetail.Contains(podcontext.PodUpgradeContextDataKey, "true") {
 			contextDetail.Put(podcontext.RevisionContextDataKey, updatedRevision.Name)
+			needUpdateContext = true
 		}
 		// if pod is delete and recreate, never change revisionKey
 	} else {
 		// TODO delete ID if create succeeded
 		contextDetail.Remove(podcontext.PodJustCreateContextDataKey)
 		contextDetail.Remove(podcontext.PodUpgradeContextDataKey)
+		needUpdateContext = true
 	}
+	return needUpdateContext
 }
 
 func (r *RealSyncControl) Update(
