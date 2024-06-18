@@ -32,11 +32,11 @@ import (
 )
 
 const (
-	OwnerContextKey             = "Owner"
-	RevisionContextDataKey      = "Revision"
-	PodDecorationRevisionKey    = "PodDecorationRevisions"
-	PodJustCreateContextDataKey = "PodJustCreate"
-	PodUpgradeContextDataKey    = "PodUpgrade"
+	OwnerContextKey              = "Owner"
+	RevisionContextDataKey       = "Revision"
+	PodDecorationRevisionKey     = "PodDecorationRevisions"
+	JustCreateContextDataKey     = "PodJustCreate"
+	RecreateUpdateContextDataKey = "PodRecreateUpdate"
 )
 
 func AllocateID(c client.Client, instance *appsv1alpha1.CollaSet, defaultRevision string, replicas int) (map[int]*appsv1alpha1.ContextDetail, error) {
@@ -88,9 +88,9 @@ func AllocateID(c client.Client, instance *appsv1alpha1.CollaSet, defaultRevisio
 			ID: candidateID,
 			// TODO choose just create pods' revision according to scaleStrategy
 			Data: map[string]string{
-				OwnerContextKey:             instance.Name,
-				RevisionContextDataKey:      defaultRevision,
-				PodJustCreateContextDataKey: "true",
+				OwnerContextKey:          instance.Name,
+				RevisionContextDataKey:   defaultRevision,
+				JustCreateContextDataKey: "true",
 			},
 		}
 		existingIDs[candidateID] = detail

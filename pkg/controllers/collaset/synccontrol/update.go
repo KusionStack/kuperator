@@ -392,8 +392,14 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(podToUpdate []*PodUpdateInfo, own
 		if !ownedIDs[podInfo.ID].Contains(podcontext.RevisionContextDataKey, resources.UpdatedRevision.Name) {
 			needUpdateContext = true
 			ownedIDs[podInfo.ID].Put(podcontext.RevisionContextDataKey, resources.UpdatedRevision.Name)
-			ownedIDs[podInfo.ID].Put(podcontext.PodUpgradeContextDataKey, "true")
+
 		}
+
+		// mark podContext "PodRecreateUpgrade" if upgrade by recreate
+		if !podInfo.OnlyMetadataChanged && !podInfo.InPlaceUpdateSupport {
+			ownedIDs[podInfo.ID].Put(podcontext.RecreateUpdateContextDataKey, "true")
+		}
+
 		if podInfo.PodDecorationChanged {
 			decorationStr := utilspoddecoration.GetDecorationInfoString(podInfo.UpdatedPodDecorations)
 			if val, ok := ownedIDs[podInfo.ID].Get(podcontext.PodDecorationRevisionKey); !ok || val != decorationStr {

@@ -264,7 +264,7 @@ func (r *RealSyncControl) SyncPods(
 			newPodId, _ := collasetutils.GetPodInstanceID(newPod)
 			ownedIDs[originPodId].Put(ReplaceNewPodIDContextDataKey, strconv.Itoa(newPodId))
 			ownedIDs[newPodId].Put(ReplaceOriginPodIDContextDataKey, strconv.Itoa(originPodId))
-			ownedIDs[newPodId].Remove(podcontext.PodJustCreateContextDataKey)
+			ownedIDs[newPodId].Remove(podcontext.JustCreateContextDataKey)
 			// create pvcs for new pod
 			err = r.pvcControl.CreatePodPvcs(ctx, instance, newPod, resources.ExistingPvcs)
 			if err != nil {
@@ -779,19 +779,19 @@ func (r *RealSyncControl) deletePodsByLabel(needDeletePods []*corev1.Pod) error 
 func decideContextRevision(contextDetail *appsv1alpha1.ContextDetail, updatedRevision *appsv1.ControllerRevision, createSucceeded bool) bool {
 	needUpdateContext := false
 	if !createSucceeded {
-		if contextDetail.Contains(podcontext.PodJustCreateContextDataKey, "true") {
+		if contextDetail.Contains(podcontext.JustCreateContextDataKey, "true") {
 			// TODO choose just create pods' revision according to scaleStrategy
 			contextDetail.Put(podcontext.RevisionContextDataKey, updatedRevision.Name)
 			needUpdateContext = true
-		} else if contextDetail.Contains(podcontext.PodUpgradeContextDataKey, "true") {
+		} else if contextDetail.Contains(podcontext.RecreateUpdateContextDataKey, "true") {
 			contextDetail.Put(podcontext.RevisionContextDataKey, updatedRevision.Name)
 			needUpdateContext = true
 		}
 		// if pod is delete and recreate, never change revisionKey
 	} else {
 		// TODO delete ID if create succeeded
-		contextDetail.Remove(podcontext.PodJustCreateContextDataKey)
-		contextDetail.Remove(podcontext.PodUpgradeContextDataKey)
+		contextDetail.Remove(podcontext.JustCreateContextDataKey)
+		contextDetail.Remove(podcontext.RecreateUpdateContextDataKey)
 		needUpdateContext = true
 	}
 	return needUpdateContext
