@@ -170,11 +170,11 @@ func (r *RealSyncControl) SyncPods(
 		}
 
 		podWrappers = append(podWrappers, &collasetutils.PodWrapper{
-			Pod:           pod,
-			ID:            id,
-			ContextDetail: ownedIDs[id],
-			ToDelete:      toDelete,
-			IsPlaceHolder: false,
+			Pod:             pod,
+			ID:              id,
+			ContextDetail:   ownedIDs[id],
+			ToDelete:        toDelete,
+			OnlyPlaceHolder: false,
 		})
 
 		if id >= 0 {
@@ -341,9 +341,10 @@ func (r *RealSyncControl) SyncPods(
 			continue
 		}
 		podWrappers = append(podWrappers, &collasetutils.PodWrapper{
-			ID:            id,
-			ContextDetail: contextDetail,
-			IsPlaceHolder: true,
+			ID:              id,
+			Pod:             nil,
+			ContextDetail:   contextDetail,
+			OnlyPlaceHolder: true,
 		})
 	}
 
@@ -471,14 +472,15 @@ func (r *RealSyncControl) Scale(
 
 	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
 	var recordedRequeueAfter *time.Duration
-	replacePodMap := classifyPodReplacingMapping(podWrappers)
+	currentPods := GetExistingPodWrappers(podWrappers)
+	replacePodMap := classifyPodReplacingMapping(currentPods)
 
 	diff := int(realValue(cls.Spec.Replicas)) - len(replacePodMap)
 	scaling := false
 
 	if diff >= 0 {
 		// trigger delete pods indicated in ScaleStrategy.PodToDelete by label
-		for _, podWrapper := range podWrappers {
+		for _, podWrapper := range currentPods {
 			if podWrapper.ToDelete {
 				err := r.deletePodsByLabel([]*corev1.Pod{podWrapper.Pod})
 				if err != nil {
@@ -490,7 +492,7 @@ func (r *RealSyncControl) Scale(
 		// scale out pods and return if diff > 0
 		if diff > 0 {
 			// collect instance ID in used from owned Pods
-			podInstanceIDSet := collasetutils.CollectPodInstanceID(podWrappers)
+			podInstanceIDSet := collasetutils.CollectPodInstanceID(currentPods)
 			// find IDs and their contexts which have not been used by owned Pods
 			availableContext := extractAvailableContexts(diff, ownedIDs, podInstanceIDSet)
 			needUpdateContext := false
@@ -579,7 +581,7 @@ func (r *RealSyncControl) Scale(
 		}
 	} else if diff < 0 {
 		// chose the pods to scale in
-		podsToScaleIn := getPodsToDelete(podWrappers, replacePodMap, diff*-1)
+		podsToScaleIn := getPodsToDelete(currentPods, replacePodMap, diff*-1)
 		// filter out Pods need to trigger PodOpsLifecycle
 		podCh := make(chan *collasetutils.PodWrapper, len(podsToScaleIn))
 		for i := range podsToScaleIn {
@@ -699,10 +701,7 @@ func (r *RealSyncControl) Scale(
 
 	// reset ContextDetail.ScalingIn, if there are Pods had its PodOpsLifecycle reverted
 	needUpdatePodContext := false
-	for _, podWrapper := range podWrappers {
-		if podWrapper.IsPlaceHolder {
-			continue
-		}
+	for _, podWrapper := range currentPods {
 		if !podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, podWrapper) && ownedIDs[podWrapper.ID].Contains(ScaleInContextDataKey, "true") {
 			needUpdatePodContext = true
 			ownedIDs[podWrapper.ID].Remove(ScaleInContextDataKey)
@@ -721,14 +720,23 @@ func (r *RealSyncControl) Scale(
 	return scaling, recordedRequeueAfter, nil
 }
 
+// GetExistingPodWrappers filter out PodWrappers whose pod is not exist
+func GetExistingPodWrappers(pods []*collasetutils.PodWrapper) []*collasetutils.PodWrapper {
+	var filteredPodWrappers []*collasetutils.PodWrapper
+	for _, pod := range pods {
+		if pod.OnlyPlaceHolder {
+			continue
+		}
+		filteredPodWrappers = append(filteredPodWrappers, pod)
+	}
+	return filteredPodWrappers
+}
+
 // classify the pair relationship for Pod replacement.
 func classifyPodReplacingMapping(podWrappers []*collasetutils.PodWrapper) map[string]*collasetutils.PodWrapper {
 	var podNameMap = make(map[string]*collasetutils.PodWrapper)
 	var podIdMap = make(map[string]*collasetutils.PodWrapper)
 	for _, podWrapper := range podWrappers {
-		if podWrapper.IsPlaceHolder {
-			continue
-		}
 		podNameMap[podWrapper.Name] = podWrapper
 		instanceId := podWrapper.Labels[appsv1alpha1.PodInstanceIDLabelKey]
 		podIdMap[instanceId] = podWrapper
@@ -736,9 +744,6 @@ func classifyPodReplacingMapping(podWrappers []*collasetutils.PodWrapper) map[st
 
 	var replacePodMapping = make(map[string]*collasetutils.PodWrapper)
 	for _, podWrapper := range podWrappers {
-		if podWrapper.IsPlaceHolder {
-			continue
-		}
 		name := podWrapper.Name
 		if podWrapper.DeletionTimestamp != nil {
 			replacePodMapping[name] = nil
@@ -836,12 +841,13 @@ func (r *RealSyncControl) Update(
 
 	// 2. decide Pod update candidates
 	podToUpdate := decidePodToUpdate(cls, podUpdateInfos)
+	currentPodToUpdate := getExisingPodUpdateInfos(podToUpdate)
 	podCh := make(chan *PodUpdateInfo, len(podToUpdate))
 	updater := newPodUpdater(ctx, r.client, cls, r.podControl, r.recorder)
 	updating := false
 
 	// 3. filter already updated revision,
-	for i, podInfo := range podToUpdate {
+	for i, podInfo := range currentPodToUpdate {
 		if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged && !podInfo.PvcTmpHashChanged {
 			continue
 		}
@@ -852,11 +858,11 @@ func (r *RealSyncControl) Update(
 			continue
 		}
 
-		if !podInfo.IsPlaceHolder && podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, podInfo) {
+		if podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, podInfo) {
 			continue
 		}
 
-		podCh <- podToUpdate[i]
+		podCh <- currentPodToUpdate[i]
 	}
 
 	// 4. begin pod update lifecycle
@@ -904,10 +910,10 @@ func (r *RealSyncControl) Update(
 	}
 
 	// 7. try to finish all Pods'PodOpsLifecycle if its update is finished.
-	succCount, err = controllerutils.SlowStartBatch(len(podUpdateInfos), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
-		podInfo := podUpdateInfos[i]
+	succCount, err = controllerutils.SlowStartBatch(len(currentPodToUpdate), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+		podInfo := currentPodToUpdate[i]
 
-		if !podInfo.isDuringOps || podInfo.IsPlaceHolder {
+		if !podInfo.isDuringOps {
 			return nil
 		}
 

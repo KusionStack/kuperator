@@ -40,7 +40,7 @@ type PodWrapper struct {
 	ID            int
 	ContextDetail *appsv1alpha1.ContextDetail
 
-	IsPlaceHolder bool
+	OnlyPlaceHolder bool
 	// TODO ToExclude
 	ToDelete bool
 }
@@ -48,7 +48,7 @@ type PodWrapper struct {
 func CollectPodInstanceID(pods []*PodWrapper) map[int]struct{} {
 	podInstanceIDSet := map[int]struct{}{}
 	for _, pod := range pods {
-		if pod.IsPlaceHolder {
+		if pod.OnlyPlaceHolder {
 			continue
 		}
 		podInstanceIDSet[pod.ID] = struct{}{}
