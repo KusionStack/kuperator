@@ -833,21 +833,21 @@ func (r *RealSyncControl) Update(
 
 	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
 	var recordedRequeueAfter *time.Duration
-	// 1. scan and analysis pods update info
+	// 1. scan and analysis pods update info for current pods and onlyPlaceHolder pods
 	podUpdateInfos, err := attachPodUpdateInfo(ctx, cls, podWrappers, resources)
 	if err != nil {
 		return false, nil, fmt.Errorf("fail to attach pod update info, %v", err)
 	}
 
 	// 2. decide Pod update candidates
-	podToUpdate := decidePodToUpdate(cls, podUpdateInfos)
-	currentPodToUpdate := getExisingPodUpdateInfos(podToUpdate)
+	candidates := decidePodToUpdate(cls, podUpdateInfos)
+	podToUpdate := getExisingPodUpdateInfos(candidates)
 	podCh := make(chan *PodUpdateInfo, len(podToUpdate))
 	updater := newPodUpdater(ctx, r.client, cls, r.podControl, r.recorder)
 	updating := false
 
 	// 3. filter already updated revision,
-	for i, podInfo := range currentPodToUpdate {
+	for i, podInfo := range podToUpdate {
 		if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged && !podInfo.PvcTmpHashChanged {
 			continue
 		}
@@ -862,7 +862,7 @@ func (r *RealSyncControl) Update(
 			continue
 		}
 
-		podCh <- currentPodToUpdate[i]
+		podCh <- podToUpdate[i]
 	}
 
 	// 4. begin pod update lifecycle
@@ -871,8 +871,8 @@ func (r *RealSyncControl) Update(
 		return updating, recordedRequeueAfter, err
 	}
 
-	// 5. filter pods not allow to ops now, such as OperationDelaySeconds strategy
-	recordedRequeueAfter, err = updater.FilterAllowOpsPods(podToUpdate, ownedIDs, resources, podCh)
+	// 5. filter out (1) pods not allow to ops now, such as OperationDelaySeconds strategy; (2) onlyPlaceHolder pods
+	recordedRequeueAfter, err = updater.FilterAllowOpsPods(candidates, ownedIDs, resources, podCh)
 	if err != nil {
 		collasetutils.AddOrUpdateCondition(resources.NewStatus,
 			appsv1alpha1.CollaSetScale, err, "UpdateFailed",
@@ -910,8 +910,8 @@ func (r *RealSyncControl) Update(
 	}
 
 	// 7. try to finish all Pods'PodOpsLifecycle if its update is finished.
-	succCount, err = controllerutils.SlowStartBatch(len(currentPodToUpdate), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
-		podInfo := currentPodToUpdate[i]
+	succCount, err = controllerutils.SlowStartBatch(len(podToUpdate), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+		podInfo := podToUpdate[i]
 
 		if !podInfo.isDuringOps {
 			return nil

@@ -361,11 +361,11 @@ func (u *GenericPodUpdater) BeginUpdatePod(resources *collasetutils.RelatedResou
 	return updating, nil
 }
 
-func (u *GenericPodUpdater) FilterAllowOpsPods(podToUpdate []*PodUpdateInfo, ownedIDs map[int]*appsv1alpha1.ContextDetail, resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (*time.Duration, error) {
+func (u *GenericPodUpdater) FilterAllowOpsPods(candidates []*PodUpdateInfo, ownedIDs map[int]*appsv1alpha1.ContextDetail, resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (*time.Duration, error) {
 	var recordedRequeueAfter *time.Duration
 	needUpdateContext := false
-	for i := range podToUpdate {
-		podInfo := podToUpdate[i]
+	for i := range candidates {
+		podInfo := candidates[i]
 
 		if !podInfo.OnlyPlaceHolder {
 			requeueAfter, allowed := podopslifecycle.AllowOps(collasetutils.UpdateOpsLifecycleAdapter, realValue(u.collaSet.Spec.UpdateStrategy.OperationDelaySeconds), podInfo.Pod)
@@ -409,7 +409,7 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(podToUpdate []*PodUpdateInfo, own
 		}
 
 		// if Pod has not been updated, update it.
-		podCh <- podToUpdate[i]
+		podCh <- candidates[i]
 	}
 	// mark Pod to use updated revision before updating it.
 	if needUpdateContext {
@@ -774,8 +774,8 @@ func (u *replaceUpdatePodUpdater) BeginUpdatePod(resources *collasetutils.Relate
 	return succCount > 0, err
 }
 
-func (u *replaceUpdatePodUpdater) FilterAllowOpsPods(podToUpdate []*PodUpdateInfo, _ map[int]*appsv1alpha1.ContextDetail, _ *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (requeueAfter *time.Duration, err error) {
-	currentPodUpdateInfos := getExisingPodUpdateInfos(podToUpdate)
+func (u *replaceUpdatePodUpdater) FilterAllowOpsPods(candidates []*PodUpdateInfo, _ map[int]*appsv1alpha1.ContextDetail, _ *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (requeueAfter *time.Duration, err error) {
+	currentPodUpdateInfos := getExisingPodUpdateInfos(candidates)
 	for i, podInfo := range currentPodUpdateInfos {
 		if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged && !podInfo.PvcTmpHashChanged {
 			continue
