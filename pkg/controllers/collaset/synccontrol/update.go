@@ -775,13 +775,13 @@ func (u *replaceUpdatePodUpdater) BeginUpdatePod(resources *collasetutils.Relate
 }
 
 func (u *replaceUpdatePodUpdater) FilterAllowOpsPods(candidates []*PodUpdateInfo, _ map[int]*appsv1alpha1.ContextDetail, _ *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (requeueAfter *time.Duration, err error) {
-	currentPodUpdateInfos := getExisingPodUpdateInfos(candidates)
-	for i, podInfo := range currentPodUpdateInfos {
+	podToUpdate := getExisingPodUpdateInfos(candidates)
+	for i, podInfo := range podToUpdate {
 		if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged && !podInfo.PvcTmpHashChanged {
 			continue
 		}
 
-		podCh <- currentPodUpdateInfos[i]
+		podCh <- podToUpdate[i]
 	}
 	return nil, err
 }
