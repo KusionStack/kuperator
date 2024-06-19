@@ -949,17 +949,3 @@ func realValue(val *int32) int32 {
 
 	return *val
 }
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
