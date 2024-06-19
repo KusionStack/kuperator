@@ -274,6 +274,11 @@ func filterReplacingNewCreatedPod(podInfos []*PodUpdateInfo) (filteredPodInfos [
 			continue
 		}
 
+		_, exist := podInfo.ContextDetail.Data[ReplaceOriginPodIDContextDataKey]
+		if exist && podInfo.OnlyPlaceHolder {
+			continue
+		}
+
 		filteredPodInfos = append(filteredPodInfos, podInfo)
 	}
 	return filteredPodInfos
