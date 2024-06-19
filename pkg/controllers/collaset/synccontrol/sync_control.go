@@ -174,6 +174,7 @@ func (r *RealSyncControl) SyncPods(
 			ID:            id,
 			ContextDetail: ownedIDs[id],
 			ToDelete:      toDelete,
+			IsPlaceHolder: false,
 		})
 
 		if id >= 0 {
@@ -333,6 +334,17 @@ func (r *RealSyncControl) SyncPods(
 	for _, id := range idToReclaim.List() {
 		needUpdateContext = true
 		delete(ownedIDs, id)
+	}
+
+	for id, contextDetail := range ownedIDs {
+		if _, inUsed := currentIDs[id]; inUsed {
+			continue
+		}
+		podWrappers = append(podWrappers, &collasetutils.PodWrapper{
+			ID:            id,
+			ContextDetail: contextDetail,
+			IsPlaceHolder: true,
+		})
 	}
 
 	if needUpdateContext {
@@ -688,6 +700,9 @@ func (r *RealSyncControl) Scale(
 	// reset ContextDetail.ScalingIn, if there are Pods had its PodOpsLifecycle reverted
 	needUpdatePodContext := false
 	for _, podWrapper := range podWrappers {
+		if podWrapper.IsPlaceHolder {
+			continue
+		}
 		if !podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, podWrapper) && ownedIDs[podWrapper.ID].Contains(ScaleInContextDataKey, "true") {
 			needUpdatePodContext = true
 			ownedIDs[podWrapper.ID].Remove(ScaleInContextDataKey)
@@ -711,6 +726,9 @@ func classifyPodReplacingMapping(podWrappers []*collasetutils.PodWrapper) map[st
 	var podNameMap = make(map[string]*collasetutils.PodWrapper)
 	var podIdMap = make(map[string]*collasetutils.PodWrapper)
 	for _, podWrapper := range podWrappers {
+		if podWrapper.IsPlaceHolder {
+			continue
+		}
 		podNameMap[podWrapper.Name] = podWrapper
 		instanceId := podWrapper.Labels[appsv1alpha1.PodInstanceIDLabelKey]
 		podIdMap[instanceId] = podWrapper
@@ -718,6 +736,9 @@ func classifyPodReplacingMapping(podWrappers []*collasetutils.PodWrapper) map[st
 
 	var replacePodMapping = make(map[string]*collasetutils.PodWrapper)
 	for _, podWrapper := range podWrappers {
+		if podWrapper.IsPlaceHolder {
+			continue
+		}
 		name := podWrapper.Name
 		if podWrapper.DeletionTimestamp != nil {
 			replacePodMapping[name] = nil
@@ -814,7 +835,7 @@ func (r *RealSyncControl) Update(
 	}
 
 	// 2. decide Pod update candidates
-	podToUpdate := decidePodToUpdate(cls, podUpdateInfos, ownedIDs, resources.UpdatedRevision)
+	podToUpdate := decidePodToUpdate(cls, podUpdateInfos)
 	podCh := make(chan *PodUpdateInfo, len(podToUpdate))
 	updater := newPodUpdater(ctx, r.client, cls, r.podControl, r.recorder)
 	updating := false
@@ -831,7 +852,7 @@ func (r *RealSyncControl) Update(
 			continue
 		}
 
-		if podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, podInfo) {
+		if !podInfo.IsPlaceHolder && podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, podInfo) {
 			continue
 		}
 
@@ -886,7 +907,7 @@ func (r *RealSyncControl) Update(
 	succCount, err = controllerutils.SlowStartBatch(len(podUpdateInfos), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		podInfo := podUpdateInfos[i]
 
-		if !podInfo.isDuringOps {
+		if !podInfo.isDuringOps || podInfo.IsPlaceHolder {
 			return nil
 		}
 

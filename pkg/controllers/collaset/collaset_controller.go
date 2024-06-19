@@ -252,6 +252,10 @@ func calculateStatus(
 		updatedReadyReplicas, updatedAvailableReplicas int32
 
 	for _, podWrapper := range podWrappers {
+		if podWrapper.IsPlaceHolder {
+			continue
+		}
+
 		replicas++
 
 		isUpdated := false
