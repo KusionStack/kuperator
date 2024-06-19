@@ -174,7 +174,7 @@ func (r *RealSyncControl) SyncPods(
 			ID:              id,
 			ContextDetail:   ownedIDs[id],
 			ToDelete:        toDelete,
-			OnlyPlaceHolder: false,
+			OnlyPlaceholder: false,
 		})
 
 		if id >= 0 {
@@ -344,7 +344,7 @@ func (r *RealSyncControl) SyncPods(
 			ID:              id,
 			Pod:             nil,
 			ContextDetail:   contextDetail,
-			OnlyPlaceHolder: true,
+			OnlyPlaceholder: true,
 		})
 	}
 
@@ -472,7 +472,7 @@ func (r *RealSyncControl) Scale(
 
 	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
 	var recordedRequeueAfter *time.Duration
-	currentPods := GetExistingPodWrappers(podWrappers)
+	currentPods := FilterOutOnlyPlaceholderPods(podWrappers)
 	replacePodMap := classifyPodReplacingMapping(currentPods)
 
 	diff := int(realValue(cls.Spec.Replicas)) - len(replacePodMap)
@@ -720,11 +720,10 @@ func (r *RealSyncControl) Scale(
 	return scaling, recordedRequeueAfter, nil
 }
 
-// GetExistingPodWrappers filter out PodWrappers whose pod is not exist
-func GetExistingPodWrappers(pods []*collasetutils.PodWrapper) []*collasetutils.PodWrapper {
+func FilterOutOnlyPlaceholderPods(pods []*collasetutils.PodWrapper) []*collasetutils.PodWrapper {
 	var filteredPodWrappers []*collasetutils.PodWrapper
 	for _, pod := range pods {
-		if pod.OnlyPlaceHolder {
+		if pod.OnlyPlaceholder {
 			continue
 		}
 		filteredPodWrappers = append(filteredPodWrappers, pod)
@@ -841,7 +840,7 @@ func (r *RealSyncControl) Update(
 
 	// 2. decide Pod update candidates
 	candidates := decidePodToUpdate(cls, podUpdateInfos)
-	podToUpdate := getExisingPodUpdateInfos(candidates)
+	podToUpdate := filterOnlyPlaceholderInfos(candidates)
 	podCh := make(chan *PodUpdateInfo, len(podToUpdate))
 	updater := newPodUpdater(ctx, r.client, cls, r.podControl, r.recorder)
 	updating := false
