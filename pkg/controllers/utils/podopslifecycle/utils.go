@@ -186,12 +186,6 @@ func deleteOperatingID(adapter LifecycleAdapter, obj client.Object) (val string,
 	return
 }
 
-func deleteOperationType(adapter LifecycleAdapter, obj client.Object) (val string, ok bool) {
-	labelType := fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, adapter.GetID())
-	delete(obj.GetLabels(), labelType)
-	return
-}
-
 func queryByOperationType(adapter LifecycleAdapter, obj client.Object) sets.String {
 	res := sets.String{}
 	valType := adapter.GetType()
