@@ -50,7 +50,7 @@ func (lc *OpsLifecycle) Validating(ctx context.Context, c client.Client, oldPod,
 	expectedLabels := make(map[string]struct{})
 	foundLabels := make(map[string]struct{})
 	for label := range newPod.Labels {
-		for _, v := range v1alpha1.WellKnownLabelPrefixesWithID { // Validate well known lifecycle Labels format
+		for _, v := range v1alpha1.WellKnownLabelPrefixesWithID { // Validate well known lifecycle labels format
 			if !strings.HasPrefix(label, v) {
 				continue
 			}
