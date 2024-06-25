@@ -472,15 +472,15 @@ func (r *RealSyncControl) Scale(
 
 	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
 	var recordedRequeueAfter *time.Duration
-	currentPods := FilterOutOnlyPlaceholderPods(podWrappers)
-	replacePodMap := classifyPodReplacingMapping(currentPods)
+	activePods := FilterOutOnlyPlaceholderPodWrappers(podWrappers)
+	replacePodMap := classifyPodReplacingMapping(activePods)
 
 	diff := int(realValue(cls.Spec.Replicas)) - len(replacePodMap)
 	scaling := false
 
 	if diff >= 0 {
 		// trigger delete pods indicated in ScaleStrategy.PodToDelete by label
-		for _, podWrapper := range currentPods {
+		for _, podWrapper := range activePods {
 			if podWrapper.ToDelete {
 				err := r.deletePodsByLabel([]*corev1.Pod{podWrapper.Pod})
 				if err != nil {
@@ -492,7 +492,7 @@ func (r *RealSyncControl) Scale(
 		// scale out pods and return if diff > 0
 		if diff > 0 {
 			// collect instance ID in used from owned Pods
-			podInstanceIDSet := collasetutils.CollectPodInstanceID(currentPods)
+			podInstanceIDSet := collasetutils.CollectPodInstanceID(activePods)
 			// find IDs and their contexts which have not been used by owned Pods
 			availableContext := extractAvailableContexts(diff, ownedIDs, podInstanceIDSet)
 			needUpdateContext := false
@@ -581,7 +581,7 @@ func (r *RealSyncControl) Scale(
 		}
 	} else if diff < 0 {
 		// chose the pods to scale in
-		podsToScaleIn := getPodsToDelete(currentPods, replacePodMap, diff*-1)
+		podsToScaleIn := getPodsToDelete(activePods, replacePodMap, diff*-1)
 		// filter out Pods need to trigger PodOpsLifecycle
 		podCh := make(chan *collasetutils.PodWrapper, len(podsToScaleIn))
 		for i := range podsToScaleIn {
@@ -701,7 +701,7 @@ func (r *RealSyncControl) Scale(
 
 	// reset ContextDetail.ScalingIn, if there are Pods had its PodOpsLifecycle reverted
 	needUpdatePodContext := false
-	for _, podWrapper := range currentPods {
+	for _, podWrapper := range activePods {
 		if !podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, podWrapper) && ownedIDs[podWrapper.ID].Contains(ScaleInContextDataKey, "true") {
 			needUpdatePodContext = true
 			ownedIDs[podWrapper.ID].Remove(ScaleInContextDataKey)
@@ -720,7 +720,7 @@ func (r *RealSyncControl) Scale(
 	return scaling, recordedRequeueAfter, nil
 }
 
-func FilterOutOnlyPlaceholderPods(pods []*collasetutils.PodWrapper) []*collasetutils.PodWrapper {
+func FilterOutOnlyPlaceholderPodWrappers(pods []*collasetutils.PodWrapper) []*collasetutils.PodWrapper {
 	var filteredPodWrappers []*collasetutils.PodWrapper
 	for _, pod := range pods {
 		if pod.OnlyPlaceholder {
@@ -832,7 +832,7 @@ func (r *RealSyncControl) Update(
 
 	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
 	var recordedRequeueAfter *time.Duration
-	// 1. scan and analysis pods update info for current pods and onlyPlaceHolder pods
+	// 1. scan and analysis pods update info for active pods and onlyPlaceholder pods
 	podUpdateInfos, err := attachPodUpdateInfo(ctx, cls, podWrappers, resources)
 	if err != nil {
 		return false, nil, fmt.Errorf("fail to attach pod update info, %v", err)
@@ -840,13 +840,13 @@ func (r *RealSyncControl) Update(
 
 	// 2. decide Pod update candidates
 	candidates := decidePodToUpdate(cls, podUpdateInfos)
-	podToUpdate := filterOnlyPlaceholderInfos(candidates)
-	podCh := make(chan *PodUpdateInfo, len(podToUpdate))
+	activePodToUpdate := filterOutOnlyPlaceholderUpdateInfos(candidates)
+	podCh := make(chan *PodUpdateInfo, len(activePodToUpdate))
 	updater := newPodUpdater(ctx, r.client, cls, r.podControl, r.recorder)
 	updating := false
 
 	// 3. filter already updated revision,
-	for i, podInfo := range podToUpdate {
+	for i, podInfo := range activePodToUpdate {
 		if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged && !podInfo.PvcTmpHashChanged {
 			continue
 		}
@@ -861,7 +861,7 @@ func (r *RealSyncControl) Update(
 			continue
 		}
 
-		podCh <- podToUpdate[i]
+		podCh <- activePodToUpdate[i]
 	}
 
 	// 4. begin pod update lifecycle
@@ -870,7 +870,7 @@ func (r *RealSyncControl) Update(
 		return updating, recordedRequeueAfter, err
 	}
 
-	// 5. filter out (1) pods not allow to ops now, such as OperationDelaySeconds strategy; (2) onlyPlaceHolder pods
+	// 5. (1) filter out  pods not allow to ops now, such as OperationDelaySeconds strategy; (2) update onlyPlaceholder Pods resourceContext revision
 	recordedRequeueAfter, err = updater.FilterAllowOpsPods(candidates, ownedIDs, resources, podCh)
 	if err != nil {
 		collasetutils.AddOrUpdateCondition(resources.NewStatus,
@@ -909,8 +909,8 @@ func (r *RealSyncControl) Update(
 	}
 
 	// 7. try to finish all Pods'PodOpsLifecycle if its update is finished.
-	succCount, err = controllerutils.SlowStartBatch(len(podToUpdate), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
-		podInfo := podToUpdate[i]
+	succCount, err = controllerutils.SlowStartBatch(len(activePodToUpdate), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+		podInfo := activePodToUpdate[i]
 
 		if !podInfo.isDuringOps {
 			return nil

@@ -251,8 +251,8 @@ func calculateStatus(
 	var scheduledReplicas, readyReplicas, availableReplicas, replicas, updatedReplicas, operatingReplicas,
 		updatedReadyReplicas, updatedAvailableReplicas int32
 
-	currentPods := synccontrol.FilterOutOnlyPlaceholderPods(podWrappers)
-	for _, podWrapper := range currentPods {
+	activePods := synccontrol.FilterOutOnlyPlaceholderPodWrappers(podWrappers)
+	for _, podWrapper := range activePods {
 		replicas++
 
 		isUpdated := false
