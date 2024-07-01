@@ -256,7 +256,7 @@ func (r *RealSyncControl) SyncPods(
 			var instanceId string
 			if newPodContext, exist := replaceContextsMap[originPodId]; exist && newPodContext != nil {
 				// reuse podContext ID if pair-relation exists
-				instanceId = replaceContextsMap[originPodId].Data[ReplaceNewPodIDContextDataKey]
+				instanceId = newPodContext.Data[ReplaceNewPodIDContextDataKey]
 				newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
 			} else {
 				// add replace pair-relation to podContexts for originPod and newPod
@@ -469,8 +469,9 @@ func classifyReplacingPodContexts(ownedIDs map[int]*appsv1alpha1.ContextDetail) 
 	for id, contextDetail := range ownedIDs {
 		if val, exist := contextDetail.Data[ReplaceNewPodIDContextDataKey]; exist {
 			newPodId, _ := strconv.ParseInt(val, 10, 32)
-			if _, exist := ownedIDs[int(newPodId)]; exist {
-				podContextMap[id] = ownedIDs[int(newPodId)]
+			newPodContextDetail, exist := ownedIDs[int(newPodId)]
+			if exist && newPodContextDetail.Data[ReplaceOriginPodIDContextDataKey] == strconv.Itoa(id) {
+				podContextMap[id] = contextDetail
 			} else {
 				podContextMap[id] = nil
 			}
