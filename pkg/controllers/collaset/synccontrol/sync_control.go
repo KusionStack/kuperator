@@ -234,6 +234,7 @@ func (r *RealSyncControl) SyncPods(
 	// 4. create new pods for need replace pods
 	if len(needReplaceOriginPods) > 0 {
 		availableContexts := extractAvailableContexts(len(needReplaceOriginPods), ownedIDs, currentIDs)
+		replaceContextsMap := classifyReplacingPodContexts(ownedIDs)
 		successCount, err := controllerutils.SlowStartBatch(len(needReplaceOriginPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 			originPod := needReplaceOriginPods[i]
 			originPodId, _ := collasetutils.GetPodInstanceID(originPod)
@@ -251,21 +252,21 @@ func (r *RealSyncControl) SyncPods(
 				return err
 			}
 			// add instance id and replace pair label
-			instanceId := fmt.Sprintf("%d", availableContexts[i].ID)
-			if val, exist := ownedIDs[originPodId].Data[ReplaceNewPodIDContextDataKey]; exist {
-				// reuse new pod ID if pair-relation exists
-				id, _ := strconv.ParseInt(val, 10, 32)
-				if ownedIDs[int(id)] != nil {
-					instanceId = val
-				}
-			}
-			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
 			newPod.Labels[appsv1alpha1.PodReplacePairOriginName] = originPod.GetName()
-			// add replace pair-relation to IDs for originPod and newPod
-			newPodId, _ := collasetutils.GetPodInstanceID(newPod)
-			ownedIDs[originPodId].Put(ReplaceNewPodIDContextDataKey, strconv.Itoa(newPodId))
-			ownedIDs[newPodId].Put(ReplaceOriginPodIDContextDataKey, strconv.Itoa(originPodId))
-			ownedIDs[newPodId].Remove(podcontext.JustCreateContextDataKey)
+			var instanceId string
+			if newPodContext, exist := replaceContextsMap[originPodId]; exist && newPodContext != nil {
+				// reuse podContext ID if pair-relation exists
+				instanceId = replaceContextsMap[originPodId].Data[ReplaceNewPodIDContextDataKey]
+				newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
+			} else {
+				// add replace pair-relation to podContexts for originPod and newPod
+				instanceId = fmt.Sprintf("%d", availableContexts[i].ID)
+				newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
+				newPodId, _ := collasetutils.GetPodInstanceID(newPod)
+				ownedIDs[originPodId].Put(ReplaceNewPodIDContextDataKey, strconv.Itoa(newPodId))
+				ownedIDs[newPodId].Put(ReplaceOriginPodIDContextDataKey, strconv.Itoa(originPodId))
+				ownedIDs[newPodId].Remove(podcontext.JustCreateContextDataKey)
+			}
 			// create pvcs for new pod
 			err = r.pvcControl.CreatePodPvcs(ctx, instance, newPod, resources.ExistingPvcs)
 			if err != nil {
@@ -460,6 +461,22 @@ func (r *RealSyncControl) updateCollaSet(ctx context.Context, cls *appsv1alpha1.
 		return err
 	}
 	return collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.CollaSet, cls.Name, cls.ResourceVersion)
+}
+
+func classifyReplacingPodContexts(ownedIDs map[int]*appsv1alpha1.ContextDetail) map[int]*appsv1alpha1.ContextDetail {
+	// map replace origin pod to new pod
+	podContextMap := make(map[int]*appsv1alpha1.ContextDetail)
+	for id, contextDetail := range ownedIDs {
+		if val, exist := contextDetail.Data[ReplaceNewPodIDContextDataKey]; exist {
+			newPodId, _ := strconv.ParseInt(val, 10, 32)
+			if _, exist := ownedIDs[int(newPodId)]; exist {
+				podContextMap[id] = ownedIDs[int(newPodId)]
+			} else {
+				podContextMap[id] = nil
+			}
+		}
+	}
+	return podContextMap
 }
 
 func (r *RealSyncControl) Scale(
@@ -773,6 +790,10 @@ func extractAvailableContexts(diff int, ownedIDs map[int]*appsv1alpha1.ContextDe
 	idx := 0
 	for id := range ownedIDs {
 		if _, inUsed := podInstanceIDSet[id]; inUsed {
+			continue
+		}
+
+		if ownedIDs[id].Data[ReplaceNewPodIDContextDataKey] != "" {
 			continue
 		}
 
