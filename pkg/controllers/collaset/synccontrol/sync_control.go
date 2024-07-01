@@ -585,8 +585,6 @@ func (r *RealSyncControl) Scale(
 				}); updateContextErr != nil {
 					err = controllerutils.AggregateErrors([]error{updateContextErr, err})
 				}
-			} else {
-				println("needUpdateContext=false")
 			}
 			r.recorder.Eventf(cls, corev1.EventTypeNormal, "ScaleOut", "scale out %d Pod(s)", succCount)
 			if err != nil {
