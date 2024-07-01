@@ -252,28 +252,31 @@ func (r *RealSyncControl) SyncPods(
 				return err
 			}
 			// add instance id and replace pair label
-			newPod.Labels[appsv1alpha1.PodReplacePairOriginName] = originPod.GetName()
 			var instanceId string
-			if newPodContext, exist := replaceContextsMap[originPodId]; exist && newPodContext != nil {
+			var newPodContext *appsv1alpha1.ContextDetail
+			if contextDetail, exist := replaceContextsMap[originPodId]; exist && contextDetail != nil {
+				newPodContext = contextDetail
 				// reuse podContext ID if pair-relation exists
-				instanceId = newPodContext.Data[ReplaceNewPodIDContextDataKey]
+				instanceId = fmt.Sprintf("%d", newPodContext.ID)
 				newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
 			} else {
+				newPodContext = availableContexts[i]
 				// add replace pair-relation to podContexts for originPod and newPod
-				instanceId = fmt.Sprintf("%d", availableContexts[i].ID)
+				instanceId = fmt.Sprintf("%d", newPodContext.ID)
 				newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
 				newPodId, _ := collasetutils.GetPodInstanceID(newPod)
 				ownedIDs[originPodId].Put(ReplaceNewPodIDContextDataKey, strconv.Itoa(newPodId))
 				ownedIDs[newPodId].Put(ReplaceOriginPodIDContextDataKey, strconv.Itoa(originPodId))
 				ownedIDs[newPodId].Remove(podcontext.JustCreateContextDataKey)
 			}
+			newPod.Labels[appsv1alpha1.PodReplacePairOriginName] = originPod.GetName()
+			newPodContext.Put(podcontext.RevisionContextDataKey, replaceRevision.Name)
 			// create pvcs for new pod
 			err = r.pvcControl.CreatePodPvcs(ctx, instance, newPod, resources.ExistingPvcs)
 			if err != nil {
 				return fmt.Errorf("fail to migrate PVCs from origin pod %s to replace pod %s: %s", originPod.Name, newPod.Name, err)
 			}
 			if newCreatedPod, err := r.podControl.CreatePod(newPod); err == nil {
-				availableContexts[i].Put(podcontext.RevisionContextDataKey, replaceRevision.Name)
 				r.recorder.Eventf(originPod,
 					corev1.EventTypeNormal,
 					"CreatePairPod",
@@ -471,7 +474,7 @@ func classifyReplacingPodContexts(ownedIDs map[int]*appsv1alpha1.ContextDetail) 
 			newPodId, _ := strconv.ParseInt(val, 10, 32)
 			newPodContextDetail, exist := ownedIDs[int(newPodId)]
 			if exist && newPodContextDetail.Data[ReplaceOriginPodIDContextDataKey] == strconv.Itoa(id) {
-				podContextMap[id] = contextDetail
+				podContextMap[id] = newPodContextDetail
 			} else {
 				podContextMap[id] = nil
 			}
@@ -792,7 +795,8 @@ func extractAvailableContexts(diff int, ownedIDs map[int]*appsv1alpha1.ContextDe
 			continue
 		}
 
-		if ownedIDs[id].Data[ReplaceNewPodIDContextDataKey] != "" {
+		// skip replaceNewPod ID
+		if ownedIDs[id].Data[ReplaceOriginPodIDContextDataKey] != "" {
 			continue
 		}
 
