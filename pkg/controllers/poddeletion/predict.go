@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/utils"
 )
 
 type PredicateDeletionIndicatedPod struct {
@@ -28,22 +29,22 @@ type PredicateDeletionIndicatedPod struct {
 
 // Create returns true if the Create event should be processed
 func (p *PredicateDeletionIndicatedPod) Create(e event.CreateEvent) bool {
-	return hasTerminatingLabel(e.Object)
+	return utils.ControlledByKusionStack(e.Object) && hasTerminatingLabel(e.Object)
 }
 
 // Delete returns true if the Delete event should be processed
 func (p *PredicateDeletionIndicatedPod) Delete(e event.DeleteEvent) bool {
-	return hasTerminatingLabel(e.Object)
+	return utils.ControlledByKusionStack(e.Object) && hasTerminatingLabel(e.Object)
 }
 
 // Update returns true if the Update event should be processed
 func (p *PredicateDeletionIndicatedPod) Update(e event.UpdateEvent) bool {
-	return hasTerminatingLabel(e.ObjectNew)
+	return utils.ControlledByKusionStack(e.ObjectNew) && hasTerminatingLabel(e.ObjectNew)
 }
 
 // Generic returns true if the Generic event should be processed
 func (p *PredicateDeletionIndicatedPod) Generic(e event.GenericEvent) bool {
-	return hasTerminatingLabel(e.Object)
+	return utils.ControlledByKusionStack(e.Object) && hasTerminatingLabel(e.Object)
 }
 
 func hasTerminatingLabel(pod client.Object) bool {
