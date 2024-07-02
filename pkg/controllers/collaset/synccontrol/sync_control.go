@@ -183,7 +183,7 @@ func (r *RealSyncControl) SyncPods(
 	}
 
 	needUpdateContext := false
-	needDeleteOriginPodsIDs := sets.String{}
+	needDeletePodsIDs := sets.String{}
 	mapNewToOriginPodContext, mapOriginToNewPodContext := classifyReplacingPodContexts(ownedIDs)
 	if len(needCleanLabelPods) > 0 {
 		_, err := controllerutils.SlowStartBatch(len(needCleanLabelPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
@@ -202,7 +202,7 @@ func (r *RealSyncControl) SyncPods(
 					newPodId, _ := collasetutils.GetPodInstanceID(pod)
 					if originPodContext, exist := mapOriginToNewPodContext[newPodId]; exist && originPodContext != nil {
 						originPodContext.Remove(ReplaceNewPodIDContextDataKey)
-						needDeleteOriginPodsIDs.Insert(strconv.Itoa(originPodContext.ID))
+						needDeletePodsIDs.Insert(strconv.Itoa(originPodContext.ID))
 					}
 					ownedIDs[newPodId].Remove(ReplaceOriginPodIDContextDataKey)
 				}
@@ -227,7 +227,7 @@ func (r *RealSyncControl) SyncPods(
 		if _, exist := currentIDs[id]; exist {
 			continue
 		}
-		_, exist := needDeleteOriginPodsIDs[strconv.Itoa(contextDetail.ID)]
+		_, exist := needDeletePodsIDs[strconv.Itoa(contextDetail.ID)]
 		if contextDetail.Contains(ScaleInContextDataKey, "true") || exist {
 			idToReclaim.Insert(id)
 		}
