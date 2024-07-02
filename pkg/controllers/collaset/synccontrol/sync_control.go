@@ -184,6 +184,7 @@ func (r *RealSyncControl) SyncPods(
 
 	needUpdateContext := false
 	needDeleteOriginPodsIDs := sets.String{}
+	mapNewToOriginPodContext, mapOriginToNewPodContext := classifyReplacingPodContexts(ownedIDs)
 	if len(needCleanLabelPods) > 0 {
 		_, err := controllerutils.SlowStartBatch(len(needCleanLabelPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 			pod := needCleanLabelPods[i]
@@ -195,14 +196,15 @@ func (r *RealSyncControl) SyncPods(
 					"path": fmt.Sprintf("/metadata/labels/%s", strings.ReplaceAll(labelKey, "/", "~1")),
 				}
 				deletePatch = append(deletePatch, patchOperation)
-				// replace finished, (1) remove ReplaceOriginPodID from new pod ID, (2) delete origin Pod's ID
+				// replace finished, (1) remove ReplaceNewPodID, ReplaceOriginPodID key from IDs, (2) try to delete origin Pod's ID
 				if labelKey == appsv1alpha1.PodReplacePairOriginName {
 					needUpdateContext = true
-					id, _ := collasetutils.GetPodInstanceID(pod)
-					if val, exist := ownedIDs[id].Data[ReplaceOriginPodIDContextDataKey]; exist {
-						needDeleteOriginPodsIDs.Insert(val)
-						ownedIDs[id].Remove(ReplaceOriginPodIDContextDataKey)
+					newPodId, _ := collasetutils.GetPodInstanceID(pod)
+					if originPodContext, exist := mapOriginToNewPodContext[newPodId]; exist && originPodContext != nil {
+						originPodContext.Remove(ReplaceNewPodIDContextDataKey)
+						needDeleteOriginPodsIDs.Insert(strconv.Itoa(originPodContext.ID))
 					}
+					ownedIDs[newPodId].Remove(ReplaceOriginPodIDContextDataKey)
 				}
 			}
 			// patch to bytes
@@ -234,7 +236,6 @@ func (r *RealSyncControl) SyncPods(
 	// 4. create new pods for need replace pods
 	if len(needReplaceOriginPods) > 0 {
 		availableContexts := extractAvailableContexts(len(needReplaceOriginPods), ownedIDs, currentIDs)
-		replaceContextsMap := classifyReplacingPodContexts(ownedIDs)
 		successCount, err := controllerutils.SlowStartBatch(len(needReplaceOriginPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 			originPod := needReplaceOriginPods[i]
 			originPodId, _ := collasetutils.GetPodInstanceID(originPod)
@@ -254,7 +255,7 @@ func (r *RealSyncControl) SyncPods(
 			// add instance id and replace pair label
 			var instanceId string
 			var newPodContext *appsv1alpha1.ContextDetail
-			if contextDetail, exist := replaceContextsMap[originPodId]; exist && contextDetail != nil {
+			if contextDetail, exist := mapNewToOriginPodContext[originPodId]; exist && contextDetail != nil {
 				newPodContext = contextDetail
 				// reuse podContext ID if pair-relation exists
 				instanceId = fmt.Sprintf("%d", newPodContext.ID)
@@ -466,21 +467,30 @@ func (r *RealSyncControl) updateCollaSet(ctx context.Context, cls *appsv1alpha1.
 	return collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.CollaSet, cls.Name, cls.ResourceVersion)
 }
 
-func classifyReplacingPodContexts(ownedIDs map[int]*appsv1alpha1.ContextDetail) map[int]*appsv1alpha1.ContextDetail {
-	// map replace origin pod to new pod
-	podContextMap := make(map[int]*appsv1alpha1.ContextDetail)
+func classifyReplacingPodContexts(ownedIDs map[int]*appsv1alpha1.ContextDetail) (map[int]*appsv1alpha1.ContextDetail, map[int]*appsv1alpha1.ContextDetail) {
+	mapNewToOriginPodContext := make(map[int]*appsv1alpha1.ContextDetail)
+	mapOriginToNewPodContext := make(map[int]*appsv1alpha1.ContextDetail)
 	for id, contextDetail := range ownedIDs {
 		if val, exist := contextDetail.Data[ReplaceNewPodIDContextDataKey]; exist {
 			newPodId, _ := strconv.ParseInt(val, 10, 32)
 			newPodContextDetail, exist := ownedIDs[int(newPodId)]
 			if exist && newPodContextDetail.Data[ReplaceOriginPodIDContextDataKey] == strconv.Itoa(id) {
-				podContextMap[id] = newPodContextDetail
+				mapNewToOriginPodContext[id] = newPodContextDetail
 			} else {
-				podContextMap[id] = nil
+				mapNewToOriginPodContext[id] = nil
+			}
+		}
+		if val, exist := contextDetail.Data[ReplaceOriginPodIDContextDataKey]; exist {
+			originPodId, _ := strconv.ParseInt(val, 10, 32)
+			originPodContextDetail, exist := ownedIDs[int(originPodId)]
+			if exist && originPodContextDetail.Data[ReplaceNewPodIDContextDataKey] == strconv.Itoa(id) {
+				mapOriginToNewPodContext[id] = originPodContextDetail
+			} else {
+				mapOriginToNewPodContext[id] = nil
 			}
 		}
 	}
-	return podContextMap
+	return mapNewToOriginPodContext, mapOriginToNewPodContext
 }
 
 func (r *RealSyncControl) Scale(
