@@ -150,10 +150,10 @@ clean-kind:
 
 .PHONY: e2e-local
 e2e-local:
-	KUBECONFIG=/tmp/kind-kubeconfig.yaml ./bin/ginkgo -timeout 10m -v test/e2e
+	KUBECONFIG=/tmp/kind/kubeconfig.yaml ./bin/ginkgo -timeout 10m -v test/e2e
 
 .PHONY: e2e-all
-e2e-all: e2e-local-deploy e2e-local clean-kind
+e2e-all: deploy-in-kind e2e-local clean-kind
 
 ##@ Build Dependencies
 
