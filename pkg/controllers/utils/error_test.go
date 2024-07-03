@@ -25,6 +25,7 @@ func TestError(t *testing.T) {
 	var errs []error
 	err1 := fmt.Errorf("error 1")
 	err2 := fmt.Errorf("error 2")
+	var err3 error
 
 	actual := AggregateErrors(errs)
 	if actual != nil {
@@ -44,4 +45,10 @@ func TestError(t *testing.T) {
 		t.Fatalf("expect %v equal to %v", actual, expected)
 	}
 
+	errs = append(errs, err3)
+	actual = AggregateErrors(errs)
+	expected = fmt.Errorf("%v; %v", errs[0], errs[1])
+	if actual.Error() != expected.Error() {
+		t.Fatalf("expect %v equal to %v", actual, expected)
+	}
 }
