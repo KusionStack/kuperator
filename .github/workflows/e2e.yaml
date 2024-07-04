@@ -1,4 +1,4 @@
-name: e2e
+name: E2E
 on:
   pull_request:
     branches:
@@ -38,10 +38,11 @@ jobs:
       with:
         node_image: ${{ env.KIND_IMAGE }}
         cluster_name: ${{ env.KIND_CLUSTER_NAME }}
-        config: /tmp/kind/kubeconfig.yaml
+        config: ./test/e2e/scripts/kind-conf.yaml
         version: ${{ env.KIND_VERSION }}
     - name: Build Image
       run: |
+        mkdir -p /tmp/kind
         make kind-kube-config
         make docker-build
     - name: Install Operating
@@ -50,7 +51,8 @@ jobs:
         make deploy
     - name: Run e2e Tests
       run: |
-        make e2e-local
+        make ginkgo
+        KUBECONFIG=/tmp/kind/kubeconfig.yaml ./bin/ginkgo -timeout 10m -v --focus='\[apps\] CollaSet' test/e2e
     - name: Clean Kind Cluster
       run: |
         make clean-kind
