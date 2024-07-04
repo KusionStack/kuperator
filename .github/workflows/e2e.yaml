@@ -1,0 +1,56 @@
+name: e2e
+on:
+  pull_request:
+    branches:
+      - main
+      - release-*
+  push:
+    branches:
+      - main
+      - release-*
+
+env:
+  GO_VERSION: '1.19'
+  KIND_VERSION: 'v0.14.0'
+  KIND_IMAGE: 'kindest/node:v1.22.2'
+  KIND_CLUSTER_NAME: 'e2e-test'
+
+jobs:
+
+  CollaSet:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    - name: Cache Go Dependencies
+      uses: actions/cache@v2
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: ${{ runner.os }}-go-
+    - name: Setup Kind Cluster
+      uses: helm/kind-action@v1.10.0
+      with:
+        node_image: ${{ env.KIND_IMAGE }}
+        cluster_name: ${{ env.KIND_CLUSTER_NAME }}
+        config: /tmp/kind/kubeconfig.yaml
+        version: ${{ env.KIND_VERSION }}
+    - name: Build Image
+      run: |
+        make kind-kube-config
+        make docker-build
+    - name: Install Operating
+      run: |
+        make sync-kind-image
+        make deploy
+    - name: Run e2e Tests
+      run: |
+        make e2e-local
+    - name: Clean Kind Cluster
+      run: |
+        make clean-kind
