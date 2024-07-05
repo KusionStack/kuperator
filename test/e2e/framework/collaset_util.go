@@ -118,7 +118,7 @@ func (t *CollaSetTester) ListPodsForCollaSet(cls *appsv1alpha1.CollaSet) (pods [
 	return
 }
 
-func (t *CollaSetTester) ListPVCForCloneSet(cls *appsv1alpha1.CollaSet) (pvcs []*v1.PersistentVolumeClaim, err error) {
+func (t *CollaSetTester) ListPVCForCollaSet(cls *appsv1alpha1.CollaSet) (pvcs []*v1.PersistentVolumeClaim, err error) {
 	pvcList := &v1.PersistentVolumeClaimList{}
 	err = t.client.List(context.TODO(), pvcList, client.InNamespace(cls.Namespace))
 	if err != nil {

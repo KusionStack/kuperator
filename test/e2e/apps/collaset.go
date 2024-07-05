@@ -61,12 +61,12 @@ var _ = SIGDescribe("CollaSet", func() {
 			By("Wait for status replicas satisfied")
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 3, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
-			By("Scale in 1 replicas")
+			By("Scale in 1 pod")
 			Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
 				cls.Spec.Replicas = int32Pointer(2)
 			})).NotTo(HaveOccurred())
 
-			By("Wait for CollaSet generation consistent")
+			By("Wait for CollaSet reconciled")
 			Eventually(func() bool {
 				if err := tester.GetCollaSet(cls); err != nil {
 					return false
@@ -78,7 +78,7 @@ var _ = SIGDescribe("CollaSet", func() {
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 2, 2, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 		})
 
-		framework.ConformanceIt("pod recreate pod with same revision", func() {
+		framework.ConformanceIt("recreate pod with same revision", func() {
 			cls := tester.NewCollaSet("collaset-"+randStr, 2, appsv1alpha1.UpdateStrategy{})
 			Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
 
@@ -96,7 +96,7 @@ var _ = SIGDescribe("CollaSet", func() {
 				}
 			})).NotTo(HaveOccurred())
 
-			By("Wait for CollaSet generation consistent")
+			By("Wait for CollaSet reconciled")
 			Eventually(func() bool {
 				if err := tester.GetCollaSet(cls); err != nil {
 					return false
@@ -156,7 +156,7 @@ var _ = SIGDescribe("CollaSet", func() {
 			}, 30*time.Second, 3*time.Second).Should(Equal(true))
 		})
 
-		framework.ConformanceIt("podToDelete", func() {
+		framework.ConformanceIt("Selective delete and scale in pods", func() {
 			cls := tester.NewCollaSet("collaset-"+randStr, 3, appsv1alpha1.UpdateStrategy{})
 			Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
 
@@ -173,7 +173,7 @@ var _ = SIGDescribe("CollaSet", func() {
 				}
 			})).NotTo(HaveOccurred())
 
-			By("Wait for CollaSet generation consistent")
+			By("Wait for CollaSet reconciled")
 			Eventually(func() bool {
 				if err := tester.GetCollaSet(cls); err != nil {
 					return false
@@ -214,7 +214,7 @@ var _ = SIGDescribe("CollaSet", func() {
 				cls.Spec.Replicas = int32Pointer(2)
 			})).NotTo(HaveOccurred())
 
-			By("Wait for CollaSet generation consistent")
+			By("Wait for CollaSet reconciled")
 			Eventually(func() bool {
 				if err := tester.GetCollaSet(cls); err != nil {
 					return false
@@ -245,7 +245,7 @@ var _ = SIGDescribe("CollaSet", func() {
 			}, 30*time.Second, 3*time.Second).Should(Equal(true))
 		})
 
-		framework.ConformanceIt("pvc retention policy with scale in pods", func() {
+		framework.ConformanceIt("PVC retention policy with scale in pods", func() {
 			cls := tester.NewCollaSet("collaset-"+randStr, 2, appsv1alpha1.UpdateStrategy{})
 			cls.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy = &appsv1alpha1.PersistentVolumeClaimRetentionPolicy{
 				WhenScaled: appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType,
@@ -276,10 +276,10 @@ var _ = SIGDescribe("CollaSet", func() {
 			By("Wait for status replicas satisfied")
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 2, 2, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
-			By("Wait for pvc provisioned")
+			By("Wait for PVC provisioned")
 			pvcNames := sets.String{}
 			Eventually(func() bool {
-				pvcs, err := tester.ListPVCForCloneSet(cls)
+				pvcs, err := tester.ListPVCForCollaSet(cls)
 				if err != nil {
 					return false
 				}
@@ -298,7 +298,7 @@ var _ = SIGDescribe("CollaSet", func() {
 			})).NotTo(HaveOccurred())
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 1, 1, 1, 1, 1) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
-			By("Wait for CollaSet generation consistent")
+			By("Wait for CollaSet reconciled")
 			Eventually(func() bool {
 				if err := tester.GetCollaSet(cls); err != nil {
 					return false
@@ -306,9 +306,9 @@ var _ = SIGDescribe("CollaSet", func() {
 				return cls.Generation == cls.Status.ObservedGeneration
 			}, 10*time.Second, 3*time.Second).Should(Equal(true))
 
-			By("Check pvc is reserved")
+			By("Check PVC is reserved")
 			Eventually(func() bool {
-				pvcs, err := tester.ListPVCForCloneSet(cls)
+				pvcs, err := tester.ListPVCForCollaSet(cls)
 				if err != nil {
 					return false
 				}
@@ -321,7 +321,7 @@ var _ = SIGDescribe("CollaSet", func() {
 			})).NotTo(HaveOccurred())
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 2, 2, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
-			By("Wait for CollaSet generation consistent")
+			By("Wait for CollaSet reconciled")
 			Eventually(func() bool {
 				if err := tester.GetCollaSet(cls); err != nil {
 					return false
@@ -329,9 +329,9 @@ var _ = SIGDescribe("CollaSet", func() {
 				return cls.Generation == cls.Status.ObservedGeneration
 			}, 10*time.Second, 3*time.Second).Should(Equal(true))
 
-			By("Check pvc is retained")
+			By("Check PVC is retained")
 			Eventually(func() bool {
-				pvcs, err := tester.ListPVCForCloneSet(cls)
+				pvcs, err := tester.ListPVCForCollaSet(cls)
 				if err != nil {
 					return false
 				}
@@ -367,7 +367,7 @@ var _ = SIGDescribe("CollaSet", func() {
 				cls.Spec.Template.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.NginxNew)
 			})).NotTo(HaveOccurred())
 
-			By("Wait for CollaSet generation consistent")
+			By("Wait for CollaSet reconciled")
 			Eventually(func() bool {
 				if err = tester.GetCollaSet(cls); err != nil {
 					return false
@@ -407,7 +407,7 @@ var _ = SIGDescribe("CollaSet", func() {
 			})).NotTo(HaveOccurred())
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 0, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
-			By("Wait for CollaSet generation consistent")
+			By("Wait for CollaSet reconciled")
 			Eventually(func() bool {
 				if err := tester.GetCollaSet(cls); err != nil {
 					return false
@@ -428,7 +428,7 @@ var _ = SIGDescribe("CollaSet", func() {
 
 		})
 
-		framework.ConformanceIt("pvc template update", func() {
+		framework.ConformanceIt("PVC template update", func() {
 			cls := tester.NewCollaSet("collaset-"+randStr, 2, appsv1alpha1.UpdateStrategy{})
 			cls.Spec.VolumeClaimTemplates = []v1.PersistentVolumeClaim{
 				{
@@ -456,11 +456,11 @@ var _ = SIGDescribe("CollaSet", func() {
 			By("Wait for status replicas satisfied")
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 2, 2, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
-			By("Wait for pvc provisioned")
+			By("Wait for PVC provisioned")
 			oldPvcNames := sets.String{}
 			oldRevision := cls.Status.UpdatedRevision
 			Eventually(func() bool {
-				pvcs, err := tester.ListPVCForCloneSet(cls)
+				pvcs, err := tester.ListPVCForCollaSet(cls)
 				if err != nil {
 					return false
 				}
@@ -473,7 +473,7 @@ var _ = SIGDescribe("CollaSet", func() {
 				return true
 			}, 30*time.Second, 3*time.Second).Should(Equal(true))
 
-			By("Update pvc template")
+			By("Update PVC template")
 			Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
 				cls.Spec.VolumeClaimTemplates[0].Spec.Resources = v1.ResourceRequirements{
 					Requests: v1.ResourceList{
@@ -482,7 +482,7 @@ var _ = SIGDescribe("CollaSet", func() {
 				}
 			})).NotTo(HaveOccurred())
 
-			By("Wait for CollaSet generation consistent")
+			By("Wait for CollaSet reconciled")
 			Eventually(func() bool {
 				if err := tester.GetCollaSet(cls); err != nil {
 					return false
@@ -490,7 +490,7 @@ var _ = SIGDescribe("CollaSet", func() {
 				return cls.Generation == cls.Status.ObservedGeneration
 			}, 10*time.Second, 3*time.Second).Should(Equal(true))
 
-			By("Wait for pvcs and pods recreated")
+			By("Wait for PVCs and pods recreated")
 			Eventually(func() bool {
 				if err := tester.GetCollaSet(cls); err != nil {
 					return false
@@ -499,9 +499,9 @@ var _ = SIGDescribe("CollaSet", func() {
 			}, 30*time.Second, 3*time.Second).Should(Equal(true))
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 2, 2, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
-			By("Check new pvcs provisioned")
+			By("Check new PVCs provisioned")
 			Eventually(func() bool {
-				pvcs, err := tester.ListPVCForCloneSet(cls)
+				pvcs, err := tester.ListPVCForCollaSet(cls)
 				if err != nil {
 					return false
 				}
@@ -537,7 +537,7 @@ var _ = SIGDescribe("CollaSet", func() {
 				}
 			})).NotTo(HaveOccurred())
 
-			By("Wait for CollaSet generation consistent")
+			By("Wait for CollaSet reconciled")
 			Eventually(func() bool {
 				if err := tester.GetCollaSet(cls); err != nil {
 					return false
