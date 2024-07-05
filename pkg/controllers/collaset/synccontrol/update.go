@@ -84,12 +84,14 @@ type PodUpdateInfo struct {
 }
 
 func attachPodUpdateInfo(ctx context.Context, cls *appsv1alpha1.CollaSet, pods []*collasetutils.PodWrapper, resource *collasetutils.RelatedResources) ([]*PodUpdateInfo, error) {
-	podUpdateInfoList := make([]*PodUpdateInfo, len(pods))
+	activePods := FilterOutPlaceHolderPodWrappers(pods)
+	podUpdateInfoList := make([]*PodUpdateInfo, len(activePods))
 
-	for i, pod := range pods {
+	for i, pod := range activePods {
 		updateInfo := &PodUpdateInfo{
 			PodWrapper: pod,
 		}
+
 		currentPDs, err := resource.PDGetter.GetOnPod(ctx, pod.Pod)
 		if err != nil {
 			return nil, err
@@ -149,7 +151,7 @@ func attachPodUpdateInfo(ctx context.Context, cls *appsv1alpha1.CollaSet, pods [
 	for _, podUpdateInfo := range podUpdateInfoList {
 		podUpdateInfoMap[podUpdateInfo.Name] = podUpdateInfo
 	}
-	replacePodMap := classifyPodReplacingMapping(pods)
+	replacePodMap := classifyPodReplacingMapping(activePods)
 	for originPodName, replacePairNewPod := range replacePodMap {
 		originPodInfo := podUpdateInfoMap[originPodName]
 		if replacePairNewPod != nil {
@@ -170,12 +172,43 @@ func attachPodUpdateInfo(ctx context.Context, cls *appsv1alpha1.CollaSet, pods [
 		}
 	}
 
+	// join PlaceHolder pods in updating
+	for _, pod := range pods {
+		if !pod.PlaceHolder {
+			continue
+		}
+		updateInfo := &PodUpdateInfo{
+			PodWrapper:     pod,
+			UpdateRevision: resource.UpdatedRevision,
+		}
+		if revision, exist := pod.ContextDetail.Data[podcontext.RevisionContextDataKey]; exist &&
+			revision == resource.UpdatedRevision.Name {
+			updateInfo.IsUpdatedRevision = true
+		}
+		podUpdateInfoList = append(podUpdateInfoList, updateInfo)
+	}
+
 	return podUpdateInfoList, nil
 }
 
-func decidePodToUpdate(cls *appsv1alpha1.CollaSet, podInfos []*PodUpdateInfo) []*PodUpdateInfo {
+func filterOutPlaceHolderUpdateInfos(pods []*PodUpdateInfo) []*PodUpdateInfo {
+	var filteredPodUpdateInfos []*PodUpdateInfo
+	for _, pod := range pods {
+		if pod.PlaceHolder {
+			continue
+		}
+		filteredPodUpdateInfos = append(filteredPodUpdateInfos, pod)
+	}
+	return filteredPodUpdateInfos
+}
+
+func decidePodToUpdate(
+	cls *appsv1alpha1.CollaSet,
+	podInfos []*PodUpdateInfo) []*PodUpdateInfo {
+
 	if cls.Spec.UpdateStrategy.RollingUpdate != nil && cls.Spec.UpdateStrategy.RollingUpdate.ByLabel != nil {
-		return decidePodToUpdateByLabel(cls, podInfos)
+		activePodInfos := filterOutPlaceHolderUpdateInfos(podInfos)
+		return decidePodToUpdateByLabel(cls, activePodInfos)
 	}
 
 	return decidePodToUpdateByPartition(cls, podInfos)
@@ -207,7 +240,10 @@ func decidePodToUpdateByLabel(_ *appsv1alpha1.CollaSet, podInfos []*PodUpdateInf
 	return podToUpdate
 }
 
-func decidePodToUpdateByPartition(cls *appsv1alpha1.CollaSet, podInfos []*PodUpdateInfo) (podToUpdate []*PodUpdateInfo) {
+func decidePodToUpdateByPartition(
+	cls *appsv1alpha1.CollaSet,
+	podInfos []*PodUpdateInfo) (podToUpdate []*PodUpdateInfo) {
+
 	filteredPodInfos := filterReplacingNewCreatedPod(podInfos)
 	if cls.Spec.UpdateStrategy.RollingUpdate == nil ||
 		cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition == nil {
@@ -221,6 +257,7 @@ func decidePodToUpdateByPartition(cls *appsv1alpha1.CollaSet, podInfos []*PodUpd
 	if partition >= podsNum {
 		return podToUpdate
 	}
+
 	podToUpdate = ordered[:podsNum-partition]
 	for i := podsNum - partition; i < podsNum; i++ {
 		if podInfos[i].PodDecorationChanged {
@@ -235,6 +272,14 @@ func filterReplacingNewCreatedPod(podInfos []*PodUpdateInfo) (filteredPodInfos [
 	for _, podInfo := range podInfos {
 		if podInfo.isInReplacing && podInfo.replacePairOriginPodName != "" {
 			continue
+		}
+
+		if podInfo.PlaceHolder {
+			_, isReplaceNewPod := podInfo.ContextDetail.Data[ReplaceOriginPodIDContextDataKey]
+			_, isReplaceOriginPod := podInfo.ContextDetail.Data[ReplaceNewPodIDContextDataKey]
+			if isReplaceNewPod || isReplaceOriginPod {
+				continue
+			}
 		}
 
 		filteredPodInfos = append(filteredPodInfos, podInfo)
@@ -258,6 +303,14 @@ func (o orderByDefault) Less(i, j int) bool {
 
 	if l.isDuringOps != r.isDuringOps {
 		return l.isDuringOps
+	}
+
+	if l.PlaceHolder != r.PlaceHolder {
+		return r.PlaceHolder
+	}
+
+	if l.PlaceHolder && r.PlaceHolder {
+		return true
 	}
 
 	if controllerutils.BeforeReady(l.Pod) == controllerutils.BeforeReady(r.Pod) &&
@@ -316,28 +369,37 @@ func (u *GenericPodUpdater) BeginUpdatePod(resources *collasetutils.RelatedResou
 	return updating, nil
 }
 
-func (u *GenericPodUpdater) FilterAllowOpsPods(podToUpdate []*PodUpdateInfo, ownedIDs map[int]*appsv1alpha1.ContextDetail, resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (*time.Duration, error) {
+func (u *GenericPodUpdater) FilterAllowOpsPods(candidates []*PodUpdateInfo, ownedIDs map[int]*appsv1alpha1.ContextDetail, resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (*time.Duration, error) {
 	var recordedRequeueAfter *time.Duration
 	needUpdateContext := false
-	for i := range podToUpdate {
-		podInfo := podToUpdate[i]
-		requeueAfter, allowed := podopslifecycle.AllowOps(collasetutils.UpdateOpsLifecycleAdapter, realValue(u.collaSet.Spec.UpdateStrategy.OperationDelaySeconds), podInfo.Pod)
-		if !allowed {
-			u.recorder.Eventf(podInfo, corev1.EventTypeNormal, "PodUpdateLifecycle", "Pod %s is not allowed to update", commonutils.ObjectKeyString(podInfo.Pod))
-			continue
-		}
-		if requeueAfter != nil {
-			u.recorder.Eventf(podInfo, corev1.EventTypeNormal, "PodUpdateLifecycle", "delay Pod update for %d seconds", requeueAfter.Seconds())
-			if recordedRequeueAfter == nil || *requeueAfter < *recordedRequeueAfter {
-				recordedRequeueAfter = requeueAfter
+	for i := range candidates {
+		podInfo := candidates[i]
+
+		if !podInfo.PlaceHolder {
+			requeueAfter, allowed := podopslifecycle.AllowOps(collasetutils.UpdateOpsLifecycleAdapter, realValue(u.collaSet.Spec.UpdateStrategy.OperationDelaySeconds), podInfo.Pod)
+			if !allowed {
+				u.recorder.Eventf(podInfo, corev1.EventTypeNormal, "PodUpdateLifecycle", "Pod %s is not allowed to update", commonutils.ObjectKeyString(podInfo.Pod))
+				continue
 			}
-			continue
+			if requeueAfter != nil {
+				u.recorder.Eventf(podInfo, corev1.EventTypeNormal, "PodUpdateLifecycle", "delay Pod update for %d seconds", requeueAfter.Seconds())
+				if recordedRequeueAfter == nil || *requeueAfter < *recordedRequeueAfter {
+					recordedRequeueAfter = requeueAfter
+				}
+				continue
+			}
 		}
 
 		if !ownedIDs[podInfo.ID].Contains(podcontext.RevisionContextDataKey, resources.UpdatedRevision.Name) {
 			needUpdateContext = true
 			ownedIDs[podInfo.ID].Put(podcontext.RevisionContextDataKey, resources.UpdatedRevision.Name)
 		}
+
+		// mark podContext "PodRecreateUpgrade" if upgrade by recreate
+		if !podInfo.OnlyMetadataChanged && !podInfo.InPlaceUpdateSupport {
+			ownedIDs[podInfo.ID].Put(podcontext.RecreateUpdateContextDataKey, "true")
+		}
+
 		if podInfo.PodDecorationChanged {
 			decorationStr := utilspoddecoration.GetDecorationInfoString(podInfo.UpdatedPodDecorations)
 			if val, ok := ownedIDs[podInfo.ID].Get(podcontext.PodDecorationRevisionKey); !ok || val != decorationStr {
@@ -349,8 +411,13 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(podToUpdate []*PodUpdateInfo, own
 		if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged && !podInfo.PvcTmpHashChanged {
 			continue
 		}
+
+		if podInfo.PlaceHolder {
+			continue
+		}
+
 		// if Pod has not been updated, update it.
-		podCh <- podToUpdate[i]
+		podCh <- candidates[i]
 	}
 	// mark Pod to use updated revision before updating it.
 	if needUpdateContext {
@@ -715,13 +782,14 @@ func (u *replaceUpdatePodUpdater) BeginUpdatePod(resources *collasetutils.Relate
 	return succCount > 0, err
 }
 
-func (u *replaceUpdatePodUpdater) FilterAllowOpsPods(podToUpdate []*PodUpdateInfo, _ map[int]*appsv1alpha1.ContextDetail, _ *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (requeueAfter *time.Duration, err error) {
-	for i, podInfo := range podToUpdate {
+func (u *replaceUpdatePodUpdater) FilterAllowOpsPods(candidates []*PodUpdateInfo, _ map[int]*appsv1alpha1.ContextDetail, _ *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (requeueAfter *time.Duration, err error) {
+	activePodToUpdate := filterOutPlaceHolderUpdateInfos(candidates)
+	for i, podInfo := range activePodToUpdate {
 		if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged && !podInfo.PvcTmpHashChanged {
 			continue
 		}
 
-		podCh <- podToUpdate[i]
+		podCh <- activePodToUpdate[i]
 	}
 	return nil, err
 }
