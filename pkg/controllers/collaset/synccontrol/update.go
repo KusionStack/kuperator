@@ -84,7 +84,7 @@ type PodUpdateInfo struct {
 }
 
 func attachPodUpdateInfo(ctx context.Context, cls *appsv1alpha1.CollaSet, pods []*collasetutils.PodWrapper, resource *collasetutils.RelatedResources) ([]*PodUpdateInfo, error) {
-	activePods := FilterOutOnlyPlaceholderPodWrappers(pods)
+	activePods := FilterOutPlaceHolderPodWrappers(pods)
 	podUpdateInfoList := make([]*PodUpdateInfo, len(activePods))
 
 	for i, pod := range activePods {
@@ -172,9 +172,9 @@ func attachPodUpdateInfo(ctx context.Context, cls *appsv1alpha1.CollaSet, pods [
 		}
 	}
 
-	// join onlyPlaceholder pods in updating
+	// join PlaceHolder pods in updating
 	for _, pod := range pods {
-		if !pod.OnlyPlaceholder {
+		if !pod.PlaceHolder {
 			continue
 		}
 		updateInfo := &PodUpdateInfo{
@@ -191,10 +191,10 @@ func attachPodUpdateInfo(ctx context.Context, cls *appsv1alpha1.CollaSet, pods [
 	return podUpdateInfoList, nil
 }
 
-func filterOutOnlyPlaceholderUpdateInfos(pods []*PodUpdateInfo) []*PodUpdateInfo {
+func filterOutPlaceHolderUpdateInfos(pods []*PodUpdateInfo) []*PodUpdateInfo {
 	var filteredPodUpdateInfos []*PodUpdateInfo
 	for _, pod := range pods {
-		if pod.OnlyPlaceholder {
+		if pod.PlaceHolder {
 			continue
 		}
 		filteredPodUpdateInfos = append(filteredPodUpdateInfos, pod)
@@ -207,7 +207,7 @@ func decidePodToUpdate(
 	podInfos []*PodUpdateInfo) []*PodUpdateInfo {
 
 	if cls.Spec.UpdateStrategy.RollingUpdate != nil && cls.Spec.UpdateStrategy.RollingUpdate.ByLabel != nil {
-		activePodInfos := filterOutOnlyPlaceholderUpdateInfos(podInfos)
+		activePodInfos := filterOutPlaceHolderUpdateInfos(podInfos)
 		return decidePodToUpdateByLabel(cls, activePodInfos)
 	}
 
@@ -274,7 +274,7 @@ func filterReplacingNewCreatedPod(podInfos []*PodUpdateInfo) (filteredPodInfos [
 			continue
 		}
 
-		if podInfo.OnlyPlaceholder {
+		if podInfo.PlaceHolder {
 			_, isReplaceNewPod := podInfo.ContextDetail.Data[ReplaceOriginPodIDContextDataKey]
 			_, isReplaceOriginPod := podInfo.ContextDetail.Data[ReplaceNewPodIDContextDataKey]
 			if isReplaceNewPod || isReplaceOriginPod {
@@ -305,11 +305,11 @@ func (o orderByDefault) Less(i, j int) bool {
 		return l.isDuringOps
 	}
 
-	if l.OnlyPlaceholder != r.OnlyPlaceholder {
-		return r.OnlyPlaceholder
+	if l.PlaceHolder != r.PlaceHolder {
+		return r.PlaceHolder
 	}
 
-	if l.OnlyPlaceholder && r.OnlyPlaceholder {
+	if l.PlaceHolder && r.PlaceHolder {
 		return true
 	}
 
@@ -375,7 +375,7 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(candidates []*PodUpdateInfo, owne
 	for i := range candidates {
 		podInfo := candidates[i]
 
-		if !podInfo.OnlyPlaceholder {
+		if !podInfo.PlaceHolder {
 			requeueAfter, allowed := podopslifecycle.AllowOps(collasetutils.UpdateOpsLifecycleAdapter, realValue(u.collaSet.Spec.UpdateStrategy.OperationDelaySeconds), podInfo.Pod)
 			if !allowed {
 				u.recorder.Eventf(podInfo, corev1.EventTypeNormal, "PodUpdateLifecycle", "Pod %s is not allowed to update", commonutils.ObjectKeyString(podInfo.Pod))
@@ -412,7 +412,7 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(candidates []*PodUpdateInfo, owne
 			continue
 		}
 
-		if podInfo.OnlyPlaceholder {
+		if podInfo.PlaceHolder {
 			continue
 		}
 
@@ -783,7 +783,7 @@ func (u *replaceUpdatePodUpdater) BeginUpdatePod(resources *collasetutils.Relate
 }
 
 func (u *replaceUpdatePodUpdater) FilterAllowOpsPods(candidates []*PodUpdateInfo, _ map[int]*appsv1alpha1.ContextDetail, _ *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (requeueAfter *time.Duration, err error) {
-	activePodToUpdate := filterOutOnlyPlaceholderUpdateInfos(candidates)
+	activePodToUpdate := filterOutPlaceHolderUpdateInfos(candidates)
 	for i, podInfo := range activePodToUpdate {
 		if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged && !podInfo.PvcTmpHashChanged {
 			continue

@@ -164,11 +164,11 @@ func (r *RealSyncControl) SyncPods(
 		}
 
 		podWrappers = append(podWrappers, &collasetutils.PodWrapper{
-			Pod:             pod,
-			ID:              id,
-			ContextDetail:   ownedIDs[id],
-			ToDelete:        toDelete,
-			OnlyPlaceholder: false,
+			Pod:           pod,
+			ID:            id,
+			ContextDetail: ownedIDs[id],
+			ToDelete:      toDelete,
+			PlaceHolder:   false,
 		})
 
 		if id >= 0 {
@@ -258,10 +258,10 @@ func (r *RealSyncControl) SyncPods(
 			continue
 		}
 		podWrappers = append(podWrappers, &collasetutils.PodWrapper{
-			ID:              id,
-			Pod:             nil,
-			ContextDetail:   contextDetail,
-			OnlyPlaceholder: true,
+			ID:            id,
+			Pod:           nil,
+			ContextDetail: contextDetail,
+			PlaceHolder:   true,
 		})
 	}
 
@@ -287,7 +287,7 @@ func (r *RealSyncControl) Scale(
 
 	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
 	var recordedRequeueAfter *time.Duration
-	activePods := FilterOutOnlyPlaceholderPodWrappers(podWrappers)
+	activePods := FilterOutPlaceHolderPodWrappers(podWrappers)
 	replacePodMap := classifyPodReplacingMapping(activePods)
 
 	diff := int(realValue(cls.Spec.Replicas)) - len(replacePodMap)
@@ -533,10 +533,10 @@ func (r *RealSyncControl) Scale(
 	return scaling, recordedRequeueAfter, nil
 }
 
-func FilterOutOnlyPlaceholderPodWrappers(pods []*collasetutils.PodWrapper) []*collasetutils.PodWrapper {
+func FilterOutPlaceHolderPodWrappers(pods []*collasetutils.PodWrapper) []*collasetutils.PodWrapper {
 	var filteredPodWrappers []*collasetutils.PodWrapper
 	for _, pod := range pods {
-		if pod.OnlyPlaceholder {
+		if pod.PlaceHolder {
 			continue
 		}
 		filteredPodWrappers = append(filteredPodWrappers, pod)
@@ -614,7 +614,7 @@ func (r *RealSyncControl) Update(
 
 	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
 	var recordedRequeueAfter *time.Duration
-	// 1. scan and analysis pods update info for active pods and onlyPlaceholder pods
+	// 1. scan and analysis pods update info for active pods and PlaceHolder pods
 	podUpdateInfos, err := attachPodUpdateInfo(ctx, cls, podWrappers, resources)
 	if err != nil {
 		return false, nil, fmt.Errorf("fail to attach pod update info, %v", err)
@@ -622,7 +622,7 @@ func (r *RealSyncControl) Update(
 
 	// 2. decide Pod update candidates
 	candidates := decidePodToUpdate(cls, podUpdateInfos)
-	activePodToUpdate := filterOutOnlyPlaceholderUpdateInfos(candidates)
+	activePodToUpdate := filterOutPlaceHolderUpdateInfos(candidates)
 	podCh := make(chan *PodUpdateInfo, len(activePodToUpdate))
 	updater := newPodUpdater(ctx, r.client, cls, r.podControl, r.recorder)
 	updating := false
@@ -652,7 +652,7 @@ func (r *RealSyncControl) Update(
 		return updating, recordedRequeueAfter, err
 	}
 
-	// 5. (1) filter out  pods not allow to ops now, such as OperationDelaySeconds strategy; (2) update onlyPlaceholder Pods resourceContext revision
+	// 5. (1) filter out  pods not allow to ops now, such as OperationDelaySeconds strategy; (2) update PlaceHolder Pods resourceContext revision
 	recordedRequeueAfter, err = updater.FilterAllowOpsPods(candidates, ownedIDs, resources, podCh)
 	if err != nil {
 		collasetutils.AddOrUpdateCondition(resources.NewStatus,
