@@ -227,9 +227,8 @@ spec:
                           controlled by partition value.
                         properties:
                           partition:
-                            description: Partition controls the update progress by
-                              indicating how many pods should be updated. Defaults
-                              to nil (all pods will be updated)
+                            description: Partition controls the number of pods in
+                              old revisions. Defaults to nil (all pods will be updated)
                             format: int32
                             type: integer
                         type: object
