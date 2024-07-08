@@ -51,6 +51,7 @@ func (r *RealSyncControl) cleanReplacePodLabels(
 	needUpdateContext := false
 	needDeletePodsIDs := sets.String{}
 	mapOriginToNewPodContext := mapReplaceOriginToNewPodContext(ownedIDs)
+	mapNewToOriginPodContext := mapReplaceNewToOriginPodContext(ownedIDs)
 	_, err := controllerutils.SlowStartBatch(len(needCleanLabelPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		pod := needCleanLabelPods[i]
 		needCleanLabels := podsNeedCleanLabels[i]
@@ -70,6 +71,17 @@ func (r *RealSyncControl) cleanReplacePodLabels(
 					needDeletePodsIDs.Insert(strconv.Itoa(originPodContext.ID))
 				}
 				ownedIDs[newPodId].Remove(ReplaceOriginPodIDContextDataKey)
+			}
+			// replace canceled, (1) remove ReplaceNewPodID, ReplaceOriginPodID key from IDs, (2) try to delete new Pod's ID
+			_, replaceIndicate := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
+			if !replaceIndicate && labelKey == appsv1alpha1.PodReplacePairNewId {
+				needUpdateContext = true
+				originPodId, _ := collasetutils.GetPodInstanceID(pod)
+				if newPodContext, exist := mapNewToOriginPodContext[originPodId]; exist && newPodContext != nil {
+					newPodContext.Remove(ReplaceOriginPodIDContextDataKey)
+					needDeletePodsIDs.Insert(strconv.Itoa(newPodContext.ID))
+				}
+				ownedIDs[originPodId].Remove(ReplaceNewPodIDContextDataKey)
 			}
 		}
 		// patch to bytes
@@ -219,6 +231,11 @@ func dealReplacePods(pods []*corev1.Pod, instance *appsv1alpha1.CollaSet) (needR
 			// replace pair origin pod is not exist, clean label.
 			if originPod, exist := podNameMap[originPodName]; !exist {
 				needCleanLabels = append(needCleanLabels, appsv1alpha1.PodReplacePairOriginName)
+			} else if originPod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] == "" {
+				// replace canceled, delete replace new pod if origin pod is active
+				if originPod.DeletionTimestamp == nil {
+					needDeletePods = append(needDeletePods, pod)
+				}
 			} else if !replaceByUpdate {
 				// not replace update, delete origin pod when new created pod is service available
 				if _, serviceAvailable := pod.Labels[appsv1alpha1.PodServiceAvailableLabel]; serviceAvailable {
