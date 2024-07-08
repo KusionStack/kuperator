@@ -1264,6 +1264,96 @@ var _ = Describe("collaset controller", func() {
 		}
 	})
 
+	It("cancel pod replace", func() {
+		testcase := "test-cancel-pod-replace"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+
+		cs := &appsv1alpha1.CollaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.CollaSetSpec{
+				Replicas: int32Pointer(1),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "foo",
+								Image: "nginx:v1",
+							},
+						},
+					},
+				},
+				UpdateStrategy: appsv1alpha1.UpdateStrategy{
+					OperationDelaySeconds: int32Pointer(1),
+				},
+			},
+		}
+
+		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
+		podList := &corev1.PodList{}
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 1
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 1, 1, 0, 0, 0)).Should(BeNil())
+
+		// try to replace pod
+		podToReplace := &podList.Items[0]
+		Expect(updatePodWithRetry(c, podToReplace.Namespace, podToReplace.Name, func(pod *corev1.Pod) bool {
+			pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] = "true"
+			return true
+		})).Should(BeNil())
+
+		// wait for new replace pod created
+		podNewCreate := &corev1.Pod{}
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 2
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		for i := range podList.Items {
+			if podList.Items[i].Labels[appsv1alpha1.PodReplacePairOriginName] == podToReplace.Name {
+				podNewCreate = &podList.Items[i]
+			}
+		}
+		Expect(podNewCreate).ShouldNot(BeNil())
+		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
+
+		// cancel replace
+		Expect(updatePodWithRetry(c, podToReplace.Namespace, podToReplace.Name, func(pod *corev1.Pod) bool {
+			delete(pod.Labels, appsv1alpha1.PodReplaceIndicationLabelKey)
+			return true
+		})).Should(BeNil())
+
+		// allow new replace pod to delete
+		Expect(updatePodWithRetry(c, podNewCreate.Namespace, podNewCreate.Name, func(pod *corev1.Pod) bool {
+			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID())
+			pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+			return true
+		})).Should(BeNil())
+
+		// wait for replace canceled
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 1
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 1, 1, 0, 0, 0)).Should(BeNil())
+		Expect(podList.Items[0].Name).Should(BeEquivalentTo(podToReplace.Name))
+	})
+
 	It("replace update change to inplaceUpdate", func() {
 		testcase := "test-replace-update-change-to-inplace-update"
 		Expect(createNamespace(c, testcase)).Should(BeNil())

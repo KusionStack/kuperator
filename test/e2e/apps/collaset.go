@@ -565,6 +565,41 @@ var _ = SIGDescribe("CollaSet", func() {
 		})
 	})
 
+	framework.KusionstackDescribe("CollaSet Replacing", func() {
+
+		framework.ConformanceIt("replace pod by label and cancel replace", func() {
+			cls := tester.NewCollaSet("collaset-"+randStr, 1, appsv1alpha1.UpdateStrategy{})
+			// use bad image to mock new replace pod unavailable
+			cls.Spec.Template.Spec.Containers[0].Image = "nginx:non-exist"
+			Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
+
+			By("Wait for status replicas satisfied")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 1, 0, 0, 1, 1) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Replace pod by label")
+			pods, err := tester.ListPodsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			podToReplace := pods[0]
+			Expect(tester.UpdatePod(podToReplace, func(pod *v1.Pod) {
+				podToReplace.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] = "true"
+			})).NotTo(HaveOccurred())
+
+			By("Wait for replace new pod created")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 0, 0, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Cancel replace pod by delete to-replace label")
+			Expect(tester.UpdatePod(podToReplace, func(pod *v1.Pod) {
+				delete(pod.Labels, appsv1alpha1.PodReplaceIndicationLabelKey)
+			})).NotTo(HaveOccurred())
+
+			By("Wait for replace cancel finished")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 1, 0, 0, 1, 1) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+			pods, err = tester.ListPodsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pods[0].Name).To(Equal(podToReplace.Name))
+		})
+	})
+
 })
 
 func int32Pointer(val int32) *int32 {
