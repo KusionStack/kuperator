@@ -162,7 +162,7 @@ type PersistentVolumeClaimRetentionPolicy struct {
 }
 
 type ByPartition struct {
-	// Partition controls the update progress by indicating how many pods should be updated.
+	// Partition controls the number of pods in old revisions.
 	// Defaults to nil (all pods will be updated)
 	// +optional
 	Partition *int32 `json:"partition,omitempty"`
