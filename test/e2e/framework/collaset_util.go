@@ -136,6 +136,24 @@ func (t *CollaSetTester) ListPVCForCollaSet(cls *appsv1alpha1.CollaSet) (pvcs []
 	return
 }
 
+func (t *CollaSetTester) ListResourceContextsForCollaSet(cls *appsv1alpha1.CollaSet) (resourceContexts []*appsv1alpha1.ResourceContext, err error) {
+	rcList := &appsv1alpha1.ResourceContextList{}
+	err = t.client.List(context.TODO(), rcList, client.InNamespace(cls.Namespace))
+	if err != nil {
+		return nil, err
+	}
+	for i := range rcList.Items {
+		rc := &rcList.Items[i]
+		if rc.DeletionTimestamp.IsZero() {
+			resourceContexts = append(resourceContexts, rc)
+		}
+	}
+	sort.SliceStable(resourceContexts, func(i, j int) bool {
+		return resourceContexts[i].Name < resourceContexts[j].Name
+	})
+	return
+}
+
 func (t *CollaSetTester) DeleteCollaSet(cls *appsv1alpha1.CollaSet) error {
 	return t.client.Delete(context.TODO(), cls)
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -563,6 +564,176 @@ var _ = SIGDescribe("CollaSet", func() {
 				Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 3-partition, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 			}
 		})
+	})
+
+	framework.KusionstackDescribe("CollaSet Replacing", func() {
+
+		framework.ConformanceIt("replace pod by label", func() {
+			cls := tester.NewCollaSet("collaset-"+randStr, 1, appsv1alpha1.UpdateStrategy{})
+			cls.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy = &appsv1alpha1.PersistentVolumeClaimRetentionPolicy{
+				WhenScaled: appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType,
+			}
+			cls.Spec.VolumeClaimTemplates = []v1.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pvc-test",
+					},
+					Spec: v1.PersistentVolumeClaimSpec{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"storage": resource.MustParse("100m"),
+							},
+						},
+						AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+					},
+				},
+			}
+			cls.Spec.Template.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+				{
+					MountPath: "/path/to/mount",
+					Name:      "pvc-test",
+				},
+			}
+			Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
+
+			By("Wait for status replicas satisfied")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 1, 1, 1, 1, 1) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Replace pod by label")
+			pods, err := tester.ListPodsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			podToReplace := pods[0]
+			Expect(tester.UpdatePod(podToReplace, func(pod *v1.Pod) {
+				podToReplace.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] = "true"
+			})).NotTo(HaveOccurred())
+
+			By("Wait for replace finished")
+			Eventually(func() bool {
+				pods, err = tester.ListPodsForCollaSet(cls)
+				if err != nil {
+					return false
+				}
+				for i := range pods {
+					if pods[i].Labels[appsv1alpha1.PodReplaceIndicationLabelKey] != "" ||
+						pods[i].Labels[appsv1alpha1.PodReplacePairOriginName] != "" {
+						return false
+					}
+				}
+				return len(pods) == 1
+			}, 30*time.Second, 3*time.Second).Should(BeTrue())
+
+			By("Check replace new pod")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 1, 1, 1, 1, 1) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+			podNewCreate := pods[0]
+			Expect(podNewCreate.Name).ShouldNot(Equal(podToReplace.Name))
+
+			By("Check pvc and resourceContext")
+			newPvcs, err := tester.ListPVCForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			currResourceContexts, err := tester.ListResourceContextsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(newPvcs)).To(Equal(1))
+			Expect(newPvcs[0].Labels[appsv1alpha1.PodInstanceIDLabelKey]).To(Equal(podNewCreate.Labels[appsv1alpha1.PodInstanceIDLabelKey]))
+			Expect(len(currResourceContexts[0].Spec.Contexts)).To(Equal(1))
+			Expect(strconv.Itoa(currResourceContexts[0].Spec.Contexts[0].ID)).To(Equal(podNewCreate.Labels[appsv1alpha1.PodInstanceIDLabelKey]))
+		})
+
+		framework.ConformanceIt("cancel replace pod by label", func() {
+			cls := tester.NewCollaSet("collaset-"+randStr, 1, appsv1alpha1.UpdateStrategy{})
+			cls.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy = &appsv1alpha1.PersistentVolumeClaimRetentionPolicy{
+				WhenScaled: appsv1alpha1.RetainPersistentVolumeClaimRetentionPolicyType,
+			}
+			cls.Spec.VolumeClaimTemplates = []v1.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pvc-test",
+					},
+					Spec: v1.PersistentVolumeClaimSpec{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"storage": resource.MustParse("100m"),
+							},
+						},
+						AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+					},
+				},
+			}
+			cls.Spec.Template.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+				{
+					MountPath: "/path/to/mount",
+					Name:      "pvc-test",
+				},
+			}
+			// use bad image to mock new replace pod unavailable
+			cls.Spec.Template.Spec.Containers[0].Image = "nginx:non-exist"
+			Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
+
+			By("Wait for status replicas satisfied")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 1, 0, 0, 1, 1) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+			resourceContexts, err := tester.ListResourceContextsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Replace pod by label")
+			pods, err := tester.ListPodsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			podToReplace := pods[0]
+			Expect(tester.UpdatePod(podToReplace, func(pod *v1.Pod) {
+				podToReplace.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] = "true"
+			})).NotTo(HaveOccurred())
+
+			By("Wait for replace new pod created")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 0, 0, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+			Eventually(func() bool {
+				pvcs, err := tester.ListPVCForCollaSet(cls)
+				if err != nil {
+					return false
+				}
+				if len(pvcs) != 2 {
+					return false
+				}
+				return true
+			}, 30*time.Second, 3*time.Second).Should(Equal(true))
+
+			By("Cancel replace pod by delete to-replace label")
+			Expect(tester.UpdatePod(podToReplace, func(pod *v1.Pod) {
+				delete(pod.Labels, appsv1alpha1.PodReplaceIndicationLabelKey)
+			})).NotTo(HaveOccurred())
+
+			By("Wait for replace cancel finished")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 1, 0, 0, 1, 1) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Check replace origin pod")
+			pods, err = tester.ListPodsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pods[0].Name).To(Equal(podToReplace.Name))
+
+			By("Check pvc and resourceContext")
+			Eventually(func() bool {
+				pvcs, err := tester.ListPVCForCollaSet(cls)
+				if err != nil {
+					return false
+				}
+				if len(pvcs) != 1 {
+					return false
+				}
+				return pvcs[0].Labels[appsv1alpha1.PodInstanceIDLabelKey] == podToReplace.Labels[appsv1alpha1.PodInstanceIDLabelKey]
+			}, 30*time.Second, 3*time.Second).Should(Equal(true))
+			Expect(err).NotTo(HaveOccurred())
+			var currResourceContexts []*appsv1alpha1.ResourceContext
+			Eventually(func() bool {
+				currResourceContexts, err = tester.ListResourceContextsForCollaSet(cls)
+				return len(currResourceContexts[0].Spec.Contexts) == 1
+			}, 30*time.Second, 3*time.Second).Should(BeTrue())
+			Expect(len(currResourceContexts[0].Spec.Contexts)).To(Equal(len(resourceContexts[0].Spec.Contexts)))
+			Expect(currResourceContexts[0].Spec.Contexts[0].ID).To(Equal(resourceContexts[0].Spec.Contexts[0].ID))
+			for k := range resourceContexts[0].Spec.Contexts[0].Data {
+				Expect(currResourceContexts[0].Spec.Contexts[0].Data[k]).To(Equal(resourceContexts[0].Spec.Contexts[0].Data[k]))
+			}
+			for k := range currResourceContexts[0].Spec.Contexts[0].Data {
+				Expect(currResourceContexts[0].Spec.Contexts[0].Data[k]).To(Equal(resourceContexts[0].Spec.Contexts[0].Data[k]))
+			}
+		})
+
 	})
 
 })
