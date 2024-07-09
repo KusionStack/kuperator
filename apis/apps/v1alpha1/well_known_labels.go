@@ -16,7 +16,7 @@ limitations under the License.
 
 package v1alpha1
 
-// pod ops lifecyle labels
+// pod ops lifecycle labels
 const (
 	ControlledByKusionStackLabelKey = "kusionstack.io/control"
 

@@ -674,9 +674,9 @@ func (u *inPlaceIfPossibleUpdater) GetPodUpdateFinishStatus(podUpdateInfo *PodUp
 		imageIdMapping[containerStatus.Name] = containerStatus.ImageID
 	}
 
-	for containerName, lastContaienrState := range podLastState.ContainerStates {
-		latestImage := lastContaienrState.LatestImage
-		lastImageId := lastContaienrState.LastImageID
+	for containerName, lastContainerState := range podLastState.ContainerStates {
+		latestImage := lastContainerState.LatestImage
+		lastImageId := lastContainerState.LastImageID
 
 		if currentImage, exist := imageMapping[containerName]; !exist {
 			// If no this container image recorded, ignore this container.
@@ -740,7 +740,7 @@ func (u *recreatePodUpdater) UpgradePod(podInfo *PodUpdateInfo) error {
 }
 
 func (u *recreatePodUpdater) GetPodUpdateFinishStatus(podInfo *PodUpdateInfo) (finished bool, msg string, err error) {
-	// Recreate policy alway treat Pod as update finished
+	// Recreate policy always treat Pod as update finished
 	return podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged, "", nil
 }
 

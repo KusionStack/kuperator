@@ -38,36 +38,36 @@ func AddInitContainers(pod *corev1.Pod, initContainers []*corev1.Container) {
 	}
 }
 
-func PrimaryContainerPatch(pod *corev1.Pod, patchs []*appsv1alpha1.PrimaryContainerPatch) {
-	for i, patch := range patchs {
+func PrimaryContainerPatch(pod *corev1.Pod, patches []*appsv1alpha1.PrimaryContainerPatch) {
+	for i, patch := range patches {
 		switch patch.TargetPolicy {
 		case appsv1alpha1.InjectByName, "":
 			for idx := range pod.Spec.Containers {
 				if patch.Name != nil && pod.Spec.Containers[idx].Name == *patch.Name {
-					patchContainer(&pod.Spec.Containers[idx], &patchs[i].PodDecorationPrimaryContainer)
+					patchContainer(&pod.Spec.Containers[idx], &patches[i].PodDecorationPrimaryContainer)
 					break
 				}
 			}
 		case appsv1alpha1.InjectAllContainers:
 			for idx := range pod.Spec.Containers {
-				patchContainer(&pod.Spec.Containers[idx], &patchs[i].PodDecorationPrimaryContainer)
+				patchContainer(&pod.Spec.Containers[idx], &patches[i].PodDecorationPrimaryContainer)
 			}
 		case appsv1alpha1.InjectFirstContainer:
-			patchContainer(&pod.Spec.Containers[0], &patchs[i].PodDecorationPrimaryContainer)
+			patchContainer(&pod.Spec.Containers[0], &patches[i].PodDecorationPrimaryContainer)
 		case appsv1alpha1.InjectLastContainer:
-			patchContainer(&pod.Spec.Containers[len(pod.Spec.Containers)-1], &patchs[i].PodDecorationPrimaryContainer)
+			patchContainer(&pod.Spec.Containers[len(pod.Spec.Containers)-1], &patches[i].PodDecorationPrimaryContainer)
 		}
 	}
 }
 
-func ContainersPatch(pod *corev1.Pod, patchs []*appsv1alpha1.ContainerPatch) {
+func ContainersPatch(pod *corev1.Pod, patches []*appsv1alpha1.ContainerPatch) {
 	var beforeContainers, afterContainers []corev1.Container
-	for i, patch := range patchs {
+	for i, patch := range patches {
 		switch patch.InjectPolicy {
 		case appsv1alpha1.BeforePrimaryContainer:
-			beforeContainers = append(beforeContainers, patchs[i].Container)
+			beforeContainers = append(beforeContainers, patches[i].Container)
 		case appsv1alpha1.AfterPrimaryContainer, "":
-			afterContainers = append(afterContainers, patchs[i].Container)
+			afterContainers = append(afterContainers, patches[i].Container)
 		}
 	}
 	if len(beforeContainers) > 0 {

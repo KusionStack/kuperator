@@ -166,10 +166,10 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 		}
 	}
 	if err != nil {
-		logger.Error(err, "pod in stage informations", "stage", state.Stage, "labels", labels)
+		logger.Error(err, "pod in stage information", "stage", state.Stage, "labels", labels)
 		return reconcile.Result{}, err
 	}
-	logger.Info("pod in stage informations", "stage", state.Stage, "labels", labels)
+	logger.Info("pod in stage information", "stage", state.Stage, "labels", labels)
 	if len(labels) > 0 {
 		return reconcile.Result{}, r.addLabels(ctx, pod, labels)
 	}

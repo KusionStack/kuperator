@@ -55,7 +55,7 @@ type TransitionRule struct {
 }
 
 type TransitionRuleFilter struct {
-	// LabelSelector is used to filter resource with label match expresion.
+	// LabelSelector is used to filter resource with label match expression.
 	// +optional
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 }

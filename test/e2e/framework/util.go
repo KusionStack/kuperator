@@ -361,7 +361,7 @@ func logNamespace(c clientset.Interface, namespace string) {
 		Logf("namespace: %v, unable to get namespace due to error: %v", namespace, err)
 		return
 	}
-	Logf("namespace: %v, DeletionTimetamp: %v, Finalizers: %v, Phase: %v", ns.Name, ns.DeletionTimestamp, ns.Spec.Finalizers, ns.Status.Phase)
+	Logf("namespace: %v, DeletionTimestamp: %v, Finalizers: %v, Phase: %v", ns.Name, ns.DeletionTimestamp, ns.Spec.Finalizers, ns.Status.Phase)
 }
 
 // hasRemainingContent checks if there is remaining content in the namespace via API discovery

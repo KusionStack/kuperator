@@ -38,7 +38,7 @@ func ControlledByKusionStack(obj client.Object) bool {
 	return ok && v == "true"
 }
 
-func ControllByKusionStack(obj client.Object) {
+func ControlByKusionStack(obj client.Object) {
 	if obj.GetLabels() == nil {
 		obj.SetLabels(map[string]string{})
 	}
