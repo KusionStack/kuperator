@@ -305,16 +305,14 @@ func (pm *podDecorationManager) updateSelectedPods(ctx context.Context, pd *apps
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 	pm.latestPodDecoration = pd.DeepCopy()
-	newPods := map[string]*corev1.Pod{}
 	newEffectivePods := map[string]*podInfo{}
 	existInstanceId := sets.NewString()
 	oldPods := pm.effectivePods
 	collaSets := sets.NewString()
-	for i, pod := range pods {
+	for _, pod := range pods {
 		if !IsActive(pod) {
 			continue
 		}
-		newPods[pod.Name] = pods[i]
 		newPodInfo, err := getter.buildPodInfo(pod, pm.latestPodDecoration)
 		if err != nil {
 			return err
