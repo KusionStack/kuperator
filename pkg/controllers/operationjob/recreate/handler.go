@@ -19,6 +19,7 @@ package recreate
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
@@ -45,4 +46,21 @@ func GetRecreateHandler(methodName string) RestartHandler {
 		return registry[methodName]
 	}
 	return nil
+}
+
+func GetRecreateHandlerFromPod(pod *corev1.Pod) RestartHandler {
+	// use Kruise ContainerRecreateRequest to recreate container by default
+	defaultRecreateHandler := GetRecreateHandler(KruiseCcontainerRecreateRequest)
+	if pod == nil || pod.ObjectMeta.Annotations == nil {
+		return defaultRecreateHandler
+	}
+
+	recreateMethodAnno, exist := pod.ObjectMeta.Annotations[appsv1alpha1.AnnotationOperationJobRecreateMethod]
+	if !exist || recreateMethodAnno == KruiseCcontainerRecreateRequest {
+		return defaultRecreateHandler
+	} else if currRecreateHandler := GetRecreateHandler(recreateMethodAnno); currRecreateHandler != nil {
+		return currRecreateHandler
+	} else {
+		return defaultRecreateHandler
+	}
 }

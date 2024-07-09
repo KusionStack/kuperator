@@ -18,15 +18,10 @@ package operationjob
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
 
-	admissionv1 "k8s.io/api/admission/v1"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/operationjob/recreate"
 	"kusionstack.io/operating/pkg/utils/mixin"
 )
 
@@ -44,30 +39,5 @@ func NewMutatingHandler() *MutatingHandler {
 }
 
 func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
-	if req.Operation == admissionv1.Delete {
-		return admission.Allowed("")
-	}
-
-	var instance appsv1alpha1.OperationJob
-	if err := h.Decoder.Decode(req, &instance); err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
-	}
-
-	if instance.Spec.Action != appsv1alpha1.OpsActionRecreate {
-		return admission.Allowed("")
-	}
-
-	if instance.ObjectMeta.Annotations == nil {
-		instance.ObjectMeta.Annotations = make(map[string]string)
-	}
-	if _, exist := instance.ObjectMeta.Annotations[appsv1alpha1.AnnotationOperationJobRecreateMethod]; !exist {
-		instance.ObjectMeta.Annotations[appsv1alpha1.AnnotationOperationJobRecreateMethod] = recreate.KruiseCcontainerRecreateRequest
-		marshalled, err := json.Marshal(instance)
-		if err != nil {
-			return admission.Errored(http.StatusInternalServerError, err)
-		}
-		return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
-	}
-
 	return admission.Allowed("")
 }
