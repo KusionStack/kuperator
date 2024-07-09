@@ -187,7 +187,7 @@ func (w *Webhook) Do(targets map[string]*corev1.Pod, subjects sets.String) *Filt
 			PollingManager.Delete(taskId)
 			klog.Infof("polling task stopped after %d times, approved pods %v, %s, %s", pollingResult.Count, pollingResult.Approved.List(), pollingResult.Info, pollingResult.LastMessage)
 			rejectMsg = fmt.Sprintf(
-				"Not approved by webhook %s, polling task %s stoped %s %s",
+				"Not approved by webhook %s, polling task %s stopped %s %s",
 				w.Key,
 				taskId,
 				pollingResult.LastMessage,

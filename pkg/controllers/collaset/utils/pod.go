@@ -85,7 +85,7 @@ func NewPodFrom(owner metav1.Object, ownerRef *metav1.OwnerReference, revision *
 
 	pod.Labels[appsv1.ControllerRevisionHashLabelKey] = revision.Name
 
-	utils.ControllByKusionStack(pod)
+	utils.ControlByKusionStack(pod)
 	for _, fn := range updateFn {
 		if err = fn(pod); err != nil {
 			return pod, err

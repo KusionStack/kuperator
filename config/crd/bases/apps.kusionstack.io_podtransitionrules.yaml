@@ -79,7 +79,7 @@ spec:
                       properties:
                         labelSelector:
                           description: LabelSelector is used to filter resource with
-                            label match expresion.
+                            label match expression.
                           properties:
                             matchExpressions:
                               description: matchExpressions is a list of label selector
