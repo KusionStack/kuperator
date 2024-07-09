@@ -1,0 +1,143 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.10.0
+  creationTimestamp: null
+  name: operationjobs.apps.kusionstack.io
+spec:
+  group: apps.kusionstack.io
+  names:
+    kind: OperationJob
+    listKind: OperationJobList
+    plural: operationjobs
+    shortNames:
+    - oj
+    singular: operationjob
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.progress
+      name: PROGRESS
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: OperationJob is the Schema for the operationjobs API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: OperationJobSpec defines the desired state of OperationJob
+            properties:
+              TTLSecondsAfterFinished:
+                description: Limit the lifetime of an operation that has finished
+                  execution (either Complete or Failed)
+                format: int32
+                type: integer
+              action:
+                description: 'Specify the operation actions including: Restart, Replace'
+                type: string
+              activeDeadlineSeconds:
+                description: Specify the duration in seconds relative to the startTime
+                  that the job may be active before the system tries to terminate
+                  it
+                format: int32
+                type: integer
+              operationDelaySeconds:
+                description: OperationDelaySeconds indicates how many seconds it should
+                  delay before operating update.
+                format: int32
+                type: integer
+              partition:
+                description: Partition controls the operation progress by indicating
+                  how many pods should be operated. Defaults to nil (all pods will
+                  be updated)
+                format: int32
+                type: integer
+              targets:
+                description: Define the operation target pods
+                items:
+                  description: PodOpsTarget defines the target pods of the OperationJob
+                  properties:
+                    containers:
+                      description: Specify the containers to restart
+                      items:
+                        type: string
+                      type: array
+                    podName:
+                      description: Specify the operation target pods
+                      type: string
+                  type: object
+                type: array
+            type: object
+          status:
+            description: OperationJobStatus defines the observed state of OperationJob
+            properties:
+              endTimestamp:
+                description: Operation end time
+                format: date-time
+                type: string
+              failedPodCount:
+                description: failed pod count of the pods involved in the OperationJob
+                format: int32
+                type: integer
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed
+                  for this OperationJob. It corresponds to the OperationJob's generation,
+                  which is updated on mutation by the API Server.
+                format: int64
+                type: integer
+              progress:
+                description: Phase indicates the of the OperationJob
+                type: string
+              startTimestamp:
+                description: Operation start time
+                format: date-time
+                type: string
+              succeededPodCount:
+                description: Succeeded replicas of the pods involved in the OperationJob
+                format: int32
+                type: integer
+              targetDetails:
+                description: Operation details of the target pods
+                items:
+                  properties:
+                    message:
+                      description: message displays detail of reason
+                      type: string
+                    podName:
+                      description: name of the target pod
+                      type: string
+                    progress:
+                      description: operation progress of target pod
+                      type: string
+                    reason:
+                      description: reason for current operation progress
+                      type: string
+                  type: object
+                type: array
+              totalPodCount:
+                description: Replicas of the pods involved in the OperationJob
+                format: int32
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
