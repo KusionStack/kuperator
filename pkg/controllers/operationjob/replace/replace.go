@@ -17,7 +17,9 @@ limitations under the License.
 package replace
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -147,5 +149,23 @@ func (p *PodReplaceControl) FulfilPodOpsStatus(candidate *OpsCandidate) error {
 }
 
 func (p *PodReplaceControl) ReleaseTarget(candidate *OpsCandidate) error {
+	if candidate.Pod == nil || candidate.Pod.DeletionTimestamp != nil {
+		return nil
+	}
+
+	// try to remove replace label from origin pod
+	patchOperation := map[string]string{
+		"op":   "remove",
+		"path": fmt.Sprintf("/metadata/labels/%s", strings.ReplaceAll(appsv1alpha1.PodReplaceIndicationLabelKey, "/", "~1")),
+	}
+
+	patchBytes, err := json.Marshal([]map[string]string{patchOperation})
+	if err != nil {
+		return err
+	}
+
+	if err := p.PodControl.PatchPod(candidate.Pod, client.RawPatch(types.JSONPatchType, patchBytes)); err != nil {
+		return fmt.Errorf("failed to remove to-replace label %s/%s: %s", candidate.Pod.Namespace, candidate.Pod.Name, err)
+	}
 	return nil
 }

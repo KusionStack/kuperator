@@ -500,6 +500,63 @@ var _ = Describe("operationjob controller", func() {
 		assertJobProgressSucceeded(oj2, time.Second*5)
 	})
 
+	It("[replace] cancel", func() {
+		testcase := "test-replace-cancel"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+		cs := createCollaSetWithReplicas("foo", testcase, 1)
+		podNames := getPodNamesFromCollaSet(cs)
+
+		oj := &appsv1alpha1.OperationJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.OperationJobSpec{
+				Action: appsv1alpha1.OpsActionReplace,
+				Targets: []appsv1alpha1.PodOpsTarget{
+					{
+						PodName: podNames[0],
+					},
+				},
+			},
+		}
+
+		Expect(c.Create(ctx, oj)).Should(BeNil())
+
+		// wait for new pod created
+		podList := &corev1.PodList{}
+		Eventually(func() bool {
+			Expect(c.List(ctx, podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 2
+		}, time.Second*10, time.Second).Should(BeTrue())
+
+		// delete operationJob and wait for deleted
+		Expect(c.Delete(ctx, oj)).Should(BeNil())
+		Eventually(func() bool {
+			err := c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
+			return errors.IsNotFound(err)
+		}, time.Second*10, time.Second).Should(BeTrue())
+
+		// allow new pod to be deleted
+		for i := range podList.Items {
+			pod := &podList.Items[i]
+			if _, exist := pod.Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
+				Expect(updatePodWithRetry(pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID())
+					pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+					pod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] = fmt.Sprintf("%d", time.Now().UnixNano())
+					return true
+				})).Should(BeNil())
+			}
+		}
+
+		// wait for replace canceled finished
+		Eventually(func() bool {
+			Expect(c.List(ctx, podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 1 && podList.Items[0].Name == podNames[0]
+		}, time.Second*10, time.Second).Should(BeTrue())
+	})
+
 	It("deadline and ttl", func() {
 		testcase := "test-deadline-ttl"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
