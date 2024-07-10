@@ -13,6 +13,7 @@ env:
   GO_VERSION: '1.19'
   KIND_VERSION: 'v0.14.0'
   KIND_IMAGE: 'kindest/node:v1.22.2'
+  KIND_IMAGE_KRUISE:  'kindest/node:v1.24.6'
   KIND_CLUSTER_NAME: 'e2e-test'
 
 jobs:
@@ -82,3 +83,146 @@ jobs:
           kubectl get pod -n kusionstack-system --no-headers -l control-plane=controller-manager | awk '{print $1}' | xargs kubectl logs -p -n kusionstack-system
           exit 1
         fi
+
+  OperationJob:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Cache Go Dependencies
+        uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-
+      - name: Setup Kind Cluster
+        uses: helm/kind-action@v1.10.0
+        with:
+          node_image: ${{ env.KIND_IMAGE_KRUISE }}
+          cluster_name: ${{ env.KIND_CLUSTER_NAME }}
+          config: ./test/e2e/scripts/kind-conf.yaml
+          version: ${{ env.KIND_VERSION }}
+      - name: Setup Kube-config
+        run: |
+          mkdir -p /tmp/kind
+          make kind-kube-config
+      - name: Clone Kruise Repo
+        uses: GuillaumeFalourd/clone-github-repo-action@v2.3
+        with:
+          branch: release-1.6
+          owner: openkruise
+          repository: kruise
+      - name: Install Kruise
+        run: |
+          set -ex
+          cd kruise
+          export KRUISE_IMG="openkruise/kruise-manager:v1.6"
+          docker build -t ${KRUISE_IMG} .
+          kind load docker-image --name=${KIND_CLUSTER_NAME} ${KRUISE_IMG}
+          make deploy
+          NODES=$(kubectl get node | wc -l)
+          for ((i=1;i<10;i++));
+          do
+            set +e
+            PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
+            set -e
+            if [ "$PODS" -eq "$NODES" ]; then
+              break
+            fi
+            sleep 3
+          done
+          set +e
+          PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
+          kubectl get node -o yaml
+          kubectl get all -n kruise-system -o yaml
+          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
+          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
+          set -e
+          if [ "$PODS" -eq "$NODES" ]; then
+            echo "Wait for kruise-manager and kruise-daemon ready successfully"
+          else
+            echo "Timeout to wait for kruise-manager and kruise-daemon ready"
+            exit 1
+          fi
+      - name: Install Operating
+        run: |
+          set -ex
+          kubectl cluster-info
+          make docker-build
+          make sync-kind-image
+          make deploy
+          for ((i=1;i<10;i++));
+          do
+            set +e
+            PODS=$(kubectl get pod -n kusionstack-system | grep -c '1/1')
+            set -e
+            if [ "$PODS" -eq 1 ]; then
+              break
+            fi
+            sleep 3
+          done
+          set -e
+          PODS=$(kubectl get pod -n kusionstack-system | grep -c '1/1')
+          if [ "$PODS" -eq 1 ]; then
+            echo "Wait for Kusionstack-manager ready successfully"
+          else 
+            echo "Timeout to wait for Kusionstack-manager ready"
+          fi
+      - name: Run e2e Tests
+        run: |
+          make ginkgo
+          set -e
+          KUBECONFIG=/tmp/kind/kubeconfig.yaml ./bin/ginkgo -timeout 10m -v --focus='\[apps\] OperationJob' test/e2e
+      - name: Check Operating Manager
+        run: |
+          restartCount=$(kubectl get pod -n kusionstack-system -l control-plane=controller-manager --no-headers | awk '{print $4}')
+          if [ "${restartCount}" -eq "0" ];then
+            echo "Kusionstack-manager has not restarted"
+          else
+            kubectl get pod -n kusionstack-system -l control-plane=controller-manager --no-headers
+            echo "Kusionstack-manager has restarted, abort!!!"
+            kubectl get pod -n kusionstack-system --no-headers -l control-plane=controller-manager | awk '{print $1}' | xargs kubectl logs -p -n kusionstack-system
+            exit 1
+          fi
+      - name: Check Kruise Manager
+        run: |
+          retVal=$?
+          restartCount=$(kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $4}')
+          if [ "${restartCount}" -eq "0" ];then
+              echo "$out"
+              echo "Kruise-manager has not restarted"
+          else
+              echo "$out"
+              echo "Kruise-manager has restarted, abort!!!"
+              kubectl get pod -n kruise-system --no-headers -l control-plane=controller-manager | awk '{print $1}' | xargs kubectl logs -p -n kruise-system
+              exit 1
+          fi
+          kubectl get pods -n kruise-system -l control-plane=daemon -o=jsonpath="{range .items[*]}{.metadata.namespace}{\"\t\"}{.metadata.name}{\"\n\"}{end}" | while read ns name;
+          do
+            restartCount=$(kubectl get pod -n ${ns} ${name} --no-headers | awk '{print $4}')
+            if [ "${restartCount}" -eq "0" ];then
+                echo "Kruise-daemon has not restarted"
+            else
+                kubectl get pods -n ${ns} -l control-plane=daemon --no-headers
+                echo "Kruise-daemon has restarted, abort!!!"
+                kubectl logs -p -n ${ns} ${name}
+                exit 1
+            fi
+          done
+
+          if [ "$retVal" -ne 0 ];then
+              echo "test fail, dump kruise-manager logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}') 
+              echo "test fail, dump kruise-daemon logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=daemon --no-headers | awk '{print $1}')            
+          fi
+          exit $retVal
