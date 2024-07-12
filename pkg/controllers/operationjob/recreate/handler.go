@@ -18,12 +18,15 @@ package recreate
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
+	"kusionstack.io/operating/pkg/features"
+	"kusionstack.io/operating/pkg/utils/feature"
 )
 
 type RestartHandler interface {
@@ -48,19 +51,28 @@ func GetRecreateHandler(methodName string) RestartHandler {
 	return nil
 }
 
-func GetRecreateHandlerFromPod(pod *corev1.Pod) RestartHandler {
-	// use Kruise ContainerRecreateRequest to recreate container by default
+func GetRecreateHandlerFromPod(pod *corev1.Pod) (RestartHandler, error) {
 	defaultRecreateHandler := GetRecreateHandler(KruiseCcontainerRecreateRequest)
 	if pod == nil || pod.ObjectMeta.Annotations == nil {
-		return defaultRecreateHandler
+		return nil, fmt.Errorf("")
 	}
+	enableKruiseToRecreate := feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRecreate)
 
 	recreateMethodAnno, exist := pod.ObjectMeta.Annotations[appsv1alpha1.AnnotationOperationJobRecreateMethod]
-	if !exist || recreateMethodAnno == KruiseCcontainerRecreateRequest {
-		return defaultRecreateHandler
-	} else if currRecreateHandler := GetRecreateHandler(recreateMethodAnno); currRecreateHandler != nil {
-		return currRecreateHandler
+	if exist {
+		currRecreateHandler := GetRecreateHandler(recreateMethodAnno)
+		if currRecreateHandler == nil {
+			return nil, fmt.Errorf("cannot find operationjob recreate handler: %s", recreateMethodAnno)
+		}
+		if !enableKruiseToRecreate && recreateMethodAnno == KruiseCcontainerRecreateRequest {
+			return nil, fmt.Errorf("cannot use kruise-containerrecreaterequest handler if EnableKruiseToRecreate is disabled")
+		}
+		return currRecreateHandler, nil
 	} else {
-		return defaultRecreateHandler
+		if enableKruiseToRecreate {
+			return defaultRecreateHandler, nil
+		}
+		return nil, fmt.Errorf("please define and register recreate handler")
 	}
+
 }

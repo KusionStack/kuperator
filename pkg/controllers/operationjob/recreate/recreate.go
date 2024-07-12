@@ -89,7 +89,12 @@ func (p *ContainerRecreateControl) OperateTarget(candidate *OpsCandidate) error 
 		return nil
 	}
 
-	handler := GetRecreateHandlerFromPod(candidate.Pod)
+	// get recreate handler from pod's Anno, to do recreate
+	handler, err := GetRecreateHandlerFromPod(candidate.Pod)
+	if err != nil {
+		return err
+	}
+
 	// if Pod is not during RecreateOpsLifecycle, trigger it
 	isDuringRecreateOps := podopslifecycle.IsDuringOps(ojutils.RecreateOpsLifecycleAdapter, candidate.Pod)
 	if !isDuringRecreateOps {
@@ -137,8 +142,13 @@ func (p *ContainerRecreateControl) FulfilPodOpsStatus(candidate *OpsCandidate) e
 		return nil
 	}
 
+	// get recreate handler from pod's Anno, to do recreate
+	handler, err := GetRecreateHandlerFromPod(candidate.Pod)
+	if err != nil {
+		return err
+	}
+
 	// calculate restart progress of podOpsStatus
-	handler := GetRecreateHandlerFromPod(candidate.Pod)
 	candidate.PodOpsStatus.Progress = handler.GetRestartProgress(p.Context, p.Client, p.OperationJob, candidate)
 	return nil
 }
@@ -148,8 +158,13 @@ func (p *ContainerRecreateControl) ReleaseTarget(candidate *OpsCandidate) error 
 		return nil
 	}
 
+	// get recreate handler from pod's Anno, to do recreate
+	handler, err := GetRecreateHandlerFromPod(candidate.Pod)
+	if err != nil {
+		return err
+	}
+
 	// 1. release target
-	handler := GetRecreateHandlerFromPod(candidate.Pod)
 	if err := handler.ReleasePod(p.Context, p.Client, p.OperationJob, candidate); err != nil {
 		return err
 	}

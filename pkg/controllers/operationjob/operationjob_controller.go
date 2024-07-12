@@ -39,7 +39,9 @@ import (
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	ctrlutils "kusionstack.io/operating/pkg/controllers/utils"
+	"kusionstack.io/operating/pkg/features"
 	"kusionstack.io/operating/pkg/utils"
+	"kusionstack.io/operating/pkg/utils/feature"
 	"kusionstack.io/operating/pkg/utils/mixin"
 )
 
@@ -81,13 +83,16 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to ContainerRecreateRequest
-	err = c.Watch(&source.Kind{Type: &kruisev1alpha1.ContainerRecreateRequest{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &appsv1alpha1.OperationJob{},
-	})
-	if err != nil {
-		return err
+	// Watch for changes to ContainerRecreateRequest if EnableKruiseToRecreate (enabled by default)
+	// Add '--feature-gates=EnableKruiseToRecreate=false' to container args to disable kruise recreate
+	if feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRecreate) {
+		err = c.Watch(&source.Kind{Type: &kruisev1alpha1.ContainerRecreateRequest{}}, &handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &appsv1alpha1.OperationJob{},
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	// Watch for changes to Pod
