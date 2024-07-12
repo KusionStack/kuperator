@@ -35,6 +35,7 @@ import (
 	"kusionstack.io/operating/apis"
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers"
+	"kusionstack.io/operating/pkg/features"
 	"kusionstack.io/operating/pkg/utils/feature"
 	"kusionstack.io/operating/pkg/utils/inject"
 	"kusionstack.io/operating/pkg/webhook"
@@ -112,9 +113,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = kruisev1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
-		setupLog.Error(err, "unable to add containerRecreateRequest API scheme")
-		os.Exit(1)
+	if feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRecreate) {
+		if err = kruisev1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
+			setupLog.Error(err, "unable to add containerRecreateRequest API scheme")
+			os.Exit(1)
+		}
 	}
 
 	if err = controllers.AddToManager(mgr); err != nil {

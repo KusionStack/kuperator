@@ -51,10 +51,10 @@ func GetRecreateHandler(methodName string) RestartHandler {
 	return nil
 }
 
-func GetRecreateHandlerFromPod(pod *corev1.Pod) (RestartHandler, error) {
+func GetRecreateHandlerFromPod(pod *corev1.Pod) (RestartHandler, string) {
 	defaultRecreateHandler := GetRecreateHandler(KruiseCcontainerRecreateRequest)
 	if pod == nil || pod.ObjectMeta.Annotations == nil {
-		return nil, fmt.Errorf("")
+		return nil, "Pod or pod's objectMeta is nil"
 	}
 	enableKruiseToRecreate := feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRecreate)
 
@@ -62,17 +62,16 @@ func GetRecreateHandlerFromPod(pod *corev1.Pod) (RestartHandler, error) {
 	if exist {
 		currRecreateHandler := GetRecreateHandler(recreateMethodAnno)
 		if currRecreateHandler == nil {
-			return nil, fmt.Errorf("cannot find operationjob recreate handler: %s", recreateMethodAnno)
+			return nil, fmt.Sprintf("Failed to get recreate handler: %s", recreateMethodAnno)
 		}
 		if !enableKruiseToRecreate && recreateMethodAnno == KruiseCcontainerRecreateRequest {
-			return nil, fmt.Errorf("cannot use kruise-containerrecreaterequest handler if EnableKruiseToRecreate is disabled")
+			return nil, "Forbidden to use Kruise crr handler when EnableKruiseToRecreate=false"
 		}
-		return currRecreateHandler, nil
+		return currRecreateHandler, ""
 	} else {
 		if enableKruiseToRecreate {
-			return defaultRecreateHandler, nil
+			return defaultRecreateHandler, ""
 		}
-		return nil, fmt.Errorf("please define and register recreate handler")
+		return nil, "Annotation operationjob.kusionstack.io/recreate-method is not set on Pod, or EnableKruiseToRecreate=false"
 	}
-
 }

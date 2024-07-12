@@ -32,9 +32,10 @@ const (
 type ReasonForOpsProgress string
 
 const (
-	ReasonPodNotFound       ReasonForOpsProgress = "PodNotFound"
-	ReasonContainerNotFound ReasonForOpsProgress = "ContainerNotFound"
-	ReasonReplacedByNewPod  ReasonForOpsProgress = "ReplacedByNewPod"
+	ReasonPodNotFound           ReasonForOpsProgress = "PodNotFound"
+	ReasonContainerNotFound     ReasonForOpsProgress = "ContainerNotFound"
+	ReasonReplacedByNewPod      ReasonForOpsProgress = "ReplacedByNewPod"
+	ReasonInvalidRecreateMethod ReasonForOpsProgress = "InvalidRecreateMethod"
 )
 
 // OperationProgress indicates operation progress of pod

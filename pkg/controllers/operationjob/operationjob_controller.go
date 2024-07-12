@@ -161,9 +161,7 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileOperationJob) doReconcile(ctx context.Context,
-	instance *appsv1alpha1.OperationJob,
-	logger logr.Logger) error {
+func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) error {
 	operator := r.newOperator(ctx, instance, logger)
 	candidates, err := operator.ListTargets()
 	if err != nil {
@@ -184,9 +182,7 @@ func (r *ReconcileOperationJob) doReconcile(ctx context.Context,
 	return nil
 }
 
-func (r *ReconcileOperationJob) calculateStatus(
-	instance *appsv1alpha1.OperationJob,
-	candidates []*OpsCandidate) (jobStatus appsv1alpha1.OperationJobStatus) {
+func (r *ReconcileOperationJob) calculateStatus(instance *appsv1alpha1.OperationJob, candidates []*OpsCandidate) (jobStatus appsv1alpha1.OperationJobStatus) {
 	now := ctrlutils.FormatTimeNow()
 	jobStatus = appsv1alpha1.OperationJobStatus{
 		StartTimestamp:     instance.Status.StartTimestamp,

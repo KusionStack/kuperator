@@ -90,9 +90,10 @@ func (p *ContainerRecreateControl) OperateTarget(candidate *OpsCandidate) error 
 	}
 
 	// get recreate handler from pod's Anno, to do recreate
-	handler, err := GetRecreateHandlerFromPod(candidate.Pod)
-	if err != nil {
-		return err
+	handler, message := GetRecreateHandlerFromPod(candidate.Pod)
+	if handler == nil {
+		MarkCandidateAsFailed(p.OperationJob, candidate, appsv1alpha1.ReasonInvalidRecreateMethod, message)
+		return nil
 	}
 
 	// if Pod is not during RecreateOpsLifecycle, trigger it
@@ -133,19 +134,20 @@ func (p *ContainerRecreateControl) FulfilPodOpsStatus(candidate *OpsCandidate) e
 	}
 
 	if candidate.Pod == nil {
-		MarkCandidateAsFailed(candidate, appsv1alpha1.ReasonPodNotFound, fmt.Sprintf("pod named %s not found", candidate.PodName))
+		MarkCandidateAsFailed(p.OperationJob, candidate, appsv1alpha1.ReasonPodNotFound, "")
 		return nil
 	}
 
 	if containers, notFound := ojutils.ContainersNotFoundInPod(candidate.Pod, candidate.Containers); notFound {
-		MarkCandidateAsFailed(candidate, appsv1alpha1.ReasonContainerNotFound, fmt.Sprintf("Container named %v not found", containers))
+		MarkCandidateAsFailed(p.OperationJob, candidate, appsv1alpha1.ReasonContainerNotFound, fmt.Sprintf("Container named %v not found", containers))
 		return nil
 	}
 
 	// get recreate handler from pod's Anno, to do recreate
-	handler, err := GetRecreateHandlerFromPod(candidate.Pod)
-	if err != nil {
-		return err
+	handler, message := GetRecreateHandlerFromPod(candidate.Pod)
+	if handler == nil {
+		MarkCandidateAsFailed(p.OperationJob, candidate, appsv1alpha1.ReasonInvalidRecreateMethod, message)
+		return nil
 	}
 
 	// calculate restart progress of podOpsStatus
@@ -159,17 +161,18 @@ func (p *ContainerRecreateControl) ReleaseTarget(candidate *OpsCandidate) error 
 	}
 
 	// get recreate handler from pod's Anno, to do recreate
-	handler, err := GetRecreateHandlerFromPod(candidate.Pod)
-	if err != nil {
-		return err
+	handler, message := GetRecreateHandlerFromPod(candidate.Pod)
+	if handler == nil {
+		MarkCandidateAsFailed(p.OperationJob, candidate, appsv1alpha1.ReasonInvalidRecreateMethod, message)
+		return nil
 	}
 
-	// 1. release target
+	// release target
 	if err := handler.ReleasePod(p.Context, p.Client, p.OperationJob, candidate); err != nil {
 		return err
 	}
 
-	// 2. cancel lifecycle if pod is during recreate lifecycle
+	// cancel lifecycle if pod is during recreate lifecycle
 	if podopslifecycle.IsDuringOps(ojutils.RecreateOpsLifecycleAdapter, candidate.Pod) {
 		return ojutils.CancelOpsLifecycle(p.Context, p.Client, ojutils.RecreateOpsLifecycleAdapter, candidate.Pod)
 	}

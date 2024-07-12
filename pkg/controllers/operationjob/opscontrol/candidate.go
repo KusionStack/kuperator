@@ -81,8 +81,10 @@ func IsCandidateOpsFinished(candidate *OpsCandidate) bool {
 		candidate.PodOpsStatus.Progress == appsv1alpha1.OperationProgressSucceeded
 }
 
-func MarkCandidateAsFailed(candidate *OpsCandidate, reason appsv1alpha1.ReasonForOpsProgress, message string) {
+func MarkCandidateAsFailed(job *appsv1alpha1.OperationJob, candidate *OpsCandidate, reason appsv1alpha1.ReasonForOpsProgress, message string) {
 	candidate.PodOpsStatus.Progress = appsv1alpha1.OperationProgressFailed
 	candidate.PodOpsStatus.Reason = reason
-	candidate.PodOpsStatus.Message = message
+	if message != "" {
+		candidate.PodOpsStatus.Message = message
+	}
 }
