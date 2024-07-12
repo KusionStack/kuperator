@@ -22,6 +22,7 @@ import (
 	"net/http"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -63,6 +64,26 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
+	if req.Operation == admissionv1.Update && isControlledByRollout(cls) {
+		// CollaSet is controlled by rollout, we need to check if template is changed
+		old := &appsv1alpha1.CollaSet{}
+		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, old); err != nil {
+			logger.Error(err, "failed to decode old collaset")
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+
+		if !equality.Semantic.DeepEqual(old.Spec.Template, cls.Spec.Template) {
+			if cls.Spec.UpdateStrategy.RollingUpdate == nil || cls.Spec.UpdateStrategy.RollingUpdate.ByLabel == nil {
+				logger.Info("collaset template is changed and it is controlled by rollout, set Partition to pause RollingUpdate")
+				cls.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateCollaSetStrategy{
+					ByPartition: &appsv1alpha1.ByPartition{
+						Partition: cls.Spec.Replicas,
+					},
+				}
+			}
+		}
+	}
+
 	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
 }
 
@@ -78,4 +99,13 @@ var _ admission.DecoderInjector = &MutatingHandler{}
 func (h *MutatingHandler) InjectDecoder(d *admission.Decoder) error {
 	h.Decoder = d
 	return nil
+}
+
+func isControlledByRollout(cls *appsv1alpha1.CollaSet) bool {
+	if len(cls.Labels) == 0 {
+		return false
+	}
+
+	_, ok := cls.Labels["rollout.kusionstack.io/workload"]
+	return ok
 }
