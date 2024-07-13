@@ -113,7 +113,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRecreate) {
+	if feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRestart) {
 		if err = kruisev1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
 			setupLog.Error(err, "unable to add containerRecreateRequest API scheme")
 			os.Exit(1)

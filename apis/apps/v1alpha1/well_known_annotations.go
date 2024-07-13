@@ -42,6 +42,6 @@ const (
 
 // OperationJob Annotation
 const (
-	// AnnotationRecreateMethod string, e.g., ContainerRecreateRequest
-	AnnotationOperationJobRecreateMethod = "operationjob.kusionstack.io/recreate-method"
+	// AnnotationOperationJobRestartMethod string, e.g., ContainerRecreateRequest
+	AnnotationOperationJobRestartMethod = "operationjob.kusionstack.io/restart-method"
 )

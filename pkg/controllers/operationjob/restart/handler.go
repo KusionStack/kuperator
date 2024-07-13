@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package recreate
+package restart
 
 import (
 	"context"
@@ -37,41 +37,41 @@ type RestartHandler interface {
 
 var registry map[string]RestartHandler
 
-func RegisterRecreateHandler(methodName string, handler RestartHandler) {
+func RegisterRestartHandler(methodName string, handler RestartHandler) {
 	if registry == nil {
 		registry = make(map[string]RestartHandler)
 	}
 	registry[methodName] = handler
 }
 
-func GetRecreateHandler(methodName string) RestartHandler {
+func GetRestartHandler(methodName string) RestartHandler {
 	if _, exist := registry[methodName]; exist {
 		return registry[methodName]
 	}
 	return nil
 }
 
-func GetRecreateHandlerFromPod(pod *corev1.Pod) (RestartHandler, string) {
-	defaultRecreateHandler := GetRecreateHandler(KruiseCcontainerRecreateRequest)
+func GetRestartHandlerFromPod(pod *corev1.Pod) (RestartHandler, string) {
+	defaultRestartHandler := GetRestartHandler(KruiseCcontainerRecreateRequest)
 	if pod == nil || pod.ObjectMeta.Annotations == nil {
 		return nil, "Pod or pod's objectMeta is nil"
 	}
-	enableKruiseToRecreate := feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRecreate)
+	enableKruiseToRestart := feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRestart)
 
-	recreateMethodAnno, exist := pod.ObjectMeta.Annotations[appsv1alpha1.AnnotationOperationJobRecreateMethod]
+	restartMethodAnno, exist := pod.ObjectMeta.Annotations[appsv1alpha1.AnnotationOperationJobRestartMethod]
 	if exist {
-		currRecreateHandler := GetRecreateHandler(recreateMethodAnno)
-		if currRecreateHandler == nil {
-			return nil, fmt.Sprintf("Failed to get recreate handler: %s", recreateMethodAnno)
+		currRestartHandler := GetRestartHandler(restartMethodAnno)
+		if currRestartHandler == nil {
+			return nil, fmt.Sprintf("Failed to get restart handler: %s", restartMethodAnno)
 		}
-		if !enableKruiseToRecreate && recreateMethodAnno == KruiseCcontainerRecreateRequest {
-			return nil, "Forbidden to use Kruise crr handler when EnableKruiseToRecreate=false"
+		if !enableKruiseToRestart && restartMethodAnno == KruiseCcontainerRecreateRequest {
+			return nil, "Forbidden to use Kruise crr handler when EnableKruiseToRestart=false"
 		}
-		return currRecreateHandler, ""
+		return currRestartHandler, ""
 	} else {
-		if enableKruiseToRecreate {
-			return defaultRecreateHandler, ""
+		if enableKruiseToRestart {
+			return defaultRestartHandler, ""
 		}
-		return nil, "Annotation operationjob.kusionstack.io/recreate-method is not set on Pod, or EnableKruiseToRecreate=false"
+		return nil, "Annotation operationjob.kusionstack.io/restart-method is not set on Pod, or EnableKruiseToRestart=false"
 	}
 }

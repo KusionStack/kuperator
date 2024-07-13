@@ -35,7 +35,7 @@ import (
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
-	"kusionstack.io/operating/pkg/controllers/operationjob/recreate"
+	"kusionstack.io/operating/pkg/controllers/operationjob/restart"
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	ctrlutils "kusionstack.io/operating/pkg/controllers/utils"
@@ -61,7 +61,7 @@ func Add(mgr ctrl.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	reconcilerMixin := mixin.NewReconcilerMixin(controllerName, mgr)
-	recreate.RegisterRecreateHandler(recreate.KruiseCcontainerRecreateRequest, &recreate.ContainerRecreateRequestHandler{})
+	restart.RegisterRestartHandler(restart.KruiseCcontainerRecreateRequest, &restart.ContainerRecreateRequestHandler{})
 	return &ReconcileOperationJob{
 		ReconcilerMixin: reconcilerMixin,
 	}
@@ -83,9 +83,9 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to ContainerRecreateRequest if EnableKruiseToRecreate (enabled by default)
-	// Add '--feature-gates=EnableKruiseToRecreate=false' to container args to disable kruise recreate
-	if feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRecreate) {
+	// Watch for changes to ContainerRecreateRequest if EnableKruiseToRestart (enabled by default)
+	// Add '--feature-gates=EnableKruiseToRestart=false' to container args to disable kruise restart method
+	if feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRestart) {
 		err = c.Watch(&source.Kind{Type: &kruisev1alpha1.ContainerRecreateRequest{}}, &handler.EnqueueRequestForOwner{
 			IsController: true,
 			OwnerType:    &appsv1alpha1.OperationJob{},

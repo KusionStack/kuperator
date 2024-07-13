@@ -78,11 +78,11 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 
 func (h *ValidatingHandler) validateOpsType(instance *appsv1alpha1.OperationJob, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
-	if instance.Spec.Action != appsv1alpha1.OpsActionRecreate &&
+	if instance.Spec.Action != appsv1alpha1.OpsActionRestart &&
 		instance.Spec.Action != appsv1alpha1.OpsActionReplace {
 		allErrors = append(allErrors, field.Invalid(fldPath.Child("action"), instance.Spec.Action,
 			fmt.Sprintf("should be one of: %s", strings.Join([]string{
-				string(appsv1alpha1.OpsActionRecreate),
+				string(appsv1alpha1.OpsActionRestart),
 				string(appsv1alpha1.OpsActionReplace),
 			}, ","))))
 	}
@@ -100,7 +100,7 @@ func (h *ValidatingHandler) validateOpsTarget(instance, old *appsv1alpha1.Operat
 	for podIdx, target := range instance.Spec.Targets {
 		podFldPath := fldPath.Index(podIdx).Child("podName")
 
-		if instance.Spec.Action == appsv1alpha1.OpsActionRecreate {
+		if instance.Spec.Action == appsv1alpha1.OpsActionRestart {
 			cntSets := sets.String{}
 			for ctnIdx, containerName := range target.Containers {
 				containerFldPath := fldPath.Index(podIdx).Child("containerName").Index(ctnIdx)

@@ -263,7 +263,7 @@ var _ = SIGDescribe("OperationJob", func() {
 
 	framework.KusionstackDescribe("OperationJob Recreating", func() {
 
-		framework.ConformanceIt("operationjob recreate pod", func() {
+		framework.ConformanceIt("operationjob restart pod", func() {
 			cls := clsTester.NewCollaSet("collaset-"+randStr, 1, appsv1alpha1.UpdateStrategy{})
 			Expect(clsTester.CreateCollaSet(cls)).NotTo(HaveOccurred())
 
@@ -272,26 +272,26 @@ var _ = SIGDescribe("OperationJob", func() {
 			pods, err := clsTester.ListPodsForCollaSet(cls)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Create recreate OperationJob")
-			podToRecreate := pods[0]
-			oj := ojTester.NewOperationJob("operationjob-"+randStr, appsv1alpha1.OpsActionRecreate, []appsv1alpha1.PodOpsTarget{
+			By("Create restart OperationJob")
+			podToRestart := pods[0]
+			oj := ojTester.NewOperationJob("operationjob-"+randStr, appsv1alpha1.OpsActionRestart, []appsv1alpha1.PodOpsTarget{
 				{
-					PodName: podToRecreate.Name,
+					PodName: podToRestart.Name,
 				},
 			})
 			Expect(ojTester.CreateOperationJob(oj)).NotTo(HaveOccurred())
 
-			By("Wait for recreate OperationJob Succeeded")
+			By("Wait for restart OperationJob Succeeded")
 			Eventually(func() error { return ojTester.ExpectOperationJobProgress(oj, appsv1alpha1.OperationProgressSucceeded) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
 			By("Check restartCount of pod")
 			pods, err = clsTester.ListPodsForCollaSet(cls)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(pods[0].Name).To(Equal(podToRecreate.Name))
+			Expect(pods[0].Name).To(Equal(podToRestart.Name))
 			Expect(int(pods[0].Status.ContainerStatuses[0].RestartCount)).To(Equal(1))
 		})
 
-		framework.ConformanceIt("operationjob recreate by partition", func() {
+		framework.ConformanceIt("operationjob restart by partition", func() {
 			cls := clsTester.NewCollaSet("collaset-"+randStr, 3, appsv1alpha1.UpdateStrategy{})
 			Expect(clsTester.CreateCollaSet(cls)).NotTo(HaveOccurred())
 
@@ -300,8 +300,8 @@ var _ = SIGDescribe("OperationJob", func() {
 			pods, err := clsTester.ListPodsForCollaSet(cls)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Create recreate OperationJob")
-			oj := ojTester.NewOperationJob("operationjob-"+randStr, appsv1alpha1.OpsActionRecreate, []appsv1alpha1.PodOpsTarget{
+			By("Create restart OperationJob")
+			oj := ojTester.NewOperationJob("operationjob-"+randStr, appsv1alpha1.OpsActionRestart, []appsv1alpha1.PodOpsTarget{
 				{
 					PodName: pods[0].Name,
 				}, {
@@ -313,10 +313,10 @@ var _ = SIGDescribe("OperationJob", func() {
 			oj.Spec.Partition = int32Pointer(0)
 			Expect(ojTester.CreateOperationJob(oj)).NotTo(HaveOccurred())
 
-			By("Wait for recreate OperationJob Pending")
+			By("Wait for restart OperationJob Pending")
 			Eventually(func() error { return ojTester.ExpectOperationJobProgress(oj, appsv1alpha1.OperationProgressPending) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
-			By("Start to recreate pod byPartition")
+			By("Start to restart pod byPartition")
 			for _, partition := range []int32{0, 1, 2, 3} {
 				Expect(ojTester.UpdateOperationJob(oj, func(oj *appsv1alpha1.OperationJob) {
 					oj.Spec.Partition = &partition
@@ -329,7 +329,7 @@ var _ = SIGDescribe("OperationJob", func() {
 				}, 10*time.Second, 3*time.Second).Should(Equal(partition))
 			}
 
-			By("Wait for recreate OperationJob Succeeded")
+			By("Wait for restart OperationJob Succeeded")
 			Eventually(func() error { return ojTester.ExpectOperationJobProgress(oj, appsv1alpha1.OperationProgressSucceeded) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
 			By("Check restartCount of pods")
@@ -340,26 +340,26 @@ var _ = SIGDescribe("OperationJob", func() {
 			}
 		})
 
-		framework.ConformanceIt("operationjob recreate non-exist pod", func() {
+		framework.ConformanceIt("operationjob restart non-exist pod", func() {
 			cls := clsTester.NewCollaSet("collaset-"+randStr, 1, appsv1alpha1.UpdateStrategy{})
 			Expect(clsTester.CreateCollaSet(cls)).NotTo(HaveOccurred())
 
-			By("Create recreate OperationJob")
-			oj := ojTester.NewOperationJob("operationjob-"+randStr, appsv1alpha1.OpsActionRecreate, []appsv1alpha1.PodOpsTarget{
+			By("Create restart OperationJob")
+			oj := ojTester.NewOperationJob("operationjob-"+randStr, appsv1alpha1.OpsActionRestart, []appsv1alpha1.PodOpsTarget{
 				{
 					PodName: "non-exist-pod",
 				},
 			})
 			Expect(ojTester.CreateOperationJob(oj)).NotTo(HaveOccurred())
 
-			By("Wait for recreate OperationJob Failed")
+			By("Wait for restart OperationJob Failed")
 			Eventually(func() error { return ojTester.ExpectOperationJobProgress(oj, appsv1alpha1.OperationProgressFailed) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
 			By("Check reason for Failed")
 			Expect(oj.Status.PodDetails[0].Reason).To(Equal(appsv1alpha1.ReasonPodNotFound))
 		})
 
-		framework.ConformanceIt("operationjob activeDeadlineSeconds and TTLSecondsAfterFinished for recreate", func() {
+		framework.ConformanceIt("operationjob activeDeadlineSeconds and TTLSecondsAfterFinished for restart", func() {
 			cls := clsTester.NewCollaSet("collaset-"+randStr, 1, appsv1alpha1.UpdateStrategy{})
 			Expect(clsTester.CreateCollaSet(cls)).NotTo(HaveOccurred())
 
@@ -368,40 +368,40 @@ var _ = SIGDescribe("OperationJob", func() {
 			pods, err := clsTester.ListPodsForCollaSet(cls)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Create recreate OperationJob")
-			podToRecreate := pods[0]
-			oj := ojTester.NewOperationJob("operationjob-"+randStr, appsv1alpha1.OpsActionRecreate, []appsv1alpha1.PodOpsTarget{
+			By("Create restart OperationJob")
+			podToRestart := pods[0]
+			oj := ojTester.NewOperationJob("operationjob-"+randStr, appsv1alpha1.OpsActionRestart, []appsv1alpha1.PodOpsTarget{
 				{
-					PodName: podToRecreate.Name,
+					PodName: podToRestart.Name,
 				},
 			})
 			oj.Spec.TTLSecondsAfterFinished = int32Pointer(10)
 			Expect(ojTester.CreateOperationJob(oj)).NotTo(HaveOccurred())
 
-			By("Wait for recreate OperationJob Succeeded")
+			By("Wait for restart OperationJob Succeeded")
 			Eventually(func() error { return ojTester.ExpectOperationJobProgress(oj, appsv1alpha1.OperationProgressSucceeded) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 			Eventually(func() bool {
-				CRR, err := ojTester.GetForOperationJobTester(oj, podToRecreate)
+				CRR, err := ojTester.GetForOperationJobTester(oj, podToRestart)
 				if err != nil {
 					return false
 				}
-				return CRR.Name == fmt.Sprintf("%s-%s", oj.Name, podToRecreate.Name)
+				return CRR.Name == fmt.Sprintf("%s-%s", oj.Name, podToRestart.Name)
 			}, 30*time.Second, 3*time.Second).ShouldNot(BeTrue())
 
 			By("Check restartCount of pod")
 			pods, err = clsTester.ListPodsForCollaSet(cls)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(pods[0].Name).To(Equal(podToRecreate.Name))
+			Expect(pods[0].Name).To(Equal(podToRestart.Name))
 			Expect(int(pods[0].Status.ContainerStatuses[0].RestartCount)).To(Equal(1))
 
-			By("Wait for recreate OperationJob deleted")
+			By("Wait for restart OperationJob deleted")
 			Eventually(func() bool {
 				return errors.IsNotFound(ojTester.GetOperationJob(oj))
 			}, 20*time.Second, 3*time.Second).Should(BeTrue())
 
 			By("Check crr is cleaned")
 			Eventually(func() bool {
-				_, err := ojTester.GetForOperationJobTester(oj, podToRecreate)
+				_, err := ojTester.GetForOperationJobTester(oj, podToRestart)
 				return errors.IsNotFound(err)
 			}, 30*time.Second, 3*time.Second).Should(BeTrue())
 		})

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package recreate
+package restart
 
 import (
 	"fmt"
@@ -29,11 +29,11 @@ import (
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 )
 
-type ContainerRecreateControl struct {
+type ContainerRestartControl struct {
 	*OperateInfo
 }
 
-func (p *ContainerRecreateControl) ListTargets() ([]*OpsCandidate, error) {
+func (p *ContainerRestartControl) ListTargets() ([]*OpsCandidate, error) {
 	var candidates []*OpsCandidate
 	podOpsStatusMap := ojutils.MapOpsStatusByPod(p.OperationJob)
 	for _, target := range p.OperationJob.Spec.Targets {
@@ -77,7 +77,7 @@ func (p *ContainerRecreateControl) ListTargets() ([]*OpsCandidate, error) {
 	return candidates, nil
 }
 
-func (p *ContainerRecreateControl) OperateTarget(candidate *OpsCandidate) error {
+func (p *ContainerRestartControl) OperateTarget(candidate *OpsCandidate) error {
 	// mark candidate ops started is not started
 	if IsCandidateOpsPending(candidate) {
 		candidate.PodOpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
@@ -89,24 +89,24 @@ func (p *ContainerRecreateControl) OperateTarget(candidate *OpsCandidate) error 
 		return nil
 	}
 
-	// get recreate handler from pod's Anno, to do recreate
-	handler, message := GetRecreateHandlerFromPod(candidate.Pod)
+	// get restart handler from pod's Anno, to do restart
+	handler, message := GetRestartHandlerFromPod(candidate.Pod)
 	if handler == nil {
-		MarkCandidateAsFailed(p.OperationJob, candidate, appsv1alpha1.ReasonInvalidRecreateMethod, message)
+		MarkCandidateAsFailed(p.OperationJob, candidate, appsv1alpha1.ReasonInvalidRestartMethod, message)
 		return nil
 	}
 
-	// if Pod is not during RecreateOpsLifecycle, trigger it
-	isDuringRecreateOps := podopslifecycle.IsDuringOps(ojutils.RecreateOpsLifecycleAdapter, candidate.Pod)
-	if !isDuringRecreateOps {
-		p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "ContainerRecreateLifecycle", "try to begin PodOpsLifecycle for recreating Container of Pod")
-		if err := ojutils.BeginRecreateLifecycle(p.Client, ojutils.RecreateOpsLifecycleAdapter, candidate.Pod); err != nil {
+	// if Pod is not during RestartOpsLifecycle, trigger it
+	isDuringRestartOps := podopslifecycle.IsDuringOps(ojutils.RestartOpsLifecycleAdapter, candidate.Pod)
+	if !isDuringRestartOps {
+		p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "ContainerRestartLifecycle", "try to begin PodOpsLifecycle for recreating Container of Pod")
+		if err := ojutils.BeginRestarteLifecycle(p.Client, ojutils.RestartOpsLifecycleAdapter, candidate.Pod); err != nil {
 			return err
 		}
 	}
 
-	// if Pod is allowed to recreate, try to do restart
-	_, allowed := podopslifecycle.AllowOps(ojutils.RecreateOpsLifecycleAdapter, realValue(p.OperationJob.Spec.OperationDelaySeconds), candidate.Pod)
+	// if Pod is allowed to restart, try to do restart
+	_, allowed := podopslifecycle.AllowOps(ojutils.RestartOpsLifecycleAdapter, realValue(p.OperationJob.Spec.OperationDelaySeconds), candidate.Pod)
 	if allowed {
 		err := handler.DoRestartContainers(p.Context, p.Client, p.OperationJob, candidate, candidate.Containers)
 		if err != nil {
@@ -114,21 +114,21 @@ func (p *ContainerRecreateControl) OperateTarget(candidate *OpsCandidate) error 
 		}
 	}
 
-	// if CRR completed or during updating opsLifecycle, try to finish Recreate PodOpsLifeCycle
+	// if CRR completed or during updating opsLifecycle, try to finish Restart PodOpsLifeCycle
 	candidate.PodOpsStatus.Progress = handler.GetRestartProgress(p.Context, p.Client, p.OperationJob, candidate)
-	if IsCandidateOpsFinished(candidate) && isDuringRecreateOps {
-		if err := ojutils.FinishRecreateLifecycle(p.Client, ojutils.RecreateOpsLifecycleAdapter, candidate.Pod); err != nil {
+	if IsCandidateOpsFinished(candidate) && isDuringRestartOps {
+		if err := ojutils.FinishRestartLifecycle(p.Client, ojutils.RestartOpsLifecycleAdapter, candidate.Pod); err != nil {
 			return err
 		}
-		p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "RecreateFinished", "pod %s/%s recreate finished", candidate.Pod.Namespace, candidate.Pod.Name)
+		p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "RestartFinished", "pod %s/%s restart finished", candidate.Pod.Namespace, candidate.Pod.Name)
 	} else {
-		p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "WaitingRecreateFinished", "waiting for pod %s/%s to recreate finished", candidate.Pod.Namespace, candidate.Pod.Name)
+		p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "WaitingRestartFinished", "waiting for pod %s/%s to restart finished", candidate.Pod.Namespace, candidate.Pod.Name)
 	}
 
 	return nil
 }
 
-func (p *ContainerRecreateControl) FulfilPodOpsStatus(candidate *OpsCandidate) error {
+func (p *ContainerRestartControl) FulfilPodOpsStatus(candidate *OpsCandidate) error {
 	if IsCandidateOpsFinished(candidate) {
 		return nil
 	}
@@ -143,10 +143,10 @@ func (p *ContainerRecreateControl) FulfilPodOpsStatus(candidate *OpsCandidate) e
 		return nil
 	}
 
-	// get recreate handler from pod's Anno, to do recreate
-	handler, message := GetRecreateHandlerFromPod(candidate.Pod)
+	// get restart handler from pod's Anno, to do restart
+	handler, message := GetRestartHandlerFromPod(candidate.Pod)
 	if handler == nil {
-		MarkCandidateAsFailed(p.OperationJob, candidate, appsv1alpha1.ReasonInvalidRecreateMethod, message)
+		MarkCandidateAsFailed(p.OperationJob, candidate, appsv1alpha1.ReasonInvalidRestartMethod, message)
 		return nil
 	}
 
@@ -155,15 +155,15 @@ func (p *ContainerRecreateControl) FulfilPodOpsStatus(candidate *OpsCandidate) e
 	return nil
 }
 
-func (p *ContainerRecreateControl) ReleaseTarget(candidate *OpsCandidate) error {
+func (p *ContainerRestartControl) ReleaseTarget(candidate *OpsCandidate) error {
 	if candidate.Pod == nil {
 		return nil
 	}
 
-	// get recreate handler from pod's Anno, to do recreate
-	handler, message := GetRecreateHandlerFromPod(candidate.Pod)
+	// get restart handler from pod's Anno, to do restart
+	handler, message := GetRestartHandlerFromPod(candidate.Pod)
 	if handler == nil {
-		MarkCandidateAsFailed(p.OperationJob, candidate, appsv1alpha1.ReasonInvalidRecreateMethod, message)
+		MarkCandidateAsFailed(p.OperationJob, candidate, appsv1alpha1.ReasonInvalidRestartMethod, message)
 		return nil
 	}
 
@@ -172,9 +172,9 @@ func (p *ContainerRecreateControl) ReleaseTarget(candidate *OpsCandidate) error 
 		return err
 	}
 
-	// cancel lifecycle if pod is during recreate lifecycle
-	if podopslifecycle.IsDuringOps(ojutils.RecreateOpsLifecycleAdapter, candidate.Pod) {
-		return ojutils.CancelOpsLifecycle(p.Context, p.Client, ojutils.RecreateOpsLifecycleAdapter, candidate.Pod)
+	// cancel lifecycle if pod is during restart lifecycle
+	if podopslifecycle.IsDuringOps(ojutils.RestartOpsLifecycleAdapter, candidate.Pod) {
+		return ojutils.CancelOpsLifecycle(p.Context, p.Client, ojutils.RestartOpsLifecycleAdapter, candidate.Pod)
 	}
 	return nil
 }

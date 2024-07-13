@@ -27,8 +27,8 @@ import (
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
-	"kusionstack.io/operating/pkg/controllers/operationjob/recreate"
 	"kusionstack.io/operating/pkg/controllers/operationjob/replace"
+	"kusionstack.io/operating/pkg/controllers/operationjob/restart"
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 )
 
@@ -37,8 +37,8 @@ func (r *ReconcileOperationJob) newOperator(ctx context.Context, instance *appsv
 	operateInfo := &OperateInfo{Client: mixin.Client, Context: ctx, OperationJob: instance, Logger: logger, Recorder: mixin.Recorder}
 
 	switch instance.Spec.Action {
-	case appsv1alpha1.OpsActionRecreate:
-		return &recreate.ContainerRecreateControl{OperateInfo: operateInfo}
+	case appsv1alpha1.OpsActionRestart:
+		return &restart.ContainerRestartControl{OperateInfo: operateInfo}
 	case appsv1alpha1.OpsActionReplace:
 		return &replace.PodReplaceControl{OperateInfo: operateInfo,
 			PodControl: podcontrol.NewRealPodControl(r.ReconcilerMixin.Client, r.ReconcilerMixin.Scheme)}

@@ -62,8 +62,8 @@ var (
 
 var _ = Describe("operationjob controller", func() {
 
-	It("[recreate] reconcile", func() {
-		testcase := "test-recreate"
+	It("[restart] reconcile", func() {
+		testcase := "test-restart"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
 		cs := createCollaSetWithReplicas("foo", testcase, 2)
 		podNames := getPodNamesFromCollaSet(cs)
@@ -74,7 +74,7 @@ var _ = Describe("operationjob controller", func() {
 				Name:      "foo",
 			},
 			Spec: appsv1alpha1.OperationJobSpec{
-				Action: appsv1alpha1.OpsActionRecreate,
+				Action: appsv1alpha1.OpsActionRestart,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
 						PodName: podNames[0],
@@ -88,7 +88,7 @@ var _ = Describe("operationjob controller", func() {
 
 		Expect(c.Create(ctx, oj)).Should(BeNil())
 
-		// mock lifecycle pod is allowed to recreate
+		// mock lifecycle pod is allowed to restart
 		podList := &corev1.PodList{}
 		Eventually(func() int {
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
@@ -97,7 +97,7 @@ var _ = Describe("operationjob controller", func() {
 		for i := range podList.Items {
 			pod := podList.Items[i]
 			Expect(updatePodWithRetry(pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, ojutils.RecreateOpsLifecycleAdapter.GetID())
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, ojutils.RestartOpsLifecycleAdapter.GetID())
 				pod.Labels[labelOperate] = "true"
 				return true
 			})).Should(BeNil())
@@ -132,8 +132,8 @@ var _ = Describe("operationjob controller", func() {
 		assertJobProgressSucceeded(oj, time.Second*5)
 	})
 
-	It("[recreate] by partition", func() {
-		testcase := "test-recreate-by-partition"
+	It("[restart] by partition", func() {
+		testcase := "test-restart-by-partition"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
 		cs := createCollaSetWithReplicas("foo", testcase, 3)
 		podNames := getPodNamesFromCollaSet(cs)
@@ -144,7 +144,7 @@ var _ = Describe("operationjob controller", func() {
 				Name:      "foo",
 			},
 			Spec: appsv1alpha1.OperationJobSpec{
-				Action:    appsv1alpha1.OpsActionRecreate,
+				Action:    appsv1alpha1.OpsActionRestart,
 				Partition: int32Pointer(0),
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
@@ -162,7 +162,7 @@ var _ = Describe("operationjob controller", func() {
 
 		Expect(c.Create(ctx, oj)).Should(BeNil())
 
-		// mock lifecycle pod is allowed to recreate
+		// mock lifecycle pod is allowed to restart
 		podList := &corev1.PodList{}
 		Eventually(func() int {
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
@@ -171,7 +171,7 @@ var _ = Describe("operationjob controller", func() {
 		for i := range podList.Items {
 			pod := podList.Items[i]
 			Expect(updatePodWithRetry(pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, ojutils.RecreateOpsLifecycleAdapter.GetID())
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, ojutils.RestartOpsLifecycleAdapter.GetID())
 				pod.Labels[labelOperate] = "true"
 				return true
 			})).Should(BeNil())
@@ -224,8 +224,8 @@ var _ = Describe("operationjob controller", func() {
 		}
 	})
 
-	It("[recreate] non-exist pod", func() {
-		testcase := "test-recreate-non-exist-pod"
+	It("[restart] non-exist pod", func() {
+		testcase := "test-restart-non-exist-pod"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
 
 		oj := &appsv1alpha1.OperationJob{
@@ -234,7 +234,7 @@ var _ = Describe("operationjob controller", func() {
 				Name:      "foo",
 			},
 			Spec: appsv1alpha1.OperationJobSpec{
-				Action: appsv1alpha1.OpsActionRecreate,
+				Action: appsv1alpha1.OpsActionRestart,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
 						PodName: "non-exist",
@@ -569,7 +569,7 @@ var _ = Describe("operationjob controller", func() {
 				Name:      "foo",
 			},
 			Spec: appsv1alpha1.OperationJobSpec{
-				Action: appsv1alpha1.OpsActionRecreate,
+				Action: appsv1alpha1.OpsActionRestart,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
 						PodName: podNames[0],

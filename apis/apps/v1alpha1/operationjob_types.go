@@ -24,18 +24,18 @@ import (
 type OpsAction string
 
 const (
-	OpsActionRecreate OpsAction = "Recreate"
-	OpsActionReplace  OpsAction = "Replace"
+	OpsActionRestart OpsAction = "Restart"
+	OpsActionReplace OpsAction = "Replace"
 )
 
 // ReasonForOpsProgress defines the reason of pod operation progress
 type ReasonForOpsProgress string
 
 const (
-	ReasonPodNotFound           ReasonForOpsProgress = "PodNotFound"
-	ReasonContainerNotFound     ReasonForOpsProgress = "ContainerNotFound"
-	ReasonReplacedByNewPod      ReasonForOpsProgress = "ReplacedByNewPod"
-	ReasonInvalidRecreateMethod ReasonForOpsProgress = "InvalidRecreateMethod"
+	ReasonPodNotFound          ReasonForOpsProgress = "PodNotFound"
+	ReasonContainerNotFound    ReasonForOpsProgress = "ContainerNotFound"
+	ReasonReplacedByNewPod     ReasonForOpsProgress = "ReplacedByNewPod"
+	ReasonInvalidRestartMethod ReasonForOpsProgress = "InvalidRecreateMethod"
 )
 
 // OperationProgress indicates operation progress of pod
