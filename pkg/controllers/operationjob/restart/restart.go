@@ -85,7 +85,7 @@ func (p *ContainerRestartControl) OperateTarget(candidate *OpsCandidate) error {
 
 	// skip if candidate ops finished, or pod and containers do not exist
 	_, containerNotFound := ojutils.ContainersNotFoundInPod(candidate.Pod, candidate.Containers)
-	if IsCandidateOpsFinished(candidate) || candidate.Pod == nil || containerNotFound {
+	if candidate.Pod == nil || containerNotFound {
 		return nil
 	}
 
@@ -97,9 +97,10 @@ func (p *ContainerRestartControl) OperateTarget(candidate *OpsCandidate) error {
 	}
 
 	// if Pod is not during RestartOpsLifecycle, trigger it
+	isOpsFinished := IsCandidateOpsFinished(candidate)
 	isDuringRestartOps := podopslifecycle.IsDuringOps(ojutils.RestartOpsLifecycleAdapter, candidate.Pod)
-	if !isDuringRestartOps {
-		p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "ContainerRestartLifecycle", "try to begin PodOpsLifecycle for recreating Container of Pod")
+	if !isOpsFinished && !isDuringRestartOps {
+		p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "ContainerRestartLifecycle", "try to begin PodOpsLifecycle for restarting Container of Pod")
 		if err := ojutils.BeginRestarteLifecycle(p.Client, ojutils.RestartOpsLifecycleAdapter, candidate.Pod); err != nil {
 			return err
 		}
@@ -107,7 +108,7 @@ func (p *ContainerRestartControl) OperateTarget(candidate *OpsCandidate) error {
 
 	// if Pod is allowed to restart, try to do restart
 	_, allowed := podopslifecycle.AllowOps(ojutils.RestartOpsLifecycleAdapter, realValue(p.OperationJob.Spec.OperationDelaySeconds), candidate.Pod)
-	if allowed {
+	if !isOpsFinished && allowed {
 		err := handler.DoRestartContainers(p.Context, p.Client, p.OperationJob, candidate, candidate.Containers)
 		if err != nil {
 			return err
@@ -116,7 +117,7 @@ func (p *ContainerRestartControl) OperateTarget(candidate *OpsCandidate) error {
 
 	// if CRR completed or during updating opsLifecycle, try to finish Restart PodOpsLifeCycle
 	candidate.PodOpsStatus.Progress = handler.GetRestartProgress(p.Context, p.Client, p.OperationJob, candidate)
-	if IsCandidateOpsFinished(candidate) && isDuringRestartOps {
+	if isOpsFinished && isDuringRestartOps {
 		if err := ojutils.FinishRestartLifecycle(p.Client, ojutils.RestartOpsLifecycleAdapter, candidate.Pod); err != nil {
 			return err
 		}
