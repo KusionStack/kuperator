@@ -32,18 +32,19 @@ import (
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 )
 
-func (r *ReconcileOperationJob) newOperator(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) ActionOperator {
+func (r *ReconcileOperationJob) newOperator(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) (ActionOperator, error) {
 	mixin := r.ReconcilerMixin
 	operateInfo := &OperateInfo{Client: mixin.Client, Context: ctx, OperationJob: instance, Logger: logger, Recorder: mixin.Recorder}
 
 	switch instance.Spec.Action {
 	case appsv1alpha1.OpsActionRestart:
-		return &restart.ContainerRestartControl{OperateInfo: operateInfo}
+		return &restart.ContainerRestartControl{OperateInfo: operateInfo}, nil
 	case appsv1alpha1.OpsActionReplace:
 		return &replace.PodReplaceControl{OperateInfo: operateInfo,
-			PodControl: podcontrol.NewRealPodControl(r.ReconcilerMixin.Client, r.ReconcilerMixin.Scheme)}
+			PodControl: podcontrol.NewRealPodControl(r.ReconcilerMixin.Client, r.ReconcilerMixin.Scheme)}, nil
 	default:
-		panic(fmt.Errorf("unsupported operation type %s", instance.Spec.Action))
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "OpsAction", "unsupported operation type !")
+		return nil, fmt.Errorf("unsupported operation type %s", instance.Spec.Action)
 	}
 }
 
@@ -84,7 +85,12 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineOrTTL(ctx context.Context, i
 
 func (r *ReconcileOperationJob) ReleaseTargetsForDeletion(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) error {
 	ojutils.MarkOperationJobFailed(instance)
-	operator := r.newOperator(ctx, instance, logger)
+
+	operator, err := r.newOperator(ctx, instance, logger)
+	if err != nil {
+		return err
+	}
+
 	candidates, err := operator.ListTargets()
 	if err != nil {
 		return err

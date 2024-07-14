@@ -160,7 +160,10 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 }
 
 func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) error {
-	operator := r.newOperator(ctx, instance, logger)
+	operator, err := r.newOperator(ctx, instance, logger)
+	if err != nil {
+		return err
+	}
 	candidates, err := operator.ListTargets()
 	if err != nil {
 		return err
