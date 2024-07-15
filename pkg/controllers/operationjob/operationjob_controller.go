@@ -170,9 +170,9 @@ func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv
 	}
 
 	filteredCandidates := DecideCandidateByPartition(instance, candidates)
-	_, opsErr := controllerutils.SlowStartBatch(len(filteredCandidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, err error) error {
+	_, opsErr := controllerutils.SlowStartBatch(len(filteredCandidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := filteredCandidates[i]
-		if err = operator.OperateTarget(candidate); err != nil {
+		if err := operator.OperateTarget(candidate); err != nil {
 			return err
 		}
 		return operator.FulfilTargetOpsStatus(candidate)
