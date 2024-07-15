@@ -64,7 +64,7 @@ func Add(mgr ctrl.Manager) error {
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	reconcilerMixin := mixin.NewReconcilerMixin(controllerName, mgr)
 	// register Action: Restart and Replace
-	RegisterAction(appsv1alpha1.OpsActionRestart, &restart.ContainerRestartControl{}, ojutils.RestartOpsLifecycleAdapter)
+	RegisterAction(appsv1alpha1.OpsActionRestart, &restart.ContainerRestartControl{}, restart.OpsLifecycleAdapter)
 	RegisterAction(appsv1alpha1.OpsActionReplace, &replace.PodReplaceControl{PodControl: podcontrol.NewRealPodControl(reconcilerMixin.Client, reconcilerMixin.Scheme)}, nil)
 	return &ReconcileOperationJob{
 		ReconcilerMixin: reconcilerMixin,

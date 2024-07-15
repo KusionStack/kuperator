@@ -28,6 +28,7 @@ import (
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
+	"kusionstack.io/operating/pkg/controllers/operationjob/restart"
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
@@ -134,7 +135,7 @@ func (r *ReconcileOperationJob) operateTargets(
 		} else {
 			usingOpsLifecycle = true
 			isDuringOps = podopslifecycle.IsDuringOps(lifecycleAdapter, candidate.Pod)
-			_, isAllowedOps = podopslifecycle.AllowOps(ojutils.RestartOpsLifecycleAdapter, realValue(operationJob.Spec.OperationDelaySeconds), candidate.Pod)
+			_, isAllowedOps = podopslifecycle.AllowOps(restart.OpsLifecycleAdapter, realValue(operationJob.Spec.OperationDelaySeconds), candidate.Pod)
 		}
 
 		// 2. begin OpsLifecycle if necessary
@@ -155,7 +156,7 @@ func (r *ReconcileOperationJob) operateTargets(
 
 		// 4. finish OpsLifecycle if operation is done
 		if usingOpsLifecycle && isOpsFinished && isDuringOps {
-			if err := ojutils.FinishOperateLifecycle(r.Client, ojutils.RestartOpsLifecycleAdapter, candidate.Pod); err != nil {
+			if err := ojutils.FinishOperateLifecycle(r.Client, restart.OpsLifecycleAdapter, candidate.Pod); err != nil {
 				return err
 			}
 			r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, fmt.Sprintf("%sOpsFinished", operationJob.Spec.Action), "pod %s/%s ops finished", candidate.Pod.Namespace, candidate.Pod.Name)

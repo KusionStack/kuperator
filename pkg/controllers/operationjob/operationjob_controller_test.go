@@ -45,7 +45,7 @@ import (
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset"
-	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
+	"kusionstack.io/operating/pkg/controllers/operationjob/restart"
 	"kusionstack.io/operating/pkg/controllers/poddeletion"
 	"kusionstack.io/operating/pkg/features"
 	"kusionstack.io/operating/pkg/utils/feature"
@@ -99,7 +99,7 @@ var _ = Describe("operationjob controller", func() {
 		for i := range podList.Items {
 			pod := podList.Items[i]
 			Expect(updatePodWithRetry(pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, ojutils.RestartOpsLifecycleAdapter.GetID())
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, restart.OpsLifecycleAdapter.GetID())
 				pod.Labels[labelOperate] = "true"
 				return true
 			})).Should(BeNil())
@@ -173,7 +173,7 @@ var _ = Describe("operationjob controller", func() {
 		for i := range podList.Items {
 			pod := podList.Items[i]
 			Expect(updatePodWithRetry(pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, ojutils.RestartOpsLifecycleAdapter.GetID())
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, restart.OpsLifecycleAdapter.GetID())
 				pod.Labels[labelOperate] = "true"
 				return true
 			})).Should(BeNil())
