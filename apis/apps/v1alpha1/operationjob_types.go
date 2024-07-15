@@ -20,12 +20,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// OpsAction defines operation type Recreate and Replace
-type OpsAction string
-
 const (
-	OpsActionRestart OpsAction = "Restart"
-	OpsActionReplace OpsAction = "Replace"
+	OpsActionRestart = "Restart"
+	OpsActionReplace = "Replace"
 )
 
 // ReasonForOpsProgress defines the reason of pod operation progress
@@ -52,7 +49,7 @@ const (
 type OperationJobSpec struct {
 	// Specify the operation actions including: Restart, Replace
 	// +optional
-	Action OpsAction `json:"action,omitempty"`
+	Action string `json:"action,omitempty"`
 
 	// Define the operation target pods
 	// +optional

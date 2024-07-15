@@ -27,35 +27,30 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
-	"kusionstack.io/operating/pkg/controllers/operationjob/replace"
-	"kusionstack.io/operating/pkg/controllers/operationjob/restart"
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/operating/pkg/features"
+	"kusionstack.io/operating/pkg/utils/feature"
 )
 
-func (r *ReconcileOperationJob) newOperator(ctx context.Context, operationJob *appsv1alpha1.OperationJob, logger logr.Logger) (ActionOperator, podopslifecycle.LifecycleAdapter, error) {
-	mixin := r.ReconcilerMixin
-	operateInfo := &OperateInfo{
-		Context:      ctx,
-		Logger:       logger,
-		Client:       mixin.Client,
-		Recorder:     mixin.Recorder,
-		OperationJob: operationJob,
+func (r *ReconcileOperationJob) newOperator(operationJob *appsv1alpha1.OperationJob) (ActionHandler, podopslifecycle.LifecycleAdapter, error) {
+	action := operationJob.Spec.Action
+	handler, lifecycleAdapter := GetActionResources(action)
+	if handler == nil {
+		errMsg := fmt.Sprintf("unsupported operation type! please register handler for action: %s", action)
+		r.Recorder.Eventf(operationJob, corev1.EventTypeWarning, "OpsAction", errMsg)
+		return nil, nil, fmt.Errorf(errMsg)
 	}
 
-	switch operationJob.Spec.Action {
-	case appsv1alpha1.OpsActionRestart:
-		return &restart.ContainerRestartControl{OperateInfo: operateInfo}, ojutils.RestartOpsLifecycleAdapter, nil
-	case appsv1alpha1.OpsActionReplace:
-		return &replace.PodReplaceControl{OperateInfo: operateInfo,
-			PodControl: podcontrol.NewRealPodControl(r.ReconcilerMixin.Client, r.ReconcilerMixin.Scheme)}, nil, nil
-	default:
-		r.Recorder.Eventf(operationJob, corev1.EventTypeWarning, "OpsAction", "unsupported operation type!")
-		return nil, nil, fmt.Errorf("unsupported operation type %s", operationJob.Spec.Action)
+	if action == appsv1alpha1.OpsActionRestart && !feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRestart) {
+		errMsg := "please install kruise manager and set EnableKruiseToRestart=true"
+		r.Recorder.Eventf(operationJob, corev1.EventTypeWarning, "OpsAction", errMsg)
+		return nil, nil, fmt.Errorf(errMsg)
 	}
+
+	return handler, lifecycleAdapter, nil
 }
 
 func (r *ReconcileOperationJob) listTargets(ctx context.Context, operationJob *appsv1alpha1.OperationJob) ([]*OpsCandidate, error) {
@@ -111,7 +106,8 @@ func (r *ReconcileOperationJob) listTargets(ctx context.Context, operationJob *a
 }
 
 func (r *ReconcileOperationJob) operateTargets(
-	operator ActionOperator,
+	ctx context.Context,
+	operator ActionHandler,
 	candidates []*OpsCandidate,
 	lifecycleAdapter podopslifecycle.LifecycleAdapter,
 	operationJob *appsv1alpha1.OperationJob) error {
@@ -151,7 +147,7 @@ func (r *ReconcileOperationJob) operateTargets(
 
 		// 3. try to do real operation
 		if !isOpsFinished && isAllowedOps {
-			err := operator.OperateTarget(candidate)
+			err := operator.OperateTarget(ctx, r.Client, operationJob, candidate)
 			if err != nil {
 				return err
 			}
@@ -173,13 +169,13 @@ func (r *ReconcileOperationJob) operateTargets(
 	return opsErr
 }
 
-func (r *ReconcileOperationJob) fulfilTargetsOpsStatus(operator ActionOperator, candidates []*OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
+func (r *ReconcileOperationJob) fulfilTargetsOpsStatus(ctx context.Context, operator ActionHandler, candidates []*OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
 	_, err := controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
 		if IsCandidateOpsFinished(candidate) {
 			return nil
 		}
-		return operator.FulfilTargetOpsStatus(candidate)
+		return operator.FulfilTargetOpsStatus(ctx, r.Client, operationJob, r.Recorder, candidate)
 	})
 	return err
 }
@@ -221,7 +217,7 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineOrTTL(ctx context.Context, o
 
 func (r *ReconcileOperationJob) ReleaseTargetsForDeletion(ctx context.Context, operationJob *appsv1alpha1.OperationJob, logger logr.Logger) error {
 	ojutils.MarkOperationJobFailed(operationJob)
-	operator, lifecycleAdapter, err := r.newOperator(ctx, operationJob, logger)
+	operator, lifecycleAdapter, err := r.newOperator(operationJob)
 	if err != nil {
 		return err
 	}
@@ -236,7 +232,7 @@ func (r *ReconcileOperationJob) ReleaseTargetsForDeletion(ctx context.Context, o
 		if candidate.Pod == nil {
 			return nil
 		}
-		err := operator.ReleaseTarget(candidate)
+		err := operator.ReleaseTarget(ctx, r.Client, operationJob, candidate)
 		// cancel lifecycle if pod is during ops lifecycle
 		if lifecycleAdapter != nil && podopslifecycle.IsDuringOps(lifecycleAdapter, candidate.Pod) {
 			return ojutils.CancelOpsLifecycle(ctx, r.Client, lifecycleAdapter, candidate.Pod)

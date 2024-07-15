@@ -17,12 +17,14 @@ limitations under the License.
 package replace
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
@@ -31,11 +33,10 @@ import (
 )
 
 type PodReplaceControl struct {
-	*OperateInfo
 	PodControl podcontrol.Interface
 }
 
-func (p *PodReplaceControl) OperateTarget(candidate *OpsCandidate) error {
+func (p *PodReplaceControl) OperateTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, candidate *OpsCandidate) error {
 	// parse replace information from origin pod
 	var replaceIndicated, replaceByReplaceUpdate, replaceNewPodExists bool
 	_, replaceIndicated = candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
@@ -46,7 +47,7 @@ func (p *PodReplaceControl) OperateTarget(candidate *OpsCandidate) error {
 	replaceTriggered := replaceIndicated || replaceByReplaceUpdate || replaceNewPodExists
 	if !replaceTriggered {
 		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, true)))
-		if err := p.Client.Patch(p.Context, candidate.Pod, patch); err != nil {
+		if err := c.Patch(ctx, candidate.Pod, patch); err != nil {
 			return fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %s", candidate.Pod.Namespace, candidate.Pod.Name, err)
 		}
 	}
@@ -54,7 +55,7 @@ func (p *PodReplaceControl) OperateTarget(candidate *OpsCandidate) error {
 	return nil
 }
 
-func (p *PodReplaceControl) FulfilTargetOpsStatus(candidate *OpsCandidate) error {
+func (p *PodReplaceControl) FulfilTargetOpsStatus(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) error {
 	// try to find replaceNewPod
 	if candidate.Pod != nil && candidate.CollaSet != nil {
 		newPodId, exist := candidate.Pod.Labels[appsv1alpha1.PodReplacePairNewId]
@@ -65,8 +66,8 @@ func (p *PodReplaceControl) FulfilTargetOpsStatus(candidate *OpsCandidate) error
 			}
 			for _, newPod := range filteredPods {
 				if newPodId == newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] {
-					p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "ReplaceNewPod", "replace by pod %s with operationjob %s", candidate.PodName, p.OperationJob.Name)
-					p.Recorder.Eventf(newPod, corev1.EventTypeNormal, "ReplaceOriginPod", "replace pod %s with operationjob %s", newPod.Name, p.OperationJob.Name)
+					recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "ReplaceNewPod", "replace by pod %s with operationjob %s", candidate.PodName, operationJob.Name)
+					recorder.Eventf(newPod, corev1.EventTypeNormal, "ReplaceOriginPod", "replace pod %s with operationjob %s", newPod.Name, operationJob.Name)
 					candidate.OpsStatus.Reason = appsv1alpha1.ReasonReplacedByNewPod
 					candidate.OpsStatus.Message = newPod.Name
 				}
@@ -87,7 +88,7 @@ func (p *PodReplaceControl) FulfilTargetOpsStatus(candidate *OpsCandidate) error
 	return nil
 }
 
-func (p *PodReplaceControl) ReleaseTarget(candidate *OpsCandidate) error {
+func (p *PodReplaceControl) ReleaseTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, candidate *OpsCandidate) error {
 	if candidate.Pod == nil || candidate.Pod.DeletionTimestamp != nil {
 		return nil
 	}

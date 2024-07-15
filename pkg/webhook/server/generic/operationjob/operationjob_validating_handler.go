@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -66,7 +65,6 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 	}
 
 	fldPath := field.NewPath("spec")
-	allErrors = append(allErrors, h.validateOpsType(&obj, fldPath)...)
 	allErrors = append(allErrors, h.validatePartition(&obj, &old, fldPath)...)
 	allErrors = append(allErrors, h.validateTTLAndActiveDeadline(&obj, fldPath)...)
 	allErrors = append(allErrors, h.validateOpsTarget(&obj, &old, fldPath.Child("targets"))...)
@@ -74,19 +72,6 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 		return admission.ValidationResponse(false, allErrors.ToAggregate().Error())
 	}
 	return admission.ValidationResponse(true, "")
-}
-
-func (h *ValidatingHandler) validateOpsType(instance *appsv1alpha1.OperationJob, fldPath *field.Path) field.ErrorList {
-	var allErrors field.ErrorList
-	if instance.Spec.Action != appsv1alpha1.OpsActionRestart &&
-		instance.Spec.Action != appsv1alpha1.OpsActionReplace {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("action"), instance.Spec.Action,
-			fmt.Sprintf("should be one of: %s", strings.Join([]string{
-				string(appsv1alpha1.OpsActionRestart),
-				string(appsv1alpha1.OpsActionReplace),
-			}, ","))))
-	}
-	return allErrors
 }
 
 func (h *ValidatingHandler) validateOpsTarget(instance, old *appsv1alpha1.OperationJob, fldPath *field.Path) field.ErrorList {
@@ -100,17 +85,13 @@ func (h *ValidatingHandler) validateOpsTarget(instance, old *appsv1alpha1.Operat
 	for podIdx, target := range instance.Spec.Targets {
 		podFldPath := fldPath.Index(podIdx).Child("podName")
 
-		if instance.Spec.Action == appsv1alpha1.OpsActionRestart {
-			cntSets := sets.String{}
-			for ctnIdx, containerName := range target.Containers {
-				containerFldPath := fldPath.Index(podIdx).Child("containerName").Index(ctnIdx)
-				if cntSets.Has(containerName) {
-					allErrors = append(allErrors, field.Invalid(containerFldPath, containerName, fmt.Sprintf("container named %s exists multiple times", containerName)))
-				}
-				cntSets.Insert(containerName)
+		cntSets := sets.String{}
+		for ctnIdx, containerName := range target.Containers {
+			containerFldPath := fldPath.Index(podIdx).Child("containerName").Index(ctnIdx)
+			if cntSets.Has(containerName) {
+				allErrors = append(allErrors, field.Invalid(containerFldPath, containerName, fmt.Sprintf("container named %s exists multiple times", containerName)))
 			}
-		} else if len(target.Containers) != 0 {
-			allErrors = append(allErrors, field.Invalid(fldPath, target.Name, fmt.Sprintf("containerNames should be empty for %s action", instance.Spec.Action)))
+			cntSets.Insert(containerName)
 		}
 
 		if podSets.Has(target.Name) {

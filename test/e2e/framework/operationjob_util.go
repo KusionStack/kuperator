@@ -46,7 +46,7 @@ func NewOperationJobTester(clientSet clientset.Interface, client client.Client, 
 	}
 }
 
-func (t *OperationJobTester) NewOperationJob(name string, action appsv1alpha1.OpsAction, targets []appsv1alpha1.PodOpsTarget) *appsv1alpha1.OperationJob {
+func (t *OperationJobTester) NewOperationJob(name string, action string, targets []appsv1alpha1.PodOpsTarget) *appsv1alpha1.OperationJob {
 	return &appsv1alpha1.OperationJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: t.ns,

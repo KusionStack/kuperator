@@ -34,7 +34,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
+	"kusionstack.io/operating/pkg/controllers/operationjob/replace"
 	"kusionstack.io/operating/pkg/controllers/operationjob/restart"
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
@@ -61,7 +63,9 @@ func Add(mgr ctrl.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	reconcilerMixin := mixin.NewReconcilerMixin(controllerName, mgr)
-	restart.RegisterRestartHandler(restart.KruiseCcontainerRecreateRequest, &restart.ContainerRecreateRequestHandler{})
+	// register Action: Restart and Replace
+	RegisterAction(appsv1alpha1.OpsActionRestart, &restart.ContainerRestartControl{}, ojutils.RestartOpsLifecycleAdapter)
+	RegisterAction(appsv1alpha1.OpsActionReplace, &replace.PodReplaceControl{PodControl: podcontrol.NewRealPodControl(reconcilerMixin.Client, reconcilerMixin.Scheme)}, nil)
 	return &ReconcileOperationJob{
 		ReconcilerMixin: reconcilerMixin,
 	}
@@ -160,7 +164,7 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 }
 
 func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) error {
-	operator, lifecycleAdapter, err := r.newOperator(ctx, instance, logger)
+	operator, lifecycleAdapter, err := r.newOperator(instance)
 	if err != nil {
 		return err
 	}
@@ -171,10 +175,10 @@ func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv
 
 	// operate targets by partition
 	filteredCandidates := DecideCandidateByPartition(instance, candidates)
-	if err := r.operateTargets(operator, filteredCandidates, lifecycleAdapter, instance); err != nil {
+	if err := r.operateTargets(ctx, operator, filteredCandidates, lifecycleAdapter, instance); err != nil {
 		return err
 	}
-	if err := r.fulfilTargetsOpsStatus(operator, filteredCandidates, instance); err != nil {
+	if err := r.fulfilTargetsOpsStatus(ctx, operator, filteredCandidates, instance); err != nil {
 		return err
 	}
 

@@ -19,32 +19,66 @@ package restart
 import (
 	"fmt"
 
+	kruisev1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"golang.org/x/net/context"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
+	"kusionstack.io/operating/pkg/utils/inject"
 )
 
-type ContainerRestartControl struct {
-	*OperateInfo
-}
+type ContainerRestartControl struct{}
 
-func (p *ContainerRestartControl) OperateTarget(candidate *OpsCandidate) error {
+func (p *ContainerRestartControl) OperateTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, candidate *OpsCandidate) error {
 	// skip if containers do not exist
 	if _, containerNotFound := ojutils.ContainersNotFoundInPod(candidate.Pod, candidate.Containers); containerNotFound {
 		return nil
 	}
 
-	// get restart handler from pod's Anno, to do restart
-	handler, message := GetRestartHandlerFromPod(candidate.Pod)
-	if handler == nil {
-		MarkCandidateAsFailed(candidate, appsv1alpha1.ReasonInvalidRestartMethod, message)
-		return nil
+	// create kruise crr to restart container
+	_, err := getCRRByOperationJobAndPod(ctx, c, operationJob, candidate.PodName)
+	if errors.IsNotFound(err) {
+		var crrContainers []kruisev1alpha1.ContainerRecreateRequestContainer
+		for _, container := range candidate.Containers {
+			crrContainer := kruisev1alpha1.ContainerRecreateRequestContainer{
+				Name: container,
+			}
+			crrContainers = append(crrContainers, crrContainer)
+		}
+
+		crr := &kruisev1alpha1.ContainerRecreateRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    operationJob.Namespace,
+				Name:         "",
+				GenerateName: fmt.Sprintf("%s-", operationJob.Name),
+				OwnerReferences: []metav1.OwnerReference{
+					*metav1.NewControllerRef(operationJob, appsv1alpha1.GroupVersion.WithKind("OperationJob")),
+				},
+			},
+			Spec: kruisev1alpha1.ContainerRecreateRequestSpec{
+				PodName:    candidate.PodName,
+				Containers: crrContainers,
+			},
+		}
+
+		if err = c.Create(ctx, crr); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
 	}
 
-	return handler.DoRestartContainers(p.Context, p.Client, p.OperationJob, candidate, candidate.Containers)
+	return nil
 }
 
-func (p *ContainerRestartControl) FulfilTargetOpsStatus(candidate *OpsCandidate) error {
+func (p *ContainerRestartControl) FulfilTargetOpsStatus(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) error {
 	if candidate.Pod == nil {
 		MarkCandidateAsFailed(candidate, appsv1alpha1.ReasonPodNotFound, "")
 		return nil
@@ -55,34 +89,51 @@ func (p *ContainerRestartControl) FulfilTargetOpsStatus(candidate *OpsCandidate)
 		return nil
 	}
 
-	// get restart handler from pod's Anno, to do restart
-	handler, message := GetRestartHandlerFromPod(candidate.Pod)
-	if handler == nil {
-		MarkCandidateAsFailed(candidate, appsv1alpha1.ReasonInvalidRestartMethod, message)
+	crr, err := getCRRByOperationJobAndPod(ctx, c, operationJob, candidate.PodName)
+	if errors.IsNotFound(err) {
+		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressPending
+		return nil
+	} else if err != nil {
+		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
 		return nil
 	}
 
-	// calculate restart progress of podOpsStatus
-	candidate.OpsStatus.Progress = handler.GetRestartProgress(p.Context, p.Client, p.OperationJob, candidate)
+	if crr.Status.Phase == kruisev1alpha1.ContainerRecreateRequestCompleted ||
+		crr.Status.Phase == kruisev1alpha1.ContainerRecreateRequestSucceeded {
+		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressSucceeded
+	} else if crr.Status.Phase == kruisev1alpha1.ContainerRecreateRequestFailed {
+		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
+	} else {
+		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
+	}
 	return nil
 }
 
-func (p *ContainerRestartControl) ReleaseTarget(candidate *OpsCandidate) error {
+func (p *ContainerRestartControl) ReleaseTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, candidate *OpsCandidate) error {
 	if candidate.Pod == nil {
 		return nil
 	}
 
-	// get restart handler from pod's Anno, to do restart
-	handler, message := GetRestartHandlerFromPod(candidate.Pod)
-	if handler == nil {
-		MarkCandidateAsFailed(candidate, appsv1alpha1.ReasonInvalidRestartMethod, message)
+	crr, err := getCRRByOperationJobAndPod(ctx, c, operationJob, candidate.PodName)
+	if errors.IsNotFound(err) {
 		return nil
-	}
-
-	// release target
-	if err := handler.ReleasePod(p.Context, p.Client, p.OperationJob, candidate); err != nil {
+	} else if err != nil {
 		return err
 	}
 
-	return nil
+	return c.Delete(ctx, crr)
+
+}
+
+func getCRRByOperationJobAndPod(ctx context.Context, c client.Client, instance *appsv1alpha1.OperationJob, podName string) (*kruisev1alpha1.ContainerRecreateRequest, error) {
+	crrList := &kruisev1alpha1.ContainerRecreateRequestList{}
+	if err := c.List(ctx, crrList, &client.ListOptions{Namespace: instance.Namespace, FieldSelector: fields.OneTermEqualSelector(inject.FieldIndexOwnerRefUID, string(instance.GetUID()))}); err != nil {
+		return nil, err
+	}
+	for i := range crrList.Items {
+		if crrList.Items[i].Spec.PodName == podName {
+			return &crrList.Items[i], nil
+		}
+	}
+	return nil, errors.NewNotFound(schema.GroupResource{Resource: "containerrecreaterequest"}, fmt.Sprintf("%s-", instance.Name))
 }

@@ -26,10 +26,10 @@ import (
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
-type ActionOperator interface {
-	OperateTarget(*OpsCandidate) error
-	FulfilTargetOpsStatus(*OpsCandidate) error
-	ReleaseTarget(*OpsCandidate) error
+type ActionHandler interface {
+	OperateTarget(context.Context, client.Client, *appsv1alpha1.OperationJob, *OpsCandidate) error
+	FulfilTargetOpsStatus(context.Context, client.Client, *appsv1alpha1.OperationJob, record.EventRecorder, *OpsCandidate) error
+	ReleaseTarget(context.Context, client.Client, *appsv1alpha1.OperationJob, *OpsCandidate) error
 }
 
 type OperateInfo struct {
