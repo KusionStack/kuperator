@@ -79,6 +79,10 @@ func main() {
 
 	ctrl.SetLogger(klogr.New())
 
+	if feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRestart) {
+		utilruntime.Must(kruisev1alpha1.AddToScheme(scheme))
+	}
+
 	config := ctrl.GetConfigOrDie()
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme:                 scheme,
@@ -111,13 +115,6 @@ func main() {
 	if err = apis.AddToScheme(mgr.GetScheme()); err != nil {
 		setupLog.Error(err, "unable to add APIs scheme")
 		os.Exit(1)
-	}
-
-	if feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRestart) {
-		if err = kruisev1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
-			setupLog.Error(err, "unable to add containerRecreateRequest API scheme")
-			os.Exit(1)
-		}
 	}
 
 	if err = controllers.AddToManager(mgr); err != nil {

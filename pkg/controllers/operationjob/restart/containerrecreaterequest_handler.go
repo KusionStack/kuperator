@@ -23,11 +23,13 @@ import (
 	kruisev1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
+	"kusionstack.io/operating/pkg/utils/inject"
 )
 
 const (
@@ -41,10 +43,9 @@ func (h *ContainerRecreateRequestHandler) DoRestartContainers(
 	ctx context.Context, client client.Client,
 	instance *appsv1alpha1.OperationJob,
 	candidate *opscontrol.OpsCandidate, containers []string) error {
-	crr := &kruisev1alpha1.ContainerRecreateRequest{}
-	crrName := fmt.Sprintf("%s-%s", instance.Name, candidate.PodName)
 
-	err := client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: crrName}, crr)
+	crr := &kruisev1alpha1.ContainerRecreateRequest{}
+	crr, err := getCRRByOperationJobAndPod(ctx, client, instance, candidate.PodName)
 	if errors.IsNotFound(err) {
 		var crrContainers []kruisev1alpha1.ContainerRecreateRequestContainer
 		for _, container := range containers {
@@ -56,8 +57,9 @@ func (h *ContainerRecreateRequestHandler) DoRestartContainers(
 
 		crr = &kruisev1alpha1.ContainerRecreateRequest{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: instance.Namespace,
-				Name:      fmt.Sprintf("%s-%s", instance.Name, candidate.PodName),
+				Namespace:    instance.Namespace,
+				Name:         "",
+				GenerateName: fmt.Sprintf("%s-", instance.Name),
 				OwnerReferences: []metav1.OwnerReference{
 					*metav1.NewControllerRef(instance, appsv1alpha1.GroupVersion.WithKind("OperationJob")),
 				},
@@ -81,10 +83,9 @@ func (h *ContainerRecreateRequestHandler) DoRestartContainers(
 func (h *ContainerRecreateRequestHandler) GetRestartProgress(
 	ctx context.Context, client client.Client,
 	instance *appsv1alpha1.OperationJob, candidate *opscontrol.OpsCandidate) appsv1alpha1.OperationProgress {
-	crr := &kruisev1alpha1.ContainerRecreateRequest{}
-	crrName := fmt.Sprintf("%s-%s", instance.Name, candidate.PodName)
 
-	err := client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: crrName}, crr)
+	crr := &kruisev1alpha1.ContainerRecreateRequest{}
+	crr, err := getCRRByOperationJobAndPod(ctx, client, instance, candidate.PodName)
 	if errors.IsNotFound(err) {
 		return appsv1alpha1.OperationProgressPending
 	} else if err != nil {
@@ -105,10 +106,8 @@ func (h *ContainerRecreateRequestHandler) ReleasePod(
 	ctx context.Context, client client.Client,
 	instance *appsv1alpha1.OperationJob,
 	candidate *opscontrol.OpsCandidate) error {
-	crr := &kruisev1alpha1.ContainerRecreateRequest{}
-	crrName := fmt.Sprintf("%s-%s", instance.Name, candidate.PodName)
 
-	err := client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: crrName}, crr)
+	crr, err := getCRRByOperationJobAndPod(ctx, client, instance, candidate.PodName)
 	if errors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
@@ -116,4 +115,17 @@ func (h *ContainerRecreateRequestHandler) ReleasePod(
 	}
 
 	return client.Delete(ctx, crr)
+}
+
+func getCRRByOperationJobAndPod(ctx context.Context, c client.Client, instance *appsv1alpha1.OperationJob, podName string) (*kruisev1alpha1.ContainerRecreateRequest, error) {
+	crrList := &kruisev1alpha1.ContainerRecreateRequestList{}
+	if err := c.List(ctx, crrList, &client.ListOptions{Namespace: instance.Namespace, FieldSelector: fields.OneTermEqualSelector(inject.FieldIndexOwnerRefUID, string(instance.GetUID()))}); err != nil {
+		return nil, err
+	}
+	for i := range crrList.Items {
+		if crrList.Items[i].Spec.PodName == podName {
+			return &crrList.Items[i], nil
+		}
+	}
+	return nil, errors.NewNotFound(schema.GroupResource{Resource: "containerrecreaterequest"}, fmt.Sprintf("%s-", instance.Name))
 }
