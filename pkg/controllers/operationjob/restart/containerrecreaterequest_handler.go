@@ -44,7 +44,6 @@ func (h *ContainerRecreateRequestHandler) DoRestartContainers(
 	instance *appsv1alpha1.OperationJob,
 	candidate *opscontrol.OpsCandidate, containers []string) error {
 
-	crr := &kruisev1alpha1.ContainerRecreateRequest{}
 	crr, err := getCRRByOperationJobAndPod(ctx, client, instance, candidate.PodName)
 	if errors.IsNotFound(err) {
 		var crrContainers []kruisev1alpha1.ContainerRecreateRequestContainer
@@ -84,7 +83,6 @@ func (h *ContainerRecreateRequestHandler) GetRestartProgress(
 	ctx context.Context, client client.Client,
 	instance *appsv1alpha1.OperationJob, candidate *opscontrol.OpsCandidate) appsv1alpha1.OperationProgress {
 
-	crr := &kruisev1alpha1.ContainerRecreateRequest{}
 	crr, err := getCRRByOperationJobAndPod(ctx, client, instance, candidate.PodName)
 	if errors.IsNotFound(err) {
 		return appsv1alpha1.OperationProgressPending
