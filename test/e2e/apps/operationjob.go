@@ -65,7 +65,7 @@ var _ = SIGDescribe("OperationJob", func() {
 			podToReplace := pods[0]
 			oj := ojTester.NewOperationJob("operationjob-"+randStr, appsv1alpha1.OpsActionReplace, []appsv1alpha1.PodOpsTarget{
 				{
-					PodName: podToReplace.Name,
+					Name: podToReplace.Name,
 				},
 			})
 			Expect(ojTester.CreateOperationJob(oj)).NotTo(HaveOccurred())
@@ -86,11 +86,11 @@ var _ = SIGDescribe("OperationJob", func() {
 			By("Create replace OperationJob")
 			oj := ojTester.NewOperationJob("operationjob-"+randStr, appsv1alpha1.OpsActionReplace, []appsv1alpha1.PodOpsTarget{
 				{
-					PodName: pods[0].Name,
+					Name: pods[0].Name,
 				}, {
-					PodName: pods[1].Name,
+					Name: pods[1].Name,
 				}, {
-					PodName: pods[2].Name,
+					Name: pods[2].Name,
 				},
 			})
 			oj.Spec.Partition = int32Pointer(0)
@@ -124,7 +124,7 @@ var _ = SIGDescribe("OperationJob", func() {
 			By("Create replace OperationJob")
 			oj := ojTester.NewOperationJob("operationjob-"+randStr, appsv1alpha1.OpsActionReplace, []appsv1alpha1.PodOpsTarget{
 				{
-					PodName: "non-exist-pod",
+					Name: "non-exist-pod",
 				},
 			})
 			Expect(ojTester.CreateOperationJob(oj)).NotTo(HaveOccurred())
@@ -149,12 +149,12 @@ var _ = SIGDescribe("OperationJob", func() {
 			podToReplace := pods[0]
 			oj1 := ojTester.NewOperationJob("operationjob-"+randStr+"-1", appsv1alpha1.OpsActionReplace, []appsv1alpha1.PodOpsTarget{
 				{
-					PodName: podToReplace.Name,
+					Name: podToReplace.Name,
 				},
 			})
 			oj2 := ojTester.NewOperationJob("operationjob-"+randStr+"-2", appsv1alpha1.OpsActionReplace, []appsv1alpha1.PodOpsTarget{
 				{
-					PodName: podToReplace.Name,
+					Name: podToReplace.Name,
 				},
 			})
 			Expect(ojTester.CreateOperationJob(oj1)).NotTo(HaveOccurred())
@@ -183,7 +183,7 @@ var _ = SIGDescribe("OperationJob", func() {
 			podToReplace := pods[0]
 			oj := ojTester.NewOperationJob("operationjob-"+randStr, appsv1alpha1.OpsActionReplace, []appsv1alpha1.PodOpsTarget{
 				{
-					PodName: podToReplace.Name,
+					Name: podToReplace.Name,
 				},
 			})
 			Expect(ojTester.CreateOperationJob(oj)).NotTo(HaveOccurred())
@@ -232,7 +232,7 @@ var _ = SIGDescribe("OperationJob", func() {
 			podToReplace := pods[0]
 			oj := ojTester.NewOperationJob("operationjob-"+randStr, appsv1alpha1.OpsActionReplace, []appsv1alpha1.PodOpsTarget{
 				{
-					PodName: podToReplace.Name,
+					Name: podToReplace.Name,
 				},
 			})
 			oj.Spec.ActiveDeadlineSeconds = int32Pointer(10)
@@ -276,7 +276,7 @@ var _ = SIGDescribe("OperationJob", func() {
 			podToRestart := pods[0]
 			oj := ojTester.NewOperationJob("operationjob-"+randStr, appsv1alpha1.OpsActionRestart, []appsv1alpha1.PodOpsTarget{
 				{
-					PodName: podToRestart.Name,
+					Name: podToRestart.Name,
 				},
 			})
 			Expect(ojTester.CreateOperationJob(oj)).NotTo(HaveOccurred())
@@ -303,11 +303,11 @@ var _ = SIGDescribe("OperationJob", func() {
 			By("Create restart OperationJob")
 			oj := ojTester.NewOperationJob("operationjob-"+randStr, appsv1alpha1.OpsActionRestart, []appsv1alpha1.PodOpsTarget{
 				{
-					PodName: pods[0].Name,
+					Name: pods[0].Name,
 				}, {
-					PodName: pods[1].Name,
+					Name: pods[1].Name,
 				}, {
-					PodName: pods[2].Name,
+					Name: pods[2].Name,
 				},
 			})
 			oj.Spec.Partition = int32Pointer(0)
@@ -347,7 +347,7 @@ var _ = SIGDescribe("OperationJob", func() {
 			By("Create restart OperationJob")
 			oj := ojTester.NewOperationJob("operationjob-"+randStr, appsv1alpha1.OpsActionRestart, []appsv1alpha1.PodOpsTarget{
 				{
-					PodName: "non-exist-pod",
+					Name: "non-exist-pod",
 				},
 			})
 			Expect(ojTester.CreateOperationJob(oj)).NotTo(HaveOccurred())
@@ -372,7 +372,7 @@ var _ = SIGDescribe("OperationJob", func() {
 			podToRestart := pods[0]
 			oj := ojTester.NewOperationJob("operationjob-"+randStr, appsv1alpha1.OpsActionRestart, []appsv1alpha1.PodOpsTarget{
 				{
-					PodName: podToRestart.Name,
+					Name: podToRestart.Name,
 				},
 			})
 			oj.Spec.TTLSecondsAfterFinished = int32Pointer(10)

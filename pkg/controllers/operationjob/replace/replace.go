@@ -22,14 +22,12 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
-	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 )
 
 type PodReplaceControl struct {
@@ -37,62 +35,7 @@ type PodReplaceControl struct {
 	PodControl podcontrol.Interface
 }
 
-func (p *PodReplaceControl) ListTargets() ([]*OpsCandidate, error) {
-	var candidates []*OpsCandidate
-	podOpsStatusMap := ojutils.MapOpsStatusByPod(p.OperationJob)
-	for _, target := range p.OperationJob.Spec.Targets {
-		var candidate OpsCandidate
-		var originPod corev1.Pod
-
-		// fulfil origin pod
-		candidate.PodName = target.PodName
-		err := p.Client.Get(p.Context, types.NamespacedName{Namespace: p.OperationJob.Namespace, Name: target.PodName}, &originPod)
-		if err == nil {
-			candidate.Pod = &originPod
-		} else if errors.IsNotFound(err) {
-			candidate.Pod = nil
-		} else {
-			return candidates, err
-		}
-
-		// fulfil or initialize opsStatus and replaceNewPod
-		if opsStatus, exist := podOpsStatusMap[target.PodName]; exist {
-			candidate.OpsStatus = opsStatus
-		} else {
-			candidate.OpsStatus = &appsv1alpha1.OpsStatus{
-				Name:     target.PodName,
-				Progress: appsv1alpha1.OperationProgressPending,
-			}
-		}
-
-		// fulfil Collaset
-		collaset, err := ojutils.GetCollaSetByPod(p.Context, p.Client, p.OperationJob, &candidate)
-		if err != nil {
-			return candidates, err
-		}
-		candidate.CollaSet = collaset
-
-		candidates = append(candidates, &candidate)
-	}
-
-	return candidates, nil
-}
-
 func (p *PodReplaceControl) OperateTarget(candidate *OpsCandidate) error {
-	// mark candidate ops started is not started
-	if IsCandidateOpsPending(candidate) {
-		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
-	}
-
-	// skip if candidate ops finished
-	if IsCandidateOpsFinished(candidate) {
-		return nil
-	}
-
-	if candidate.Pod == nil {
-		return nil
-	}
-
 	// parse replace information from origin pod
 	var replaceIndicated, replaceByReplaceUpdate, replaceNewPodExists bool
 	_, replaceIndicated = candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
@@ -112,10 +55,6 @@ func (p *PodReplaceControl) OperateTarget(candidate *OpsCandidate) error {
 }
 
 func (p *PodReplaceControl) FulfilTargetOpsStatus(candidate *OpsCandidate) error {
-	if IsCandidateOpsFinished(candidate) {
-		return nil
-	}
-
 	// try to find replaceNewPod
 	if candidate.Pod != nil && candidate.CollaSet != nil {
 		newPodId, exist := candidate.Pod.Labels[appsv1alpha1.PodReplacePairNewId]

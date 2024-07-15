@@ -160,26 +160,27 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 }
 
 func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) error {
-	operator, err := r.newOperator(ctx, instance, logger)
+	operator, lifecycleAdapter, err := r.newOperator(ctx, instance, logger)
 	if err != nil {
 		return err
 	}
-	candidates, err := operator.ListTargets()
+	candidates, err := r.listTargets(ctx, instance)
 	if err != nil {
 		return err
 	}
 
+	// operate targets by partition
 	filteredCandidates := DecideCandidateByPartition(instance, candidates)
-	_, opsErr := controllerutils.SlowStartBatch(len(filteredCandidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
-		candidate := filteredCandidates[i]
-		if err := operator.OperateTarget(candidate); err != nil {
-			return err
-		}
-		return operator.FulfilTargetOpsStatus(candidate)
-	})
+	if err := r.operateTargets(operator, filteredCandidates, lifecycleAdapter, instance); err != nil {
+		return err
+	}
+	if err := r.fulfilTargetsOpsStatus(operator, filteredCandidates, instance); err != nil {
+		return err
+	}
 
+	// calculate opsStatus of all candidates
 	instance.Status = r.calculateStatus(instance, candidates)
-	return opsErr
+	return nil
 }
 
 func (r *ReconcileOperationJob) calculateStatus(instance *appsv1alpha1.OperationJob, candidates []*OpsCandidate) (jobStatus appsv1alpha1.OperationJobStatus) {

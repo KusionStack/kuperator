@@ -77,10 +77,10 @@ var _ = Describe("operationjob controller", func() {
 				Action: appsv1alpha1.OpsActionRestart,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
-						PodName: podNames[0],
+						Name: podNames[0],
 					},
 					{
-						PodName: podNames[1],
+						Name: podNames[1],
 					},
 				},
 			},
@@ -148,13 +148,13 @@ var _ = Describe("operationjob controller", func() {
 				Partition: int32Pointer(0),
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
-						PodName: podNames[0],
+						Name: podNames[0],
 					},
 					{
-						PodName: podNames[1],
+						Name: podNames[1],
 					},
 					{
-						PodName: podNames[2],
+						Name: podNames[2],
 					},
 				},
 			},
@@ -237,7 +237,7 @@ var _ = Describe("operationjob controller", func() {
 				Action: appsv1alpha1.OpsActionRestart,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
-						PodName: "non-exist",
+						Name: "non-exist",
 					},
 				},
 			},
@@ -264,10 +264,10 @@ var _ = Describe("operationjob controller", func() {
 				Action: appsv1alpha1.OpsActionReplace,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
-						PodName: podNames[0],
+						Name: podNames[0],
 					},
 					{
-						PodName: podNames[1],
+						Name: podNames[1],
 					},
 				},
 			},
@@ -326,13 +326,13 @@ var _ = Describe("operationjob controller", func() {
 				Partition: int32Pointer(0),
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
-						PodName: podNames[0],
+						Name: podNames[0],
 					},
 					{
-						PodName: podNames[1],
+						Name: podNames[1],
 					},
 					{
-						PodName: podNames[2],
+						Name: podNames[2],
 					},
 				},
 			},
@@ -400,6 +400,7 @@ var _ = Describe("operationjob controller", func() {
 			// assert operation progress
 			assertSucceededReplicas(oj, partition, time.Second*5)
 			if partition == 0 {
+				c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
 				assertJobProgressPending(oj, time.Second*5)
 			} else if partition < 3 {
 				assertJobProgressProcessing(oj, time.Second*5)
@@ -423,7 +424,7 @@ var _ = Describe("operationjob controller", func() {
 				Action: appsv1alpha1.OpsActionReplace,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
-						PodName: "non-exist",
+						Name: "non-exist",
 					},
 				},
 			},
@@ -449,10 +450,10 @@ var _ = Describe("operationjob controller", func() {
 				Action: appsv1alpha1.OpsActionReplace,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
-						PodName: podNames[0],
+						Name: podNames[0],
 					},
 					{
-						PodName: podNames[1],
+						Name: podNames[1],
 					},
 				},
 			},
@@ -515,7 +516,7 @@ var _ = Describe("operationjob controller", func() {
 				Action: appsv1alpha1.OpsActionReplace,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
-						PodName: podNames[0],
+						Name: podNames[0],
 					},
 				},
 			},
@@ -572,10 +573,10 @@ var _ = Describe("operationjob controller", func() {
 				Action: appsv1alpha1.OpsActionRestart,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
-						PodName: podNames[0],
+						Name: podNames[0],
 					},
 					{
-						PodName: podNames[1],
+						Name: podNames[1],
 					},
 				},
 				ActiveDeadlineSeconds:   int32Pointer(5),

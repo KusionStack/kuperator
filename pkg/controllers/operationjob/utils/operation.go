@@ -105,7 +105,7 @@ func CancelOpsLifecycle(ctx context.Context, client client.Client, adapter podop
 	return client.Update(ctx, pod)
 }
 
-func BeginRestarteLifecycle(client client.Client, adapter podopslifecycle.LifecycleAdapter, pod *corev1.Pod) error {
+func BeginOperateLifecycle(client client.Client, adapter podopslifecycle.LifecycleAdapter, pod *corev1.Pod) error {
 	if updated, err := podopslifecycle.Begin(client, adapter, pod); err != nil {
 		return fmt.Errorf("fail to begin PodOpsLifecycle for %s %s/%s: %s", adapter.GetType(), pod.Namespace, pod.Name, err)
 	} else if updated {
@@ -116,7 +116,7 @@ func BeginRestarteLifecycle(client client.Client, adapter podopslifecycle.Lifecy
 	return nil
 }
 
-func FinishRestartLifecycle(client client.Client, adapter podopslifecycle.LifecycleAdapter, pod *corev1.Pod) error {
+func FinishOperateLifecycle(client client.Client, adapter podopslifecycle.LifecycleAdapter, pod *corev1.Pod) error {
 	if pod == nil {
 		return nil
 	}

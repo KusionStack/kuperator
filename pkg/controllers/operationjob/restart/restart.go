@@ -19,73 +19,18 @@ package restart
 import (
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
-
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
-	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 )
 
 type ContainerRestartControl struct {
 	*OperateInfo
 }
 
-func (p *ContainerRestartControl) ListTargets() ([]*OpsCandidate, error) {
-	var candidates []*OpsCandidate
-	podOpsStatusMap := ojutils.MapOpsStatusByPod(p.OperationJob)
-	for _, target := range p.OperationJob.Spec.Targets {
-		var candidate OpsCandidate
-		var pod corev1.Pod
-
-		// fulfil pod
-		candidate.PodName = target.PodName
-		err := p.Client.Get(p.Context, types.NamespacedName{Namespace: p.OperationJob.Namespace, Name: target.PodName}, &pod)
-		if err == nil {
-			candidate.Pod = &pod
-		} else if errors.IsNotFound(err) {
-			candidate.Pod = nil
-		} else {
-			return candidates, err
-		}
-
-		// fulfil containers
-		candidate.Containers = target.Containers
-		if len(target.Containers) == 0 && candidate.Pod != nil {
-			// restart all containers
-			var containers []string
-			for _, container := range candidate.Pod.Spec.Containers {
-				containers = append(containers, container.Name)
-			}
-			candidate.Containers = containers
-		}
-
-		// fulfil or initialize opsStatus
-		if opsStatus, exist := podOpsStatusMap[target.PodName]; exist {
-			candidate.OpsStatus = opsStatus
-		} else {
-			candidate.OpsStatus = &appsv1alpha1.OpsStatus{
-				Name:     target.PodName,
-				Progress: appsv1alpha1.OperationProgressPending,
-			}
-		}
-
-		candidates = append(candidates, &candidate)
-	}
-	return candidates, nil
-}
-
 func (p *ContainerRestartControl) OperateTarget(candidate *OpsCandidate) error {
-	// mark candidate ops started is not started
-	if IsCandidateOpsPending(candidate) {
-		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
-	}
-
-	// skip if candidate ops finished, or pod and containers do not exist
-	_, containerNotFound := ojutils.ContainersNotFoundInPod(candidate.Pod, candidate.Containers)
-	if candidate.Pod == nil || containerNotFound {
+	// skip if containers do not exist
+	if _, containerNotFound := ojutils.ContainersNotFoundInPod(candidate.Pod, candidate.Containers); containerNotFound {
 		return nil
 	}
 
@@ -96,44 +41,10 @@ func (p *ContainerRestartControl) OperateTarget(candidate *OpsCandidate) error {
 		return nil
 	}
 
-	// if Pod is not during RestartOpsLifecycle, trigger it
-	isOpsFinished := IsCandidateOpsFinished(candidate)
-	isDuringRestartOps := podopslifecycle.IsDuringOps(ojutils.RestartOpsLifecycleAdapter, candidate.Pod)
-	if !isOpsFinished && !isDuringRestartOps {
-		p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "ContainerRestartLifecycle", "try to begin PodOpsLifecycle for restarting Container of Pod")
-		if err := ojutils.BeginRestarteLifecycle(p.Client, ojutils.RestartOpsLifecycleAdapter, candidate.Pod); err != nil {
-			return err
-		}
-	}
-
-	// if Pod is allowed to restart, try to do restart
-	_, allowed := podopslifecycle.AllowOps(ojutils.RestartOpsLifecycleAdapter, realValue(p.OperationJob.Spec.OperationDelaySeconds), candidate.Pod)
-	if !isOpsFinished && allowed {
-		err := handler.DoRestartContainers(p.Context, p.Client, p.OperationJob, candidate, candidate.Containers)
-		if err != nil {
-			return err
-		}
-	}
-
-	// if CRR completed or during updating opsLifecycle, try to finish Restart PodOpsLifeCycle
-	candidate.OpsStatus.Progress = handler.GetRestartProgress(p.Context, p.Client, p.OperationJob, candidate)
-	if isOpsFinished && isDuringRestartOps {
-		if err := ojutils.FinishRestartLifecycle(p.Client, ojutils.RestartOpsLifecycleAdapter, candidate.Pod); err != nil {
-			return err
-		}
-		p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "RestartFinished", "pod %s/%s restart finished", candidate.Pod.Namespace, candidate.Pod.Name)
-	} else {
-		p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "WaitingRestartFinished", "waiting for pod %s/%s to restart finished", candidate.Pod.Namespace, candidate.Pod.Name)
-	}
-
-	return nil
+	return handler.DoRestartContainers(p.Context, p.Client, p.OperationJob, candidate, candidate.Containers)
 }
 
 func (p *ContainerRestartControl) FulfilTargetOpsStatus(candidate *OpsCandidate) error {
-	if IsCandidateOpsFinished(candidate) {
-		return nil
-	}
-
 	if candidate.Pod == nil {
 		MarkCandidateAsFailed(p.OperationJob, candidate, appsv1alpha1.ReasonPodNotFound, "")
 		return nil
@@ -173,10 +84,6 @@ func (p *ContainerRestartControl) ReleaseTarget(candidate *OpsCandidate) error {
 		return err
 	}
 
-	// cancel lifecycle if pod is during restart lifecycle
-	if podopslifecycle.IsDuringOps(ojutils.RestartOpsLifecycleAdapter, candidate.Pod) {
-		return ojutils.CancelOpsLifecycle(p.Context, p.Client, ojutils.RestartOpsLifecycleAdapter, candidate.Pod)
-	}
 	return nil
 }
 

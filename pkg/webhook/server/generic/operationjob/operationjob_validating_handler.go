@@ -110,13 +110,13 @@ func (h *ValidatingHandler) validateOpsTarget(instance, old *appsv1alpha1.Operat
 				cntSets.Insert(containerName)
 			}
 		} else if len(target.Containers) != 0 {
-			allErrors = append(allErrors, field.Invalid(fldPath, target.PodName, fmt.Sprintf("containerNames should be empty for %s action", instance.Spec.Action)))
+			allErrors = append(allErrors, field.Invalid(fldPath, target.Name, fmt.Sprintf("containerNames should be empty for %s action", instance.Spec.Action)))
 		}
 
-		if podSets.Has(target.PodName) {
-			allErrors = append(allErrors, field.Invalid(podFldPath, target.PodName, fmt.Sprintf("pod named %s exists multiple times", target.PodName)))
+		if podSets.Has(target.Name) {
+			allErrors = append(allErrors, field.Invalid(podFldPath, target.Name, fmt.Sprintf("pod named %s exists multiple times", target.Name)))
 		}
-		podSets.Insert(target.PodName)
+		podSets.Insert(target.Name)
 	}
 
 	if len(old.Spec.Targets) > 0 && !equality.Semantic.DeepEqual(instance.Spec.Targets, old.Spec.Targets) {

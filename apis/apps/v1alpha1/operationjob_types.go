@@ -81,7 +81,7 @@ type OperationJobSpec struct {
 type PodOpsTarget struct {
 	// Specify the operation target pods
 	// +optional
-	PodName string `json:"podName,omitempty"`
+	Name string `json:"name,omitempty"`
 
 	// Specify the containers to restart
 	// +optional
@@ -127,7 +127,7 @@ type OperationJobStatus struct {
 type OpsStatus struct {
 	// name of the target pod
 	// +optional
-	Name string `json:"podName,omitempty"`
+	Name string `json:"name,omitempty"`
 
 	// operation progress of target pod
 	// +optional

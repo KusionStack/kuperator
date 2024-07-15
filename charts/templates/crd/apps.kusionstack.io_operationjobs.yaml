@@ -79,7 +79,7 @@ spec:
                       items:
                         type: string
                       type: array
-                    podName:
+                    name:
                       description: Specify the operation target pods
                       type: string
                   type: object
@@ -120,7 +120,7 @@ spec:
                     message:
                       description: message displays detail of reason
                       type: string
-                    podName:
+                    name:
                       description: name of the target pod
                       type: string
                     progress:

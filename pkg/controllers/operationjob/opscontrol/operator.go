@@ -24,19 +24,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 )
 
 type ActionOperator interface {
-	ListTargets() ([]*OpsCandidate, error)
 	OperateTarget(*OpsCandidate) error
 	FulfilTargetOpsStatus(*OpsCandidate) error
 	ReleaseTarget(*OpsCandidate) error
 }
 
 type OperateInfo struct {
-	Context  context.Context
-	Logger   logr.Logger
-	Client   client.Client
-	Recorder record.EventRecorder
+	Context   context.Context
+	Logger    logr.Logger
+	Client    client.Client
+	Recorder  record.EventRecorder
+	Lifecycle podopslifecycle.LifecycleAdapter
 	*appsv1alpha1.OperationJob
 }

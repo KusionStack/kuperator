@@ -81,11 +81,11 @@ func controlledByOperationJob(c client.Client, pod *corev1.Pod) (sets.String, bo
 
 	for _, oj := range ojList.Items {
 		for _, target := range oj.Spec.Targets {
-			if pod.Name == target.PodName {
+			if pod.Name == target.Name {
 				ojNames.Insert(oj.Name)
 				break
 			}
-			if originPodName == target.PodName {
+			if originPodName == target.Name {
 				ojNames.Insert(oj.Name)
 				break
 			}
