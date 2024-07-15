@@ -44,7 +44,7 @@ func (h *ContainerRecreateRequestHandler) DoRestartContainers(
 	instance *appsv1alpha1.OperationJob,
 	candidate *opscontrol.OpsCandidate, containers []string) error {
 
-	crr, err := getCRRByOperationJobAndPod(ctx, client, instance, candidate.PodName)
+	_, err := getCRRByOperationJobAndPod(ctx, client, instance, candidate.PodName)
 	if errors.IsNotFound(err) {
 		var crrContainers []kruisev1alpha1.ContainerRecreateRequestContainer
 		for _, container := range containers {
@@ -54,7 +54,7 @@ func (h *ContainerRecreateRequestHandler) DoRestartContainers(
 			crrContainers = append(crrContainers, crrContainer)
 		}
 
-		crr = &kruisev1alpha1.ContainerRecreateRequest{
+		crr := &kruisev1alpha1.ContainerRecreateRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    instance.Namespace,
 				Name:         "",
