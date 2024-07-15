@@ -170,17 +170,16 @@ func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv
 	}
 
 	filteredCandidates := DecideCandidateByPartition(instance, candidates)
-	for _, candidate := range filteredCandidates {
+	_, opsErr := controllerutils.SlowStartBatch(len(filteredCandidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, err error) error {
+		candidate := filteredCandidates[i]
 		if err = operator.OperateTarget(candidate); err != nil {
 			return err
 		}
-		if err = operator.FulfilPodOpsStatus(candidate); err != nil {
-			return err
-		}
-	}
+		return operator.FulfilPodOpsStatus(candidate)
+	})
 
 	instance.Status = r.calculateStatus(instance, candidates)
-	return nil
+	return opsErr
 }
 
 func (r *ReconcileOperationJob) calculateStatus(instance *appsv1alpha1.OperationJob, candidates []*OpsCandidate) (jobStatus appsv1alpha1.OperationJobStatus) {
