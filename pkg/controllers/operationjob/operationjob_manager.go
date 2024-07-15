@@ -233,6 +233,9 @@ func (r *ReconcileOperationJob) ReleaseTargetsForDeletion(ctx context.Context, o
 
 	_, err = controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
+		if candidate.Pod == nil {
+			return nil
+		}
 		err := operator.ReleaseTarget(candidate)
 		// cancel lifecycle if pod is during ops lifecycle
 		if lifecycleAdapter != nil && podopslifecycle.IsDuringOps(lifecycleAdapter, candidate.Pod) {

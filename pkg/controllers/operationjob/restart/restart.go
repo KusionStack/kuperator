@@ -37,7 +37,7 @@ func (p *ContainerRestartControl) OperateTarget(candidate *OpsCandidate) error {
 	// get restart handler from pod's Anno, to do restart
 	handler, message := GetRestartHandlerFromPod(candidate.Pod)
 	if handler == nil {
-		MarkCandidateAsFailed(p.OperationJob, candidate, appsv1alpha1.ReasonInvalidRestartMethod, message)
+		MarkCandidateAsFailed(candidate, appsv1alpha1.ReasonInvalidRestartMethod, message)
 		return nil
 	}
 
@@ -46,19 +46,19 @@ func (p *ContainerRestartControl) OperateTarget(candidate *OpsCandidate) error {
 
 func (p *ContainerRestartControl) FulfilTargetOpsStatus(candidate *OpsCandidate) error {
 	if candidate.Pod == nil {
-		MarkCandidateAsFailed(p.OperationJob, candidate, appsv1alpha1.ReasonPodNotFound, "")
+		MarkCandidateAsFailed(candidate, appsv1alpha1.ReasonPodNotFound, "")
 		return nil
 	}
 
 	if containers, notFound := ojutils.ContainersNotFoundInPod(candidate.Pod, candidate.Containers); notFound {
-		MarkCandidateAsFailed(p.OperationJob, candidate, appsv1alpha1.ReasonContainerNotFound, fmt.Sprintf("Container named %v not found", containers))
+		MarkCandidateAsFailed(candidate, appsv1alpha1.ReasonContainerNotFound, fmt.Sprintf("Container named %v not found", containers))
 		return nil
 	}
 
 	// get restart handler from pod's Anno, to do restart
 	handler, message := GetRestartHandlerFromPod(candidate.Pod)
 	if handler == nil {
-		MarkCandidateAsFailed(p.OperationJob, candidate, appsv1alpha1.ReasonInvalidRestartMethod, message)
+		MarkCandidateAsFailed(candidate, appsv1alpha1.ReasonInvalidRestartMethod, message)
 		return nil
 	}
 
@@ -75,7 +75,7 @@ func (p *ContainerRestartControl) ReleaseTarget(candidate *OpsCandidate) error {
 	// get restart handler from pod's Anno, to do restart
 	handler, message := GetRestartHandlerFromPod(candidate.Pod)
 	if handler == nil {
-		MarkCandidateAsFailed(p.OperationJob, candidate, appsv1alpha1.ReasonInvalidRestartMethod, message)
+		MarkCandidateAsFailed(candidate, appsv1alpha1.ReasonInvalidRestartMethod, message)
 		return nil
 	}
 
@@ -85,12 +85,4 @@ func (p *ContainerRestartControl) ReleaseTarget(candidate *OpsCandidate) error {
 	}
 
 	return nil
-}
-
-func realValue(val *int32) int32 {
-	if val == nil {
-		return 0
-	}
-
-	return *val
 }

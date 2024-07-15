@@ -81,7 +81,7 @@ func IsCandidateOpsFinished(candidate *OpsCandidate) bool {
 		candidate.OpsStatus.Progress == appsv1alpha1.OperationProgressSucceeded
 }
 
-func MarkCandidateAsFailed(job *appsv1alpha1.OperationJob, candidate *OpsCandidate, reason appsv1alpha1.ReasonForOpsProgress, message string) {
+func MarkCandidateAsFailed(candidate *OpsCandidate, reason appsv1alpha1.ReasonForOpsProgress, message string) {
 	candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
 	candidate.OpsStatus.Reason = reason
 	if message != "" {
