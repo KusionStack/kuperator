@@ -38,7 +38,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	AlibabaCloudSlb:       {Default: false, PreRelease: featuregate.Alpha},
 	GraceDeleteWebhook:    {Default: false, PreRelease: featuregate.Alpha},
 	ReclaimPodToDelete:    {Default: true, PreRelease: featuregate.Alpha},
-	EnableKruiseToRestart: {Default: true, PreRelease: featuregate.Alpha},
+	EnableKruiseToRestart: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

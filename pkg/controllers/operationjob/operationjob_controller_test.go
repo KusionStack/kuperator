@@ -47,6 +47,8 @@ import (
 	"kusionstack.io/operating/pkg/controllers/collaset"
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 	"kusionstack.io/operating/pkg/controllers/poddeletion"
+	"kusionstack.io/operating/pkg/features"
+	"kusionstack.io/operating/pkg/utils/feature"
 	"kusionstack.io/operating/pkg/utils/inject"
 )
 
@@ -844,6 +846,8 @@ var _ = BeforeSuite(func() {
 	Expect(appsv1alpha1.SchemeBuilder.AddToScheme(sch)).NotTo(HaveOccurred())
 	Expect(kruisev1alpha1.AddToScheme(sch)).NotTo(HaveOccurred())
 
+	// set EnableKruiseToRestart=true
+	_ = feature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%s", features.EnableKruiseToRestart, "true"))
 	mgr, err = manager.New(config, manager.Options{
 		MetricsBindAddress: "0",
 		NewCache:           inject.NewCacheWithFieldIndex,
