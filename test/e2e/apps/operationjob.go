@@ -133,7 +133,7 @@ var _ = SIGDescribe("OperationJob", func() {
 			Eventually(func() error { return ojTester.ExpectOperationJobProgress(oj, appsv1alpha1.OperationProgressSucceeded) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
 			By("Check reason for Succeeded")
-			Expect(oj.Status.PodDetails[0].Reason).To(Equal(appsv1alpha1.ReasonPodNotFound))
+			Expect(oj.Status.TargetDetails[0].Reason).To(Equal(appsv1alpha1.ReasonPodNotFound))
 		})
 
 		framework.ConformanceIt("operationjob replace pod parallel", func() {
@@ -165,7 +165,7 @@ var _ = SIGDescribe("OperationJob", func() {
 			Eventually(func() error { return ojTester.ExpectOperationJobProgress(oj2, appsv1alpha1.OperationProgressSucceeded) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
 			By("Check replace new pod of OperationJobs")
-			Expect(oj1.Status.PodDetails[0].Message).To(Equal(oj2.Status.PodDetails[0].Message))
+			Expect(oj1.Status.TargetDetails[0].Message).To(Equal(oj2.Status.TargetDetails[0].Message))
 		})
 
 		framework.ConformanceIt("delete operationjob to cancel replace", func() {
@@ -356,7 +356,7 @@ var _ = SIGDescribe("OperationJob", func() {
 			Eventually(func() error { return ojTester.ExpectOperationJobProgress(oj, appsv1alpha1.OperationProgressFailed) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
 			By("Check reason for Failed")
-			Expect(oj.Status.PodDetails[0].Reason).To(Equal(appsv1alpha1.ReasonPodNotFound))
+			Expect(oj.Status.TargetDetails[0].Reason).To(Equal(appsv1alpha1.ReasonPodNotFound))
 		})
 
 		framework.ConformanceIt("operationjob activeDeadlineSeconds and TTLSecondsAfterFinished for restart", func() {

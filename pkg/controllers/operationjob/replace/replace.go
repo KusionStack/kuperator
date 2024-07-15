@@ -57,10 +57,10 @@ func (p *PodReplaceControl) ListTargets() ([]*OpsCandidate, error) {
 
 		// fulfil or initialize opsStatus and replaceNewPod
 		if opsStatus, exist := podOpsStatusMap[target.PodName]; exist {
-			candidate.PodOpsStatus = opsStatus
+			candidate.OpsStatus = opsStatus
 		} else {
-			candidate.PodOpsStatus = &appsv1alpha1.PodOpsStatus{
-				PodName:  target.PodName,
+			candidate.OpsStatus = &appsv1alpha1.OpsStatus{
+				Name:     target.PodName,
 				Progress: appsv1alpha1.OperationProgressPending,
 			}
 		}
@@ -81,7 +81,7 @@ func (p *PodReplaceControl) ListTargets() ([]*OpsCandidate, error) {
 func (p *PodReplaceControl) OperateTarget(candidate *OpsCandidate) error {
 	// mark candidate ops started is not started
 	if IsCandidateOpsPending(candidate) {
-		candidate.PodOpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
+		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 	}
 
 	// skip if candidate ops finished
@@ -111,7 +111,7 @@ func (p *PodReplaceControl) OperateTarget(candidate *OpsCandidate) error {
 	return nil
 }
 
-func (p *PodReplaceControl) FulfilPodOpsStatus(candidate *OpsCandidate) error {
+func (p *PodReplaceControl) FulfilTargetOpsStatus(candidate *OpsCandidate) error {
 	if IsCandidateOpsFinished(candidate) {
 		return nil
 	}
@@ -128,8 +128,8 @@ func (p *PodReplaceControl) FulfilPodOpsStatus(candidate *OpsCandidate) error {
 				if newPodId == newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] {
 					p.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "ReplaceNewPod", "replace by pod %s with operationjob %s", candidate.PodName, p.OperationJob.Name)
 					p.Recorder.Eventf(newPod, corev1.EventTypeNormal, "ReplaceOriginPod", "replace pod %s with operationjob %s", newPod.Name, p.OperationJob.Name)
-					candidate.PodOpsStatus.Reason = appsv1alpha1.ReasonReplacedByNewPod
-					candidate.PodOpsStatus.Message = newPod.Name
+					candidate.OpsStatus.Reason = appsv1alpha1.ReasonReplacedByNewPod
+					candidate.OpsStatus.Message = newPod.Name
 				}
 			}
 		}
@@ -137,12 +137,12 @@ func (p *PodReplaceControl) FulfilPodOpsStatus(candidate *OpsCandidate) error {
 
 	// origin pod is deleted not exist, mark as succeeded
 	if candidate.Pod == nil {
-		candidate.PodOpsStatus.Progress = appsv1alpha1.OperationProgressSucceeded
-		if candidate.PodOpsStatus.Reason != appsv1alpha1.ReasonReplacedByNewPod {
-			candidate.PodOpsStatus.Reason = appsv1alpha1.ReasonPodNotFound
+		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressSucceeded
+		if candidate.OpsStatus.Reason != appsv1alpha1.ReasonReplacedByNewPod {
+			candidate.OpsStatus.Reason = appsv1alpha1.ReasonPodNotFound
 		}
 	} else {
-		candidate.PodOpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
+		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 	}
 
 	return nil

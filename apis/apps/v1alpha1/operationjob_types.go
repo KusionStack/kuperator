@@ -121,13 +121,13 @@ type OperationJobStatus struct {
 
 	// Operation details of the target pods
 	// +optional
-	PodDetails []PodOpsStatus `json:"targetDetails,omitempty"`
+	TargetDetails []OpsStatus `json:"targetDetails,omitempty"`
 }
 
-type PodOpsStatus struct {
+type OpsStatus struct {
 	// name of the target pod
 	// +optional
-	PodName string `json:"podName,omitempty"`
+	Name string `json:"podName,omitempty"`
 
 	// operation progress of target pod
 	// +optional

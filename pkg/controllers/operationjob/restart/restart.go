@@ -64,10 +64,10 @@ func (p *ContainerRestartControl) ListTargets() ([]*OpsCandidate, error) {
 
 		// fulfil or initialize opsStatus
 		if opsStatus, exist := podOpsStatusMap[target.PodName]; exist {
-			candidate.PodOpsStatus = opsStatus
+			candidate.OpsStatus = opsStatus
 		} else {
-			candidate.PodOpsStatus = &appsv1alpha1.PodOpsStatus{
-				PodName:  target.PodName,
+			candidate.OpsStatus = &appsv1alpha1.OpsStatus{
+				Name:     target.PodName,
 				Progress: appsv1alpha1.OperationProgressPending,
 			}
 		}
@@ -80,7 +80,7 @@ func (p *ContainerRestartControl) ListTargets() ([]*OpsCandidate, error) {
 func (p *ContainerRestartControl) OperateTarget(candidate *OpsCandidate) error {
 	// mark candidate ops started is not started
 	if IsCandidateOpsPending(candidate) {
-		candidate.PodOpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
+		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 	}
 
 	// skip if candidate ops finished, or pod and containers do not exist
@@ -116,7 +116,7 @@ func (p *ContainerRestartControl) OperateTarget(candidate *OpsCandidate) error {
 	}
 
 	// if CRR completed or during updating opsLifecycle, try to finish Restart PodOpsLifeCycle
-	candidate.PodOpsStatus.Progress = handler.GetRestartProgress(p.Context, p.Client, p.OperationJob, candidate)
+	candidate.OpsStatus.Progress = handler.GetRestartProgress(p.Context, p.Client, p.OperationJob, candidate)
 	if isOpsFinished && isDuringRestartOps {
 		if err := ojutils.FinishRestartLifecycle(p.Client, ojutils.RestartOpsLifecycleAdapter, candidate.Pod); err != nil {
 			return err
@@ -129,7 +129,7 @@ func (p *ContainerRestartControl) OperateTarget(candidate *OpsCandidate) error {
 	return nil
 }
 
-func (p *ContainerRestartControl) FulfilPodOpsStatus(candidate *OpsCandidate) error {
+func (p *ContainerRestartControl) FulfilTargetOpsStatus(candidate *OpsCandidate) error {
 	if IsCandidateOpsFinished(candidate) {
 		return nil
 	}
@@ -152,7 +152,7 @@ func (p *ContainerRestartControl) FulfilPodOpsStatus(candidate *OpsCandidate) er
 	}
 
 	// calculate restart progress of podOpsStatus
-	candidate.PodOpsStatus.Progress = handler.GetRestartProgress(p.Context, p.Client, p.OperationJob, candidate)
+	candidate.OpsStatus.Progress = handler.GetRestartProgress(p.Context, p.Client, p.OperationJob, candidate)
 	return nil
 }
 

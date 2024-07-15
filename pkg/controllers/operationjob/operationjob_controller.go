@@ -175,7 +175,7 @@ func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv
 		if err = operator.OperateTarget(candidate); err != nil {
 			return err
 		}
-		return operator.FulfilPodOpsStatus(candidate)
+		return operator.FulfilTargetOpsStatus(candidate)
 	})
 
 	instance.Status = r.calculateStatus(instance, candidates)
@@ -192,11 +192,11 @@ func (r *ReconcileOperationJob) calculateStatus(instance *appsv1alpha1.Operation
 	}
 
 	for _, candidate := range candidates {
-		jobStatus.PodDetails = append(jobStatus.PodDetails, *candidate.PodOpsStatus)
+		jobStatus.TargetDetails = append(jobStatus.TargetDetails, *candidate.OpsStatus)
 	}
 
 	var totalPodCount, succeededPodCount, failedPodCount, pendingPodCount int32
-	for _, podDetail := range jobStatus.PodDetails {
+	for _, podDetail := range jobStatus.TargetDetails {
 		totalPodCount++
 
 		if podDetail.Progress == appsv1alpha1.OperationProgressFailed {

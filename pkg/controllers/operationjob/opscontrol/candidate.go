@@ -29,7 +29,7 @@ type OpsCandidate struct {
 	PodName    string
 	Containers []string
 	*appsv1alpha1.CollaSet
-	PodOpsStatus *appsv1alpha1.PodOpsStatus
+	OpsStatus *appsv1alpha1.OpsStatus
 }
 
 func DecideCandidateByPartition(instance *appsv1alpha1.OperationJob, candidates []*OpsCandidate) []*OpsCandidate {
@@ -67,24 +67,24 @@ func (o activeCandidateToStart) Less(i, j int) bool {
 }
 
 func IsCandidateOpsPending(candidate *OpsCandidate) bool {
-	if candidate.PodOpsStatus == nil || candidate.PodOpsStatus.Progress == "" {
+	if candidate.OpsStatus == nil || candidate.OpsStatus.Progress == "" {
 		return true
 	}
-	return candidate.PodOpsStatus.Progress == appsv1alpha1.OperationProgressPending
+	return candidate.OpsStatus.Progress == appsv1alpha1.OperationProgressPending
 }
 
 func IsCandidateOpsFinished(candidate *OpsCandidate) bool {
-	if candidate.PodOpsStatus == nil || candidate.PodOpsStatus.Progress == "" {
+	if candidate.OpsStatus == nil || candidate.OpsStatus.Progress == "" {
 		return false
 	}
-	return candidate.PodOpsStatus.Progress == appsv1alpha1.OperationProgressFailed ||
-		candidate.PodOpsStatus.Progress == appsv1alpha1.OperationProgressSucceeded
+	return candidate.OpsStatus.Progress == appsv1alpha1.OperationProgressFailed ||
+		candidate.OpsStatus.Progress == appsv1alpha1.OperationProgressSucceeded
 }
 
 func MarkCandidateAsFailed(job *appsv1alpha1.OperationJob, candidate *OpsCandidate, reason appsv1alpha1.ReasonForOpsProgress, message string) {
-	candidate.PodOpsStatus.Progress = appsv1alpha1.OperationProgressFailed
-	candidate.PodOpsStatus.Reason = reason
+	candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
+	candidate.OpsStatus.Reason = reason
 	if message != "" {
-		candidate.PodOpsStatus.Message = message
+		candidate.OpsStatus.Message = message
 	}
 }

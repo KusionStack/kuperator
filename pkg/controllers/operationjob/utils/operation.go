@@ -40,10 +40,10 @@ func MarkOperationJobFailed(instance *appsv1alpha1.OperationJob) {
 	}
 }
 
-func MapOpsStatusByPod(instance *appsv1alpha1.OperationJob) map[string]*appsv1alpha1.PodOpsStatus {
-	opsStatusMap := make(map[string]*appsv1alpha1.PodOpsStatus)
-	for i, opsStatus := range instance.Status.PodDetails {
-		opsStatusMap[opsStatus.PodName] = &instance.Status.PodDetails[i]
+func MapOpsStatusByPod(instance *appsv1alpha1.OperationJob) map[string]*appsv1alpha1.OpsStatus {
+	opsStatusMap := make(map[string]*appsv1alpha1.OpsStatus)
+	for i, opsStatus := range instance.Status.TargetDetails {
+		opsStatusMap[opsStatus.Name] = &instance.Status.TargetDetails[i]
 	}
 	return opsStatusMap
 }

@@ -29,7 +29,7 @@ import (
 type ActionOperator interface {
 	ListTargets() ([]*OpsCandidate, error)
 	OperateTarget(*OpsCandidate) error
-	FulfilPodOpsStatus(*OpsCandidate) error
+	FulfilTargetOpsStatus(*OpsCandidate) error
 	ReleaseTarget(*OpsCandidate) error
 }
 
