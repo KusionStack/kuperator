@@ -19,7 +19,6 @@ package opscontrol
 import (
 	"context"
 
-	"github.com/go-logr/logr"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -30,12 +29,4 @@ type ActionHandler interface {
 	OperateTarget(context.Context, client.Client, *appsv1alpha1.OperationJob, *OpsCandidate) error
 	FulfilTargetOpsStatus(context.Context, client.Client, *appsv1alpha1.OperationJob, record.EventRecorder, *OpsCandidate) error
 	ReleaseTarget(context.Context, client.Client, *appsv1alpha1.OperationJob, *OpsCandidate) error
-}
-
-type OperateInfo struct {
-	Context  context.Context
-	Logger   logr.Logger
-	Client   client.Client
-	Recorder record.EventRecorder
-	*appsv1alpha1.OperationJob
 }
