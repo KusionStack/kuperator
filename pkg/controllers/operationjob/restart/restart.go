@@ -102,16 +102,13 @@ func (p *KruiseRestartHandler) GetOpsProgress(
 	// get crr related to this candidate
 	crr, err := getCRRByOperationJobAndPod(ctx, c, operationJob, candidate.PodName)
 	if errors.IsNotFound(err) {
-		progress = appsv1alpha1.OperationProgressPending
-		// do not handle not found error
 		err = nil
 		return
 	} else if err != nil {
 		return
 	}
 
-	if crr.Status.Phase == kruisev1alpha1.ContainerRecreateRequestCompleted ||
-		crr.Status.Phase == kruisev1alpha1.ContainerRecreateRequestSucceeded {
+	if crr.Status.Phase == kruisev1alpha1.ContainerRecreateRequestCompleted || crr.Status.Phase == kruisev1alpha1.ContainerRecreateRequestSucceeded {
 		progress = appsv1alpha1.OperationProgressSucceeded
 	} else if crr.Status.Phase == kruisev1alpha1.ContainerRecreateRequestFailed {
 		progress = appsv1alpha1.OperationProgressFailed
@@ -134,7 +131,6 @@ func (p *KruiseRestartHandler) ReleaseTarget(ctx context.Context, c client.Clien
 	}
 
 	return c.Delete(ctx, crr)
-
 }
 
 func getCRRByOperationJobAndPod(ctx context.Context, c client.Client, instance *appsv1alpha1.OperationJob, podName string) (*kruisev1alpha1.ContainerRecreateRequest, error) {
