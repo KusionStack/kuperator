@@ -139,10 +139,12 @@ func (r *ReconcileOperationJob) operateTargets(
 		}
 
 		// 2. begin OpsLifecycle if necessary
-		if usingOpsLifecycle && !isOpsFinished && !isDuringOps {
-			r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "PodOpsLifecycle", "try to begin PodOpsLifecycle for %s", operationJob.Spec.Action)
-			if err := ojutils.BeginOperateLifecycle(r.Client, lifecycleAdapter, candidate.Pod); err != nil {
-				return err
+		if usingOpsLifecycle {
+			if !isOpsFinished && !isDuringOps {
+				r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "PodOpsLifecycle", "try to begin PodOpsLifecycle for %s", operationJob.Spec.Action)
+				if err := ojutils.BeginOperateLifecycle(r.Client, lifecycleAdapter, candidate.Pod); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -155,13 +157,15 @@ func (r *ReconcileOperationJob) operateTargets(
 		}
 
 		// 4. finish OpsLifecycle if operation is done
-		if usingOpsLifecycle && isOpsFinished && isDuringOps {
-			if err := ojutils.FinishOperateLifecycle(r.Client, restart.OpsLifecycleAdapter, candidate.Pod); err != nil {
-				return err
+		if usingOpsLifecycle {
+			if isOpsFinished && isDuringOps {
+				if err := ojutils.FinishOperateLifecycle(r.Client, restart.OpsLifecycleAdapter, candidate.Pod); err != nil {
+					return err
+				}
+				r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, fmt.Sprintf("%sOpsFinished", operationJob.Spec.Action), "pod %s/%s ops finished", candidate.Pod.Namespace, candidate.Pod.Name)
+			} else {
+				r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, fmt.Sprintf("Waiting%sOpsFinished", operationJob.Spec.Action), "waiting for pod %s/%s to ops finished", candidate.Pod.Namespace, candidate.Pod.Name)
 			}
-			r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, fmt.Sprintf("%sOpsFinished", operationJob.Spec.Action), "pod %s/%s ops finished", candidate.Pod.Namespace, candidate.Pod.Name)
-		} else {
-			r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, fmt.Sprintf("Waiting%sOpsFinished", operationJob.Spec.Action), "waiting for pod %s/%s to ops finished", candidate.Pod.Namespace, candidate.Pod.Name)
 		}
 
 		return nil
