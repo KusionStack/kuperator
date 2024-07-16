@@ -34,6 +34,8 @@ import (
 	"kusionstack.io/operating/pkg/utils/inject"
 )
 
+var _ ActionHandler = &KruiseRestartHandler{}
+
 type KruiseRestartHandler struct{}
 
 func (p *KruiseRestartHandler) OperateTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) error {

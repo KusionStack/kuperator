@@ -25,7 +25,7 @@ var actionRegistry map[string]ActionHandler
 var lifecycleAdapterRegistry map[string]podopslifecycle.LifecycleAdapter
 
 // RegisterAction will register an operationJob action with handler and lifecycleAdapter
-// NOTE: if the operation can be done without protection of podOpsLifecycle, just register lifecycleAdapter with 'nil'
+// Note: if lifecycleAdapter = nil, this operation will be done directly, ignoring podOpsLifecycle
 func RegisterAction(action string, handler ActionHandler, lifecycleAdapter podopslifecycle.LifecycleAdapter) {
 	if actionRegistry == nil {
 		actionRegistry = make(map[string]ActionHandler)

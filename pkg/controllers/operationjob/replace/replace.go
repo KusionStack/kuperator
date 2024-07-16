@@ -32,6 +32,8 @@ import (
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
 )
 
+var _ ActionHandler = &PodReplaceHandler{}
+
 type PodReplaceHandler struct {
 	PodControl podcontrol.Interface
 }
