@@ -77,8 +77,8 @@ func (p *PodReplaceHandler) GetOpsProgress(
 				if newPodId == newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] {
 					recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "ReplaceNewPod", "replace by pod %s with operationjob %s", candidate.PodName, operationJob.Name)
 					recorder.Eventf(newPod, corev1.EventTypeNormal, "ReplaceOriginPod", "replace pod %s with operationjob %s", newPod.Name, operationJob.Name)
-					candidate.OpsStatus.Reason = appsv1alpha1.ReasonReplacedByNewPod
-					candidate.OpsStatus.Message = newPod.Name
+					reason = appsv1alpha1.ReasonReplacedByNewPod
+					message = newPod.Name
 				}
 			}
 		}
