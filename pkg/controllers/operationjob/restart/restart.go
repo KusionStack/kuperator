@@ -78,34 +78,47 @@ func (p *KruiseRestartHandler) OperateTarget(ctx context.Context, c client.Clien
 	return nil
 }
 
-func (p *KruiseRestartHandler) FulfilTargetOpsStatus(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) error {
+func (p *KruiseRestartHandler) GetOpsProgress(
+	ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) (
+	progress appsv1alpha1.OperationProgress, reason string, message string, err error) {
+
+	progress = candidate.OpsStatus.Progress
+	reason = candidate.OpsStatus.Reason
+	message = candidate.OpsStatus.Message
+
 	if candidate.Pod == nil {
-		MarkCandidateAsFailed(candidate, appsv1alpha1.ReasonPodNotFound, "")
-		return nil
+		progress = appsv1alpha1.OperationProgressFailed
+		reason = appsv1alpha1.ReasonPodNotFound
+		return
 	}
 
 	if containers, notFound := ojutils.ContainersNotFoundInPod(candidate.Pod, candidate.Containers); notFound {
-		MarkCandidateAsFailed(candidate, appsv1alpha1.ReasonContainerNotFound, fmt.Sprintf("Container named %v not found", containers))
-		return nil
+		progress = appsv1alpha1.OperationProgressFailed
+		reason = appsv1alpha1.ReasonContainerNotFound
+		message = fmt.Sprintf("Container named %v not found", containers)
+		return
 	}
 
+	// get crr related to this candidate
 	crr, err := getCRRByOperationJobAndPod(ctx, c, operationJob, candidate.PodName)
 	if errors.IsNotFound(err) {
-		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressPending
-		return nil
+		progress = appsv1alpha1.OperationProgressPending
+		// do not handle not found error
+		err = nil
+		return
 	} else if err != nil {
-		return nil
+		return
 	}
 
 	if crr.Status.Phase == kruisev1alpha1.ContainerRecreateRequestCompleted ||
 		crr.Status.Phase == kruisev1alpha1.ContainerRecreateRequestSucceeded {
-		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressSucceeded
+		progress = appsv1alpha1.OperationProgressSucceeded
 	} else if crr.Status.Phase == kruisev1alpha1.ContainerRecreateRequestFailed {
-		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
+		progress = appsv1alpha1.OperationProgressFailed
 	} else {
-		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
+		progress = appsv1alpha1.OperationProgressProcessing
 	}
-	return nil
+	return
 }
 
 func (p *KruiseRestartHandler) ReleaseTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) error {

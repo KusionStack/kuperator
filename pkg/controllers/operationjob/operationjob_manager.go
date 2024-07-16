@@ -180,7 +180,9 @@ func (r *ReconcileOperationJob) fulfilTargetsOpsStatus(ctx context.Context, oper
 		if IsCandidateOpsFinished(candidate) {
 			return nil
 		}
-		return operator.FulfilTargetOpsStatus(ctx, r.Client, operationJob, r.Recorder, candidate)
+		progress, reason, message, err := operator.GetOpsProgress(ctx, r.Client, operationJob, r.Recorder, candidate)
+		FulfilCandidateStatus(candidate, progress, reason, message)
+		return err
 	})
 	return err
 }

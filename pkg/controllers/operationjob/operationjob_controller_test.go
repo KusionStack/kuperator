@@ -588,7 +588,7 @@ var _ = Describe("operationjob controller", func() {
 
 		Expect(c.Create(ctx, oj)).Should(BeNil())
 
-		// wait for replace failed after ActiveDeadlineSeconds
+		// wait for restart failed after ActiveDeadlineSeconds
 		assertJobProgressFailed(oj, time.Second*10)
 
 		// wait for operationJob deleted after TTL

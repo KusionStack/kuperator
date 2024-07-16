@@ -25,14 +25,10 @@ const (
 	OpsActionReplace = "Replace"
 )
 
-// ReasonForOpsProgress defines the reason of pod operation progress
-type ReasonForOpsProgress string
-
 const (
-	ReasonPodNotFound          ReasonForOpsProgress = "PodNotFound"
-	ReasonContainerNotFound    ReasonForOpsProgress = "ContainerNotFound"
-	ReasonReplacedByNewPod     ReasonForOpsProgress = "ReplacedByNewPod"
-	ReasonInvalidRestartMethod ReasonForOpsProgress = "InvalidRecreateMethod"
+	ReasonPodNotFound       = "PodNotFound"
+	ReasonContainerNotFound = "ContainerNotFound"
+	ReasonReplacedByNewPod  = "ReplacedByNewPod"
 )
 
 // OperationProgress indicates operation progress of pod
@@ -132,7 +128,7 @@ type OpsStatus struct {
 
 	// reason for current operation progress
 	// +optional
-	Reason ReasonForOpsProgress `json:"reason,omitempty"`
+	Reason string `json:"reason,omitempty"`
 
 	// message displays detail of reason
 	// +optional

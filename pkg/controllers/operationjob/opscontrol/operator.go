@@ -26,7 +26,13 @@ import (
 )
 
 type ActionHandler interface {
+	// OperateTarget do real operation to target, with protected by podOpsLifecycle
 	OperateTarget(context.Context, client.Client, *appsv1alpha1.OperationJob, record.EventRecorder, *OpsCandidate) error
-	FulfilTargetOpsStatus(context.Context, client.Client, *appsv1alpha1.OperationJob, record.EventRecorder, *OpsCandidate) error
+
+	// GetOpsProgress returns target's current opsStatus, e.g., progress, reason, message
+	GetOpsProgress(context.Context, client.Client, *appsv1alpha1.OperationJob, record.EventRecorder, *OpsCandidate) (
+		progress appsv1alpha1.OperationProgress, reason string, message string, err error)
+
+	// ReleaseTarget releases the target from operation when the operationJob is deleted
 	ReleaseTarget(context.Context, client.Client, *appsv1alpha1.OperationJob, record.EventRecorder, *OpsCandidate) error
 }

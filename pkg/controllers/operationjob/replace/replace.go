@@ -55,14 +55,21 @@ func (p *PodReplaceHandler) OperateTarget(ctx context.Context, c client.Client, 
 	return nil
 }
 
-func (p *PodReplaceHandler) FulfilTargetOpsStatus(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) error {
+func (p *PodReplaceHandler) GetOpsProgress(
+	ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) (
+	progress appsv1alpha1.OperationProgress, reason string, message string, err error) {
+
+	progress = candidate.OpsStatus.Progress
+	reason = candidate.OpsStatus.Reason
+	message = candidate.OpsStatus.Message
 	// try to find replaceNewPod
 	if candidate.Pod != nil && candidate.CollaSet != nil {
 		newPodId, exist := candidate.Pod.Labels[appsv1alpha1.PodReplacePairNewId]
 		if exist {
-			filteredPods, err := p.PodControl.GetFilteredPods(candidate.CollaSet.Spec.Selector, candidate.CollaSet)
+			var filteredPods []*corev1.Pod
+			filteredPods, err = p.PodControl.GetFilteredPods(candidate.CollaSet.Spec.Selector, candidate.CollaSet)
 			if err != nil {
-				return err
+				return
 			}
 			for _, newPod := range filteredPods {
 				if newPodId == newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] {
@@ -77,15 +84,14 @@ func (p *PodReplaceHandler) FulfilTargetOpsStatus(ctx context.Context, c client.
 
 	// origin pod is deleted not exist, mark as succeeded
 	if candidate.Pod == nil {
-		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressSucceeded
+		progress = appsv1alpha1.OperationProgressSucceeded
 		if candidate.OpsStatus.Reason != appsv1alpha1.ReasonReplacedByNewPod {
-			candidate.OpsStatus.Reason = appsv1alpha1.ReasonPodNotFound
+			reason = appsv1alpha1.ReasonPodNotFound
 		}
 	} else {
-		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
+		progress = appsv1alpha1.OperationProgressProcessing
 	}
-
-	return nil
+	return
 }
 
 func (p *PodReplaceHandler) ReleaseTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) error {
