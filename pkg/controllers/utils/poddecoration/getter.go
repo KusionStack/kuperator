@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/anno"
 	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/strategy"
 	"kusionstack.io/operating/pkg/utils"
 )
@@ -75,7 +76,7 @@ func (n *namespacedPodDecorationManager) GetLatestDecorations() []*appsv1alpha1.
 }
 
 func (n *namespacedPodDecorationManager) GetOnPod(ctx context.Context, pod *corev1.Pod) (map[string]*appsv1alpha1.PodDecoration, error) {
-	infos := GetDecorationRevisionInfo(pod)
+	infos := anno.GetDecorationRevisionInfo(pod)
 	var revisions []string
 	for _, info := range infos {
 		revisions = append(revisions, info.Revision)
@@ -102,7 +103,7 @@ func (n *namespacedPodDecorationManager) GetByRevisions(ctx context.Context, rev
 }
 
 func (n *namespacedPodDecorationManager) GetEffective(ctx context.Context, pod *corev1.Pod) (map[string]*appsv1alpha1.PodDecoration, error) {
-	infos := GetDecorationRevisionInfo(pod)
+	infos := anno.GetDecorationRevisionInfo(pod)
 	oldRevMap := map[string]string{}
 	for _, info := range infos {
 		oldRevMap[info.Name] = info.Revision
@@ -148,7 +149,7 @@ func (n *namespacedPodDecorationManager) getByRevision(ctx context.Context, rev 
 	if err := n.c.Get(ctx, types.NamespacedName{Namespace: n.namespace, Name: rev}, revision); err != nil {
 		return nil, fmt.Errorf("fail to get PodDecoration ControllerRevision %s/%s: %v", n.namespace, rev, err)
 	}
-	pd, err := GetPodDecorationFromRevision(revision)
+	pd, err := anno.GetPodDecorationFromRevision(revision)
 
 	if err != nil {
 		return nil, err

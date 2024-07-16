@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -333,13 +334,13 @@ func (pm *podDecorationManager) updateSelectedPods(ctx context.Context, pd *apps
 		}
 		_, ok := newEffectivePods[podName]
 		if !ok {
-			resource, err := getter.relatePodInfo(info)
+			resource, err := getter.relatePodInfo(info, pd.Name)
 			if err != nil {
 				return err
 			}
 			// Placeholder case: pod deleted but instanceId exists.
 			if resource.AllocatedIDs.Has(info.instanceId) {
-				info.isDeleted = true
+				info.state.IsDeleted = true
 				newEffectivePods[podName] = info
 			}
 		}
@@ -428,9 +429,11 @@ type relatedResource struct {
 	CollaSet        *appsv1alpha1.CollaSet
 	ResourceContext *appsv1alpha1.ResourceContext
 	AllocatedIDs    sets.String
+
+	CurrentResourceContextRevision map[string]string
 }
 
-func (r *podRelatedResourceGetter) relatedPod(po *corev1.Pod) (*relatedResource, error) {
+func (r *podRelatedResourceGetter) relatedPod(po *corev1.Pod, pdName string) (*relatedResource, error) {
 	if resource, ok := r.podResources[po.Name]; ok {
 		return resource, nil
 	}
@@ -444,7 +447,7 @@ func (r *podRelatedResourceGetter) relatedPod(po *corev1.Pod) (*relatedResource,
 		return resource, nil
 	}
 
-	resource, err := r.getResources(po.Namespace, ownerRef.Name)
+	resource, err := r.getResources(po.Namespace, ownerRef.Name, pdName)
 	if err != nil {
 		return nil, err
 	}
@@ -453,12 +456,12 @@ func (r *podRelatedResourceGetter) relatedPod(po *corev1.Pod) (*relatedResource,
 	return resource, nil
 }
 
-func (r *podRelatedResourceGetter) relatePodInfo(info *podInfo) (*relatedResource, error) {
+func (r *podRelatedResourceGetter) relatePodInfo(info *podInfo, pdName string) (*relatedResource, error) {
 	resource, ok := r.collaSetResources[info.collaSet]
 	if ok {
 		return resource, nil
 	}
-	resource, err := r.getResources(info.namespace, info.collaSet)
+	resource, err := r.getResources(info.namespace, info.collaSet, pdName)
 	if err != nil {
 		return nil, err
 	}
@@ -467,7 +470,7 @@ func (r *podRelatedResourceGetter) relatePodInfo(info *podInfo) (*relatedResourc
 	return resource, nil
 }
 
-func (r *podRelatedResourceGetter) getResources(namespace, collaSetName string) (*relatedResource, error) {
+func (r *podRelatedResourceGetter) getResources(namespace, collaSetName, pdName string) (*relatedResource, error) {
 	cls := &appsv1alpha1.CollaSet{}
 	if err := r.Get(r.ctx, types.NamespacedName{Namespace: namespace, Name: collaSetName}, cls); err != nil {
 		return nil, err
@@ -477,15 +480,16 @@ func (r *podRelatedResourceGetter) getResources(namespace, collaSetName string) 
 		return nil, err
 	}
 	resource := &relatedResource{
-		CollaSet:        cls,
-		ResourceContext: rc,
-		AllocatedIDs:    getAllocatedId(rc),
+		CollaSet:                       cls,
+		ResourceContext:                rc,
+		AllocatedIDs:                   getAllocatedId(rc),
+		CurrentResourceContextRevision: getUpdatedPodDecorationRevision(rc, pdName),
 	}
 	return resource, nil
 }
 
 func (r *podRelatedResourceGetter) buildPodInfo(pod *corev1.Pod, pd *appsv1alpha1.PodDecoration) (*podInfo, error) {
-	resource, err := r.relatedPod(pod)
+	resource, err := r.relatedPod(pod, pd.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -497,6 +501,11 @@ func (r *podRelatedResourceGetter) buildPodInfo(pod *corev1.Pod, pd *appsv1alpha
 		resourceContext: resource.ResourceContext.Name,
 		instanceId:      pod.Labels[appsv1alpha1.PodInstanceIDLabelKey],
 		revision:        pod.Labels[appsv1alpha1.PodDecorationLabelPrefix+pd.Name],
+	}
+	setPodState(pod, info)
+	info.state.IsCollaSetUpdatedRevision = resource.CollaSet.Status.UpdatedRevision == pod.Labels[appsv1.ControllerRevisionHashLabelKey]
+	if rev, ok := resource.CurrentResourceContextRevision[info.instanceId]; ok {
+		info.revision = rev
 	}
 	return info, nil
 }

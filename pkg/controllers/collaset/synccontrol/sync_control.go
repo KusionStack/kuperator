@@ -40,6 +40,7 @@ import (
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
 	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration"
+	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/anno"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/operating/pkg/features"
 	commonutils "kusionstack.io/operating/pkg/utils"
@@ -313,8 +314,9 @@ func (r *RealSyncControl) Scale(
 			needUpdateContext := false
 			succCount, err := controllerutils.SlowStartBatch(diff, controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) (err error) {
 				availableIDContext := availableContext[idx]
+				shouldInitPDContext := false
 				defer func() {
-					needUpdateContext = decideContextRevision(availableIDContext, resources.UpdatedRevision, err == nil)
+					needUpdateContext = decideContextRevision(availableIDContext, resources.UpdatedRevision, err == nil) || shouldInitPDContext
 				}()
 				// use revision recorded in Context
 				revision := resources.UpdatedRevision
@@ -342,9 +344,11 @@ func (r *RealSyncControl) Scale(
 							if localErr != nil {
 								return localErr
 							}
+							shouldInitPDContext = true
+							availableIDContext.Put(podcontext.PodDecorationRevisionKey, anno.GetDecorationInfoString(pds))
 						} else {
 							// upgrade by recreate pod case
-							infos, marshallErr := utilspoddecoration.UnmarshallFromString(revisionsInfo)
+							infos, marshallErr := anno.UnmarshallFromString(revisionsInfo)
 							if marshallErr != nil {
 								return marshallErr
 							}

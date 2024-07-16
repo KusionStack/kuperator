@@ -21,6 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/anno"
 	"kusionstack.io/operating/pkg/utils"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
@@ -71,6 +72,6 @@ func PatchListOfDecorations(pod *corev1.Pod, podDecorations map[string]*appsv1al
 			err = utils.Join(err, patchErr)
 		}
 	}
-	setDecorationInfo(pod, podDecorations)
+	anno.SetDecorationInfo(pod, podDecorations)
 	return
 }

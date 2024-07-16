@@ -41,7 +41,7 @@ import (
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
-	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration"
+	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration/anno"
 	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/strategy"
 	"kusionstack.io/operating/pkg/controllers/utils/revision"
 	"kusionstack.io/operating/pkg/utils"
