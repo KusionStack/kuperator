@@ -18,12 +18,14 @@ package opscontrol
 
 import "kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 
-// registry of operationjob.spec.action handler
+// registry map of operationjob.spec.action to actionHandler
 var actionRegistry map[string]ActionHandler
 
-// registry of operationjob.spec.action podOpsLifecycle
+// registry map of operationjob.spec.action to lifecycleAdapter
 var lifecycleAdapterRegistry map[string]podopslifecycle.LifecycleAdapter
 
+// RegisterAction will register an operationJob action with handler and lifecycleAdapter
+// NOTE: if the operation can be done without protection of podOpsLifecycle, just register lifecycleAdapter with 'nil'
 func RegisterAction(action string, handler ActionHandler, lifecycleAdapter podopslifecycle.LifecycleAdapter) {
 	if actionRegistry == nil {
 		actionRegistry = make(map[string]ActionHandler)
