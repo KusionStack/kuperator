@@ -87,8 +87,7 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to ContainerRecreateRequest if EnableKruiseToRestart (enabled by default)
-	// Add '--feature-gates=EnableKruiseToRestart=false' to container args to disable kruise restart method
+	// Add '--feature-gates=EnableKruiseToRestart=true' to container args to enable kruise restart, default false
 	if feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRestart) {
 		err = c.Watch(&source.Kind{Type: &kruisev1alpha1.ContainerRecreateRequest{}}, &handler.EnqueueRequestForOwner{
 			IsController: true,

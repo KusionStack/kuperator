@@ -30,7 +30,7 @@ const (
 	GraceDeleteWebhook featuregate.Feature = "GraceDeleteWebhook"
 	// ReclaimPodToDelete enables reclaim of collaset.spec.scaleStrategy.podToDelete
 	ReclaimPodToDelete featuregate.Feature = "ReclaimPodToDelete"
-	// EnableKruiseToRestart disable kruise to recreate containers
+	// EnableKruiseToRestart enable kruise to recreate containers
 	EnableKruiseToRestart featuregate.Feature = "EnableKruiseToRestart"
 )
 
