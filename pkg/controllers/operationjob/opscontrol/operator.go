@@ -26,7 +26,7 @@ import (
 )
 
 type ActionHandler interface {
-	OperateTarget(context.Context, client.Client, *appsv1alpha1.OperationJob, *OpsCandidate) error
+	OperateTarget(context.Context, client.Client, *appsv1alpha1.OperationJob, record.EventRecorder, *OpsCandidate) error
 	FulfilTargetOpsStatus(context.Context, client.Client, *appsv1alpha1.OperationJob, record.EventRecorder, *OpsCandidate) error
-	ReleaseTarget(context.Context, client.Client, *appsv1alpha1.OperationJob, *OpsCandidate) error
+	ReleaseTarget(context.Context, client.Client, *appsv1alpha1.OperationJob, record.EventRecorder, *OpsCandidate) error
 }

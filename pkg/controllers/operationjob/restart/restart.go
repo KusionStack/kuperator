@@ -36,7 +36,7 @@ import (
 
 type KruiseRestartHandler struct{}
 
-func (p *KruiseRestartHandler) OperateTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, candidate *OpsCandidate) error {
+func (p *KruiseRestartHandler) OperateTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) error {
 	// skip if containers do not exist
 	if _, containerNotFound := ojutils.ContainersNotFoundInPod(candidate.Pod, candidate.Containers); containerNotFound {
 		return nil
@@ -108,7 +108,7 @@ func (p *KruiseRestartHandler) FulfilTargetOpsStatus(ctx context.Context, c clie
 	return nil
 }
 
-func (p *KruiseRestartHandler) ReleaseTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, candidate *OpsCandidate) error {
+func (p *KruiseRestartHandler) ReleaseTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) error {
 	if candidate.Pod == nil {
 		return nil
 	}

@@ -36,7 +36,7 @@ type PodReplaceHandler struct {
 	PodControl podcontrol.Interface
 }
 
-func (p *PodReplaceHandler) OperateTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, candidate *OpsCandidate) error {
+func (p *PodReplaceHandler) OperateTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) error {
 	// parse replace information from origin pod
 	var replaceIndicated, replaceByReplaceUpdate, replaceNewPodExists bool
 	_, replaceIndicated = candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
@@ -88,7 +88,7 @@ func (p *PodReplaceHandler) FulfilTargetOpsStatus(ctx context.Context, c client.
 	return nil
 }
 
-func (p *PodReplaceHandler) ReleaseTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, candidate *OpsCandidate) error {
+func (p *PodReplaceHandler) ReleaseTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) error {
 	if candidate.Pod == nil || candidate.Pod.DeletionTimestamp != nil {
 		return nil
 	}

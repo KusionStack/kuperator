@@ -148,7 +148,7 @@ func (r *ReconcileOperationJob) operateTargets(
 
 		// 3. try to do real operation
 		if !isOpsFinished && isAllowedOps {
-			err := operator.OperateTarget(ctx, r.Client, operationJob, candidate)
+			err := operator.OperateTarget(ctx, r.Client, operationJob, r.Recorder, candidate)
 			if err != nil {
 				return err
 			}
@@ -233,7 +233,7 @@ func (r *ReconcileOperationJob) ReleaseTargetsForDeletion(ctx context.Context, o
 		if candidate.Pod == nil {
 			return nil
 		}
-		err := operator.ReleaseTarget(ctx, r.Client, operationJob, candidate)
+		err := operator.ReleaseTarget(ctx, r.Client, operationJob, r.Recorder, candidate)
 		// cancel lifecycle if pod is during ops lifecycle
 		if lifecycleAdapter != nil && podopslifecycle.IsDuringOps(lifecycleAdapter, candidate.Pod) {
 			return ojutils.CancelOpsLifecycle(ctx, r.Client, lifecycleAdapter, candidate.Pod)
