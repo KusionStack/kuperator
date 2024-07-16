@@ -32,11 +32,11 @@ import (
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
 )
 
-type PodReplaceControl struct {
+type PodReplaceHandler struct {
 	PodControl podcontrol.Interface
 }
 
-func (p *PodReplaceControl) OperateTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, candidate *OpsCandidate) error {
+func (p *PodReplaceHandler) OperateTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, candidate *OpsCandidate) error {
 	// parse replace information from origin pod
 	var replaceIndicated, replaceByReplaceUpdate, replaceNewPodExists bool
 	_, replaceIndicated = candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
@@ -55,7 +55,7 @@ func (p *PodReplaceControl) OperateTarget(ctx context.Context, c client.Client, 
 	return nil
 }
 
-func (p *PodReplaceControl) FulfilTargetOpsStatus(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) error {
+func (p *PodReplaceHandler) FulfilTargetOpsStatus(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) error {
 	// try to find replaceNewPod
 	if candidate.Pod != nil && candidate.CollaSet != nil {
 		newPodId, exist := candidate.Pod.Labels[appsv1alpha1.PodReplacePairNewId]
@@ -88,7 +88,7 @@ func (p *PodReplaceControl) FulfilTargetOpsStatus(ctx context.Context, c client.
 	return nil
 }
 
-func (p *PodReplaceControl) ReleaseTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, candidate *OpsCandidate) error {
+func (p *PodReplaceHandler) ReleaseTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, candidate *OpsCandidate) error {
 	if candidate.Pod == nil || candidate.Pod.DeletionTimestamp != nil {
 		return nil
 	}

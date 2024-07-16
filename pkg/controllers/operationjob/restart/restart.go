@@ -34,9 +34,9 @@ import (
 	"kusionstack.io/operating/pkg/utils/inject"
 )
 
-type ContainerRestartControl struct{}
+type KruiseRestartHandler struct{}
 
-func (p *ContainerRestartControl) OperateTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, candidate *OpsCandidate) error {
+func (p *KruiseRestartHandler) OperateTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, candidate *OpsCandidate) error {
 	// skip if containers do not exist
 	if _, containerNotFound := ojutils.ContainersNotFoundInPod(candidate.Pod, candidate.Containers); containerNotFound {
 		return nil
@@ -78,7 +78,7 @@ func (p *ContainerRestartControl) OperateTarget(ctx context.Context, c client.Cl
 	return nil
 }
 
-func (p *ContainerRestartControl) FulfilTargetOpsStatus(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) error {
+func (p *KruiseRestartHandler) FulfilTargetOpsStatus(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) error {
 	if candidate.Pod == nil {
 		MarkCandidateAsFailed(candidate, appsv1alpha1.ReasonPodNotFound, "")
 		return nil
@@ -94,7 +94,6 @@ func (p *ContainerRestartControl) FulfilTargetOpsStatus(ctx context.Context, c c
 		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressPending
 		return nil
 	} else if err != nil {
-		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
 		return nil
 	}
 
@@ -109,7 +108,7 @@ func (p *ContainerRestartControl) FulfilTargetOpsStatus(ctx context.Context, c c
 	return nil
 }
 
-func (p *ContainerRestartControl) ReleaseTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, candidate *OpsCandidate) error {
+func (p *KruiseRestartHandler) ReleaseTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, candidate *OpsCandidate) error {
 	if candidate.Pod == nil {
 		return nil
 	}
