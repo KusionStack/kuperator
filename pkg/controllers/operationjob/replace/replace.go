@@ -29,7 +29,7 @@ import (
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
-	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
+	. "kusionstack.io/operating/pkg/controllers/operationjob/opscore"
 )
 
 var _ ActionHandler = &PodReplaceHandler{}

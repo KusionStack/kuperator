@@ -14,38 +14,36 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package opscontrol
-
-import "kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
+package opscore
 
 // registry map of operationjob.spec.action to actionHandler
 var actionRegistry map[string]ActionHandler
 
-// registry map of operationjob.spec.action to lifecycleAdapter
-var lifecycleAdapterRegistry map[string]podopslifecycle.LifecycleAdapter
+// registry map of operationjob.spec.action to enablePodOpsLifecycle
+var enablePodOpsLifecycleRegistry map[string]bool
 
 // RegisterAction will register an operationJob action with handler and lifecycleAdapter
-// Note: if lifecycleAdapter = nil, this operation will be done directly, ignoring podOpsLifecycle
-func RegisterAction(action string, handler ActionHandler, lifecycleAdapter podopslifecycle.LifecycleAdapter) {
+// Note: if enablePodOpsLifecycle=false, this operation will be done directly, ignoring podOpsLifecycle
+func RegisterAction(action string, handler ActionHandler, enablePodOpsLifecycle bool) {
 	if actionRegistry == nil {
 		actionRegistry = make(map[string]ActionHandler)
 	}
 	actionRegistry[action] = handler
 
-	if lifecycleAdapterRegistry == nil {
-		lifecycleAdapterRegistry = make(map[string]podopslifecycle.LifecycleAdapter)
+	if enablePodOpsLifecycleRegistry == nil {
+		enablePodOpsLifecycleRegistry = make(map[string]bool)
 	}
-	lifecycleAdapterRegistry[action] = lifecycleAdapter
+	enablePodOpsLifecycleRegistry[action] = enablePodOpsLifecycle
 }
 
-func GetActionResources(action string) (ActionHandler, podopslifecycle.LifecycleAdapter) {
+func GetActionResources(action string) (ActionHandler, bool) {
 	var handler ActionHandler
-	var lifecycleAdapter podopslifecycle.LifecycleAdapter
+	var enablePodOpsLifecycle bool
 	if _, exist := actionRegistry[action]; exist {
 		handler = actionRegistry[action]
 	}
-	if _, exist := lifecycleAdapterRegistry[action]; exist {
-		lifecycleAdapter = lifecycleAdapterRegistry[action]
+	if _, exist := enablePodOpsLifecycleRegistry[action]; exist {
+		enablePodOpsLifecycle = enablePodOpsLifecycleRegistry[action]
 	}
-	return handler, lifecycleAdapter
+	return handler, enablePodOpsLifecycle
 }

@@ -27,8 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
-	. "kusionstack.io/operating/pkg/controllers/operationjob/opscontrol"
-	"kusionstack.io/operating/pkg/controllers/operationjob/restart"
+	. "kusionstack.io/operating/pkg/controllers/operationjob/opscore"
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
@@ -36,22 +35,22 @@ import (
 	"kusionstack.io/operating/pkg/utils/feature"
 )
 
-func (r *ReconcileOperationJob) newOperator(operationJob *appsv1alpha1.OperationJob) (ActionHandler, podopslifecycle.LifecycleAdapter, error) {
+func (r *ReconcileOperationJob) newOperator(operationJob *appsv1alpha1.OperationJob) (ActionHandler, bool, error) {
 	action := operationJob.Spec.Action
-	handler, lifecycleAdapter := GetActionResources(action)
+	handler, enablePodOpsLifecycle := GetActionResources(action)
 	if handler == nil {
 		errMsg := fmt.Sprintf("unsupported operation type! please register handler for action: %s", action)
 		r.Recorder.Eventf(operationJob, corev1.EventTypeWarning, "OpsAction", errMsg)
-		return nil, nil, fmt.Errorf(errMsg)
+		return nil, false, fmt.Errorf(errMsg)
 	}
 
 	if action == appsv1alpha1.OpsActionRestart && !feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRestart) {
 		errMsg := "please install kruise manager and set EnableKruiseToRestart=true"
 		r.Recorder.Eventf(operationJob, corev1.EventTypeWarning, "OpsAction", errMsg)
-		return nil, nil, fmt.Errorf(errMsg)
+		return nil, false, fmt.Errorf(errMsg)
 	}
 
-	return handler, lifecycleAdapter, nil
+	return handler, enablePodOpsLifecycle, nil
 }
 
 func (r *ReconcileOperationJob) listTargets(ctx context.Context, operationJob *appsv1alpha1.OperationJob) ([]*OpsCandidate, error) {
@@ -110,7 +109,7 @@ func (r *ReconcileOperationJob) operateTargets(
 	ctx context.Context,
 	operator ActionHandler,
 	candidates []*OpsCandidate,
-	lifecycleAdapter podopslifecycle.LifecycleAdapter,
+	enablePodOpsLifecycle bool,
 	operationJob *appsv1alpha1.OperationJob) error {
 
 	_, opsErr := controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
@@ -126,20 +125,19 @@ func (r *ReconcileOperationJob) operateTargets(
 
 		// 1. get operation stages
 		var isOpsFinished bool
-		var usingOpsLifecycle, isDuringOps, isAllowedOps bool
+		var isDuringOps, isAllowedOps bool
 		isOpsFinished = IsCandidateOpsFinished(candidate)
-		if lifecycleAdapter == nil {
-			// just ignore if not have OpsLifecycle, i.e., Replace.
-			usingOpsLifecycle = false
-			isAllowedOps = true
-		} else {
-			usingOpsLifecycle = true
+		lifecycleAdapter := NewLifecycleAdapter(operationJob.Spec.Action)
+		if enablePodOpsLifecycle {
 			isDuringOps = podopslifecycle.IsDuringOps(lifecycleAdapter, candidate.Pod)
-			_, isAllowedOps = podopslifecycle.AllowOps(restart.OpsLifecycleAdapter, realValue(operationJob.Spec.OperationDelaySeconds), candidate.Pod)
+			_, isAllowedOps = podopslifecycle.AllowOps(lifecycleAdapter, realValue(operationJob.Spec.OperationDelaySeconds), candidate.Pod)
+		} else {
+			// just ignore if not have OpsLifecycle, i.e., Replace.
+			isAllowedOps = true
 		}
 
 		// 2. begin OpsLifecycle if necessary
-		if usingOpsLifecycle {
+		if enablePodOpsLifecycle {
 			if !isOpsFinished && !isDuringOps {
 				r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "PodOpsLifecycle", "try to begin PodOpsLifecycle for %s", operationJob.Spec.Action)
 				if err := ojutils.BeginOperateLifecycle(r.Client, lifecycleAdapter, candidate.Pod); err != nil {
@@ -157,9 +155,9 @@ func (r *ReconcileOperationJob) operateTargets(
 		}
 
 		// 4. finish OpsLifecycle if operation is done
-		if usingOpsLifecycle {
+		if enablePodOpsLifecycle {
 			if isOpsFinished && isDuringOps {
-				if err := ojutils.FinishOperateLifecycle(r.Client, restart.OpsLifecycleAdapter, candidate.Pod); err != nil {
+				if err := ojutils.FinishOperateLifecycle(r.Client, lifecycleAdapter, candidate.Pod); err != nil {
 					return err
 				}
 				r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, fmt.Sprintf("%sOpsFinished", operationJob.Spec.Action), "pod %s/%s ops finished", candidate.Pod.Namespace, candidate.Pod.Name)
@@ -224,7 +222,7 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineOrTTL(ctx context.Context, o
 
 func (r *ReconcileOperationJob) ReleaseTargetsForDeletion(ctx context.Context, operationJob *appsv1alpha1.OperationJob, logger logr.Logger) error {
 	ojutils.MarkOperationJobFailed(operationJob)
-	operator, lifecycleAdapter, err := r.newOperator(operationJob)
+	operator, enablePodOpsLifecycle, err := r.newOperator(operationJob)
 	if err != nil {
 		return err
 	}
@@ -241,8 +239,11 @@ func (r *ReconcileOperationJob) ReleaseTargetsForDeletion(ctx context.Context, o
 		}
 		err := operator.ReleaseTarget(ctx, r.Client, operationJob, r.Recorder, candidate)
 		// cancel lifecycle if pod is during ops lifecycle
-		if lifecycleAdapter != nil && podopslifecycle.IsDuringOps(lifecycleAdapter, candidate.Pod) {
-			return ojutils.CancelOpsLifecycle(ctx, r.Client, lifecycleAdapter, candidate.Pod)
+		if enablePodOpsLifecycle {
+			lifecycleAdapter := NewLifecycleAdapter(operationJob.Spec.Action)
+			if podopslifecycle.IsDuringOps(lifecycleAdapter, candidate.Pod) {
+				return ojutils.CancelOpsLifecycle(ctx, r.Client, lifecycleAdapter, candidate.Pod)
+			}
 		}
 		return err
 	})

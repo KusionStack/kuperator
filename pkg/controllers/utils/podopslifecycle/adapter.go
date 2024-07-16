@@ -26,7 +26,6 @@ var (
 	OpsLifecycleTypeUpdate  OperationType = "update"
 	OpsLifecycleTypeScaleIn OperationType = "scale-in"
 	OpsLifecycleTypeDelete  OperationType = "delete"
-	OpsLifecycleTypeRestart OperationType = "restart"
 )
 
 type UpdateFunc func(object client.Object) (bool, error)
