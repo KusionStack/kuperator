@@ -70,7 +70,7 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 	allErrors = append(allErrors, h.validateTTLAndActiveDeadline(&obj, fldPath)...)
 	allErrors = append(allErrors, h.validateOpsTarget(&obj, &old, fldPath.Child("targets"))...)
 	if len(allErrors) > 0 {
-		return admission.ValidationResponse(false, allErrors.ToAggregate().Error())
+		return admission.Errored(http.StatusBadRequest, allErrors.ToAggregate())
 	}
 	return admission.ValidationResponse(true, "")
 }
