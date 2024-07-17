@@ -19,13 +19,13 @@ package restart
 import (
 	"fmt"
 
+	"github.com/go-logr/logr"
 	kruisev1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
@@ -38,7 +38,7 @@ var _ ActionHandler = &KruiseRestartHandler{}
 
 type KruiseRestartHandler struct{}
 
-func (p *KruiseRestartHandler) OperateTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) error {
+func (p *KruiseRestartHandler) OperateTarget(ctx context.Context, c client.Client, logger logr.Logger, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
 	// skip if containers do not exist
 	if _, containerNotFound := ojutils.ContainersNotFoundInPod(candidate.Pod, candidate.Containers); containerNotFound {
 		return nil
@@ -81,7 +81,7 @@ func (p *KruiseRestartHandler) OperateTarget(ctx context.Context, c client.Clien
 }
 
 func (p *KruiseRestartHandler) GetOpsProgress(
-	ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) (
+	ctx context.Context, c client.Client, logger logr.Logger, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) (
 	progress appsv1alpha1.OperationProgress, reason string, message string, err error) {
 
 	progress = candidate.OpsStatus.Progress
@@ -120,7 +120,7 @@ func (p *KruiseRestartHandler) GetOpsProgress(
 	return
 }
 
-func (p *KruiseRestartHandler) ReleaseTarget(ctx context.Context, c client.Client, operationJob *appsv1alpha1.OperationJob, recorder record.EventRecorder, candidate *OpsCandidate) error {
+func (p *KruiseRestartHandler) ReleaseTarget(ctx context.Context, c client.Client, logger logr.Logger, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
 	if candidate.Pod == nil {
 		return nil
 	}

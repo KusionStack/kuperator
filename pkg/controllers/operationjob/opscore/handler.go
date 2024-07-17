@@ -19,7 +19,7 @@ package opscore
 import (
 	"context"
 
-	"k8s.io/client-go/tools/record"
+	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
@@ -27,12 +27,12 @@ import (
 
 type ActionHandler interface {
 	// OperateTarget do real operation to target, with protected by podOpsLifecycle
-	OperateTarget(context.Context, client.Client, *appsv1alpha1.OperationJob, record.EventRecorder, *OpsCandidate) error
+	OperateTarget(context.Context, client.Client, logr.Logger, *OpsCandidate, *appsv1alpha1.OperationJob) error
 
 	// GetOpsProgress returns target's current opsStatus, e.g., progress, reason, message
-	GetOpsProgress(context.Context, client.Client, *appsv1alpha1.OperationJob, record.EventRecorder, *OpsCandidate) (
+	GetOpsProgress(context.Context, client.Client, logr.Logger, *OpsCandidate, *appsv1alpha1.OperationJob) (
 		progress appsv1alpha1.OperationProgress, reason string, message string, err error)
 
 	// ReleaseTarget releases the target from operation when the operationJob is deleted
-	ReleaseTarget(context.Context, client.Client, *appsv1alpha1.OperationJob, record.EventRecorder, *OpsCandidate) error
+	ReleaseTarget(context.Context, client.Client, logr.Logger, *OpsCandidate, *appsv1alpha1.OperationJob) error
 }
