@@ -174,10 +174,10 @@ func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv
 
 	// operate targets by partition
 	filteredCandidates := DecideCandidateByPartition(instance, candidates)
-	if err := r.operateTargets(ctx, operator, filteredCandidates, lifecycleAdapter, instance); err != nil {
+	if err := r.operateTargets(ctx, operator, logger, filteredCandidates, lifecycleAdapter, instance); err != nil {
 		return err
 	}
-	if err := r.fulfilTargetsOpsStatus(ctx, operator, filteredCandidates, instance); err != nil {
+	if err := r.fulfilTargetsOpsStatus(ctx, operator, logger, filteredCandidates, instance); err != nil {
 		return err
 	}
 

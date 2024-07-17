@@ -106,6 +106,7 @@ func (r *ReconcileOperationJob) listTargets(ctx context.Context, operationJob *a
 func (r *ReconcileOperationJob) operateTargets(
 	ctx context.Context,
 	operator ActionHandler,
+	logger logr.Logger,
 	candidates []*OpsCandidate,
 	enablePodOpsLifecycle bool,
 	operationJob *appsv1alpha1.OperationJob) error {
@@ -146,7 +147,7 @@ func (r *ReconcileOperationJob) operateTargets(
 
 		// 3. try to do real operation
 		if !isOpsFinished && isAllowedOps {
-			err := operator.OperateTarget(ctx, r.Client, r.Logger, candidate, operationJob)
+			err := operator.OperateTarget(ctx, r.Client, logger, candidate, operationJob)
 			if err != nil {
 				return err
 			}
@@ -170,13 +171,18 @@ func (r *ReconcileOperationJob) operateTargets(
 	return opsErr
 }
 
-func (r *ReconcileOperationJob) fulfilTargetsOpsStatus(ctx context.Context, operator ActionHandler, candidates []*OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
+func (r *ReconcileOperationJob) fulfilTargetsOpsStatus(
+	ctx context.Context,
+	operator ActionHandler,
+	logger logr.Logger,
+	candidates []*OpsCandidate,
+	operationJob *appsv1alpha1.OperationJob) error {
 	_, err := controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
 		if IsCandidateOpsFinished(candidate) {
 			return nil
 		}
-		progress, reason, message, err := operator.GetOpsProgress(ctx, r.Client, r.Logger, candidate, operationJob)
+		progress, reason, message, err := operator.GetOpsProgress(ctx, r.Client, logger, candidate, operationJob)
 		FulfilCandidateStatus(candidate, progress, reason, message)
 		return err
 	})
