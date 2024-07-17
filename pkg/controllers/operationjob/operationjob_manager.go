@@ -72,15 +72,13 @@ func (r *ReconcileOperationJob) listTargets(ctx context.Context, operationJob *a
 		}
 
 		// fulfil target containers
-		if operationJob.Spec.Action == appsv1alpha1.OpsActionRestart {
-			candidate.Containers = target.Containers
-			if len(target.Containers) == 0 && candidate.Pod != nil {
-				var containers []string
-				for _, container := range candidate.Pod.Spec.Containers {
-					containers = append(containers, container.Name)
-				}
-				candidate.Containers = containers
+		candidate.Containers = target.Containers
+		if len(target.Containers) == 0 && candidate.Pod != nil {
+			var containers []string
+			for _, container := range candidate.Pod.Spec.Containers {
+				containers = append(containers, container.Name)
 			}
+			candidate.Containers = containers
 		}
 
 		// fulfil or initialize opsStatus
