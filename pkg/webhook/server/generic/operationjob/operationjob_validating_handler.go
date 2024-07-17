@@ -65,6 +65,7 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 	}
 
 	fldPath := field.NewPath("spec")
+	allErrors = append(allErrors, h.validateOpsType(&obj, &old, fldPath)...)
 	allErrors = append(allErrors, h.validatePartition(&obj, &old, fldPath)...)
 	allErrors = append(allErrors, h.validateTTLAndActiveDeadline(&obj, fldPath)...)
 	allErrors = append(allErrors, h.validateOpsTarget(&obj, &old, fldPath.Child("targets"))...)
@@ -72,6 +73,17 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 		return admission.ValidationResponse(false, allErrors.ToAggregate().Error())
 	}
 	return admission.ValidationResponse(true, "")
+}
+
+func (h *ValidatingHandler) validateOpsType(instance, old *appsv1alpha1.OperationJob, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+	if instance.Spec.Action == "" {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("action"), instance.Spec.Action, "spec.action should not be empty"))
+	}
+	if old.Spec.Action != "" && old.Spec.Action != instance.Spec.Action {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("action"), instance.Spec.Action, "spec.action is immutable"))
+	}
+	return allErrors
 }
 
 func (h *ValidatingHandler) validateOpsTarget(instance, old *appsv1alpha1.OperationJob, fldPath *field.Path) field.ErrorList {
