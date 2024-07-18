@@ -42,6 +42,7 @@ import (
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
 	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration"
+	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/anno"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 	commonutils "kusionstack.io/operating/pkg/utils"
 )
@@ -399,9 +400,9 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(candidates []*PodUpdateInfo, owne
 		if !podInfo.OnlyMetadataChanged && !podInfo.InPlaceUpdateSupport {
 			ownedIDs[podInfo.ID].Put(podcontext.RecreateUpdateContextDataKey, "true")
 		}
-
+		//
 		if podInfo.PodDecorationChanged {
-			decorationStr := utilspoddecoration.GetDecorationInfoString(podInfo.UpdatedPodDecorations)
+			decorationStr := anno.GetDecorationInfoString(podInfo.UpdatedPodDecorations)
 			if val, ok := ownedIDs[podInfo.ID].Get(podcontext.PodDecorationRevisionKey); !ok || val != decorationStr {
 				needUpdateContext = true
 				ownedIDs[podInfo.ID].Put(podcontext.PodDecorationRevisionKey, decorationStr)
