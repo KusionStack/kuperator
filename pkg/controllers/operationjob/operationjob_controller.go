@@ -147,7 +147,7 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 		return reconcile.Result{}, err
 	}
 
-	jobDeleted, requeueAfter, err := r.ensureActiveDeadlineOrTTL(ctx, instance, logger)
+	jobDeleted, requeueAfter, err := r.ensureActiveDeadlineAndTTL(ctx, instance, logger)
 	if jobDeleted || err != nil {
 		return reconcile.Result{}, err
 	}
@@ -163,7 +163,7 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 }
 
 func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) error {
-	operator, lifecycleAdapter, err := r.newOperator(instance)
+	operator, lifecycleAdapter, err := r.getActionHandler(instance)
 	if err != nil {
 		return err
 	}

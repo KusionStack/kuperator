@@ -22,62 +22,34 @@ import (
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 )
 
-type GetID func() string
-type GetType func() podopslifecycle.OperationType
-type AllowMultiType func() bool
-type WhenBegin func(client.Object) (bool, error)
-type WhenFinish func(client.Object) (bool, error)
-
 type GenericLifecycleAdapter struct {
-	getID          GetID
-	getType        GetType
-	allowMultiType AllowMultiType
-	whenBegin      WhenBegin
-	whenFinish     WhenFinish
+	ID   string
+	Type podopslifecycle.OperationType
 }
 
 func (g GenericLifecycleAdapter) GetID() string {
-	return g.getID()
+	return g.ID
 }
 
 func (g GenericLifecycleAdapter) GetType() podopslifecycle.OperationType {
-	return g.getType()
+	return g.Type
 }
 
 func (g GenericLifecycleAdapter) AllowMultiType() bool {
-	return g.allowMultiType()
+	return true
 }
 
-func (g GenericLifecycleAdapter) WhenBegin(pod client.Object) (bool, error) {
-	return g.whenBegin(pod)
+func (g GenericLifecycleAdapter) WhenBegin(_ client.Object) (bool, error) {
+	return false, nil
 }
 
-func (g GenericLifecycleAdapter) WhenFinish(pod client.Object) (bool, error) {
-	return g.whenFinish(pod)
+func (g GenericLifecycleAdapter) WhenFinish(_ client.Object) (bool, error) {
+	return false, nil
 }
 
 func NewLifecycleAdapter(lifecycleID, lifecycleType string) podopslifecycle.LifecycleAdapter {
-	getID := func() string {
-		return lifecycleID
-	}
-	getType := func() podopslifecycle.OperationType {
-		return podopslifecycle.OperationType(lifecycleType)
-	}
-	allowMultiType := func() bool {
-		return true
-	}
-	whenBegin := func(_ client.Object) (bool, error) {
-		return false, nil
-	}
-	whenFinish := func(_ client.Object) (bool, error) {
-		return false, nil
-	}
-
 	return &GenericLifecycleAdapter{
-		getID:          getID,
-		getType:        getType,
-		allowMultiType: allowMultiType,
-		whenBegin:      whenBegin,
-		whenFinish:     whenFinish,
+		ID:   lifecycleID,
+		Type: podopslifecycle.OperationType(lifecycleType),
 	}
 }

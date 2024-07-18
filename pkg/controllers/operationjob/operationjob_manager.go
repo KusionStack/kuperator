@@ -35,7 +35,7 @@ import (
 	"kusionstack.io/operating/pkg/utils/feature"
 )
 
-func (r *ReconcileOperationJob) newOperator(operationJob *appsv1alpha1.OperationJob) (ActionHandler, bool, error) {
+func (r *ReconcileOperationJob) getActionHandler(operationJob *appsv1alpha1.OperationJob) (ActionHandler, bool, error) {
 	action := operationJob.Spec.Action
 	handler, enablePodOpsLifecycle := GetActionResources(action)
 	if handler == nil {
@@ -191,7 +191,7 @@ func (r *ReconcileOperationJob) fulfilTargetsOpsStatus(
 	return err
 }
 
-func (r *ReconcileOperationJob) ensureActiveDeadlineOrTTL(ctx context.Context, operationJob *appsv1alpha1.OperationJob, logger logr.Logger) (bool, *time.Duration, error) {
+func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, operationJob *appsv1alpha1.OperationJob, logger logr.Logger) (bool, *time.Duration, error) {
 	isFailed := operationJob.Status.Progress == appsv1alpha1.OperationProgressFailed
 	isSucceeded := operationJob.Status.Progress == appsv1alpha1.OperationProgressSucceeded
 
@@ -228,7 +228,7 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineOrTTL(ctx context.Context, o
 
 func (r *ReconcileOperationJob) ReleaseTargetsForDeletion(ctx context.Context, operationJob *appsv1alpha1.OperationJob, logger logr.Logger) error {
 	ojutils.MarkOperationJobFailed(operationJob)
-	operator, enablePodOpsLifecycle, err := r.newOperator(operationJob)
+	operator, enablePodOpsLifecycle, err := r.getActionHandler(operationJob)
 	if err != nil {
 		return err
 	}
