@@ -126,7 +126,7 @@ func (r *ReconcileOperationJob) operateTargets(
 		var isOpsFinished bool
 		var isDuringOps, isAllowedOps bool
 		isOpsFinished = IsCandidateOpsFinished(candidate)
-		lifecycleAdapter := NewLifecycleAdapter(operationJob.Spec.Action)
+		lifecycleAdapter := NewLifecycleAdapter(operationJob.Name, operationJob.Spec.Action)
 		if enablePodOpsLifecycle {
 			isDuringOps = podopslifecycle.IsDuringOps(lifecycleAdapter, candidate.Pod)
 			_, isAllowedOps = podopslifecycle.AllowOps(lifecycleAdapter, realValue(operationJob.Spec.OperationDelaySeconds), candidate.Pod)
@@ -183,7 +183,9 @@ func (r *ReconcileOperationJob) fulfilTargetsOpsStatus(
 			return nil
 		}
 		progress, reason, message, err := operator.GetOpsProgress(ctx, r.Client, logger, candidate, operationJob)
-		FulfilCandidateStatus(candidate, progress, reason, message)
+		if progress != appsv1alpha1.OperationProgressPending {
+			FulfilCandidateStatus(candidate, progress, reason, message)
+		}
 		return err
 	})
 	return err
@@ -244,7 +246,7 @@ func (r *ReconcileOperationJob) ReleaseTargetsForDeletion(ctx context.Context, o
 		err := operator.ReleaseTarget(ctx, r.Client, r.Logger, candidate, operationJob)
 		// cancel lifecycle if pod is during ops lifecycle
 		if enablePodOpsLifecycle {
-			lifecycleAdapter := NewLifecycleAdapter(operationJob.Spec.Action)
+			lifecycleAdapter := NewLifecycleAdapter(operationJob.Name, operationJob.Spec.Action)
 			if podopslifecycle.IsDuringOps(lifecycleAdapter, candidate.Pod) {
 				return ojutils.CancelOpsLifecycle(ctx, r.Client, lifecycleAdapter, candidate.Pod)
 			}

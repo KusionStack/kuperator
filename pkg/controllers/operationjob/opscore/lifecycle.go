@@ -56,12 +56,12 @@ func (g GenericLifecycleAdapter) WhenFinish(pod client.Object) (bool, error) {
 	return g.whenFinish(pod)
 }
 
-func NewLifecycleAdapter(action string) podopslifecycle.LifecycleAdapter {
+func NewLifecycleAdapter(lifecycleID, lifecycleType string) podopslifecycle.LifecycleAdapter {
 	getID := func() string {
-		return "operationjob"
+		return lifecycleID
 	}
 	getType := func() podopslifecycle.OperationType {
-		return podopslifecycle.OperationType(action)
+		return podopslifecycle.OperationType(lifecycleType)
 	}
 	allowMultiType := func() bool {
 		return true
