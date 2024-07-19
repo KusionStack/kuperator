@@ -60,10 +60,6 @@ func operatedByOperationJob(c client.Client, pod *corev1.Pod) (sets.String, bool
 		return ojNames, false
 	}
 
-	if pod.Labels == nil {
-		pod.Labels = map[string]string{}
-	}
-
 	for _, oj := range ojList.Items {
 		for _, target := range oj.Spec.Targets {
 			if pod.Name == target.Name {
