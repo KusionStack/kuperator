@@ -31,8 +31,6 @@ import (
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
-	"kusionstack.io/operating/pkg/features"
-	"kusionstack.io/operating/pkg/utils/feature"
 )
 
 func (r *ReconcileOperationJob) getActionHandler(operationJob *appsv1alpha1.OperationJob) (ActionHandler, bool, error) {
@@ -40,12 +38,6 @@ func (r *ReconcileOperationJob) getActionHandler(operationJob *appsv1alpha1.Oper
 	handler, enablePodOpsLifecycle := GetActionResources(action)
 	if handler == nil {
 		errMsg := fmt.Sprintf("unsupported operation type! please register handler for action: %s", action)
-		r.Recorder.Eventf(operationJob, corev1.EventTypeWarning, "OpsAction", errMsg)
-		return nil, false, fmt.Errorf(errMsg)
-	}
-
-	if action == appsv1alpha1.OpsActionRestart && !feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRestart) {
-		errMsg := "please install kruise manager and set EnableKruiseToRestart=true"
 		r.Recorder.Eventf(operationJob, corev1.EventTypeWarning, "OpsAction", errMsg)
 		return nil, false, fmt.Errorf(errMsg)
 	}

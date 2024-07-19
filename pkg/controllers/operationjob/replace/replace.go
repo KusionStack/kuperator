@@ -24,8 +24,12 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
@@ -36,6 +40,16 @@ var _ ActionHandler = &PodReplaceHandler{}
 
 type PodReplaceHandler struct {
 	PodControl podcontrol.Interface
+}
+
+func (p *PodReplaceHandler) Init(c client.Client, controller controller.Controller, _ *runtime.Scheme, _ cache.Cache) error {
+	// Watch for changes to replace new pods
+	err := controller.Watch(&source.Kind{Type: &corev1.Pod{}}, &OriginPodHandler{Client: c})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (p *PodReplaceHandler) OperateTarget(ctx context.Context, c client.Client, logger logr.Logger, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {

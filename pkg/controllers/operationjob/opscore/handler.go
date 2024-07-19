@@ -20,13 +20,19 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
 type ActionHandler interface {
-	// OperateTarget do real operation to target, with protected by podOpsLifecycle
+	// Init Initializes resources, i.e., watch resources related to action, inject cache index to runtime...
+	Init(client.Client, controller.Controller, *runtime.Scheme, cache.Cache) error
+
+	// OperateTarget does real operation to target
 	OperateTarget(context.Context, client.Client, logr.Logger, *OpsCandidate, *appsv1alpha1.OperationJob) error
 
 	// GetOpsProgress returns target's current opsStatus, e.g., progress, reason, message

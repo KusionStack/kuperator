@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	kruisev1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/types"
@@ -64,7 +63,9 @@ func Add(mgr ctrl.Manager) error {
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	reconcilerMixin := mixin.NewReconcilerMixin(controllerName, mgr)
 	// register Action: Restart and Replace
-	RegisterAction(appsv1alpha1.OpsActionRestart, &restart.KruiseRestartHandler{}, true)
+	if feature.DefaultMutableFeatureGate.Enabled(features.EnableKruiseToRestart) {
+		RegisterAction(appsv1alpha1.OpsActionRestart, &restart.KruiseRestartHandler{}, true)
+	}
 	RegisterAction(appsv1alpha1.OpsActionReplace, &replace.PodReplaceHandler{PodControl: podcontrol.NewRealPodControl(reconcilerMixin.Client, reconcilerMixin.Scheme)}, false)
 	return &ReconcileOperationJob{
 		ReconcilerMixin: reconcilerMixin,
@@ -87,22 +88,18 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to ContainerRecreateRequest
-	if feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRestart) {
-		err = c.Watch(&source.Kind{Type: &kruisev1alpha1.ContainerRecreateRequest{}}, &handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &appsv1alpha1.OperationJob{},
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	// Watch for changes to Pod
+	// Watch for changes to target pod
 	managerClient := mgr.GetClient()
 	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &PodHandler{Client: managerClient})
 	if err != nil {
 		return err
+	}
+
+	// Watch for changes to resources for actions
+	for _, actionHandler := range ActionRegistry {
+		if err = actionHandler.Init(managerClient, c, mgr.GetScheme(), mgr.GetCache()); err != nil {
+			return err
+		}
 	}
 
 	return nil

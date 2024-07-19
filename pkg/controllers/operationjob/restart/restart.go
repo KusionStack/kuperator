@@ -25,8 +25,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscore"
@@ -37,6 +43,35 @@ import (
 var _ ActionHandler = &KruiseRestartHandler{}
 
 type KruiseRestartHandler struct{}
+
+func (p *KruiseRestartHandler) Init(_ client.Client, controller controller.Controller, scheme *runtime.Scheme, injectCache cache.Cache) error {
+	// add crr to apiServer scheme
+	utilruntime.Must(kruisev1alpha1.AddToScheme(scheme))
+
+	// watch for changes to crr
+	err := controller.Watch(&source.Kind{Type: &kruisev1alpha1.ContainerRecreateRequest{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &appsv1alpha1.OperationJob{},
+	})
+	if err != nil {
+		return err
+	}
+
+	// inject crr into cache index
+	utilruntime.Must(injectCache.IndexField(
+		context.TODO(),
+		&kruisev1alpha1.ContainerRecreateRequest{},
+		inject.FieldIndexOwnerRefUID,
+		func(crr client.Object) []string {
+			ownerRef := metav1.GetControllerOf(crr)
+			if ownerRef == nil {
+				return nil
+			}
+			return []string{string(ownerRef.UID)}
+		}))
+
+	return nil
+}
 
 func (p *KruiseRestartHandler) OperateTarget(ctx context.Context, c client.Client, logger logr.Logger, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
 	// skip if containers do not exist

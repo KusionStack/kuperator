@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-	http://www.apache.org/licenses/LICENSE-2.0
+    http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package operationjob
+package replace
 
 import (
 	"context"
@@ -29,31 +29,31 @@ import (
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 )
 
-type PodHandler struct {
+type OriginPodHandler struct {
 	client.Client
 }
 
-func (p *PodHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (p *OriginPodHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	pod := evt.Object.(*corev1.Pod)
-	ojutils.EnqueueOperationJobFromPod(p.Client, pod, &q, operatedByOperationJob)
+	ojutils.EnqueueOperationJobFromPod(p.Client, pod, &q, replacedByOperationJob)
 }
 
-func (p *PodHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (p *OriginPodHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	pod := evt.Object.(*corev1.Pod)
-	ojutils.EnqueueOperationJobFromPod(p.Client, pod, &q, operatedByOperationJob)
+	ojutils.EnqueueOperationJobFromPod(p.Client, pod, &q, replacedByOperationJob)
 }
 
-func (p *PodHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (p *OriginPodHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	pod := evt.ObjectOld.(*corev1.Pod)
-	ojutils.EnqueueOperationJobFromPod(p.Client, pod, &q, operatedByOperationJob)
+	ojutils.EnqueueOperationJobFromPod(p.Client, pod, &q, replacedByOperationJob)
 }
 
-func (p *PodHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (p *OriginPodHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
 	pod := evt.Object.(*corev1.Pod)
-	ojutils.EnqueueOperationJobFromPod(p.Client, pod, &q, operatedByOperationJob)
+	ojutils.EnqueueOperationJobFromPod(p.Client, pod, &q, replacedByOperationJob)
 }
 
-func operatedByOperationJob(c client.Client, pod *corev1.Pod) (sets.String, bool) {
+func replacedByOperationJob(c client.Client, pod *corev1.Pod) (sets.String, bool) {
 	ojNames := sets.String{}
 	ojList := &appsv1alpha1.OperationJobList{}
 	if listErr := c.List(context.TODO(), ojList, client.InNamespace(pod.Namespace)); listErr != nil {
@@ -63,10 +63,11 @@ func operatedByOperationJob(c client.Client, pod *corev1.Pod) (sets.String, bool
 	if pod.Labels == nil {
 		pod.Labels = map[string]string{}
 	}
+	originPodName := pod.Labels[appsv1alpha1.PodReplacePairOriginName]
 
 	for _, oj := range ojList.Items {
 		for _, target := range oj.Spec.Targets {
-			if pod.Name == target.Name {
+			if originPodName == target.Name {
 				ojNames.Insert(oj.Name)
 				break
 			}

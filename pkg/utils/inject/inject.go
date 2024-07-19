@@ -19,7 +19,6 @@ package inject
 import (
 	"context"
 
-	kruisev1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,8 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/features"
-	"kusionstack.io/operating/pkg/utils/feature"
 )
 
 const (
@@ -107,19 +104,5 @@ func NewCacheWithFieldIndex(config *rest.Config, opts cache.Options) (cache.Cach
 			return
 		}))
 
-	if feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRestart) {
-		runtime.Must(c.IndexField(
-			context.TODO(),
-			&kruisev1alpha1.ContainerRecreateRequest{},
-			FieldIndexOwnerRefUID,
-			func(crr client.Object) []string {
-				ownerRef := metav1.GetControllerOf(crr)
-				if ownerRef == nil {
-					return nil
-				}
-				return []string{string(ownerRef.UID)}
-			}))
-
-	}
 	return c, nil
 }

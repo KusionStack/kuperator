@@ -16,34 +16,34 @@ limitations under the License.
 
 package opscore
 
-// registry map of operationjob.spec.action to actionHandler
-var actionRegistry map[string]ActionHandler
+// ActionRegistry is a map of operationjob.spec.action to actionHandler
+var ActionRegistry map[string]ActionHandler
 
-// registry map of operationjob.spec.action to enablePodOpsLifecycle
-var enablePodOpsLifecycleRegistry map[string]bool
+// EnablePodOpsLifecycleRegistry is a map of operationjob.spec.action to enablePodOpsLifecycle
+var EnablePodOpsLifecycleRegistry map[string]bool
 
 // RegisterAction will register an operationJob action with handler and lifecycleAdapter
 // Note: if enablePodOpsLifecycle=false, this operation will be done directly, ignoring podOpsLifecycle
 func RegisterAction(action string, handler ActionHandler, enablePodOpsLifecycle bool) {
-	if actionRegistry == nil {
-		actionRegistry = make(map[string]ActionHandler)
+	if ActionRegistry == nil {
+		ActionRegistry = make(map[string]ActionHandler)
 	}
-	actionRegistry[action] = handler
+	ActionRegistry[action] = handler
 
-	if enablePodOpsLifecycleRegistry == nil {
-		enablePodOpsLifecycleRegistry = make(map[string]bool)
+	if EnablePodOpsLifecycleRegistry == nil {
+		EnablePodOpsLifecycleRegistry = make(map[string]bool)
 	}
-	enablePodOpsLifecycleRegistry[action] = enablePodOpsLifecycle
+	EnablePodOpsLifecycleRegistry[action] = enablePodOpsLifecycle
 }
 
 func GetActionResources(action string) (ActionHandler, bool) {
 	var handler ActionHandler
 	var enablePodOpsLifecycle bool
-	if _, exist := actionRegistry[action]; exist {
-		handler = actionRegistry[action]
+	if _, exist := ActionRegistry[action]; exist {
+		handler = ActionRegistry[action]
 	}
-	if _, exist := enablePodOpsLifecycleRegistry[action]; exist {
-		enablePodOpsLifecycle = enablePodOpsLifecycleRegistry[action]
+	if _, exist := EnablePodOpsLifecycleRegistry[action]; exist {
+		enablePodOpsLifecycle = EnablePodOpsLifecycleRegistry[action]
 	}
 	return handler, enablePodOpsLifecycle
 }

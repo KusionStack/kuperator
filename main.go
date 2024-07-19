@@ -22,7 +22,6 @@ import (
 	"os"
 	"path/filepath"
 
-	kruisev1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/spf13/pflag"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -35,7 +34,6 @@ import (
 	"kusionstack.io/operating/apis"
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers"
-	"kusionstack.io/operating/pkg/features"
 	"kusionstack.io/operating/pkg/utils/feature"
 	"kusionstack.io/operating/pkg/utils/inject"
 	"kusionstack.io/operating/pkg/webhook"
@@ -78,10 +76,6 @@ func main() {
 	pflag.Parse()
 
 	ctrl.SetLogger(klogr.New())
-
-	if feature.DefaultFeatureGate.Enabled(features.EnableKruiseToRestart) {
-		utilruntime.Must(kruisev1alpha1.AddToScheme(scheme))
-	}
 
 	config := ctrl.GetConfigOrDie()
 	mgr, err := ctrl.NewManager(config, ctrl.Options{

@@ -23,7 +23,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscore"
@@ -89,6 +91,19 @@ func GetCollaSetByPod(ctx context.Context, client client.Client, instance *appsv
 	}
 
 	return &collaSet, nil
+}
+
+func EnqueueOperationJobFromPod(c client.Client, pod *corev1.Pod, q *workqueue.RateLimitingInterface, fn func(client.Client, *corev1.Pod) (sets.String, bool)) {
+	if ojNames, owned := fn(c, pod); owned {
+		for ojName := range ojNames {
+			(*q).Add(reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: pod.Namespace,
+					Name:      ojName,
+				},
+			})
+		}
+	}
 }
 
 func IsJobFinished(instance *appsv1alpha1.OperationJob) bool {
