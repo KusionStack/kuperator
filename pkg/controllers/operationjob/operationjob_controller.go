@@ -62,14 +62,18 @@ func Add(mgr ctrl.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	reconcilerMixin := mixin.NewReconcilerMixin(controllerName, mgr)
-	// register Action: Restart and Replace
+	return &ReconcileOperationJob{
+		ReconcilerMixin: reconcilerMixin,
+	}
+}
+
+// RegisterOperationJobActions register actions for operationJob
+func RegisterOperationJobActions(mgr manager.Manager) {
+	reconcilerMixin := mixin.NewReconcilerMixin("operationjob", mgr)
 	if feature.DefaultMutableFeatureGate.Enabled(features.EnableKruiseToRestart) {
 		RegisterAction(appsv1alpha1.OpsActionRestart, &restart.KruiseRestartHandler{}, true)
 	}
 	RegisterAction(appsv1alpha1.OpsActionReplace, &replace.PodReplaceHandler{PodControl: podcontrol.NewRealPodControl(reconcilerMixin.Client, reconcilerMixin.Scheme)}, false)
-	return &ReconcileOperationJob{
-		ReconcilerMixin: reconcilerMixin,
-	}
 }
 
 func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
