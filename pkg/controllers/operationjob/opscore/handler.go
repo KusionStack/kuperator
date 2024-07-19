@@ -32,7 +32,7 @@ type ActionHandler interface {
 	// Init Initializes resources, i.e., watch resources related to action, inject cache index to runtime...
 	Init(client.Client, controller.Controller, *runtime.Scheme, cache.Cache) error
 
-	// OperateTarget does real operation to target
+	// OperateTarget do real operation to target
 	OperateTarget(context.Context, client.Client, logr.Logger, *OpsCandidate, *appsv1alpha1.OperationJob) error
 
 	// GetOpsProgress returns target's current opsStatus, e.g., progress, reason, message
