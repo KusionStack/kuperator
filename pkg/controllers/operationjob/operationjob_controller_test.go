@@ -863,7 +863,7 @@ var _ = BeforeSuite(func() {
 
 	// operationJob controller
 	r, request = testReconcile(NewReconciler(mgr))
-	RegisterOperationJobActions(mgr)
+	RegisterOperationJobActions(mgr.GetClient(), mgr.GetScheme())
 	err = AddToMgr(mgr, r)
 	Expect(err).NotTo(HaveOccurred())
 	// collaset controller

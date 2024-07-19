@@ -33,16 +33,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscore"
-	"kusionstack.io/operating/pkg/controllers/operationjob/replace"
-	"kusionstack.io/operating/pkg/controllers/operationjob/restart"
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	ctrlutils "kusionstack.io/operating/pkg/controllers/utils"
-	"kusionstack.io/operating/pkg/features"
 	"kusionstack.io/operating/pkg/utils"
-	"kusionstack.io/operating/pkg/utils/feature"
 	"kusionstack.io/operating/pkg/utils/mixin"
 )
 
@@ -65,15 +60,6 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileOperationJob{
 		ReconcilerMixin: reconcilerMixin,
 	}
-}
-
-// RegisterOperationJobActions register actions for operationJob
-func RegisterOperationJobActions(mgr manager.Manager) {
-	reconcilerMixin := mixin.NewReconcilerMixin("operationjob", mgr)
-	if feature.DefaultMutableFeatureGate.Enabled(features.EnableKruiseToRestart) {
-		RegisterAction(appsv1alpha1.OpsActionRestart, &restart.KruiseRestartHandler{}, true)
-	}
-	RegisterAction(appsv1alpha1.OpsActionReplace, &replace.PodReplaceHandler{PodControl: podcontrol.NewRealPodControl(reconcilerMixin.Client, reconcilerMixin.Scheme)}, false)
 }
 
 func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {

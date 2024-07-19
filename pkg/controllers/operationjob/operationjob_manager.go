@@ -24,15 +24,31 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscore"
+	"kusionstack.io/operating/pkg/controllers/operationjob/replace"
+	"kusionstack.io/operating/pkg/controllers/operationjob/restart"
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/operating/pkg/features"
+	"kusionstack.io/operating/pkg/utils/feature"
 )
 
+// RegisterOperationJobActions register actions for operationJob
+func RegisterOperationJobActions(c client.Client, scheme *runtime.Scheme) {
+	if feature.DefaultMutableFeatureGate.Enabled(features.EnableKruiseToRestart) {
+		RegisterAction(appsv1alpha1.OpsActionRestart, &restart.KruiseRestartHandler{}, true)
+	}
+	RegisterAction(appsv1alpha1.OpsActionReplace, &replace.PodReplaceHandler{PodControl: podcontrol.NewRealPodControl(c, scheme)}, false)
+}
+
+// getActionHandler get actions registered for operationJob
 func (r *ReconcileOperationJob) getActionHandler(operationJob *appsv1alpha1.OperationJob) (ActionHandler, bool, error) {
 	action := operationJob.Spec.Action
 	handler, enablePodOpsLifecycle := GetActionResources(action)

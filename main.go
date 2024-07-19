@@ -112,7 +112,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	operationjob.RegisterOperationJobActions(mgr)
+	operationjob.RegisterOperationJobActions(mgr.GetClient(), mgr.GetScheme())
 
 	if err = controllers.AddToManager(mgr); err != nil {
 		setupLog.Error(err, "unable to add controller")
