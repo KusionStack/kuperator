@@ -3,6 +3,7 @@ module kusionstack.io/operating
 go 1.19
 
 require (
+	github.com/docker/distribution v2.8.2+incompatible
 	github.com/evanphx/json-patch v4.11.0+incompatible
 	github.com/go-logr/logr v1.2.4
 	github.com/google/uuid v1.3.0
@@ -25,8 +26,6 @@ require (
 	kusionstack.io/resourceconsist v0.0.1
 	sigs.k8s.io/controller-runtime v0.15.1
 )
-
-require github.com/docker/distribution v2.8.2+incompatible // indirect
 
 require (
 	cloud.google.com/go v0.65.0 // indirect
