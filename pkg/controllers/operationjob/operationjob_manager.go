@@ -32,19 +32,13 @@ import (
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscore"
 	"kusionstack.io/operating/pkg/controllers/operationjob/replace"
-	"kusionstack.io/operating/pkg/controllers/operationjob/restart"
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
-	"kusionstack.io/operating/pkg/features"
-	"kusionstack.io/operating/pkg/utils/feature"
 )
 
 // RegisterOperationJobActions register actions for operationJob
 func RegisterOperationJobActions(c client.Client, scheme *runtime.Scheme) {
-	if feature.DefaultMutableFeatureGate.Enabled(features.EnableKruiseToRestart) {
-		RegisterAction(appsv1alpha1.OpsActionRestart, &restart.KruiseRestartHandler{}, true)
-	}
 	RegisterAction(appsv1alpha1.OpsActionReplace, &replace.PodReplaceHandler{PodControl: podcontrol.NewRealPodControl(c, scheme)}, false)
 }
 

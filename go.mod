@@ -8,7 +8,6 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.26.0
-	github.com/openkruise/kruise v1.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.16.0
 	github.com/spf13/pflag v1.0.5
@@ -22,6 +21,7 @@ require (
 	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.110.1
 	k8s.io/kubernetes v1.22.6
+	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	kusionstack.io/resourceconsist v0.0.1
 	sigs.k8s.io/controller-runtime v0.15.1
 )
@@ -29,63 +29,7 @@ require (
 require (
 	cloud.google.com/go/compute v1.21.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
-	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
-	github.com/Microsoft/go-winio v0.6.1 // indirect
-	github.com/Microsoft/hcsshim v0.8.24 // indirect
-	github.com/alibaba/pouch v0.0.0-20190328125340-37051654f368 // indirect
-	github.com/appscode/jsonpatch v1.0.1 // indirect
-	github.com/asaskevich/govalidator v0.0.0-20200907205600-7a23bdc65eef // indirect
-	github.com/containerd/cgroups v1.0.3 // indirect
-	github.com/containerd/console v1.0.3 // indirect
-	github.com/containerd/containerd v1.5.16 // indirect
-	github.com/containerd/continuity v0.3.0 // indirect
-	github.com/containerd/fifo v1.0.0 // indirect
-	github.com/containerd/ttrpc v1.1.0 // indirect
-	github.com/containerd/typeurl v1.0.2 // indirect
-	github.com/contiv/executor v0.0.0-20180626233236-d263f4daa3ad // indirect
 	github.com/docker/distribution v2.8.2+incompatible // indirect
-	github.com/docker/docker v24.0.0+incompatible // indirect
-	github.com/docker/go-connections v0.4.0 // indirect
-	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
-	github.com/docker/go-units v0.5.0 // indirect
-	github.com/go-openapi/analysis v0.21.2 // indirect
-	github.com/go-openapi/errors v0.20.2 // indirect
-	github.com/go-openapi/jsonpointer v0.19.6 // indirect
-	github.com/go-openapi/jsonreference v0.20.2 // indirect
-	github.com/go-openapi/loads v0.21.1 // indirect
-	github.com/go-openapi/spec v0.20.4 // indirect
-	github.com/go-openapi/strfmt v0.21.2 // indirect
-	github.com/go-openapi/swag v0.22.3 // indirect
-	github.com/go-openapi/validate v0.21.0 // indirect
-	github.com/go-stack/stack v1.8.0 // indirect
-	github.com/gogo/googleapis v1.4.0 // indirect
-	github.com/josharian/intern v1.0.0 // indirect
-	github.com/klauspost/compress v1.16.5 // indirect
-	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/mitchellh/mapstructure v1.4.1 // indirect
-	github.com/moby/locker v1.0.1 // indirect
-	github.com/moby/spdystream v0.2.0 // indirect
-	github.com/moby/sys/mountinfo v0.6.2 // indirect
-	github.com/moby/term v0.0.0-20221205130635-1aeaba878587 // indirect
-	github.com/morikuni/aec v1.0.0 // indirect
-	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/opencontainers/image-spec v1.1.0-rc3 // indirect
-	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 // indirect
-	github.com/opencontainers/selinux v1.10.0 // indirect
-	github.com/sirupsen/logrus v1.9.1 // indirect
-	go.mongodb.org/mongo-driver v1.7.5 // indirect
-	go.opencensus.io v0.24.0 // indirect
-	golang.org/x/mod v0.10.0 // indirect
-	golang.org/x/sync v0.3.0 // indirect
-	golang.org/x/tools v0.9.1 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
-	google.golang.org/grpc v1.58.3 // indirect
-	k8s.io/cloud-provider v0.22.6 // indirect
-	k8s.io/cri-api v0.22.6 // indirect
-	k8s.io/gengo v0.0.0-20201214224949-b6c5ce23f027 // indirect
-	k8s.io/kube-scheduler v0.22.6 // indirect
-	k8s.io/mount-utils v0.22.6 // indirect
-	k8s.io/utils v0.0.0-20230726121419-3b25d923346b // indirect
 )
 
 require (

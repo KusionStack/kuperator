@@ -67,7 +67,6 @@ spec:
         - "--health-probe-bind-address=:8081"
         - "--metrics-bind-address=127.0.0.1:8080"
         - "-v=4"
-        - "--feature-gates=EnableKruiseToRestart=true,"
         name: manager
         env:
         - name: POD_NAMESPACE

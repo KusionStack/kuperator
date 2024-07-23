@@ -23,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	kruisev1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 
@@ -70,11 +69,6 @@ func TestMain(m *testing.M) {
 func TestE2E(t *testing.T) {
 
 	err := apis.AddToScheme(scheme.Scheme)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = kruisev1alpha1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		t.Fatal(err)
 	}

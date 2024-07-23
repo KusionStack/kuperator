@@ -7,7 +7,6 @@ resources:
 - bases/apps.kusionstack.io_resourcecontexts.yaml
 - bases/apps.kusionstack.io_poddecorations.yaml
 - bases/apps.kusionstack.io_operationjobs.yaml
-- externals/apps.kruise.io_containerrecreaterequests.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

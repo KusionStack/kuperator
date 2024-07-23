@@ -30,15 +30,12 @@ const (
 	GraceDeleteWebhook featuregate.Feature = "GraceDeleteWebhook"
 	// ReclaimPodToDelete enables reclaim of collaset.spec.scaleStrategy.podToDelete
 	ReclaimPodToDelete featuregate.Feature = "ReclaimPodToDelete"
-	// EnableKruiseToRestart enable kruise to recreate containers
-	EnableKruiseToRestart featuregate.Feature = "EnableKruiseToRestart"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	AlibabaCloudSlb:       {Default: false, PreRelease: featuregate.Alpha},
-	GraceDeleteWebhook:    {Default: false, PreRelease: featuregate.Alpha},
-	ReclaimPodToDelete:    {Default: true, PreRelease: featuregate.Alpha},
-	EnableKruiseToRestart: {Default: false, PreRelease: featuregate.Alpha},
+	AlibabaCloudSlb:    {Default: false, PreRelease: featuregate.Alpha},
+	GraceDeleteWebhook: {Default: false, PreRelease: featuregate.Alpha},
+	ReclaimPodToDelete: {Default: true, PreRelease: featuregate.Alpha},
 }
 
 func init() {

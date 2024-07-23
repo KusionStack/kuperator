@@ -28,7 +28,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	kruisev1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -45,10 +44,7 @@ import (
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset"
-	"kusionstack.io/operating/pkg/controllers/operationjob/opscore"
 	"kusionstack.io/operating/pkg/controllers/poddeletion"
-	"kusionstack.io/operating/pkg/features"
-	"kusionstack.io/operating/pkg/utils/feature"
 	"kusionstack.io/operating/pkg/utils/inject"
 )
 
@@ -63,195 +59,6 @@ var (
 )
 
 var _ = Describe("operationjob controller", func() {
-
-	It("[restart] reconcile", func() {
-		testcase := "test-restart"
-		Expect(createNamespace(c, testcase)).Should(BeNil())
-		cs := createCollaSetWithReplicas("foo", testcase, 2)
-		podNames := getPodNamesFromCollaSet(cs)
-
-		oj := &appsv1alpha1.OperationJob{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: testcase,
-				Name:      "foo",
-			},
-			Spec: appsv1alpha1.OperationJobSpec{
-				Action: appsv1alpha1.OpsActionRestart,
-				Targets: []appsv1alpha1.PodOpsTarget{
-					{
-						Name: podNames[0],
-					},
-					{
-						Name: podNames[1],
-					},
-				},
-			},
-		}
-
-		Expect(c.Create(ctx, oj)).Should(BeNil())
-
-		// mock lifecycle pod is allowed to restart
-		podList := &corev1.PodList{}
-		Eventually(func() int {
-			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-			return len(podList.Items)
-		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
-		for i := range podList.Items {
-			pod := podList.Items[i]
-			Expect(updatePodWithRetry(pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				lifecycleAdapter := opscore.NewLifecycleAdapter(oj.Name, oj.Spec.Action)
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, lifecycleAdapter.GetID())
-				pod.Labels[labelOperate] = "true"
-				return true
-			})).Should(BeNil())
-		}
-
-		// wait for crr created
-		var crrList kruisev1alpha1.ContainerRecreateRequestList
-		Eventually(func() int {
-			Expect(c.List(ctx, &crrList, client.InNamespace(oj.Namespace))).Should(BeNil())
-			return len(crrList.Items)
-		}, time.Second*10, time.Second).Should(BeEquivalentTo(2))
-
-		// mock crr as completed
-		for i := range crrList.Items {
-			crr := crrList.Items[i]
-			Expect(updateCrrWithRetry(crr.Namespace, crr.Name, func(crr *kruisev1alpha1.ContainerRecreateRequest) bool {
-				status := kruisev1alpha1.ContainerRecreateRequestStatus{
-					Phase: kruisev1alpha1.ContainerRecreateRequestCompleted,
-					ContainerRecreateStates: []kruisev1alpha1.ContainerRecreateRequestContainerRecreateState{
-						{
-							Name:  "foo",
-							Phase: kruisev1alpha1.ContainerRecreateRequestCompleted,
-						},
-					},
-				}
-				crr.Status = status
-				return true
-			})).Should(BeNil())
-		}
-
-		// wait for replace completed
-		assertJobProgressSucceeded(oj, time.Second*5)
-	})
-
-	It("[restart] by partition", func() {
-		testcase := "test-restart-by-partition"
-		Expect(createNamespace(c, testcase)).Should(BeNil())
-		cs := createCollaSetWithReplicas("foo", testcase, 3)
-		podNames := getPodNamesFromCollaSet(cs)
-
-		oj := &appsv1alpha1.OperationJob{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: testcase,
-				Name:      "foo",
-			},
-			Spec: appsv1alpha1.OperationJobSpec{
-				Action:    appsv1alpha1.OpsActionRestart,
-				Partition: int32Pointer(0),
-				Targets: []appsv1alpha1.PodOpsTarget{
-					{
-						Name: podNames[0],
-					},
-					{
-						Name: podNames[1],
-					},
-					{
-						Name: podNames[2],
-					},
-				},
-			},
-		}
-
-		Expect(c.Create(ctx, oj)).Should(BeNil())
-
-		// mock lifecycle pod is allowed to restart
-		podList := &corev1.PodList{}
-		Eventually(func() int {
-			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-			return len(podList.Items)
-		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(3))
-		for i := range podList.Items {
-			pod := podList.Items[i]
-			Expect(updatePodWithRetry(pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				lifecycleAdapter := opscore.NewLifecycleAdapter(oj.Name, oj.Spec.Action)
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, lifecycleAdapter.GetID())
-				pod.Labels[labelOperate] = "true"
-				return true
-			})).Should(BeNil())
-		}
-
-		for _, partition := range []int32{0, 1, 2, 3} {
-			// update partition
-			Eventually(func() error {
-				return c.Get(context.TODO(), types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
-			}, time.Second*5, time.Second).Should(BeNil())
-			Expect(updateOperationJobWithRetry(oj.Namespace, oj.Name, func(job *appsv1alpha1.OperationJob) bool {
-				job.Spec.Partition = &partition
-				return true
-			})).Should(BeNil())
-
-			// wait for crr created
-			var crrList kruisev1alpha1.ContainerRecreateRequestList
-			Eventually(func() int {
-				Expect(c.List(ctx, &crrList, client.InNamespace(oj.Namespace))).Should(BeNil())
-				return len(crrList.Items)
-			}, time.Second*10, time.Second).Should(BeEquivalentTo(partition))
-
-			// mock crr as completed
-			for i := range crrList.Items {
-				crr := crrList.Items[i]
-				Expect(updateCrrWithRetry(crr.Namespace, crr.Name, func(crr *kruisev1alpha1.ContainerRecreateRequest) bool {
-					status := kruisev1alpha1.ContainerRecreateRequestStatus{
-						Phase: kruisev1alpha1.ContainerRecreateRequestCompleted,
-						ContainerRecreateStates: []kruisev1alpha1.ContainerRecreateRequestContainerRecreateState{
-							{
-								Name:  "foo",
-								Phase: kruisev1alpha1.ContainerRecreateRequestCompleted,
-							},
-						},
-					}
-					crr.Status = status
-					return true
-				})).Should(BeNil())
-			}
-
-			// assert operation progress
-			assertSucceededReplicas(oj, partition, time.Second*5)
-			if partition == 0 {
-				assertJobProgressPending(oj, time.Second*5)
-			} else if partition < 3 {
-				assertJobProgressProcessing(oj, time.Second*5)
-			} else {
-				assertJobProgressSucceeded(oj, time.Second*5)
-			}
-		}
-	})
-
-	It("[restart] non-exist pod", func() {
-		testcase := "test-restart-non-exist-pod"
-		Expect(createNamespace(c, testcase)).Should(BeNil())
-
-		oj := &appsv1alpha1.OperationJob{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: testcase,
-				Name:      "foo",
-			},
-			Spec: appsv1alpha1.OperationJobSpec{
-				Action: appsv1alpha1.OpsActionRestart,
-				Targets: []appsv1alpha1.PodOpsTarget{
-					{
-						Name: "non-exist",
-					},
-				},
-			},
-		}
-
-		Expect(c.Create(ctx, oj)).Should(BeNil())
-
-		// wait for replace completed
-		assertJobProgressFailed(oj, time.Second*5)
-	})
 
 	It("[replace] reconcile", func() {
 		testcase := "test-replace"
@@ -574,7 +381,7 @@ var _ = Describe("operationjob controller", func() {
 				Name:      "foo",
 			},
 			Spec: appsv1alpha1.OperationJobSpec{
-				Action: appsv1alpha1.OpsActionRestart,
+				Action: appsv1alpha1.OpsActionReplace,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
 						Name: podNames[0],
@@ -590,7 +397,7 @@ var _ = Describe("operationjob controller", func() {
 
 		Expect(c.Create(ctx, oj)).Should(BeNil())
 
-		// wait for restart failed after ActiveDeadlineSeconds
+		// wait for replace failed after ActiveDeadlineSeconds
 		assertJobProgressFailed(oj, time.Second*10)
 
 		// wait for operationJob deleted after TTL
@@ -694,21 +501,6 @@ func updatePodWithRetry(namespace, name string, updateFn func(*corev1.Pod) bool)
 		}
 
 		return c.Update(ctx, pod)
-	})
-}
-
-func updateCrrWithRetry(namespace, name string, updateFn func(*kruisev1alpha1.ContainerRecreateRequest) bool) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		crr := &kruisev1alpha1.ContainerRecreateRequest{}
-		if err := c.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: name}, crr); err != nil {
-			return err
-		}
-
-		if !updateFn(crr) {
-			return nil
-		}
-
-		return c.Status().Update(ctx, crr)
 	})
 }
 
@@ -846,10 +638,7 @@ var _ = BeforeSuite(func() {
 	sch := scheme.Scheme
 	Expect(appsv1.SchemeBuilder.AddToScheme(sch)).NotTo(HaveOccurred())
 	Expect(appsv1alpha1.SchemeBuilder.AddToScheme(sch)).NotTo(HaveOccurred())
-	Expect(kruisev1alpha1.AddToScheme(sch)).NotTo(HaveOccurred())
 
-	// set EnableKruiseToRestart=true
-	_ = feature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%s", features.EnableKruiseToRestart, "true"))
 	mgr, err = manager.New(config, manager.Options{
 		MetricsBindAddress: "0",
 		NewCache:           inject.NewCacheWithFieldIndex,

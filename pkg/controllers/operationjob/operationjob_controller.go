@@ -98,9 +98,6 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 // +kubebuilder:rbac:groups=apps.kusionstack.io,resources=operationjobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kusionstack.io,resources=operationjobs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kusionstack.io,resources=operationjobs/finalizers,verbs=get;update;patch
-// +kubebuilder:rbac:groups=apps.kruise.io,resources=containerrecreaterequests,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps.kruise.io,resources=containerrecreaterequests/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=apps.kruise.io,resources=containerrecreaterequests/finalizers,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch
