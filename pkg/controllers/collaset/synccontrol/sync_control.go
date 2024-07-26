@@ -679,8 +679,14 @@ func (r *RealSyncControl) Update(
 			"onlyMetadataChanged", podInfo.OnlyMetadataChanged,
 		)
 
-		if err = updater.UpgradePod(podInfo); err != nil {
-			return err
+		if podInfo.isInReplacing {
+			if err = updateReplaceOriginPod(ctx, r.client, r.recorder, podInfo, podInfo.replacePairNewPodInfo, resources.UpdatedRevision); err != nil {
+				return err
+			}
+		} else {
+			if err = updater.UpgradePod(podInfo); err != nil {
+				return err
+			}
 		}
 
 		return nil

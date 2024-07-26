@@ -22,12 +22,14 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
@@ -215,16 +217,10 @@ func dealReplacePods(pods []*corev1.Pod, instance *appsv1alpha1.CollaSet) (needR
 
 		needReplacePods = append(needReplacePods, pod)
 	}
-	isReplaceUpdate := instance.Spec.UpdateStrategy.PodUpdatePolicy == appsv1alpha1.CollaSetReplacePodUpdateStrategyType
-	// deal pods need to delete when pod update strategy is not replace update
 
 	for _, pod := range pods {
-		_, inReplace := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
 		_, replaceByUpdate := pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
 		var needCleanLabels []string
-		if inReplace && replaceByUpdate && !isReplaceUpdate {
-			needCleanLabels = []string{appsv1alpha1.PodReplaceIndicationLabelKey, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey}
-		}
 
 		// pod is replace new created pod, skip replace
 		if originPodName, exist := pod.Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
@@ -245,10 +241,8 @@ func dealReplacePods(pods []*corev1.Pod, instance *appsv1alpha1.CollaSet) (needR
 		}
 
 		if newPairPodId, exist := pod.Labels[appsv1alpha1.PodReplacePairNewId]; exist {
-			if newPod, exist := podInstanceIdMap[newPairPodId]; !exist {
+			if _, exist := podInstanceIdMap[newPairPodId]; !exist {
 				needCleanLabels = append(needCleanLabels, appsv1alpha1.PodReplacePairNewId)
-			} else if replaceByUpdate && !isReplaceUpdate {
-				needDeletePods = append(needDeletePods, newPod)
 			}
 		}
 
@@ -259,6 +253,57 @@ func dealReplacePods(pods []*corev1.Pod, instance *appsv1alpha1.CollaSet) (needR
 	}
 
 	return
+}
+
+func updateReplaceOriginPod(
+	ctx context.Context,
+	c client.Client,
+	recorder record.EventRecorder,
+	originPodUpdateInfo, newPodUpdateInfo *PodUpdateInfo,
+	updatedRevision *appsv1.ControllerRevision) error {
+
+	originPod := originPodUpdateInfo.Pod
+	// 1. delete the new pod if not updated
+	if newPodUpdateInfo != nil {
+		newPod := newPodUpdateInfo.Pod
+		_, deletionIndicate := newPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]
+		currentRevision, exist := newPod.Labels[appsv1.ControllerRevisionHashLabelKey]
+		if exist && currentRevision != updatedRevision.Name && !deletionIndicate {
+			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%d"}}}`, appsv1alpha1.PodDeletionIndicationLabelKey, time.Now().UnixNano())))
+			if patchErr := c.Patch(ctx, newPod, patch); patchErr != nil {
+				err := fmt.Errorf("failed to delete replace pair new pod %s/%s %s",
+					newPod.Namespace, newPod.Name, patchErr)
+				return err
+			}
+			recorder.Eventf(originPod,
+				corev1.EventTypeNormal,
+				"DeleteOldNewPod",
+				"succeed to delete replace new Pod %s/%s by label to-replace",
+				originPod.Namespace,
+				originPod.Name,
+			)
+		}
+	}
+
+	// 2. replace the origin pod with updated pod
+	_, replaceIndicate := originPod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
+	_, replaceByUpdate := originPod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
+	if !replaceIndicate || !replaceByUpdate {
+		now := time.Now().UnixNano()
+		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v", "%s": "%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, now, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey, true)))
+		if err := c.Patch(ctx, originPod, patch); err != nil {
+			return fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %s", originPod.Namespace, originPod.Name, err)
+		}
+		recorder.Eventf(originPod,
+			corev1.EventTypeNormal,
+			"UpdateOriginPod",
+			"succeed to update Pod %s/%s by label to-replace",
+			originPod.Namespace,
+			originPod.Name,
+		)
+	}
+
+	return nil
 }
 
 func getReplaceRevision(originPod *corev1.Pod, resources *collasetutils.RelatedResources) *appsv1.ControllerRevision {

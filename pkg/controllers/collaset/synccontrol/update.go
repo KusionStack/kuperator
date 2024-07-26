@@ -756,27 +756,7 @@ type replaceUpdatePodUpdater struct {
 func (u *replaceUpdatePodUpdater) BeginUpdatePod(resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (bool, error) {
 	succCount, err := controllerutils.SlowStartBatch(len(podCh), controllerutils.SlowStartInitialBatchSize, false, func(int, error) error {
 		podInfo := <-podCh
-		if podInfo.replacePairNewPodInfo != nil {
-			replacePairNewPod := podInfo.replacePairNewPodInfo.Pod
-			newPodRevision, exist := replacePairNewPod.Labels[appsv1.ControllerRevisionHashLabelKey]
-			if exist && newPodRevision == resources.UpdatedRevision.Name {
-				return nil
-			}
-			u.recorder.Eventf(podInfo.Pod,
-				corev1.EventTypeNormal,
-				"ReplaceUpdatePod",
-				"label to-delete on new pair pod %s/%s because it is not updated revision, current revision: %s, updated revision: %s",
-				replacePairNewPod.Namespace,
-				replacePairNewPod.Name,
-				newPodRevision,
-				resources.UpdatedRevision.Name)
-			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%d"}}}`, appsv1alpha1.PodDeletionIndicationLabelKey, time.Now().UnixNano())))
-			if patchErr := u.Patch(u.ctx, podInfo.replacePairNewPodInfo.Pod, patch); patchErr != nil {
-				err := fmt.Errorf("failed to delete replace pair new pod %s/%s %s",
-					podInfo.replacePairNewPodInfo.Namespace, podInfo.replacePairNewPodInfo.Name, patchErr)
-				return err
-			}
-		}
+		u.recorder.Eventf(podInfo.Pod, corev1.EventTypeNormal, "PodUpdateLifecycle", "try to begin PodOpsLifecycle for updating Pod of CollaSet")
 		return nil
 	})
 
