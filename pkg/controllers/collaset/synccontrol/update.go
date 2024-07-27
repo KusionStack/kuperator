@@ -397,10 +397,11 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(candidates []*PodUpdateInfo, owne
 		}
 
 		// mark podContext "PodRecreateUpgrade" if upgrade by recreate
-		if !podInfo.OnlyMetadataChanged && !podInfo.InPlaceUpdateSupport {
+		isRecreateUpdatePolicy := u.collaSet.Spec.UpdateStrategy.PodUpdatePolicy == appsv1alpha1.CollaSetRecreatePodUpdateStrategyType
+		if (!podInfo.OnlyMetadataChanged && !podInfo.InPlaceUpdateSupport) || isRecreateUpdatePolicy {
 			ownedIDs[podInfo.ID].Put(podcontext.RecreateUpdateContextDataKey, "true")
 		}
-		//
+
 		if podInfo.PodDecorationChanged {
 			decorationStr := anno.GetDecorationInfoString(podInfo.UpdatedPodDecorations)
 			if val, ok := ownedIDs[podInfo.ID].Get(podcontext.PodDecorationRevisionKey); !ok || val != decorationStr {
@@ -756,7 +757,27 @@ type replaceUpdatePodUpdater struct {
 func (u *replaceUpdatePodUpdater) BeginUpdatePod(resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (bool, error) {
 	succCount, err := controllerutils.SlowStartBatch(len(podCh), controllerutils.SlowStartInitialBatchSize, false, func(int, error) error {
 		podInfo := <-podCh
-		u.recorder.Eventf(podInfo.Pod, corev1.EventTypeNormal, "PodUpdateLifecycle", "try to begin PodOpsLifecycle for updating Pod of CollaSet")
+		if podInfo.replacePairNewPodInfo != nil {
+			replacePairNewPod := podInfo.replacePairNewPodInfo.Pod
+			newPodRevision, exist := replacePairNewPod.Labels[appsv1.ControllerRevisionHashLabelKey]
+			if exist && newPodRevision == resources.UpdatedRevision.Name {
+				return nil
+			}
+			u.recorder.Eventf(podInfo.Pod,
+				corev1.EventTypeNormal,
+				"ReplaceUpdatePod",
+				"label to-delete on new pair pod %s/%s because it is not updated revision, current revision: %s, updated revision: %s",
+				replacePairNewPod.Namespace,
+				replacePairNewPod.Name,
+				newPodRevision,
+				resources.UpdatedRevision.Name)
+			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%d"}}}`, appsv1alpha1.PodDeletionIndicationLabelKey, time.Now().UnixNano())))
+			if patchErr := u.Patch(u.ctx, podInfo.replacePairNewPodInfo.Pod, patch); patchErr != nil {
+				err := fmt.Errorf("failed to delete replace pair new pod %s/%s %s",
+					podInfo.replacePairNewPodInfo.Namespace, podInfo.replacePairNewPodInfo.Name, patchErr)
+				return err
+			}
+		}
 		return nil
 	})
 
@@ -780,9 +801,11 @@ func (u *replaceUpdatePodUpdater) FulfillPodUpdatedInfo(_ *appsv1.ControllerRevi
 }
 
 func (u *replaceUpdatePodUpdater) UpgradePod(podInfo *PodUpdateInfo) error {
-	// add replace indicate label only and wait to replace when syncPods
-	if _, exist := podInfo.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist {
-		// need replace pod, label pod with replace-indicate
+	// add replace labels and wait to replace when syncPods
+	_, replaceIndicate := podInfo.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
+	_, replaceByUpdate := podInfo.Pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
+	if !replaceIndicate || !replaceByUpdate {
+		// need replace update pod, label pod with replace-indicate and replace-update
 		now := time.Now().UnixNano()
 		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v", "%s": "%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, now, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey, true)))
 		if err := u.Patch(u.ctx, podInfo.Pod, patch); err != nil {
