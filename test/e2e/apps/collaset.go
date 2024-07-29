@@ -738,7 +738,7 @@ var _ = SIGDescribe("CollaSet", func() {
 
 		framework.ConformanceIt("replace pod with recreate update", func() {
 			for _, updateStrategy := range []appsv1alpha1.PodUpdateStrategyType{appsv1alpha1.CollaSetRecreatePodUpdateStrategyType, appsv1alpha1.CollaSetReplacePodUpdateStrategyType, appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType} {
-				By(fmt.Sprintf("Test replace pod with %s", updateStrategy))
+				By(fmt.Sprintf("Test replace pod with %s update", updateStrategy))
 				cls := tester.NewCollaSet(fmt.Sprintf("collaset-%s-%s", randStr, strings.ToLower(string(updateStrategy))), 1, appsv1alpha1.UpdateStrategy{PodUpdatePolicy: appsv1alpha1.CollaSetRecreatePodUpdateStrategyType})
 				// use bad image to mock new replace pod unavailable
 				cls.Spec.Template.Spec.Containers[0].Image = "nginx:non-exist"
@@ -796,10 +796,7 @@ var _ = SIGDescribe("CollaSet", func() {
 					}
 					pods, err = tester.ListPodsForCollaSet(cls)
 					Expect(err).NotTo(HaveOccurred())
-					if strconv.Itoa(resourceContexts[0].Spec.Contexts[0].ID) != pods[0].Labels[appsv1alpha1.PodInstanceIDLabelKey] {
-						return false
-					}
-					return true
+					return strconv.Itoa(resourceContexts[0].Spec.Contexts[0].ID) != pods[0].Labels[appsv1alpha1.PodInstanceIDLabelKey]
 				}, 30*time.Second, 3*time.Second).Should(BeTrue())
 			}
 		})
