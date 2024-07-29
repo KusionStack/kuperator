@@ -796,7 +796,7 @@ var _ = SIGDescribe("CollaSet", func() {
 					}
 					pods, err = tester.ListPodsForCollaSet(cls)
 					Expect(err).NotTo(HaveOccurred())
-					return strconv.Itoa(resourceContexts[0].Spec.Contexts[0].ID) != pods[0].Labels[appsv1alpha1.PodInstanceIDLabelKey]
+					return strconv.Itoa(resourceContexts[0].Spec.Contexts[0].ID) == pods[0].Labels[appsv1alpha1.PodInstanceIDLabelKey]
 				}, 30*time.Second, 3*time.Second).Should(BeTrue())
 			}
 		})
