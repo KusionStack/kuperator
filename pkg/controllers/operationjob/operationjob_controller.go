@@ -147,7 +147,7 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 }
 
 func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) error {
-	operator, lifecycleAdapter, err := r.getActionHandler(instance)
+	operator, enablePodOpsLifecycle, err := r.getActionHandler(instance)
 	if err != nil {
 		return err
 	}
@@ -158,7 +158,7 @@ func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv
 
 	// operate targets by partition
 	filteredCandidates := DecideCandidateByPartition(instance, candidates)
-	if err := r.operateTargets(ctx, operator, logger, filteredCandidates, lifecycleAdapter, instance); err != nil {
+	if err := r.operateTargets(ctx, operator, logger, filteredCandidates, enablePodOpsLifecycle, instance); err != nil {
 		return err
 	}
 	if err := r.fulfilTargetsOpsStatus(ctx, operator, logger, filteredCandidates, instance); err != nil {
