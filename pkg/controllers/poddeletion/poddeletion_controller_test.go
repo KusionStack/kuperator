@@ -66,6 +66,9 @@ var _ = Describe("Pod Deletion controller", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testcase,
 				Name:      "test",
+				Labels: map[string]string{
+					"kusionstack.io/control": "true",
+				},
 			},
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{
@@ -83,9 +86,7 @@ var _ = Describe("Pod Deletion controller", func() {
 		}, 5*time.Second, 1*time.Second).Should(BeNil())
 
 		Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-			pod.Labels = map[string]string{
-				appsv1alpha1.PodDeletionIndicationLabelKey: "true",
-			}
+			pod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] = "true"
 			return true
 		})).Should(BeNil())
 

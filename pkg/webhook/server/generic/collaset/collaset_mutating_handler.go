@@ -56,7 +56,7 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 		logger.Error(err, "failed to decode collaset")
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	appsv1alpha1.SetDetaultCollaSet(cls)
+	appsv1alpha1.SetDefaultCollaSet(cls)
 	marshalled, err := json.Marshal(cls)
 	if err != nil {
 		logger.Error(err, "failed to marshal collaset to json")

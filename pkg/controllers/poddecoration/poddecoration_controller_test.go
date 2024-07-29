@@ -44,7 +44,7 @@ import (
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset"
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
-	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration"
+	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration/anno"
 	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/strategy"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/operating/pkg/utils/inject"
@@ -820,9 +820,8 @@ var _ = Describe("PodDecoration controller", func() {
 			}
 			return cnt
 		}, timeoutInterval, pollInterval).Should(BeEquivalentTo(1))
-		// [0] during ops
-		Expect(instanceIds.Has("2")).Should(Equal(false))
-		Expect(instanceIds.Has("1")).Should(Equal(false))
+		// 1 pods during ops
+		Expect(instanceIds.Len()).Should(Equal(1))
 		// allow Pod to do update
 		Expect(c.List(ctx, podList, client.InNamespace(testcase))).ShouldNot(HaveOccurred())
 		for i := range podList.Items {
@@ -861,9 +860,8 @@ var _ = Describe("PodDecoration controller", func() {
 			}
 			return cnt
 		}, timeoutInterval, pollInterval).Should(BeEquivalentTo(1))
-		// [1] during ops
-		Expect(instanceIds.Has("0")).Should(Equal(false))
-		Expect(instanceIds.Has("2")).Should(Equal(false))
+		// 1 pod during ops
+		Expect(instanceIds.Len()).Should(Equal(1))
 		// allow Pod to do update
 		Expect(c.List(ctx, podList, client.InNamespace(testcase))).ShouldNot(HaveOccurred())
 		for i := range podList.Items {

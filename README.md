@@ -40,11 +40,11 @@ is responsible to keep Pod operation risks under control.
 
 ### Installation
 
-You can install Operating following [installation doc](https://kusionstack.io/docs/operating/started/install).
+You can install Operating following [installation doc](https://kusionstack.io/operating/started/install).
 
 ### Tutorial
 
-Please visit this [tutorial](https://kusionstack.io/docs/operating/started/demo-graceful-operation) to gracefully operate an application.
+Please visit this [tutorial](https://kusionstack.io/operating/started/demo-graceful-operation) to gracefully operate an application.
 
 Alternatively, this [video](https://www.bilibili.com/video/BV1n8411q7sP/?t=15.7) also records the e2e experience.
 

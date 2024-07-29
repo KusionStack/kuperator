@@ -46,6 +46,7 @@ help: ## Display this help.
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	rm -f charts/templates/crd/* && cp config/crd/bases/* charts/templates/crd/
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -62,7 +63,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./pkg/... -coverprofile cover.out
 
 ##@ Build
 
@@ -150,10 +151,10 @@ clean-kind:
 
 .PHONY: e2e-local
 e2e-local:
-	KUBECONFIG=/tmp/kind-kubeconfig.yaml ./bin/ginkgo -timeout 10m -v test/e2e
+	KUBECONFIG=/tmp/kind/kubeconfig.yaml ./bin/ginkgo -timeout 10m -v test/e2e
 
 .PHONY: e2e-all
-e2e-all: e2e-local-deploy e2e-local clean-kind
+e2e-all: deploy-in-kind e2e-local clean-kind
 
 ##@ Build Dependencies
 

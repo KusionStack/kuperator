@@ -137,7 +137,9 @@ func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			}
 		}
 		// if this pod in replaced update, delete pvcs
-		if _, exist := instance.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
+		_, isReplaceOriginPod := instance.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
+		_, isReplaceNewPod := instance.Labels[appsv1alpha1.PodReplacePairOriginName]
+		if isReplaceOriginPod || isReplaceNewPod {
 			err := r.deleteReplacedPodPvcs(ctx, instance)
 			return ctrl.Result{}, err
 		}

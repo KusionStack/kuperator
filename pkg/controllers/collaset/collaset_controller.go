@@ -228,16 +228,13 @@ func (r *CollaSetReconciler) doSync(
 		return podWrappers, nil, err
 	}
 
-	scaling, scaleRequeueAfter, err := r.syncControl.Scale(ctx, instance, resources, podWrappers, ownedIDs)
-	if err != nil || scaling {
-		return podWrappers, scaleRequeueAfter, err
-	}
+	_, scaleRequeueAfter, scaleErr := r.syncControl.Scale(ctx, instance, resources, podWrappers, ownedIDs)
+	_, updateRequeueAfter, updateErr := r.syncControl.Update(ctx, instance, resources, podWrappers, ownedIDs)
 
-	_, updateRequeueAfter, err := r.syncControl.Update(ctx, instance, resources, podWrappers, ownedIDs)
+	err = controllerutils.AggregateErrors([]error{scaleErr, updateErr})
 	if updateRequeueAfter != nil && (scaleRequeueAfter == nil || *updateRequeueAfter < *scaleRequeueAfter) {
 		return podWrappers, updateRequeueAfter, err
 	}
-
 	return podWrappers, scaleRequeueAfter, err
 }
 
@@ -254,7 +251,8 @@ func calculateStatus(
 	var scheduledReplicas, readyReplicas, availableReplicas, replicas, updatedReplicas, operatingReplicas,
 		updatedReadyReplicas, updatedAvailableReplicas int32
 
-	for _, podWrapper := range podWrappers {
+	activePods := synccontrol.FilterOutPlaceHolderPodWrappers(podWrappers)
+	for _, podWrapper := range activePods {
 		replicas++
 
 		isUpdated := false

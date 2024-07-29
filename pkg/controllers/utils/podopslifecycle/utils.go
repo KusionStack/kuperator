@@ -125,7 +125,6 @@ func Finish(c client.Client, adapter LifecycleAdapter, obj client.Object, update
 	if hasID || hasType {
 		needUpdate = true
 		deleteOperatingID(adapter, obj)
-		deleteOperationType(adapter, obj)
 	}
 
 	updated, err = DefaultUpdateAll(obj, append(updateFunc, adapter.WhenFinish)...)
@@ -184,12 +183,6 @@ func setOperate(adapter LifecycleAdapter, obj client.Object) (val string, ok boo
 func deleteOperatingID(adapter LifecycleAdapter, obj client.Object) (val string, ok bool) {
 	labelID := fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, adapter.GetID())
 	delete(obj.GetLabels(), labelID)
-	return
-}
-
-func deleteOperationType(adapter LifecycleAdapter, obj client.Object) (val string, ok bool) {
-	labelType := fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, adapter.GetID())
-	delete(obj.GetLabels(), labelType)
 	return
 }
 

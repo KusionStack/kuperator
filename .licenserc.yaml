@@ -55,6 +55,7 @@ header:
     - 'vendor/**'
     - '.gitignore'
     - '.licenserc'
+    - 'typos.toml'
     - '**/zz_generated.deepcopy.go'
     - '**/*.pb.go'
     - '**/*.proto'

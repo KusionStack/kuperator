@@ -28,6 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/anno"
 )
 
 var _ = Describe("PodDecoration controller", func() {
@@ -412,7 +413,7 @@ var _ = Describe("PodDecoration controller", func() {
 			"101": pdB,
 		}
 		Expect(PatchListOfDecorations(pod, pds)).Should(BeNil())
-		Expect(GetDecorationRevisionInfo(pod).Size()).Should(Equal(2))
+		Expect(anno.GetDecorationRevisionInfo(pod).Size()).Should(Equal(2))
 	})
 })
 

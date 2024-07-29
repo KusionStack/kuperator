@@ -18,9 +18,8 @@ package synccontrol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strings"
+	"strconv"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -41,6 +40,7 @@ import (
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
 	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration"
+	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/anno"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/operating/pkg/features"
 	commonutils "kusionstack.io/operating/pkg/utils"
@@ -120,42 +120,12 @@ func (r *RealSyncControl) SyncPods(
 		resources.ExistingPvcs = append(resources.ExistingPvcs, adoptedPvcs...)
 	}
 
-	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(filteredPods, instance)
-	if err := r.deletePodsByLabel(needDeletePods); err != nil {
-		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "clean pods replace pair new id label with error: %s", err.Error())
-	}
-
-	if len(needCleanLabelPods) > 0 {
-		_, err := controllerutils.SlowStartBatch(len(needCleanLabelPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
-			pod := needCleanLabelPods[i]
-			needCleanLabels := podsNeedCleanLabels[i]
-			var deletePatch []map[string]string
-			for _, labelKey := range needCleanLabels {
-				patchOperation := map[string]string{
-					"op":   "remove",
-					"path": fmt.Sprintf("/metadata/labels/%s", strings.ReplaceAll(labelKey, "/", "~1")),
-				}
-				deletePatch = append(deletePatch, patchOperation)
-			}
-			// patch to bytes
-			patchBytes, err := json.Marshal(deletePatch)
-			if err != nil {
-				return err
-			}
-			if err = r.podControl.PatchPod(pod, client.RawPatch(types.JSONPatchType, patchBytes)); err != nil {
-				return fmt.Errorf("failed to remove replace pair label %s/%s: %s", pod.Namespace, pod.Name, err)
-			}
-			return nil
-		})
-		if err != nil {
-			r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "clean pods replace pair origin name label with error: %s", err.Error())
-		}
-	}
+	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods, replaceIndicateCount := dealReplacePods(filteredPods, instance)
 
 	// get owned IDs
 	var ownedIDs map[int]*appsv1alpha1.ContextDetail
 	if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		needAllocateReplicas := maxInt(len(filteredPods), int(realValue(instance.Spec.Replicas))) + len(needReplaceOriginPods)
+		needAllocateReplicas := int(realValue(instance.Spec.Replicas)) + replaceIndicateCount
 		ownedIDs, err = podcontext.AllocateID(r.client, instance, resources.UpdatedRevision.Name, needAllocateReplicas)
 		return err
 	}); err != nil {
@@ -167,6 +137,7 @@ func (r *RealSyncControl) SyncPods(
 
 	// stateless case
 	currentIDs := make(map[int]struct{})
+	needUpdateContext := false
 	idToReclaim := sets.Int{}
 	toDeletePodNames := sets.NewString(instance.Spec.ScaleStrategy.PodToDelete...)
 	for i := range filteredPods {
@@ -198,6 +169,7 @@ func (r *RealSyncControl) SyncPods(
 			ID:            id,
 			ContextDetail: ownedIDs[id],
 			ToDelete:      toDelete,
+			PlaceHolder:   false,
 		})
 
 		if id >= 0 {
@@ -205,74 +177,26 @@ func (r *RealSyncControl) SyncPods(
 		}
 	}
 
-	// 3. Reclaim Pod ID which Pod & PVC are all non-existing
-	for id, contextDetail := range ownedIDs {
-		_, exist := currentIDs[id]
-		if contextDetail.Contains(ScaleInContextDataKey, "true") && !exist {
-			idToReclaim.Insert(id)
+	// 3.1 delete origin pods for replace
+	if len(needDeletePods) > 0 {
+		if err := r.deletePodsByLabel(needDeletePods); err != nil {
+			r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "delete pods by label with error: %s", err.Error())
+		}
+
+	}
+
+	// 3.2 clean labels for replace pods
+	needDeletePodsIDs := sets.String{}
+	if len(needCleanLabelPods) > 0 {
+		needUpdateContext, needDeletePodsIDs, err = r.cleanReplacePodLabels(needCleanLabelPods, podsNeedCleanLabels, ownedIDs)
+		if err != nil {
+			r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "clean pods replace pair origin name label with error: %s", err.Error())
 		}
 	}
 
-	needUpdateContext := false
-	for _, id := range idToReclaim.List() {
-		needUpdateContext = true
-		delete(ownedIDs, id)
-	}
-	// 4. create new pods for need replace pods
+	// 3.3 create new pods for need replace pods
 	if len(needReplaceOriginPods) > 0 {
-		availableContexts := extractAvailableContexts(len(needReplaceOriginPods), ownedIDs, currentIDs)
-		successCount, err := controllerutils.SlowStartBatch(len(needReplaceOriginPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
-			originPod := needReplaceOriginPods[i]
-			ownerRef := metav1.NewControllerRef(instance, instance.GroupVersionKind())
-			updatedPDs, err := resources.PDGetter.GetEffective(ctx, originPod)
-			replaceRevision := getReplaceRevision(originPod, resources)
-			if err != nil {
-				return err
-			}
-			// always replace by update revision.
-			newPod, err := collasetutils.NewPodFrom(instance, ownerRef, replaceRevision, func(in *corev1.Pod) error {
-				return utilspoddecoration.PatchListOfDecorations(in, updatedPDs)
-			})
-			if err != nil {
-				return err
-			}
-			// add instance id and replace pair label
-			instanceId := fmt.Sprintf("%d", availableContexts[i].ID)
-			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
-			newPod.Labels[appsv1alpha1.PodReplacePairOriginName] = originPod.GetName()
-			// create pvcs for new pod
-			err = r.pvcControl.CreatePodPvcs(ctx, instance, newPod, resources.ExistingPvcs)
-			if err != nil {
-				return fmt.Errorf("fail to migrate PVCs from origin pod %s to replace pod %s: %s", originPod.Name, newPod.Name, err)
-			}
-			if newCreatedPod, err := r.podControl.CreatePod(newPod); err == nil {
-				r.recorder.Eventf(originPod,
-					corev1.EventTypeNormal,
-					"CreatePairPod",
-					"succeed to create replace pair Pod %s/%s with revision %s by replace",
-					originPod.Namespace,
-					originPod.Name,
-					replaceRevision.Name)
-				if err := collasetutils.ActiveExpectations.ExpectCreate(instance, expectations.Pod, newCreatedPod.Name); err != nil {
-					return err
-				}
-
-				patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, appsv1alpha1.PodReplacePairNewId, instanceId)))
-				if err = r.podControl.PatchPod(originPod, patch); err != nil {
-					return fmt.Errorf("fail to update origin pod %s/%s pair label %s when updating by replaceUpdate: %s", originPod.Namespace, originPod.Name, newCreatedPod.Name, err)
-				}
-			} else {
-				r.recorder.Eventf(originPod,
-					corev1.EventTypeNormal,
-					"ReplacePod",
-					"failed to create replace pair Pod %s/%s to from revision %s to revision %s by replace update",
-					originPod.Namespace,
-					originPod.Name,
-					replaceRevision.Name)
-				return err
-			}
-			return nil
-		})
+		successCount, err := r.replaceOriginPods(ctx, instance, resources, needReplaceOriginPods, ownedIDs, currentIDs)
 
 		if err != nil {
 			r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "deal replace pods with error: %s", err.Error())
@@ -280,6 +204,17 @@ func (r *RealSyncControl) SyncPods(
 
 		if successCount > 0 {
 			needUpdateContext = true
+		}
+	}
+
+	// 4. Reclaim Pod ID which is (1) during ScalingIn, (2) ReplaceOriginPod; besides, Pod & PVC are all non-existing
+	for id, contextDetail := range ownedIDs {
+		if _, exist := currentIDs[id]; exist {
+			continue
+		}
+		_, exist := needDeletePodsIDs[strconv.Itoa(contextDetail.ID)]
+		if contextDetail.Contains(ScaleInContextDataKey, "true") || exist {
+			idToReclaim.Insert(id)
 		}
 	}
 
@@ -304,6 +239,11 @@ func (r *RealSyncControl) SyncPods(
 	// 1. only reclaim non-existing Pods' ID. Do not reclaim terminating Pods' ID until these Pods and PVC have been deleted from ETCD
 	// 2. do not filter out these terminating Pods
 
+	for _, id := range idToReclaim.List() {
+		needUpdateContext = true
+		delete(ownedIDs, id)
+	}
+
 	if needUpdateContext {
 		logger.V(1).Info("try to update ResourceContext for CollaSet when sync")
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -313,99 +253,20 @@ func (r *RealSyncControl) SyncPods(
 		}
 	}
 
-	return false, podWrappers, ownedIDs, nil
-}
-
-func getReplaceRevision(originPod *corev1.Pod, resources *collasetutils.RelatedResources) *appsv1.ControllerRevision {
-	if _, exist := originPod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]; exist {
-		return resources.UpdatedRevision
-	}
-	podCurrentRevisionName, exist := originPod.Labels[appsv1.ControllerRevisionHashLabelKey]
-	if !exist {
-		return resources.CurrentRevision
-	}
-
-	for _, revision := range resources.Revisions {
-		if revision.Name == podCurrentRevisionName {
-			return revision
-		}
-	}
-
-	return resources.CurrentRevision
-}
-
-func dealReplacePods(pods []*corev1.Pod, instance *appsv1alpha1.CollaSet) (needReplacePods []*corev1.Pod, needCleanLabelPods []*corev1.Pod, podNeedCleanLabels [][]string, needDeletePods []*corev1.Pod) {
-	var podInstanceIdMap = make(map[string]*corev1.Pod)
-	var podNameMap = make(map[string]*corev1.Pod)
-	for _, pod := range pods {
-		if instanceId, exist := pod.Labels[appsv1alpha1.PodInstanceIDLabelKey]; exist {
-			podInstanceIdMap[instanceId] = pod
-		}
-		podNameMap[pod.Name] = pod
-	}
-
-	// deal need replace pods
-	for _, pod := range pods {
-		// no replace indication label
-		if _, exist := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist {
+	// 6. create podWrappers for non-exist pods
+	for id, contextDetail := range ownedIDs {
+		if _, inUsed := currentIDs[id]; inUsed {
 			continue
 		}
-
-		// pod is replace new created pod, skip replace
-		if originPodName, exist := pod.Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
-			if _, exist := podNameMap[originPodName]; exist {
-				continue
-			}
-		}
-
-		// pod already has a new created pod for replacement
-		if newPairPodId, exist := pod.Labels[appsv1alpha1.PodReplacePairNewId]; exist {
-			if _, exist := podInstanceIdMap[newPairPodId]; exist {
-				continue
-			}
-		}
-
-		needReplacePods = append(needReplacePods, pod)
-	}
-	isReplaceUpdate := instance.Spec.UpdateStrategy.PodUpdatePolicy == appsv1alpha1.CollaSetReplacePodUpdateStrategyType
-	// deal pods need to delete when pod update strategy is not replace update
-
-	for _, pod := range pods {
-		_, inReplace := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
-		_, replaceByUpdate := pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
-		var needCleanLabels []string
-		if inReplace && replaceByUpdate && !isReplaceUpdate {
-			needCleanLabels = []string{appsv1alpha1.PodReplaceIndicationLabelKey, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey}
-		}
-
-		// pod is replace new created pod, skip replace
-		if originPodName, exist := pod.Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
-			// replace pair origin pod is not exist, clean label.
-			if originPod, exist := podNameMap[originPodName]; !exist {
-				needCleanLabels = append(needCleanLabels, appsv1alpha1.PodReplacePairOriginName)
-			} else if !replaceByUpdate {
-				// not replace update, delete origin pod when new created pod is service available
-				if _, serviceAvailable := pod.Labels[appsv1alpha1.PodServiceAvailableLabel]; serviceAvailable {
-					needDeletePods = append(needDeletePods, originPod)
-				}
-			}
-		}
-
-		if newPairPodId, exist := pod.Labels[appsv1alpha1.PodReplacePairNewId]; exist {
-			if newPod, exist := podInstanceIdMap[newPairPodId]; !exist {
-				needCleanLabels = append(needCleanLabels, appsv1alpha1.PodReplacePairNewId)
-			} else if replaceByUpdate && !isReplaceUpdate {
-				needDeletePods = append(needDeletePods, newPod)
-			}
-		}
-
-		if len(needCleanLabels) > 0 {
-			needCleanLabelPods = append(needCleanLabelPods, pod)
-			podNeedCleanLabels = append(podNeedCleanLabels, needCleanLabels)
-		}
+		podWrappers = append(podWrappers, &collasetutils.PodWrapper{
+			ID:            id,
+			Pod:           nil,
+			ContextDetail: contextDetail,
+			PlaceHolder:   true,
+		})
 	}
 
-	return
+	return false, podWrappers, ownedIDs, nil
 }
 
 func (r *RealSyncControl) updateCollaSet(ctx context.Context, cls *appsv1alpha1.CollaSet) error {
@@ -427,14 +288,15 @@ func (r *RealSyncControl) Scale(
 
 	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
 	var recordedRequeueAfter *time.Duration
-	replacePodMap := classifyPodReplacingMapping(podWrappers)
+	activePods := FilterOutPlaceHolderPodWrappers(podWrappers)
+	replacePodMap := classifyPodReplacingMapping(activePods)
 
 	diff := int(realValue(cls.Spec.Replicas)) - len(replacePodMap)
 	scaling := false
 
 	if diff >= 0 {
 		// trigger delete pods indicated in ScaleStrategy.PodToDelete by label
-		for _, podWrapper := range podWrappers {
+		for _, podWrapper := range activePods {
 			if podWrapper.ToDelete {
 				err := r.deletePodsByLabel([]*corev1.Pod{podWrapper.Pod})
 				if err != nil {
@@ -446,11 +308,16 @@ func (r *RealSyncControl) Scale(
 		// scale out pods and return if diff > 0
 		if diff > 0 {
 			// collect instance ID in used from owned Pods
-			podInstanceIDSet := collasetutils.CollectPodInstanceID(podWrappers)
+			podInstanceIDSet := collasetutils.CollectPodInstanceID(activePods)
 			// find IDs and their contexts which have not been used by owned Pods
 			availableContext := extractAvailableContexts(diff, ownedIDs, podInstanceIDSet)
-			succCount, err := controllerutils.SlowStartBatch(diff, controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) error {
+			needUpdateContext := false
+			succCount, err := controllerutils.SlowStartBatch(diff, controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) (err error) {
 				availableIDContext := availableContext[idx]
+				shouldInitPDContext := false
+				defer func() {
+					needUpdateContext = decideContextRevision(availableIDContext, resources.UpdatedRevision, err == nil) || shouldInitPDContext
+				}()
 				// use revision recorded in Context
 				revision := resources.UpdatedRevision
 				if revisionName, exist := availableIDContext.Data[podcontext.RevisionContextDataKey]; exist && revisionName != "" {
@@ -477,9 +344,11 @@ func (r *RealSyncControl) Scale(
 							if localErr != nil {
 								return localErr
 							}
+							shouldInitPDContext = true
+							availableIDContext.Put(podcontext.PodDecorationRevisionKey, anno.GetDecorationInfoString(pds))
 						} else {
 							// upgrade by recreate pod case
-							infos, marshallErr := utilspoddecoration.UnmarshallFromString(revisionsInfo)
+							infos, marshallErr := anno.UnmarshallFromString(revisionsInfo)
 							if marshallErr != nil {
 								return marshallErr
 							}
@@ -511,6 +380,14 @@ func (r *RealSyncControl) Scale(
 				// add an expectation for this pod creation, before next reconciling
 				return collasetutils.ActiveExpectations.ExpectCreate(cls, expectations.Pod, pod.Name)
 			})
+			if needUpdateContext {
+				logger.V(1).Info("try to update ResourceContext for CollaSet after scaling out")
+				if updateContextErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+					return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
+				}); updateContextErr != nil {
+					err = controllerutils.AggregateErrors([]error{updateContextErr, err})
+				}
+			}
 			r.recorder.Eventf(cls, corev1.EventTypeNormal, "ScaleOut", "scale out %d Pod(s)", succCount)
 			if err != nil {
 				collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, err, "ScaleOutFailed", err.Error())
@@ -521,7 +398,7 @@ func (r *RealSyncControl) Scale(
 		}
 	} else if diff < 0 {
 		// chose the pods to scale in
-		podsToScaleIn := getPodsToDelete(podWrappers, replacePodMap, diff*-1)
+		podsToScaleIn := getPodsToDelete(activePods, replacePodMap, diff*-1)
 		// filter out Pods need to trigger PodOpsLifecycle
 		podCh := make(chan *collasetutils.PodWrapper, len(podsToScaleIn))
 		for i := range podsToScaleIn {
@@ -641,7 +518,7 @@ func (r *RealSyncControl) Scale(
 
 	// reset ContextDetail.ScalingIn, if there are Pods had its PodOpsLifecycle reverted
 	needUpdatePodContext := false
-	for _, podWrapper := range podWrappers {
+	for _, podWrapper := range activePods {
 		if !podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, podWrapper) && ownedIDs[podWrapper.ID].Contains(ScaleInContextDataKey, "true") {
 			needUpdatePodContext = true
 			ownedIDs[podWrapper.ID].Remove(ScaleInContextDataKey)
@@ -660,40 +537,15 @@ func (r *RealSyncControl) Scale(
 	return scaling, recordedRequeueAfter, nil
 }
 
-// classify the pair relationship for Pod replacement.
-func classifyPodReplacingMapping(podWrappers []*collasetutils.PodWrapper) map[string]*collasetutils.PodWrapper {
-	var podNameMap = make(map[string]*collasetutils.PodWrapper)
-	var podIdMap = make(map[string]*collasetutils.PodWrapper)
-	for _, podWrapper := range podWrappers {
-		podNameMap[podWrapper.Name] = podWrapper
-		instanceId := podWrapper.Labels[appsv1alpha1.PodInstanceIDLabelKey]
-		podIdMap[instanceId] = podWrapper
-	}
-
-	var replacePodMapping = make(map[string]*collasetutils.PodWrapper)
-	for _, podWrapper := range podWrappers {
-		name := podWrapper.Name
-		if podWrapper.DeletionTimestamp != nil {
-			replacePodMapping[name] = nil
+func FilterOutPlaceHolderPodWrappers(pods []*collasetutils.PodWrapper) []*collasetutils.PodWrapper {
+	var filteredPodWrappers []*collasetutils.PodWrapper
+	for _, pod := range pods {
+		if pod.PlaceHolder {
 			continue
 		}
-
-		if replacePairNewIdStr, exist := podWrapper.Labels[appsv1alpha1.PodReplacePairNewId]; exist {
-			if pairNewPod, exist := podIdMap[replacePairNewIdStr]; exist {
-				replacePodMapping[name] = pairNewPod
-				continue
-			}
-		} else if replaceOriginStr, exist := podWrapper.Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
-			if originPod, exist := podNameMap[replaceOriginStr]; exist {
-				if originPod.Labels[appsv1alpha1.PodReplacePairNewId] == podWrapper.Labels[appsv1alpha1.PodInstanceIDLabelKey] {
-					continue
-				}
-			}
-		}
-
-		replacePodMapping[name] = nil
+		filteredPodWrappers = append(filteredPodWrappers, pod)
 	}
-	return replacePodMapping
+	return filteredPodWrappers
 }
 
 func extractAvailableContexts(diff int, ownedIDs map[int]*appsv1alpha1.ContextDetail, podInstanceIDSet map[int]struct{}) []*appsv1alpha1.ContextDetail {
@@ -702,6 +554,11 @@ func extractAvailableContexts(diff int, ownedIDs map[int]*appsv1alpha1.ContextDe
 	idx := 0
 	for id := range ownedIDs {
 		if _, inUsed := podInstanceIDSet[id]; inUsed {
+			continue
+		}
+
+		// skip replaceNewPod ID
+		if ownedIDs[id].Data[ReplaceOriginPodIDContextDataKey] != "" {
 			continue
 		}
 
@@ -729,6 +586,28 @@ func (r *RealSyncControl) deletePodsByLabel(needDeletePods []*corev1.Pod) error 
 	return err
 }
 
+// decide revision for 3 pod create types: (1) just create, (2) upgrade by recreate, (3) delete and recreate
+func decideContextRevision(contextDetail *appsv1alpha1.ContextDetail, updatedRevision *appsv1.ControllerRevision, createSucceeded bool) bool {
+	needUpdateContext := false
+	if !createSucceeded {
+		if contextDetail.Contains(podcontext.JustCreateContextDataKey, "true") {
+			// TODO choose just create pods' revision according to scaleStrategy
+			contextDetail.Put(podcontext.RevisionContextDataKey, updatedRevision.Name)
+			needUpdateContext = true
+		} else if contextDetail.Contains(podcontext.RecreateUpdateContextDataKey, "true") {
+			contextDetail.Put(podcontext.RevisionContextDataKey, updatedRevision.Name)
+			needUpdateContext = true
+		}
+		// if pod is delete and recreate, never change revisionKey
+	} else {
+		// TODO delete ID if create succeeded
+		contextDetail.Remove(podcontext.JustCreateContextDataKey)
+		contextDetail.Remove(podcontext.RecreateUpdateContextDataKey)
+		needUpdateContext = true
+	}
+	return needUpdateContext
+}
+
 func (r *RealSyncControl) Update(
 	ctx context.Context,
 	cls *appsv1alpha1.CollaSet,
@@ -739,20 +618,21 @@ func (r *RealSyncControl) Update(
 
 	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
 	var recordedRequeueAfter *time.Duration
-	// 1. scan and analysis pods update info
+	// 1. scan and analysis pods update info for active pods and PlaceHolder pods
 	podUpdateInfos, err := attachPodUpdateInfo(ctx, cls, podWrappers, resources)
 	if err != nil {
 		return false, nil, fmt.Errorf("fail to attach pod update info, %v", err)
 	}
 
 	// 2. decide Pod update candidates
-	podToUpdate := decidePodToUpdate(cls, podUpdateInfos)
-	podCh := make(chan *PodUpdateInfo, len(podToUpdate))
+	candidates := decidePodToUpdate(cls, podUpdateInfos)
+	activePodToUpdate := filterOutPlaceHolderUpdateInfos(candidates)
+	podCh := make(chan *PodUpdateInfo, len(activePodToUpdate))
 	updater := newPodUpdater(ctx, r.client, cls, r.podControl, r.recorder)
 	updating := false
 
 	// 3. filter already updated revision,
-	for i, podInfo := range podToUpdate {
+	for i, podInfo := range activePodToUpdate {
 		if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged && !podInfo.PvcTmpHashChanged {
 			continue
 		}
@@ -767,7 +647,7 @@ func (r *RealSyncControl) Update(
 			continue
 		}
 
-		podCh <- podToUpdate[i]
+		podCh <- activePodToUpdate[i]
 	}
 
 	// 4. begin pod update lifecycle
@@ -776,8 +656,8 @@ func (r *RealSyncControl) Update(
 		return updating, recordedRequeueAfter, err
 	}
 
-	// 5. filter pods not allow to ops now, such as OperationDelaySeconds strategy
-	recordedRequeueAfter, err = updater.FilterAllowOpsPods(podToUpdate, ownedIDs, resources, podCh)
+	// 5. (1) filter out  pods not allow to ops now, such as OperationDelaySeconds strategy; (2) update PlaceHolder Pods resourceContext revision
+	recordedRequeueAfter, err = updater.FilterAllowOpsPods(candidates, ownedIDs, resources, podCh)
 	if err != nil {
 		collasetutils.AddOrUpdateCondition(resources.NewStatus,
 			appsv1alpha1.CollaSetScale, err, "UpdateFailed",
@@ -815,8 +695,8 @@ func (r *RealSyncControl) Update(
 	}
 
 	// 7. try to finish all Pods'PodOpsLifecycle if its update is finished.
-	succCount, err = controllerutils.SlowStartBatch(len(podUpdateInfos), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
-		podInfo := podUpdateInfos[i]
+	succCount, err = controllerutils.SlowStartBatch(len(activePodToUpdate), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+		podInfo := activePodToUpdate[i]
 
 		if !podInfo.isDuringOps {
 			return nil
@@ -853,11 +733,4 @@ func realValue(val *int32) int32 {
 	}
 
 	return *val
-}
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

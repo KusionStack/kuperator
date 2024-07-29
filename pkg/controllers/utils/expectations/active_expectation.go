@@ -33,16 +33,16 @@ import (
 )
 
 var (
-	ResourceInitializers map[ExpectedReosurceType]func() client.Object
+	ResourceInitializers map[ExpectedReosourceType]func() client.Object
 )
 
-type ExpectedReosurceType string
+type ExpectedReosourceType string
 
 const (
-	Pod             ExpectedReosurceType = "pod"
-	Pvc             ExpectedReosurceType = "pvc"
-	CollaSet        ExpectedReosurceType = "CollaSet"
-	ResourceContext ExpectedReosurceType = "ResourceContext"
+	Pod             ExpectedReosourceType = "pod"
+	Pvc             ExpectedReosourceType = "pvc"
+	CollaSet        ExpectedReosourceType = "CollaSet"
+	ResourceContext ExpectedReosourceType = "ResourceContext"
 )
 
 type ActiveExpectationAction int
@@ -54,7 +54,7 @@ const (
 )
 
 func init() {
-	ResourceInitializers = map[ExpectedReosurceType]func() client.Object{
+	ResourceInitializers = map[ExpectedReosourceType]func() client.Object{
 		Pod: func() client.Object {
 			return &corev1.Pod{}
 		},
@@ -82,7 +82,7 @@ type ActiveExpectations struct {
 	subjects cache.Store
 }
 
-func (ae *ActiveExpectations) expect(subject metav1.Object, kind ExpectedReosurceType, name string, action ActiveExpectationAction) error {
+func (ae *ActiveExpectations) expect(subject metav1.Object, kind ExpectedReosourceType, name string, action ActiveExpectationAction) error {
 	if _, exist := ResourceInitializers[kind]; !exist {
 		panic(fmt.Sprintf("kind %s is not supported for Active Expectation", kind))
 	}
@@ -111,15 +111,15 @@ func (ae *ActiveExpectations) expect(subject metav1.Object, kind ExpectedReosurc
 	return nil
 }
 
-func (ae *ActiveExpectations) ExpectCreate(subject metav1.Object, kind ExpectedReosurceType, name string) error {
+func (ae *ActiveExpectations) ExpectCreate(subject metav1.Object, kind ExpectedReosourceType, name string) error {
 	return ae.expect(subject, kind, name, Create)
 }
 
-func (ae *ActiveExpectations) ExpectDelete(subject metav1.Object, kind ExpectedReosurceType, name string) error {
+func (ae *ActiveExpectations) ExpectDelete(subject metav1.Object, kind ExpectedReosourceType, name string) error {
 	return ae.expect(subject, kind, name, Delete)
 }
 
-func (ae *ActiveExpectations) ExpectUpdate(subject metav1.Object, kind ExpectedReosurceType, name string, updatedResourceVersion string) error {
+func (ae *ActiveExpectations) ExpectUpdate(subject metav1.Object, kind ExpectedReosourceType, name string, updatedResourceVersion string) error {
 	rv, err := strconv.ParseInt(updatedResourceVersion, 10, 64)
 	if err != nil {
 		panic(fmt.Sprintf("fail to parse resource version %s of resource %s/%s to int64 for subject %s/%s: %s",
@@ -175,7 +175,7 @@ func (ae *ActiveExpectations) IsSatisfied(subject metav1.Object) (satisfied bool
 	return
 }
 
-func (ae *ActiveExpectations) DeleteItem(subject metav1.Object, kind ExpectedReosurceType, name string) error {
+func (ae *ActiveExpectations) DeleteItem(subject metav1.Object, kind ExpectedReosourceType, name string) error {
 	if _, exist := ResourceInitializers[kind]; !exist {
 		panic(fmt.Sprintf("kind %s is not supported for Active Expectation", kind))
 	}
@@ -265,7 +265,7 @@ type ActiveExpectation struct {
 	recordTimestamp time.Time
 }
 
-func (ae *ActiveExpectation) expect(kind ExpectedReosurceType, name string, action ActiveExpectationAction) error {
+func (ae *ActiveExpectation) expect(kind ExpectedReosourceType, name string, action ActiveExpectationAction) error {
 	if action == Update {
 		panic("update action is not supported by this method")
 	}
@@ -291,7 +291,7 @@ func (ae *ActiveExpectation) expect(kind ExpectedReosurceType, name string, acti
 	return nil
 }
 
-func (ae *ActiveExpectation) expectUpdate(kind ExpectedReosurceType, name string, resourceVersion int64) error {
+func (ae *ActiveExpectation) expectUpdate(kind ExpectedReosourceType, name string, resourceVersion int64) error {
 	key := fmt.Sprintf("%s/%s", kind, name)
 	item, exist, err := ae.items.GetByKey(key)
 	if err != nil {
@@ -371,7 +371,7 @@ type ActiveExpectationItem struct {
 
 	Key             string
 	Name            string
-	Kind            ExpectedReosurceType
+	Kind            ExpectedReosourceType
 	Action          ActiveExpectationAction
 	ResourceVersion int64
 	RecordTimestamp time.Time

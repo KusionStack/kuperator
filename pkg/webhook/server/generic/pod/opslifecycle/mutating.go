@@ -171,6 +171,7 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 				continue
 			}
 			delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodOperationPermissionLabelPrefix, t))
+			delete(newPod.Labels, fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, id))
 
 			newPod.Labels[fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, id)] = t // done-operation-type
 		}

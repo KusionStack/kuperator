@@ -20,7 +20,7 @@ import (
 	k8scorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
-func SetDetaultCollaSet(cls *CollaSet) {
+func SetDefaultCollaSet(cls *CollaSet) {
 	SetDefaultPodSpec(cls)
 	SetDefaultCollaSetUpdateStrategy(cls)
 }

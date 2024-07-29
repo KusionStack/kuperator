@@ -270,7 +270,7 @@ var _ = Describe("PodOpsLifecycle controller", func() {
 		}, 3*time.Second, 200*time.Millisecond).Should(BeNil())
 	})
 
-	It("Update pod with label compling", func() {
+	It("Update pod with label compiling", func() {
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package poddecoration
+package anno
 
 import (
 	"encoding/json"
@@ -75,7 +75,7 @@ func CurrentRevision(pod *corev1.Pod, podDecorationName string) *string {
 	return nil
 }
 
-func setDecorationInfo(pod *corev1.Pod, podDecorations map[string]*appsv1alpha1.PodDecoration) {
+func SetDecorationInfo(pod *corev1.Pod, podDecorations map[string]*appsv1alpha1.PodDecoration) {
 	if pod.Annotations == nil {
 		pod.Annotations = map[string]string{}
 	}
