@@ -17,7 +17,9 @@ limitations under the License.
 package apps
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -734,6 +736,73 @@ var _ = SIGDescribe("CollaSet", func() {
 			}
 		})
 
+		framework.ConformanceIt("replace pod with recreate update", func() {
+			for _, updateStrategy := range []appsv1alpha1.PodUpdateStrategyType{appsv1alpha1.CollaSetRecreatePodUpdateStrategyType, appsv1alpha1.CollaSetReplacePodUpdateStrategyType, appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType} {
+				By(fmt.Sprintf("Test replace pod with %s", updateStrategy))
+				cls := tester.NewCollaSet(fmt.Sprintf("collaset-%s-%s", randStr, strings.ToLower(string(updateStrategy))), 1, appsv1alpha1.UpdateStrategy{PodUpdatePolicy: appsv1alpha1.CollaSetRecreatePodUpdateStrategyType})
+				// use bad image to mock new replace pod unavailable
+				cls.Spec.Template.Spec.Containers[0].Image = "nginx:non-exist"
+				Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
+
+				By("Wait for status replicas satisfied")
+				Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 1, 0, 0, 1, 1) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+				By("Replace pod by label")
+				pods, err := tester.ListPodsForCollaSet(cls)
+				Expect(err).NotTo(HaveOccurred())
+				podToReplace := pods[0]
+				Expect(tester.UpdatePod(podToReplace, func(pod *v1.Pod) {
+					podToReplace.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] = "true"
+				})).NotTo(HaveOccurred())
+
+				By("Wait for replace new pod created")
+				Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 0, 0, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+				pods, err = tester.ListPodsForCollaSet(cls)
+				Expect(err).NotTo(HaveOccurred())
+				var replaceNewPod *v1.Pod
+				for _, pod := range pods {
+					if pod.Name != podToReplace.Name {
+						replaceNewPod = pod
+					}
+				}
+				Expect(replaceNewPod).ShouldNot(BeNil())
+
+				By("Update collaset image")
+				Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
+					cls.Spec.Template.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.NginxNew)
+				})).NotTo(HaveOccurred())
+
+				By("Wait for replace and update finished")
+				Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 1, 1, 1, 1, 1) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+				By("Check replace new pod is deleted")
+				Eventually(func() bool {
+					pods, err = tester.ListPodsForCollaSet(cls)
+					Expect(err).NotTo(HaveOccurred())
+					for _, pod := range pods {
+						if pod.Name == replaceNewPod.Name {
+							return false
+						}
+					}
+					return len(pods) == 1 && pods[0].Spec.Containers[0].Image == imageutils.GetE2EImage(imageutils.NginxNew)
+				}, 30*time.Second, 3*time.Second)
+
+				By("Check resource contexts")
+				Eventually(func() bool {
+					resourceContexts, err := tester.ListResourceContextsForCollaSet(cls)
+					Expect(err).NotTo(HaveOccurred())
+					if len(resourceContexts[0].Spec.Contexts) != 1 {
+						return false
+					}
+					pods, err = tester.ListPodsForCollaSet(cls)
+					Expect(err).NotTo(HaveOccurred())
+					if strconv.Itoa(resourceContexts[0].Spec.Contexts[0].ID) != pods[0].Labels[appsv1alpha1.PodInstanceIDLabelKey] {
+						return false
+					}
+					return true
+				}, 30*time.Second, 3*time.Second).Should(BeTrue())
+			}
+		})
 	})
 
 })
