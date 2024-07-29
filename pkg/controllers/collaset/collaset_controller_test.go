@@ -1364,7 +1364,7 @@ var _ = Describe("collaset controller", func() {
 				Name:      "foo",
 			},
 			Spec: appsv1alpha1.CollaSetSpec{
-				Replicas: int32Pointer(1),
+				Replicas: int32Pointer(2),
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"app": "foo",
@@ -1397,10 +1397,10 @@ var _ = Describe("collaset controller", func() {
 		podList := &corev1.PodList{}
 		Eventually(func() bool {
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-			return len(podList.Items) == 1
+			return len(podList.Items) == 2
 		}, 5*time.Second, 1*time.Second).Should(BeTrue())
 		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
-		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 1, 1, 0, 0, 0)).Should(BeNil())
+		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
 
 		observedGeneration := cs.Status.ObservedGeneration
 		// update CollaSet image
@@ -1418,10 +1418,11 @@ var _ = Describe("collaset controller", func() {
 		}, 5*time.Second, 1*time.Second).Should(BeTrue())
 
 		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-		originPod := podList.Items[0]
+		originPod1 := podList.Items[0]
+		originPod2 := podList.Items[1]
 
-		// label pod to trigger update
-		Expect(updatePodWithRetry(c, originPod.Namespace, originPod.Name, func(pod *corev1.Pod) bool {
+		// label originPod1 to trigger update
+		Expect(updatePodWithRetry(c, originPod1.Namespace, originPod1.Name, func(pod *corev1.Pod) bool {
 			if pod.Labels == nil {
 				pod.Labels = map[string]string{}
 			}
@@ -1431,7 +1432,7 @@ var _ = Describe("collaset controller", func() {
 
 		Eventually(func() error {
 			// check updated pod replicas by CollaSet status
-			return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 1, 0, 0, 0)
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 3, 1, 0, 0, 0)
 		}, 30*time.Second, 1*time.Second).Should(BeNil())
 
 		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
@@ -1441,22 +1442,45 @@ var _ = Describe("collaset controller", func() {
 
 		Eventually(func() bool {
 			pod := &corev1.Pod{}
-			error := c.Get(context.TODO(), types.NamespacedName{Namespace: originPod.Namespace, Name: originPod.Name}, pod)
+			error := c.Get(context.TODO(), types.NamespacedName{Namespace: originPod1.Namespace, Name: originPod1.Name}, pod)
 			Expect(error).Should(BeNil())
 			Expect(pod.Labels).ShouldNot(BeNil())
 			_, replaceIndicate := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
 			_, replaceByUpdate := pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
 			// check updated pod replicas by CollaSet status
-			return !replaceIndicate && !replaceByUpdate
+			return replaceIndicate && replaceByUpdate
 		}, 5*time.Second, 1*time.Second).Should(BeTrue())
-		// double check updated pod replicas
+
+		// label originPod2 to trigger update
+		Expect(updatePodWithRetry(c, originPod2.Namespace, originPod2.Name, func(pod *corev1.Pod) bool {
+			if pod.Labels == nil {
+				pod.Labels = map[string]string{}
+			}
+			pod.Labels[appsv1alpha1.CollaSetUpdateIndicateLabelKey] = "true"
+			return true
+		})).Should(BeNil())
+
+		// allow originPod2 to do inPlace update
+		Expect(updatePodWithRetry(c, originPod2.Namespace, originPod2.Name, func(pod *corev1.Pod) bool {
+			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+			pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+			return true
+		})).Should(BeNil())
+
+		time.Sleep(3 * time.Second)
+
+		Eventually(func() error {
+			// check updated pod replicas by CollaSet status
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 3, 2, 2, 0, 0)
+		}, 30*time.Second, 1*time.Second).Should(BeNil())
+
 		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-		for _, pod := range podList.Items {
-			if pod.Spec.Containers[0].Image == cs.Spec.Template.Spec.Containers[0].Image {
-				// check new pod to delete
-				Expect(pod.Labels).ShouldNot(BeNil())
-				Expect(pod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]).ShouldNot(BeNil())
-				Expect(pod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]).ShouldNot(BeNil())
+		for i := range podList.Items {
+			pod := podList.Items[i]
+			// origin pod1 is selected to do inPlaceUpdate but actually doing replaceUpdate
+			// origin pod2 is during inPlaceUpdate lifecycle
+			if pod.Name == originPod1.Name || pod.Name == originPod2.Name {
+				Expect(podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, &pod)).Should(BeTrue())
 			}
 		}
 	})
