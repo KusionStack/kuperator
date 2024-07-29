@@ -383,7 +383,7 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(candidates []*PodUpdateInfo, owne
 				continue
 			}
 			if requeueAfter != nil {
-				u.recorder.Eventf(podInfo, corev1.EventTypeNormal, "PodUpdateLifecycle", "delay Pod update for %d seconds", requeueAfter.Seconds())
+				u.recorder.Eventf(podInfo, corev1.EventTypeNormal, "PodUpdateLifecycle", "delay Pod update for %f seconds", requeueAfter.Seconds())
 				if recordedRequeueAfter == nil || *requeueAfter < *recordedRequeueAfter {
 					recordedRequeueAfter = requeueAfter
 				}
