@@ -113,6 +113,10 @@ func (p *PodReplaceHandler) ReleaseTarget(ctx context.Context, c client.Client, 
 		return nil
 	}
 
+	if _, exist := candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist {
+		return nil
+	}
+
 	// try to remove replace label from origin pod
 	patchOperation := map[string]string{
 		"op":   "remove",

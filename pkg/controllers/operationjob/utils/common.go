@@ -48,23 +48,6 @@ func MapOpsStatusByPod(instance *appsv1alpha1.OperationJob) map[string]*appsv1al
 	return opsStatusMap
 }
 
-func ContainersNotFoundInPod(pod *corev1.Pod, containers []string) ([]string, bool) {
-	var containersNotFound []string
-	if pod == nil {
-		return containersNotFound, false
-	}
-	cntSets := sets.String{}
-	for i := range pod.Spec.Containers {
-		cntSets.Insert(pod.Spec.Containers[i].Name)
-	}
-	for _, container := range containers {
-		if !cntSets.Has(container) {
-			containersNotFound = append(containersNotFound, container)
-		}
-	}
-	return containersNotFound, len(containersNotFound) > 0
-}
-
 func GetCollaSetByPod(ctx context.Context, client client.Client, instance *appsv1alpha1.OperationJob, candidate *OpsCandidate) (*appsv1alpha1.CollaSet, error) {
 	var collaSet appsv1alpha1.CollaSet
 	ownedByCollaSet := false

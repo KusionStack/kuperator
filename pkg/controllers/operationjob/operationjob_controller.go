@@ -118,7 +118,7 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 	}
 
 	if instance.DeletionTimestamp != nil {
-		if err := r.ReleaseTargetsForDeletion(ctx, instance, logger); err != nil {
+		if err := r.releaseTargets(ctx, instance); err != nil {
 			return reconcile.Result{}, err
 		}
 		ojutils.StatusUpToDateExpectation.DeleteExpectations(key)
@@ -148,22 +148,27 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) error {
-	operator, enablePodOpsLifecycle, err := r.getActionHandler(instance)
-	if err != nil {
-		return err
+func (r *ReconcileOperationJob) getActionHandlerAndTargets(ctx context.Context, instance *appsv1alpha1.OperationJob) (
+	actionHandler ActionHandler, enablePodOpsLifecycle bool, candidates []*OpsCandidate, err error) {
+	if actionHandler, enablePodOpsLifecycle, err = r.getActionHandler(instance); err != nil {
+		return
 	}
-	candidates, err := r.listTargets(ctx, instance)
+	candidates, err = r.listTargets(ctx, instance)
+	return
+}
+
+func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) error {
+	actionHandler, enablePodOpsLifecycle, candidates, err := r.getActionHandlerAndTargets(ctx, instance)
 	if err != nil {
 		return err
 	}
 
 	// operate targets by partition
 	filteredCandidates := DecideCandidateByPartition(instance, candidates)
-	if err := r.operateTargets(ctx, operator, logger, filteredCandidates, enablePodOpsLifecycle, instance); err != nil {
+	if err := r.operateTargets(ctx, actionHandler, logger, filteredCandidates, enablePodOpsLifecycle, instance); err != nil {
 		return err
 	}
-	if err := r.fulfilTargetsOpsStatus(ctx, operator, logger, filteredCandidates, instance); err != nil {
+	if err := r.fulfilTargetsOpsStatus(ctx, actionHandler, logger, filteredCandidates, instance); err != nil {
 		return err
 	}
 

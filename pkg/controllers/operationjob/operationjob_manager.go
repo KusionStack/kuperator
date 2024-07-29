@@ -205,8 +205,9 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, 
 			} else {
 				logger.Info("should end but still processing")
 				r.Recorder.Eventf(operationJob, corev1.EventTypeNormal, "Timeout", "Try to fail OperationJob for timeout...")
+				// mark operationjob failed and release targets
 				ojutils.MarkOperationJobFailed(operationJob)
-				return false, nil, nil
+				return false, nil, r.releaseTargets(ctx, operationJob)
 			}
 		}
 	}
@@ -228,14 +229,8 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, 
 	return false, nil, nil
 }
 
-func (r *ReconcileOperationJob) ReleaseTargetsForDeletion(ctx context.Context, operationJob *appsv1alpha1.OperationJob, logger logr.Logger) error {
-	ojutils.MarkOperationJobFailed(operationJob)
-	operator, enablePodOpsLifecycle, err := r.getActionHandler(operationJob)
-	if err != nil {
-		return err
-	}
-
-	candidates, err := r.listTargets(ctx, operationJob)
+func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob *appsv1alpha1.OperationJob) error {
+	actionHandler, enablePodOpsLifecycle, candidates, err := r.getActionHandlerAndTargets(ctx, operationJob)
 	if err != nil {
 		return err
 	}
@@ -245,7 +240,7 @@ func (r *ReconcileOperationJob) ReleaseTargetsForDeletion(ctx context.Context, o
 		if candidate.Pod == nil {
 			return nil
 		}
-		err := operator.ReleaseTarget(ctx, r.Client, r.Logger, candidate, operationJob)
+		err := actionHandler.ReleaseTarget(ctx, r.Client, r.Logger, candidate, operationJob)
 		// cancel lifecycle if pod is during ops lifecycle
 		if enablePodOpsLifecycle {
 			lifecycleAdapter := NewLifecycleAdapter(operationJob.Name, operationJob.Spec.Action)
