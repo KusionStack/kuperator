@@ -26,11 +26,11 @@ import (
 func getPodsToDelete(filteredPods []*collasetutils.PodWrapper, replaceMapping map[string]*collasetutils.PodWrapper, diff int) []*collasetutils.PodWrapper {
 	targetsPods := getTargetsDeletePods(filteredPods, replaceMapping)
 	sort.Sort(ActivePodsForDeletion(targetsPods))
-	start := len(targetsPods) - diff
-	if start < 0 {
-		start = 0
+	if diff > len(targetsPods) {
+		diff = len(targetsPods)
 	}
-	needDeletePods := targetsPods[start:]
+
+	needDeletePods := targetsPods[:diff]
 	for _, pod := range needDeletePods {
 		if replacePairPod, exist := replaceMapping[pod.Name]; exist && replacePairPod != nil {
 			needDeletePods = append(needDeletePods, replacePairPod)
@@ -64,7 +64,7 @@ func (s ActivePodsForDeletion) Less(i, j int) bool {
 
 	// pods which are indicated by ScaleStrategy.PodToDelete should be deleted before others
 	if l.ToDelete != r.ToDelete {
-		return r.ToDelete
+		return l.ToDelete
 	}
 
 	// pods which are during scaleInOps should be deleted before those not during
@@ -72,7 +72,7 @@ func (s ActivePodsForDeletion) Less(i, j int) bool {
 	rDuringScaleIn := podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, r)
 
 	if lDuringScaleIn != rDuringScaleIn {
-		return rDuringScaleIn
+		return lDuringScaleIn
 	}
 
 	return collasetutils.ComparePod(l.Pod, r.Pod)
