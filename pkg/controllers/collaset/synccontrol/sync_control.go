@@ -120,7 +120,7 @@ func (r *RealSyncControl) SyncPods(
 		resources.ExistingPvcs = append(resources.ExistingPvcs, adoptedPvcs...)
 	}
 
-	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods, replaceIndicateCount := dealReplacePods(filteredPods, instance)
+	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods, replaceIndicateCount := dealReplacePods(filteredPods)
 
 	// get owned IDs
 	var ownedIDs map[int]*appsv1alpha1.ContextDetail
@@ -679,8 +679,16 @@ func (r *RealSyncControl) Update(
 			"onlyMetadataChanged", podInfo.OnlyMetadataChanged,
 		)
 
-		if err = updater.UpgradePod(podInfo); err != nil {
-			return err
+		isReplaceUpdate := cls.Spec.UpdateStrategy.PodUpdatePolicy == appsv1alpha1.CollaSetReplacePodUpdateStrategyType
+		if podInfo.isInReplacing && !isReplaceUpdate {
+			// a replacing pod should be replaced by an updated revision pod when encountering upgrade
+			if err = updateReplaceOriginPod(ctx, r.client, r.recorder, podInfo, podInfo.replacePairNewPodInfo, resources.UpdatedRevision); err != nil {
+				return err
+			}
+		} else {
+			if err = updater.UpgradePod(podInfo); err != nil {
+				return err
+			}
 		}
 
 		return nil

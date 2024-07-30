@@ -383,7 +383,7 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(candidates []*PodUpdateInfo, owne
 				continue
 			}
 			if requeueAfter != nil {
-				u.recorder.Eventf(podInfo, corev1.EventTypeNormal, "PodUpdateLifecycle", "delay Pod update for %d seconds", requeueAfter.Seconds())
+				u.recorder.Eventf(podInfo, corev1.EventTypeNormal, "PodUpdateLifecycle", "delay Pod update for %f seconds", requeueAfter.Seconds())
 				if recordedRequeueAfter == nil || *requeueAfter < *recordedRequeueAfter {
 					recordedRequeueAfter = requeueAfter
 				}
@@ -397,10 +397,11 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(candidates []*PodUpdateInfo, owne
 		}
 
 		// mark podContext "PodRecreateUpgrade" if upgrade by recreate
-		if !podInfo.OnlyMetadataChanged && !podInfo.InPlaceUpdateSupport {
+		isRecreateUpdatePolicy := u.collaSet.Spec.UpdateStrategy.PodUpdatePolicy == appsv1alpha1.CollaSetRecreatePodUpdateStrategyType
+		if (!podInfo.OnlyMetadataChanged && !podInfo.InPlaceUpdateSupport) || isRecreateUpdatePolicy {
 			ownedIDs[podInfo.ID].Put(podcontext.RecreateUpdateContextDataKey, "true")
 		}
-		//
+
 		if podInfo.PodDecorationChanged {
 			decorationStr := anno.GetDecorationInfoString(podInfo.UpdatedPodDecorations)
 			if val, ok := ownedIDs[podInfo.ID].Get(podcontext.PodDecorationRevisionKey); !ok || val != decorationStr {
@@ -800,9 +801,11 @@ func (u *replaceUpdatePodUpdater) FulfillPodUpdatedInfo(_ *appsv1.ControllerRevi
 }
 
 func (u *replaceUpdatePodUpdater) UpgradePod(podInfo *PodUpdateInfo) error {
-	// add replace indicate label only and wait to replace when syncPods
-	if _, exist := podInfo.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist {
-		// need replace pod, label pod with replace-indicate
+	// add replace labels and wait to replace when syncPods
+	_, replaceIndicate := podInfo.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
+	_, replaceByUpdate := podInfo.Pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
+	if !replaceIndicate || !replaceByUpdate {
+		// need replace update pod, label pod with replace-indicate and replace-update
 		now := time.Now().UnixNano()
 		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v", "%s": "%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, now, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey, true)))
 		if err := u.Patch(u.ctx, podInfo.Pod, patch); err != nil {
