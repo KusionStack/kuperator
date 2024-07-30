@@ -34,6 +34,7 @@ import (
 	"kusionstack.io/operating/apis"
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers"
+	"kusionstack.io/operating/pkg/controllers/operationjob"
 	"kusionstack.io/operating/pkg/utils/feature"
 	"kusionstack.io/operating/pkg/utils/inject"
 	"kusionstack.io/operating/pkg/webhook"
@@ -110,6 +111,8 @@ func main() {
 		setupLog.Error(err, "unable to add APIs scheme")
 		os.Exit(1)
 	}
+
+	operationjob.RegisterOperationJobActions(mgr.GetClient(), mgr.GetScheme())
 
 	if err = controllers.AddToManager(mgr); err != nil {
 		setupLog.Error(err, "unable to add controller")
