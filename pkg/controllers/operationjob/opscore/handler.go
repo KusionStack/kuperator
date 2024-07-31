@@ -21,6 +21,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -33,12 +34,12 @@ type ActionHandler interface {
 	Init(client.Client, controller.Controller, *runtime.Scheme, cache.Cache) error
 
 	// OperateTarget do real operation to target
-	OperateTarget(context.Context, client.Client, logr.Logger, *OpsCandidate, *appsv1alpha1.OperationJob) error
+	OperateTarget(context.Context, client.Client, logr.Logger, record.EventRecorder, *OpsCandidate, *appsv1alpha1.OperationJob) error
 
 	// GetOpsProgress returns target's current opsStatus, e.g., progress, reason, message
-	GetOpsProgress(context.Context, client.Client, logr.Logger, *OpsCandidate, *appsv1alpha1.OperationJob) (
+	GetOpsProgress(context.Context, client.Client, logr.Logger, record.EventRecorder, *OpsCandidate, *appsv1alpha1.OperationJob) (
 		progress appsv1alpha1.OperationProgress, reason string, message string, err error)
 
 	// ReleaseTarget releases the target from operation when the operationJob is deleted
-	ReleaseTarget(context.Context, client.Client, logr.Logger, *OpsCandidate, *appsv1alpha1.OperationJob) error
+	ReleaseTarget(context.Context, client.Client, logr.Logger, record.EventRecorder, *OpsCandidate, *appsv1alpha1.OperationJob) error
 }

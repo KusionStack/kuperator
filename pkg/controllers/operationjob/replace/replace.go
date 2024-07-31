@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -52,12 +53,11 @@ func (p *PodReplaceHandler) Init(c client.Client, controller controller.Controll
 	return nil
 }
 
-func (p *PodReplaceHandler) OperateTarget(ctx context.Context, c client.Client, logger logr.Logger, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
+func (p *PodReplaceHandler) OperateTarget(ctx context.Context, c client.Client, logger logr.Logger, recorder record.EventRecorder, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
 	// parse replace information from origin pod
-	var replaceIndicated, replaceByReplaceUpdate, replaceNewPodExists bool
-	_, replaceIndicated = candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
-	_, replaceByReplaceUpdate = candidate.Pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
-	_, replaceNewPodExists = candidate.Pod.Labels[appsv1alpha1.PodReplacePairNewId]
+	_, replaceIndicated := candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
+	_, replaceByReplaceUpdate := candidate.Pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
+	_, replaceNewPodExists := candidate.Pod.Labels[appsv1alpha1.PodReplacePairNewId]
 
 	// label pod to trigger replace
 	replaceTriggered := replaceIndicated || replaceByReplaceUpdate || replaceNewPodExists
@@ -72,7 +72,7 @@ func (p *PodReplaceHandler) OperateTarget(ctx context.Context, c client.Client, 
 }
 
 func (p *PodReplaceHandler) GetOpsProgress(
-	ctx context.Context, c client.Client, logger logr.Logger, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) (
+	ctx context.Context, c client.Client, logger logr.Logger, recorder record.EventRecorder, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) (
 	progress appsv1alpha1.OperationProgress, reason string, message string, err error) {
 
 	progress = candidate.OpsStatus.Progress
@@ -108,7 +108,7 @@ func (p *PodReplaceHandler) GetOpsProgress(
 	return
 }
 
-func (p *PodReplaceHandler) ReleaseTarget(ctx context.Context, c client.Client, logger logr.Logger, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
+func (p *PodReplaceHandler) ReleaseTarget(ctx context.Context, c client.Client, logger logr.Logger, recorder record.EventRecorder, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
 	if candidate.Pod == nil || candidate.Pod.DeletionTimestamp != nil {
 		return nil
 	}
