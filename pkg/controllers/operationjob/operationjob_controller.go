@@ -127,10 +127,8 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 		return reconcile.Result{}, err
 	}
 
-	if !ojutils.IsJobFinished(instance) {
-		if err := r.doReconcile(ctx, instance, logger); err != nil {
-			return reconcile.Result{}, err
-		}
+	if err := r.doReconcile(ctx, instance, logger); err != nil {
+		return reconcile.Result{}, err
 	}
 
 	jobDeleted, requeueAfter, err := r.ensureActiveDeadlineAndTTL(ctx, instance, logger)
