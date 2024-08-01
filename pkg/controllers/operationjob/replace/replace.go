@@ -53,7 +53,7 @@ func (p *PodReplaceHandler) Init(c client.Client, controller controller.Controll
 	return nil
 }
 
-func (p *PodReplaceHandler) OperateTarget(ctx context.Context, c client.Client, logger logr.Logger, recorder record.EventRecorder, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
+func (p *PodReplaceHandler) OperateTarget(ctx context.Context, logger logr.Logger, recorder record.EventRecorder, c client.Client, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
 	// parse replace information from origin pod
 	_, replaceIndicated := candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
 	_, replaceByReplaceUpdate := candidate.Pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
@@ -72,7 +72,7 @@ func (p *PodReplaceHandler) OperateTarget(ctx context.Context, c client.Client, 
 }
 
 func (p *PodReplaceHandler) GetOpsProgress(
-	ctx context.Context, c client.Client, logger logr.Logger, recorder record.EventRecorder, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) (
+	ctx context.Context, logger logr.Logger, recorder record.EventRecorder, c client.Client, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) (
 	progress appsv1alpha1.OperationProgress, reason string, message string, err error) {
 
 	progress = candidate.OpsStatus.Progress
@@ -108,7 +108,7 @@ func (p *PodReplaceHandler) GetOpsProgress(
 	return
 }
 
-func (p *PodReplaceHandler) ReleaseTarget(ctx context.Context, c client.Client, logger logr.Logger, recorder record.EventRecorder, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
+func (p *PodReplaceHandler) ReleaseTarget(ctx context.Context, logger logr.Logger, recorder record.EventRecorder, c client.Client, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
 	if candidate.Pod == nil || candidate.Pod.DeletionTimestamp != nil {
 		return nil
 	}

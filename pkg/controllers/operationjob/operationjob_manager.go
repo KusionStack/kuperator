@@ -149,7 +149,7 @@ func (r *ReconcileOperationJob) operateTargets(
 
 		// 3. try to do real operation
 		if !isOpsFinished && isAllowedOps {
-			err := operator.OperateTarget(ctx, r.Client, logger, r.Recorder, candidate, operationJob)
+			err := operator.OperateTarget(ctx, logger, r.Recorder, r.Client, candidate, operationJob)
 			if err != nil {
 				return err
 			}
@@ -184,7 +184,7 @@ func (r *ReconcileOperationJob) fulfilTargetsOpsStatus(
 		if IsCandidateOpsFinished(candidate) {
 			return nil
 		}
-		progress, reason, message, err := operator.GetOpsProgress(ctx, r.Client, logger, r.Recorder, candidate, operationJob)
+		progress, reason, message, err := operator.GetOpsProgress(ctx, logger, r.Recorder, r.Client, candidate, operationJob)
 		if progress != appsv1alpha1.OperationProgressPending {
 			FulfilCandidateStatus(candidate, progress, reason, message)
 		}
@@ -240,7 +240,7 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob
 		if candidate.Pod == nil {
 			return nil
 		}
-		err := actionHandler.ReleaseTarget(ctx, r.Client, r.Logger, r.Recorder, candidate, operationJob)
+		err := actionHandler.ReleaseTarget(ctx, r.Logger, r.Recorder, r.Client, candidate, operationJob)
 		// cancel lifecycle if pod is during ops lifecycle
 		if enablePodOpsLifecycle {
 			lifecycleAdapter := NewLifecycleAdapter(operationJob.Name, operationJob.Spec.Action)
