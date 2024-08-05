@@ -57,18 +57,7 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 		logger.Error(err, "failed to decode collaset")
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-
-	if cls.Spec.UpdateStrategy.PodUpdatePolicy == "" {
-		cls.Spec.UpdateStrategy.PodUpdatePolicy = appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType
-	}
-
-	if cls.Spec.UpdateStrategy.RollingUpdate == nil {
-		cls.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateCollaSetStrategy{}
-	}
-
-	if cls.Spec.UpdateStrategy.RollingUpdate.ByPartition == nil && cls.Spec.UpdateStrategy.RollingUpdate.ByLabel == nil {
-		cls.Spec.UpdateStrategy.RollingUpdate.ByPartition = &appsv1alpha1.ByPartition{}
-	}
+	SetDefaultCollaSetUpdateStrategy(cls)
 
 	marshalled, err := json.Marshal(cls)
 	if err != nil {
@@ -91,4 +80,18 @@ var _ admission.DecoderInjector = &MutatingHandler{}
 func (h *MutatingHandler) InjectDecoder(d *admission.Decoder) error {
 	h.Decoder = d
 	return nil
+}
+
+func SetDefaultCollaSetUpdateStrategy(cls *appsv1alpha1.CollaSet) {
+	if cls.Spec.UpdateStrategy.PodUpdatePolicy == "" {
+		cls.Spec.UpdateStrategy.PodUpdatePolicy = appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType
+	}
+
+	if cls.Spec.UpdateStrategy.RollingUpdate == nil {
+		cls.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateCollaSetStrategy{}
+	}
+
+	if cls.Spec.UpdateStrategy.RollingUpdate.ByPartition == nil && cls.Spec.UpdateStrategy.RollingUpdate.ByLabel == nil {
+		cls.Spec.UpdateStrategy.RollingUpdate.ByPartition = &appsv1alpha1.ByPartition{}
+	}
 }
