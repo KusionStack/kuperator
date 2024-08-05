@@ -46,6 +46,7 @@ help: ## Display this help.
 .PHONY: manifests
 manifests:
 	cp $(API_DIR)/config/crd/apps/* config/crd/bases
+	rm -f charts/templates/crd/* && cp config/crd/bases/* charts/templates/crd/
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
