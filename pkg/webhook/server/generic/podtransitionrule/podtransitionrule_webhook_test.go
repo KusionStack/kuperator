@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
-	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 
 var _ = Describe("PodTransitionRule Validating", func() {

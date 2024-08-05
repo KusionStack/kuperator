@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 
-	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	controllerutils "kusionstack.io/operating/pkg/controllers/podtransitionrule/utils"
 	"kusionstack.io/operating/pkg/utils"
 	utilshttp "kusionstack.io/operating/pkg/utils/http"

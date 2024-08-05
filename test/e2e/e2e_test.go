@@ -25,8 +25,8 @@ import (
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
-	"kusionstack.io/operating/apis"
 	"kusionstack.io/operating/test/e2e/framework"
 	"kusionstack.io/operating/test/e2e/framework/testfiles"
 
@@ -68,7 +68,7 @@ func TestMain(m *testing.M) {
 
 func TestE2E(t *testing.T) {
 
-	err := apis.AddToScheme(scheme.Scheme)
+	err := appsv1alpha1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		t.Fatal(err)
 	}

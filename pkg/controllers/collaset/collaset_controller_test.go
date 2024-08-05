@@ -46,7 +46,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/collaset/synccontrol"
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
 	"kusionstack.io/operating/pkg/controllers/poddeletion"

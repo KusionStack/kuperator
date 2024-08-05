@@ -32,7 +32,8 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontext"
 	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
 	"kusionstack.io/operating/pkg/controllers/collaset/pvccontrol"
@@ -332,7 +333,7 @@ func (r *RealSyncControl) Scale(
 				// TODO use cache
 				pod, err := collasetutils.NewPodFrom(
 					cls,
-					metav1.NewControllerRef(cls, appsv1alpha1.GroupVersion.WithKind("CollaSet")),
+					metav1.NewControllerRef(cls, appsv1alpha1.SchemeGroupVersion.WithKind("CollaSet")),
 					revision,
 					func(in *corev1.Pod) (localErr error) {
 						in.Labels[appsv1alpha1.PodInstanceIDLabelKey] = fmt.Sprintf("%d", availableIDContext.ID)

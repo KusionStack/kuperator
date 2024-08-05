@@ -29,7 +29,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 
 type CollaSetTester struct {

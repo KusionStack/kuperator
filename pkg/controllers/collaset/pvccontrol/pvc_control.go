@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
 	refmanagerutil "kusionstack.io/operating/pkg/controllers/utils/refmanager"

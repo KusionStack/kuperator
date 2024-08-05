@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/kube-api/apps/v1alpha1"
 )
 
 // IsDuringOps decides whether the Pod is during ops or not

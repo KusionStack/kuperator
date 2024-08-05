@@ -25,7 +25,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/kube-api/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/podopslifecycle"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/utils"

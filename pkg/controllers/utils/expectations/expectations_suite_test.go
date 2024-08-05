@@ -27,12 +27,11 @@ import (
 	"github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	"kusionstack.io/operating/apis"
 )
 
 var cfg *rest.Config
@@ -41,15 +40,19 @@ func TestMain(m *testing.M) {
 	t := &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crds")},
 	}
-	apis.AddToScheme(scheme.Scheme)
+	err := appsv1alpha1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		os.Exit(1)
+	}
 
-	var err error
 	if cfg, err = t.Start(); err != nil {
 		stdlog.Fatal(err)
 	}
 
 	code := m.Run()
-	t.Stop()
+	if err = t.Stop(); err != nil {
+		os.Exit(1)
+	}
 	os.Exit(code)
 }
 
