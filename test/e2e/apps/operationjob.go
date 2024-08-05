@@ -129,9 +129,9 @@ var _ = SIGDescribe("OperationJob", func() {
 			Expect(ojTester.CreateOperationJob(oj)).NotTo(HaveOccurred())
 
 			By("Wait for replace OperationJob Succeeded")
-			Eventually(func() error { return ojTester.ExpectOperationJobProgress(oj, appsv1alpha1.OperationProgressSucceeded) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+			Eventually(func() error { return ojTester.ExpectOperationJobProgress(oj, appsv1alpha1.OperationProgressFailed) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
-			By("Check reason for Succeeded")
+			By("Check reason for Failed")
 			Expect(oj.Status.TargetDetails[0].Reason).To(Equal(appsv1alpha1.ReasonPodNotFound))
 		})
 

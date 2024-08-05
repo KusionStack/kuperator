@@ -130,7 +130,7 @@ func (p *PodReplaceHandler) GetOpsProgress(
 	} else {
 		if candidate.OpsStatus.Reason == appsv1alpha1.ReasonReplacedByNewPod {
 			newPod := &corev1.Pod{}
-			if err = c.Get(ctx, types.NamespacedName{Namespace: operationJob.Namespace, Name: message}, newPod); err != nil {
+			if err := c.Get(ctx, types.NamespacedName{Namespace: operationJob.Namespace, Name: message}, newPod); err != nil {
 				err = fmt.Errorf("fail to find replace new pod %s/%s : %s", operationJob.Namespace, message, err.Error())
 				return
 			}
