@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -45,6 +46,11 @@ import (
 	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/strategy"
 	"kusionstack.io/operating/pkg/controllers/utils/revision"
 	"kusionstack.io/operating/pkg/utils"
+	"kusionstack.io/operating/pkg/utils/mixin"
+)
+
+const (
+	controllerName = "poddecoration-controller"
 )
 
 // Add creates a new PodDecoration Controller and adds it to the Manager with default RBAC.
@@ -56,6 +62,7 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcilePodDecoration{
+		ReconcilerMixin: mixin.NewReconcilerMixin(controllerName, mgr),
 		Client:          mgr.GetClient(),
 		revisionManager: revision.NewRevisionManager(mgr.GetClient(), mgr.GetScheme(), &revisionOwnerAdapter{}),
 	}
@@ -102,6 +109,7 @@ var (
 // ReconcilePodDecoration reconciles a PodDecoration object
 type ReconcilePodDecoration struct {
 	client.Client
+	*mixin.ReconcilerMixin
 	revisionManager *revision.RevisionManager
 }
 
@@ -133,6 +141,9 @@ func (r *ReconcilePodDecoration) Reconcile(ctx context.Context, request reconcil
 	if instance.DeletionTimestamp != nil {
 		strategy.SharedStrategyController.DeletePodDecoration(instance)
 		statusUpToDateExpectation.DeleteExpectations(key)
+		if !r.shouldEscape(ctx, instance) {
+			return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
+		}
 		return reconcile.Result{}, r.clearProtection(ctx, instance)
 	}
 	if err := r.protectPD(ctx, instance); err != nil {
@@ -251,6 +262,18 @@ func (r *ReconcilePodDecoration) allCollaSetsSatisfyReplicas(collaSets sets.Stri
 		}
 	}
 	return true
+}
+
+func (r *ReconcilePodDecoration) shouldEscape(ctx context.Context, instance *appsv1alpha1.PodDecoration) bool {
+	podList := &corev1.PodList{}
+	if err := r.List(ctx, podList,
+		client.InNamespace(instance.Namespace),
+		client.HasLabels{appsv1alpha1.PodDecorationLabelPrefix + instance.Name},
+	); err != nil {
+		klog.Errorf("failed to list pods: %v", err)
+		return false
+	}
+	return len(podList.Items) == 0
 }
 
 func (r *ReconcilePodDecoration) updateStatus(

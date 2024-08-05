@@ -22,6 +22,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -97,7 +98,9 @@ func (n *namespacedPodDecorationManager) GetByRevisions(ctx context.Context, rev
 			err = utils.Join(err, localErr)
 			continue
 		}
-		res[rev] = pd
+		if pd != nil {
+			res[rev] = pd
+		}
 	}
 	return res, err
 }
@@ -147,6 +150,9 @@ func (n *namespacedPodDecorationManager) getByRevision(ctx context.Context, rev 
 	}
 	revision := &appsv1.ControllerRevision{}
 	if err := n.c.Get(ctx, types.NamespacedName{Namespace: n.namespace, Name: rev}, revision); err != nil {
+		if errors.IsNotFound(err) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("fail to get PodDecoration ControllerRevision %s/%s: %v", n.namespace, rev, err)
 	}
 	pd, err := anno.GetPodDecorationFromRevision(revision)
