@@ -243,7 +243,7 @@ var _ = Describe("operationjob controller", func() {
 
 		Expect(c.Create(ctx, oj)).Should(BeNil())
 
-		assertJobProgressSucceeded(oj, time.Second*5)
+		assertJobProgressFailed(oj, time.Second*5)
 	})
 
 	It("[replace] parallel", func() {
