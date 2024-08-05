@@ -29,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscore"
 	"kusionstack.io/operating/pkg/controllers/operationjob/replace"
 	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
@@ -39,7 +38,7 @@ import (
 
 // RegisterOperationJobActions register actions for operationJob
 func RegisterOperationJobActions(c client.Client, scheme *runtime.Scheme) {
-	RegisterAction(appsv1alpha1.OpsActionReplace, &replace.PodReplaceHandler{PodControl: podcontrol.NewRealPodControl(c, scheme)}, false)
+	RegisterAction(appsv1alpha1.OpsActionReplace, &replace.PodReplaceHandler{}, false)
 }
 
 // getActionHandler get actions registered for operationJob
