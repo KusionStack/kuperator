@@ -107,7 +107,8 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	logger := r.Logger.WithValues("operationjob", req.String())
 	instance := &appsv1alpha1.OperationJob{}
-	if err := r.Client.Get(ctx, req.NamespacedName, instance); err != nil {
+	err := r.Client.Get(ctx, req.NamespacedName, instance)
+	if err != nil {
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -118,7 +119,8 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 	}
 
 	if instance.DeletionTimestamp != nil {
-		if err := r.releaseTargets(ctx, instance); err != nil {
+		err := r.releaseTargets(ctx, instance)
+		if err != nil {
 			return reconcile.Result{}, err
 		}
 		ojutils.StatusUpToDateExpectation.DeleteExpectations(key)
@@ -127,7 +129,8 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 		return reconcile.Result{}, err
 	}
 
-	if err := r.doReconcile(ctx, instance, logger); err != nil {
+	err = r.doReconcile(ctx, instance, logger)
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -136,7 +139,8 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 		return reconcile.Result{}, err
 	}
 
-	if err := r.updateStatus(ctx, instance); err != nil {
+	err = r.updateStatus(ctx, instance)
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 
