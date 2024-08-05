@@ -167,11 +167,8 @@ func (p *PodReplaceHandler) ReleaseTarget(ctx context.Context, logger logr.Logge
 	}
 
 	if err := controllerutils.RemoveFinalizer(ctx, c, candidate.Pod, OperatingOperationReplacePodFinalizer); err != nil {
-		err = fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperatingOperationReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
+		return fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperatingOperationReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
 	}
 
-	if err := c.Patch(ctx, candidate.Pod, client.RawPatch(types.JSONPatchType, patchBytes)); err != nil {
-		return fmt.Errorf("failed to remove to-replace label %s/%s: %s", candidate.Pod.Namespace, candidate.Pod.Name, err)
-	}
-	return nil
+	return c.Patch(ctx, candidate.Pod, client.RawPatch(types.JSONPatchType, patchBytes))
 }
