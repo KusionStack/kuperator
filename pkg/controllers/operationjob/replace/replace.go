@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	OperatingOperationReplacePodFinalizer = "finalizer.operationjob.kusionstack.io/replace-protected"
+	OperationJobReplacePodFinalizer = "finalizer.operationjob.kusionstack.io/replace-protected"
 )
 
 var _ ActionHandler = &PodReplaceHandler{}
@@ -70,13 +70,13 @@ func (p *PodReplaceHandler) OperateTarget(ctx context.Context, logger logr.Logge
 	if !replaceTriggered {
 		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, true)))
 		// add finalizer on origin pod before trigger replace
-		if err := controllerutils.AddFinalizer(ctx, c, candidate.Pod, OperatingOperationReplacePodFinalizer); err != nil {
-			return fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperatingOperationReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
+		if err := controllerutils.AddFinalizer(ctx, c, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
+			return fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
 		}
 		if err := c.Patch(ctx, candidate.Pod, patch); err != nil {
 			return fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %s", candidate.Pod.Namespace, candidate.Pod.Name, err)
 		}
-		recorder.Eventf(operationJob, corev1.EventTypeNormal, "ReplaceOriginPod", fmt.Sprintf("Succeeded to trigger originPod [%s] to replace", candidate.Pod.Name))
+		recorder.Eventf(operationJob, corev1.EventTypeNormal, "ReplaceOriginPod", fmt.Sprintf("Succeeded to trigger originPod %s/%s to replace", operationJob.Namespace, candidate.Pod.Name))
 	}
 
 	return nil
@@ -113,15 +113,15 @@ func (p *PodReplaceHandler) GetOpsProgress(
 				// update ops status if newPod exists
 				reason = appsv1alpha1.ReasonReplacedByNewPod
 				message = newPod.Name
-				recorder.Eventf(operationJob, corev1.EventTypeNormal, "ReplaceNewPod", fmt.Sprintf("Succeeded to create newPod [%s] for originPod [%s]", newPod.Name, candidate.Pod.Name))
+				recorder.Eventf(operationJob, corev1.EventTypeNormal, "ReplaceNewPod", fmt.Sprintf("Succeeded to create newPod %s/%s for originPod %s/%s", operationJob.Namespace, newPod.Name, operationJob.Namespace, candidate.Pod.Name))
 				if _, serviceAvailable := newPod.Labels[appsv1alpha1.PodServiceAvailableLabel]; serviceAvailable {
-					recorder.Eventf(operationJob, corev1.EventTypeNormal, "ReplaceNewPod", fmt.Sprintf("newPod [%s] is serviceAvailable, ready to delete originPod [%s]", newPod.Name, candidate.Pod.Name))
+					recorder.Eventf(operationJob, corev1.EventTypeNormal, "ReplaceNewPod", fmt.Sprintf("newPod %s/%s is serviceAvailable, ready to delete originPod %s", operationJob.Namespace, newPod.Name, candidate.Pod.Name))
 				}
 
 				// remove replace-protection finalizer from origin pod
 				if candidate.Pod.DeletionTimestamp != nil {
-					if removeErr := controllerutils.RemoveFinalizer(ctx, c, candidate.Pod, OperatingOperationReplacePodFinalizer); removeErr != nil {
-						err = fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperatingOperationReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, removeErr.Error())
+					if removeErr := controllerutils.RemoveFinalizer(ctx, c, candidate.Pod, OperationJobReplacePodFinalizer); removeErr != nil {
+						err = fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, removeErr.Error())
 					}
 				}
 				return
@@ -131,10 +131,9 @@ func (p *PodReplaceHandler) GetOpsProgress(
 		if candidate.OpsStatus.Reason == appsv1alpha1.ReasonReplacedByNewPod {
 			newPod := &corev1.Pod{}
 			if getErr := c.Get(ctx, types.NamespacedName{Namespace: operationJob.Namespace, Name: message}, newPod); getErr != nil {
-				err = fmt.Errorf("fail to find replace new pod %s/%s : %s", operationJob.Namespace, message, getErr.Error())
+				err = fmt.Errorf("fail to find replace newPod %s/%s : %s", operationJob.Namespace, message, getErr.Error())
 				return
 			}
-			recorder.Eventf(operationJob, corev1.EventTypeNormal, "ReplaceOriginPod", fmt.Sprintf("originPod [%s] is deleted, removing lendingQuota label", candidate.PodName))
 			// mark ops status as succeeded if origin pod is replaced
 			progress = appsv1alpha1.OperationProgressSucceeded
 		} else {
@@ -166,8 +165,8 @@ func (p *PodReplaceHandler) ReleaseTarget(ctx context.Context, logger logr.Logge
 		return err
 	}
 
-	if err := controllerutils.RemoveFinalizer(ctx, c, candidate.Pod, OperatingOperationReplacePodFinalizer); err != nil {
-		return fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperatingOperationReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
+	if err := controllerutils.RemoveFinalizer(ctx, c, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
+		return fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
 	}
 
 	return c.Patch(ctx, candidate.Pod, client.RawPatch(types.JSONPatchType, patchBytes))
