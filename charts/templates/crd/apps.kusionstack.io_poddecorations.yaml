@@ -18,10 +18,6 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: The number of pods updated.
-      jsonPath: .status.isEffective
-      name: EFFECTIVE
-      type: boolean
     - description: The number of selected pods.
       jsonPath: .status.matchedPods
       name: MATCHED
