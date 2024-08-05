@@ -120,8 +120,8 @@ func (p *PodReplaceHandler) GetOpsProgress(
 
 				// remove replace-protection finalizer from origin pod
 				if candidate.Pod.DeletionTimestamp != nil {
-					if err := controllerutils.RemoveFinalizer(ctx, c, candidate.Pod, OperatingOperationReplacePodFinalizer); err != nil {
-						err = fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperatingOperationReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
+					if removeErr := controllerutils.RemoveFinalizer(ctx, c, candidate.Pod, OperatingOperationReplacePodFinalizer); removeErr != nil {
+						err = fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperatingOperationReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, removeErr.Error())
 					}
 				}
 				return
