@@ -3,8 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.10.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.15.0
   name: operationjobs.apps.kusionstack.io
 spec:
   group: apps.kusionstack.io
@@ -30,14 +29,19 @@ spec:
         description: OperationJob is the Schema for the operationjobs API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -53,9 +57,9 @@ spec:
                 description: 'Specify the operation actions including: Restart, Replace'
                 type: string
               activeDeadlineSeconds:
-                description: Specify the duration in seconds relative to the startTime
-                  that the job may be active before the system tries to terminate
-                  it
+                description: |-
+                  Specify the duration in seconds relative to the startTime
+                  that the job may be active before the system tries to terminate it
                 format: int32
                 type: integer
               operationDelaySeconds:
@@ -64,9 +68,9 @@ spec:
                 format: int32
                 type: integer
               partition:
-                description: Partition controls the operation progress by indicating
-                  how many pods should be operated. Defaults to nil (all pods will
-                  be updated)
+                description: |-
+                  Partition controls the operation progress by indicating how many pods should be operated.
+                  Defaults to nil (all pods will be updated)
                 format: int32
                 type: integer
               targets:
@@ -97,9 +101,9 @@ spec:
                 format: int32
                 type: integer
               observedGeneration:
-                description: ObservedGeneration is the most recent generation observed
-                  for this OperationJob. It corresponds to the OperationJob's generation,
-                  which is updated on mutation by the API Server.
+                description: |-
+                  ObservedGeneration is the most recent generation observed for this OperationJob. It corresponds to the
+                  OperationJob's generation, which is updated on mutation by the API Server.
                 format: int64
                 type: integer
               progress:

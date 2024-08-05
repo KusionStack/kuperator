@@ -35,7 +35,7 @@ jobs:
         make test
         git status
     - name: Check diff
-      run: '[[ -z $(git status -s) ]] || (printf "Existing modified/untracked files.\nPlease run \"make generate manifests fmt vet\" and push again.\n"; exit 1)'
+      run: '[[ -z $(git status -s) ]] || (printf "Existing modified/untracked files.\nPlease run \"make manifests fmt vet\" and push again.\n"; exit 1)'
 
 
   GolangLint:
