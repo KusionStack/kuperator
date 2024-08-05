@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	commonutils "kusionstack.io/operating/pkg/utils"
 	"kusionstack.io/operating/pkg/utils/mixin"
 )
@@ -56,7 +57,6 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 		logger.Error(err, "failed to decode collaset")
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	appsv1alpha1.SetDefaultCollaSet(cls)
 	marshalled, err := json.Marshal(cls)
 	if err != nil {
 		logger.Error(err, "failed to marshal collaset to json")

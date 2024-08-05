@@ -33,8 +33,6 @@ func TestMutatingCollaSet(t *testing.T) {
 		Spec: appsv1alpha1.CollaSetSpec{},
 	}
 
-	appsv1alpha1.SetDefaultCollaSet(cls)
-
 	if cls.Spec.UpdateStrategy.PodUpdatePolicy != appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType {
 		t.Fatalf("expected default value is %s, got %s", appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType,
 			cls.Spec.UpdateStrategy.PodUpdatePolicy)
