@@ -43,7 +43,7 @@ help: ## Display this help.
 
 ##@ Development
 .PHONY: manifests
-manifests:
+manifests: $(API_DIR)
 	cp $(API_DIR)/config/crd/apps/* config/crd/bases
 	rm -f charts/templates/crd/* && cp config/crd/bases/* charts/templates/crd/
 
