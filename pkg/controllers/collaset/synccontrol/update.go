@@ -509,7 +509,7 @@ func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(
 
 	// 2. compare current and updated pods. Only pod image and metadata are supported to update in-place
 	// TODO: use cache
-	imageChangedContainers := sets.String{}
+	var imageChangedContainers sets.String
 	podUpdateInfo.InPlaceUpdateSupport, podUpdateInfo.OnlyMetadataChanged, imageChangedContainers = u.diffPod(currentPod, podUpdateInfo.UpdatedPod)
 	// 3. if pod has changes more than metadata and image
 	if !podUpdateInfo.InPlaceUpdateSupport {
@@ -529,7 +529,7 @@ func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(
 		containerCurrentStatusMapping := map[string]*corev1.ContainerStatus{}
 		for i := range podUpdateInfo.Status.ContainerStatuses {
 			status := podUpdateInfo.Status.ContainerStatuses[i]
-			if imageChangedContainers.Has(status.Name) {
+			if imageChangedContainers != nil && imageChangedContainers.Has(status.Name) {
 				containerCurrentStatusMapping[status.Name] = &status
 			}
 		}
@@ -609,7 +609,7 @@ func recreatePod(collaSet *appsv1alpha1.CollaSet, podInfo *PodUpdateInfo, podCon
 
 func (u *inPlaceIfPossibleUpdater) diffPod(currentPod, updatedPod *corev1.Pod) (inPlaceSetUpdateSupport bool, onlyMetadataChanged bool, imageChangedContainers sets.String) {
 	if len(currentPod.Spec.Containers) != len(updatedPod.Spec.Containers) {
-		return false, false, imageChangedContainers
+		return false, false, nil
 	}
 
 	currentPod = currentPod.DeepCopy()
@@ -628,11 +628,11 @@ func (u *inPlaceIfPossibleUpdater) diffPod(currentPod, updatedPod *corev1.Pod) (
 	}
 
 	if !equality.Semantic.DeepEqual(currentPod, updatedPod) {
-		return false, false, imageChangedContainers
+		return false, false, nil
 	}
 
 	if !imageChanged {
-		return true, true, imageChangedContainers
+		return true, true, nil
 	}
 
 	return true, false, imageChangedContainers
