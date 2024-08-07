@@ -529,6 +529,7 @@ func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(
 		containerCurrentStatusMapping := map[string]*corev1.ContainerStatus{}
 		for i := range podUpdateInfo.Status.ContainerStatuses {
 			status := podUpdateInfo.Status.ContainerStatuses[i]
+			// only store and compare imageID of changed containers
 			if imageChangedContainers != nil && imageChangedContainers.Has(status.Name) {
 				containerCurrentStatusMapping[status.Name] = &status
 			}
