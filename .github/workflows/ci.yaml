@@ -51,7 +51,7 @@ jobs:
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     - name: Check diff
-      run: '[[ -z $(git status -s) ]] || (printf "Existing modified/untracked files.\nPlease run \"go mod tidy && make manifests fmt vet\" and push again.\n"; exit 1)'
+      run: '[[ -z $(git status -s) ]] || (printf "Existing modified/untracked files.\nPlease run \"go mod tidy && go mod download && make manifests fmt vet\" and push again.\n"; exit 1)'
 
   GolangLint:
     name: Golang Lint
