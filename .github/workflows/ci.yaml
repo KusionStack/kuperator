@@ -29,16 +29,16 @@ jobs:
       uses: actions/setup-go@v3
       with:
         go-version: ${{ env.GO_VERSION }}
-    - name: Update Go Modules
-      run: |
-        go mod tidy
-        go mod download
     - name: Cache Go Dependencies
       uses: actions/cache@v2
       with:
         path: ~/go/pkg/mod
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: ${{ runner.os }}-go-
+    - name: Update Go Modules
+      run: |
+        go mod tidy
+        go mod download
     - name: Run Unit Tests
       run: |
         make test
