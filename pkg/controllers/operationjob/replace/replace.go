@@ -84,15 +84,15 @@ func (p *PodReplaceHandler) OperateTarget(ctx context.Context, logger logr.Logge
 
 func (p *PodReplaceHandler) GetOpsProgress(
 	ctx context.Context, logger logr.Logger, recorder record.EventRecorder, c client.Client, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) (
-	progress appsv1alpha1.OperationProgress, reason string, message string, err error) {
+	progress ActionProgress, reason string, message string, err error) {
 
-	progress = candidate.OpsStatus.Progress
+	progress = ActionProgressProcessing
 	reason = candidate.OpsStatus.Reason
 	message = candidate.OpsStatus.Message
 
 	if candidate.Pod != nil {
 		// mark ops status as processing if origin pod exists
-		progress = appsv1alpha1.OperationProgressProcessing
+		progress = ActionProgressProcessing
 		// try to find replaceNewPod
 		newPodId, exist := candidate.Pod.Labels[appsv1alpha1.PodReplacePairNewId]
 		if exist {
@@ -135,10 +135,10 @@ func (p *PodReplaceHandler) GetOpsProgress(
 				return
 			}
 			// mark ops status as succeeded if origin pod is replaced
-			progress = appsv1alpha1.OperationProgressSucceeded
+			progress = ActionProgressSucceeded
 		} else {
 			// mark ops status as failed if origin pod not found
-			progress = appsv1alpha1.OperationProgressFailed
+			progress = ActionProgressFailed
 			reason = appsv1alpha1.ReasonPodNotFound
 		}
 	}

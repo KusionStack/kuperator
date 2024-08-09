@@ -78,7 +78,8 @@ func IsCandidateOpsFinished(candidate *OpsCandidate) bool {
 		return false
 	}
 	return candidate.OpsStatus.Progress == appsv1alpha1.OperationProgressFailed ||
-		candidate.OpsStatus.Progress == appsv1alpha1.OperationProgressSucceeded
+		candidate.OpsStatus.Progress == appsv1alpha1.OperationProgressSucceeded ||
+		candidate.OpsStatus.Progress == appsv1alpha1.OperationProgressEndingOpsLifecycle
 }
 
 func FulfilCandidateStatus(candidate *OpsCandidate, progress appsv1alpha1.OperationProgress, reason string, message string) {

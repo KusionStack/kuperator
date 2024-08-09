@@ -134,6 +134,7 @@ func (r *ReconcileOperationJob) operateTargets(
 		} else {
 			// just ignore if not have OpsLifecycle, i.e., Replace.
 			isAllowedOps = true
+			isDuringOps = false
 		}
 
 		// 2. begin OpsLifecycle if necessary
@@ -154,18 +155,33 @@ func (r *ReconcileOperationJob) operateTargets(
 			}
 		}
 
-		// 4. finish OpsLifecycle if operation is done
+		// 4. end or clean opsLifecycle when enablePodOpsLifecycle=true
 		if enablePodOpsLifecycle {
-			if isOpsFinished && isDuringOps {
-				if err := ojutils.FinishOperateLifecycle(r.Client, lifecycleAdapter, candidate.Pod); err != nil {
-					return err
+			switch candidate.OpsStatus.Progress {
+			case appsv1alpha1.OperationProgressFailed:
+				if isDuringOps {
+					// cancel opsLifecycle if ops failed
+					if err := ojutils.CancelOpsLifecycle(ctx, r.Client, lifecycleAdapter, candidate.Pod); err != nil {
+						return err
+					}
+					r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, fmt.Sprintf("%sOpsCanceled", operationJob.Spec.Action), "pod %s/%s ops canceled due to anction failed", candidate.Pod.Namespace, candidate.Pod.Name)
 				}
-				r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, fmt.Sprintf("%sOpsFinished", operationJob.Spec.Action), "pod %s/%s ops finished", candidate.Pod.Namespace, candidate.Pod.Name)
-			} else {
-				r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, fmt.Sprintf("Waiting%sOpsFinished", operationJob.Spec.Action), "waiting for pod %s/%s to ops finished", candidate.Pod.Namespace, candidate.Pod.Name)
+			case appsv1alpha1.OperationProgressEndingOpsLifecycle:
+				// finish opsLifecycle is action done
+				if isDuringOps {
+					if err := ojutils.FinishOperateLifecycle(r.Client, lifecycleAdapter, candidate.Pod); err != nil {
+						return err
+					}
+					r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, fmt.Sprintf("%sOpsFinished", operationJob.Spec.Action), "pod %s/%s ops finished", candidate.Pod.Namespace, candidate.Pod.Name)
+				}
+				// mark ops succeeded if candidate is service available when enablePodOpsLifecycle
+				if candidate.Pod.Labels != nil && candidate.Pod.Labels[appsv1alpha1.PodServiceAvailableLabel] != "" {
+					candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressSucceeded
+				}
+			case appsv1alpha1.OperationProgressSucceeded:
+			default:
 			}
 		}
-
 		return nil
 	})
 
@@ -177,6 +193,7 @@ func (r *ReconcileOperationJob) fulfilTargetsOpsStatus(
 	operator ActionHandler,
 	logger logr.Logger,
 	candidates []*OpsCandidate,
+	enablePodOpsLifecycle bool,
 	operationJob *appsv1alpha1.OperationJob) error {
 	_, err := controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
@@ -184,9 +201,23 @@ func (r *ReconcileOperationJob) fulfilTargetsOpsStatus(
 			return nil
 		}
 		progress, reason, message, err := operator.GetOpsProgress(ctx, logger, r.Recorder, r.Client, candidate, operationJob)
-		if progress != appsv1alpha1.OperationProgressPending {
-			FulfilCandidateStatus(candidate, progress, reason, message)
+		// transfer ActionProgress to OperationProgress
+		var operationProgress appsv1alpha1.OperationProgress
+		switch progress {
+		case ActionProgressProcessing:
+			operationProgress = appsv1alpha1.OperationProgressProcessing
+		case ActionProgressFailed:
+			operationProgress = appsv1alpha1.OperationProgressFailed
+		case ActionProgressSucceeded:
+			if enablePodOpsLifecycle {
+				operationProgress = appsv1alpha1.OperationProgressEndingOpsLifecycle
+			} else {
+				operationProgress = appsv1alpha1.OperationProgressSucceeded
+			}
+		default:
+			operationProgress = appsv1alpha1.OperationProgressProcessing
 		}
+		FulfilCandidateStatus(candidate, operationProgress, reason, message)
 		return err
 	})
 	return err

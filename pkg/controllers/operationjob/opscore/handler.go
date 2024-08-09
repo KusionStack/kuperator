@@ -29,6 +29,14 @@ import (
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 
+type ActionProgress string
+
+const (
+	ActionProgressProcessing ActionProgress = "Processing"
+	ActionProgressFailed     ActionProgress = "Failed"
+	ActionProgressSucceeded  ActionProgress = "Succeeded"
+)
+
 type ActionHandler interface {
 	// Init Initializes resources, i.e., watch resources related to action, inject cache index to runtime...
 	Init(client.Client, controller.Controller, *runtime.Scheme, cache.Cache) error
@@ -38,7 +46,7 @@ type ActionHandler interface {
 
 	// GetOpsProgress returns target's current opsStatus, e.g., progress, reason, message
 	GetOpsProgress(context.Context, logr.Logger, record.EventRecorder, client.Client, *OpsCandidate, *appsv1alpha1.OperationJob) (
-		progress appsv1alpha1.OperationProgress, reason string, message string, err error)
+		progress ActionProgress, reason string, message string, err error)
 
 	// ReleaseTarget releases the target from operation when the operationJob is deleted
 	ReleaseTarget(context.Context, logr.Logger, record.EventRecorder, client.Client, *OpsCandidate, *appsv1alpha1.OperationJob) error

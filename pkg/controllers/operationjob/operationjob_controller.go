@@ -166,7 +166,7 @@ func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv
 	if err := r.operateTargets(ctx, actionHandler, logger, filteredCandidates, enablePodOpsLifecycle, instance); err != nil {
 		return err
 	}
-	if err := r.fulfilTargetsOpsStatus(ctx, actionHandler, logger, filteredCandidates, instance); err != nil {
+	if err := r.fulfilTargetsOpsStatus(ctx, actionHandler, logger, filteredCandidates, enablePodOpsLifecycle, instance); err != nil {
 		return err
 	}
 
