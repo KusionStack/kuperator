@@ -22,6 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
+	operatingv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
 func TestMutatingCollaSet(t *testing.T) {
@@ -33,7 +35,7 @@ func TestMutatingCollaSet(t *testing.T) {
 		Spec: appsv1alpha1.CollaSetSpec{},
 	}
 
-	SetDefaultCollaSet(cls)
+	operatingv1alpha1.SetDefaultCollaSet(cls)
 
 	if cls.Spec.UpdateStrategy.PodUpdatePolicy != appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType {
 		t.Fatalf("expected default value is %s, got %s", appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType,
