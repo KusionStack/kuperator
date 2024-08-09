@@ -166,7 +166,7 @@ func (r *ReconcileOperationJob) operateTargets(
 					}
 					r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, fmt.Sprintf("%sOpsCanceled", operationJob.Spec.Action), "pod %s/%s ops canceled due to anction failed", candidate.Pod.Namespace, candidate.Pod.Name)
 				}
-			case appsv1alpha1.OperationProgressEndingOpsLifecycle:
+			case appsv1alpha1.OperationProgressFinishingOpsLifecycle:
 				// finish opsLifecycle is action done
 				if isDuringOps {
 					if err := ojutils.FinishOperateLifecycle(r.Client, lifecycleAdapter, candidate.Pod); err != nil {
@@ -210,7 +210,7 @@ func (r *ReconcileOperationJob) fulfilTargetsOpsStatus(
 			operationProgress = appsv1alpha1.OperationProgressFailed
 		case ActionProgressSucceeded:
 			if enablePodOpsLifecycle {
-				operationProgress = appsv1alpha1.OperationProgressEndingOpsLifecycle
+				operationProgress = appsv1alpha1.OperationProgressFinishingOpsLifecycle
 			} else {
 				operationProgress = appsv1alpha1.OperationProgressSucceeded
 			}

@@ -94,7 +94,7 @@ require (
 	k8s.io/apiserver v0.22.6 // indirect
 	k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9 // indirect
 	k8s.io/kubectl v0.29.0
-	kusionstack.io/kube-api v0.5.1-0.20240809081811-0f0a4d09ad56
+	kusionstack.io/kube-api v0.5.1-0.20240809091326-b967d94ed60d
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
