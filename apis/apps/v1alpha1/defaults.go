@@ -18,14 +18,15 @@ package v1alpha1
 
 import (
 	k8scorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 
-func SetDefaultCollaSet(cls *CollaSet) {
+func SetDefaultCollaSet(cls *appsv1alpha1.CollaSet) {
 	SetDefaultPodSpec(cls)
 	SetDefaultCollaSetUpdateStrategy(cls)
 }
 
-func SetDefaultPodSpec(in *CollaSet) {
+func SetDefaultPodSpec(in *appsv1alpha1.CollaSet) {
 	k8scorev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
@@ -238,16 +239,16 @@ func SetDefaultPodSpec(in *CollaSet) {
 	k8scorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
 }
 
-func SetDefaultCollaSetUpdateStrategy(cls *CollaSet) {
+func SetDefaultCollaSetUpdateStrategy(cls *appsv1alpha1.CollaSet) {
 	if cls.Spec.UpdateStrategy.PodUpdatePolicy == "" {
-		cls.Spec.UpdateStrategy.PodUpdatePolicy = CollaSetInPlaceIfPossiblePodUpdateStrategyType
+		cls.Spec.UpdateStrategy.PodUpdatePolicy = appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType
 	}
 
 	if cls.Spec.UpdateStrategy.RollingUpdate == nil {
-		cls.Spec.UpdateStrategy.RollingUpdate = &RollingUpdateCollaSetStrategy{}
+		cls.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateCollaSetStrategy{}
 	}
 
 	if cls.Spec.UpdateStrategy.RollingUpdate.ByPartition == nil && cls.Spec.UpdateStrategy.RollingUpdate.ByLabel == nil {
-		cls.Spec.UpdateStrategy.RollingUpdate.ByPartition = &ByPartition{}
+		cls.Spec.UpdateStrategy.RollingUpdate.ByPartition = &appsv1alpha1.ByPartition{}
 	}
 }

@@ -24,7 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
+	operatingv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
 type testCase struct {
@@ -85,7 +87,7 @@ func TestValidatingCollaSet(t *testing.T) {
 	validatingHandler := NewValidatingHandler()
 
 	for i, tc := range successCases {
-		appsv1alpha1.SetDefaultCollaSet(tc.cls)
+		operatingv1alpha1.SetDefaultCollaSet(tc.cls)
 		if err := validatingHandler.validate(tc.cls, tc.old); err != nil {
 			t.Fatalf("got unexpected err for %d case: %s", i, err)
 		}
@@ -413,7 +415,7 @@ func TestValidatingCollaSet(t *testing.T) {
 	}
 
 	for key, tc := range failureCases {
-		appsv1alpha1.SetDefaultCollaSet(tc.cls)
+		operatingv1alpha1.SetDefaultCollaSet(tc.cls)
 		err := validatingHandler.validate(tc.cls, tc.old)
 		if err == nil {
 			t.Fatalf("expected err, got nil in case %s", key)

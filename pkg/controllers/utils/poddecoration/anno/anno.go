@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 
-	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 
 type DecorationRevisionInfo []*DecorationInfo
@@ -108,7 +108,7 @@ func UnmarshallFromString(val string) ([]*DecorationInfo, error) {
 	return info, nil
 }
 
-var PodDecorationCodec = scheme.Codecs.LegacyCodec(appsv1alpha1.GroupVersion)
+var PodDecorationCodec = scheme.Codecs.LegacyCodec(appsv1alpha1.SchemeGroupVersion)
 
 func ApplyPatch(revision *appsv1.ControllerRevision) (*appsv1alpha1.PodDecoration, error) {
 	clone := &appsv1alpha1.PodDecoration{}

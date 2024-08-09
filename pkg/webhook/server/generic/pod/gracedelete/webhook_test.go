@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubectl/pkg/scheme"
-	"kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/kube-api/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/utils/feature"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -32,7 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 
 func TestGraceDelete(t *testing.T) {

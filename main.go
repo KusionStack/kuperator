@@ -28,18 +28,16 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
-	"kusionstack.io/operating/apis"
-	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers"
 	"kusionstack.io/operating/pkg/controllers/operationjob"
+	_ "kusionstack.io/operating/pkg/features"
 	"kusionstack.io/operating/pkg/utils/feature"
 	"kusionstack.io/operating/pkg/utils/inject"
 	"kusionstack.io/operating/pkg/webhook"
-
-	_ "kusionstack.io/operating/pkg/features"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -107,7 +105,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = apis.AddToScheme(mgr.GetScheme()); err != nil {
+	if err = appsv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
 		setupLog.Error(err, "unable to add APIs scheme")
 		os.Exit(1)
 	}

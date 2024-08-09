@@ -17,7 +17,7 @@ limitations under the License.
 package poddecoration
 
 import (
-	appsv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 
 type PodDecorations []*appsv1alpha1.PodDecoration

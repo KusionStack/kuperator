@@ -40,7 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"kusionstack.io/operating/apis/apps/v1alpha1"
+	"kusionstack.io/kube-api/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/controllers/podtransitionrule"
 	"kusionstack.io/operating/pkg/controllers/podtransitionrule/checker"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
