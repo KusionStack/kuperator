@@ -153,7 +153,7 @@ e2e-all: deploy-in-kind e2e-local clean-kind
 ##@ Build Dependencies
 
 ## Location to install dependencies to
-API_DIR ?= $(shell go list -f "{{.Dir}}" -m kusionstack.io/kube-api)
+API_DIR ?= $(shell go list -mod=readonly -f "{{.Dir}}" -m kusionstack.io/kube-api)
 LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
