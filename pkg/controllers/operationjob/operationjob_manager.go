@@ -24,10 +24,9 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscore"
 	"kusionstack.io/operating/pkg/controllers/operationjob/replace"
@@ -37,12 +36,12 @@ import (
 )
 
 // RegisterOperationJobActions register actions for operationJob
-func RegisterOperationJobActions(c client.Client, scheme *runtime.Scheme) {
+func RegisterOperationJobActions() {
 	RegisterAction(appsv1alpha1.OpsActionReplace, &replace.PodReplaceHandler{}, false)
 }
 
 // getActionHandler get actions registered for operationJob
-func (r *ReconcileOperationJob) getActionHandler(operationJob *appsv1alpha1.OperationJob) (ActionHandler, bool, error) {
+func (r *ReconcileOperationJob) getActionHandler(ctx context.Context, logger logr.Logger, operationJob *appsv1alpha1.OperationJob) (ActionHandler, bool, error) {
 	action := operationJob.Spec.Action
 	handler, enablePodOpsLifecycle := GetActionResources(action)
 	if handler == nil {
@@ -51,7 +50,7 @@ func (r *ReconcileOperationJob) getActionHandler(operationJob *appsv1alpha1.Oper
 		return nil, false, fmt.Errorf(errMsg)
 	}
 
-	return handler, enablePodOpsLifecycle, nil
+	return handler, enablePodOpsLifecycle, handler.SetUpOperation(ctx, logger, r.Recorder, r.Client)
 }
 
 func (r *ReconcileOperationJob) listTargets(ctx context.Context, operationJob *appsv1alpha1.OperationJob) ([]*OpsCandidate, error) {
@@ -130,7 +129,7 @@ func (r *ReconcileOperationJob) operateTargets(
 		lifecycleAdapter := NewLifecycleAdapter(operationJob.Name, operationJob.Spec.Action)
 		if enablePodOpsLifecycle {
 			isDuringOps = podopslifecycle.IsDuringOps(lifecycleAdapter, candidate.Pod)
-			_, isAllowedOps = podopslifecycle.AllowOps(lifecycleAdapter, realValue(operationJob.Spec.OperationDelaySeconds), candidate.Pod)
+			_, isAllowedOps = podopslifecycle.AllowOps(lifecycleAdapter, ptr.Deref(operationJob.Spec.OperationDelaySeconds, 0), candidate.Pod)
 		} else {
 			// just ignore if not have OpsLifecycle, i.e., Replace.
 			isAllowedOps = true
@@ -149,7 +148,7 @@ func (r *ReconcileOperationJob) operateTargets(
 
 		// 3. try to do real operation
 		if !isOpsFinished && isAllowedOps {
-			err := operator.OperateTarget(ctx, logger, r.Recorder, r.Client, candidate, operationJob)
+			err := operator.OperateTarget(candidate, operationJob)
 			if err != nil {
 				return err
 			}
@@ -200,7 +199,7 @@ func (r *ReconcileOperationJob) fulfilTargetsOpsStatus(
 		if IsCandidateOpsFinished(candidate) {
 			return nil
 		}
-		progress, reason, message, err := operator.GetOpsProgress(ctx, logger, r.Recorder, r.Client, candidate, operationJob)
+		progress, reason, message, err := operator.GetOpsProgress(candidate, operationJob)
 		// transfer ActionProgress to OperationProgress
 		var operationProgress appsv1alpha1.OperationProgress
 		switch progress {
@@ -237,7 +236,7 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, 
 				r.Recorder.Eventf(operationJob, corev1.EventTypeNormal, "Timeout", "Try to fail OperationJob for timeout...")
 				// mark operationjob failed and release targets
 				ojutils.MarkOperationJobFailed(operationJob)
-				return false, nil, r.releaseTargets(ctx, operationJob)
+				return false, nil, r.releaseTargets(ctx, logger, operationJob)
 			}
 		}
 	}
@@ -259,8 +258,8 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, 
 	return false, nil, nil
 }
 
-func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob *appsv1alpha1.OperationJob) error {
-	actionHandler, enablePodOpsLifecycle, candidates, err := r.getActionHandlerAndTargets(ctx, operationJob)
+func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, logger logr.Logger, operationJob *appsv1alpha1.OperationJob) error {
+	actionHandler, enablePodOpsLifecycle, candidates, err := r.getActionHandlerAndTargets(ctx, logger, operationJob)
 	if err != nil {
 		return err
 	}
@@ -270,7 +269,7 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob
 		if candidate.Pod == nil {
 			return nil
 		}
-		err := actionHandler.ReleaseTarget(ctx, r.Logger, r.Recorder, r.Client, candidate, operationJob)
+		err := actionHandler.ReleaseTarget(candidate, operationJob)
 		// cancel lifecycle if pod is during ops lifecycle
 		if enablePodOpsLifecycle {
 			lifecycleAdapter := NewLifecycleAdapter(operationJob.Name, operationJob.Spec.Action)
@@ -281,12 +280,4 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob
 		return err
 	})
 	return err
-}
-
-func realValue(val *int32) int32 {
-	if val == nil {
-		return 0
-	}
-
-	return *val
 }

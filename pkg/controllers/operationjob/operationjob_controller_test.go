@@ -43,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	"kusionstack.io/operating/pkg/controllers/collaset"
 	"kusionstack.io/operating/pkg/controllers/poddeletion"
 	"kusionstack.io/operating/pkg/utils/inject"
@@ -652,7 +653,7 @@ var _ = BeforeSuite(func() {
 
 	// operationJob controller
 	r, request = testReconcile(NewReconciler(mgr))
-	RegisterOperationJobActions(mgr.GetClient(), mgr.GetScheme())
+	RegisterOperationJobActions()
 	err = AddToMgr(mgr, r)
 	Expect(err).NotTo(HaveOccurred())
 	// collaset controller

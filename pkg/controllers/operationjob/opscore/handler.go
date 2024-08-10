@@ -38,16 +38,18 @@ const (
 )
 
 type ActionHandler interface {
-	// Init Initializes resources, i.e., watch resources related to action, inject cache index to runtime...
-	Init(client.Client, controller.Controller, *runtime.Scheme, cache.Cache) error
+	// SetUpAction initializes Action in AddToMgr, i.e., watch, cache...
+	SetUpAction(client.Client, controller.Controller, *runtime.Scheme, cache.Cache) error
+
+	// SetUpOperation initializes Operation in each reconcile, i.e., ctx, client, recorder...
+	SetUpOperation(context.Context, logr.Logger, record.EventRecorder, client.Client) error
 
 	// OperateTarget do real operation to target
-	OperateTarget(context.Context, logr.Logger, record.EventRecorder, client.Client, *OpsCandidate, *appsv1alpha1.OperationJob) error
+	OperateTarget(*OpsCandidate, *appsv1alpha1.OperationJob) error
 
 	// GetOpsProgress returns target's current opsStatus, e.g., progress, reason, message
-	GetOpsProgress(context.Context, logr.Logger, record.EventRecorder, client.Client, *OpsCandidate, *appsv1alpha1.OperationJob) (
-		progress ActionProgress, reason string, message string, err error)
+	GetOpsProgress(*OpsCandidate, *appsv1alpha1.OperationJob) (progress ActionProgress, reason string, message string, err error)
 
 	// ReleaseTarget releases the target from operation when the operationJob is deleted
-	ReleaseTarget(context.Context, logr.Logger, record.EventRecorder, client.Client, *OpsCandidate, *appsv1alpha1.OperationJob) error
+	ReleaseTarget(*OpsCandidate, *appsv1alpha1.OperationJob) error
 }

@@ -87,7 +87,7 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to resources for actions
 	for _, actionHandler := range ActionRegistry {
-		if err = actionHandler.Init(managerClient, c, mgr.GetScheme(), mgr.GetCache()); err != nil {
+		if err = actionHandler.SetUpAction(managerClient, c, mgr.GetScheme(), mgr.GetCache()); err != nil {
 			return err
 		}
 	}
@@ -118,7 +118,7 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 	}
 
 	if instance.DeletionTimestamp != nil {
-		if err := r.releaseTargets(ctx, instance); err != nil {
+		if err := r.releaseTargets(ctx, logger, instance); err != nil {
 			return reconcile.Result{}, err
 		}
 		ojutils.StatusUpToDateExpectation.DeleteExpectations(key)
@@ -146,9 +146,9 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileOperationJob) getActionHandlerAndTargets(ctx context.Context, instance *appsv1alpha1.OperationJob) (
+func (r *ReconcileOperationJob) getActionHandlerAndTargets(ctx context.Context, logger logr.Logger, instance *appsv1alpha1.OperationJob) (
 	actionHandler ActionHandler, enablePodOpsLifecycle bool, candidates []*OpsCandidate, err error) {
-	if actionHandler, enablePodOpsLifecycle, err = r.getActionHandler(instance); err != nil {
+	if actionHandler, enablePodOpsLifecycle, err = r.getActionHandler(ctx, logger, instance); err != nil {
 		return
 	}
 	candidates, err = r.listTargets(ctx, instance)
@@ -156,7 +156,7 @@ func (r *ReconcileOperationJob) getActionHandlerAndTargets(ctx context.Context, 
 }
 
 func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) error {
-	actionHandler, enablePodOpsLifecycle, candidates, err := r.getActionHandlerAndTargets(ctx, instance)
+	actionHandler, enablePodOpsLifecycle, candidates, err := r.getActionHandlerAndTargets(ctx, logger, instance)
 	if err != nil {
 		return err
 	}
