@@ -118,7 +118,7 @@ func (r *ReconcileOperationJob) operateTargets(
 		if IsCandidateOpsPending(candidate) {
 			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 		}
-		if candidate.Pod == nil {
+		if candidate.Pod == nil && enablePodOpsLifecycle {
 			return nil
 		}
 
@@ -266,9 +266,6 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, logger logr.
 
 	_, err = controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
-		if candidate.Pod == nil {
-			return nil
-		}
 		err := actionHandler.ReleaseTarget(candidate, operationJob)
 		// cancel lifecycle if pod is during ops lifecycle
 		if enablePodOpsLifecycle {
