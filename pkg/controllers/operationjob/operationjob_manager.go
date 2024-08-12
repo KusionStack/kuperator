@@ -234,7 +234,7 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, 
 			} else {
 				logger.Info("should end but still processing")
 				r.Recorder.Eventf(operationJob, corev1.EventTypeNormal, "Timeout", "Try to fail OperationJob for timeout...")
-				// mark operationjob failed and release targets
+				// mark operationjob and targets failed and release targets
 				ojutils.MarkOperationJobFailed(operationJob)
 				return false, nil, r.releaseTargets(ctx, logger, operationJob)
 			}
@@ -267,6 +267,10 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, logger logr.
 	_, err = controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
 		err := actionHandler.ReleaseTarget(candidate, operationJob)
+		// mark candidate as failed is not finished
+		if !IsCandidateOpsFinished(candidate) {
+			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
+		}
 		// cancel lifecycle if pod is during ops lifecycle
 		if enablePodOpsLifecycle {
 			lifecycleAdapter := NewLifecycleAdapter(operationJob.Name, operationJob.Spec.Action)
