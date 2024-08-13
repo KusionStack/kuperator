@@ -12,7 +12,7 @@ spec:
     listKind: OperationJobList
     plural: operationjobs
     shortNames:
-    - oj
+    - opj
     singular: operationjob
   scope: Namespaced
   versions:
