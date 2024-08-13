@@ -577,7 +577,7 @@ var _ = Describe("Label stay-traffic-off processing", func() {
 			Namespace: "default",
 			Labels: map[string]string{
 				v1alpha1.ControlledByKusionStackLabelKey: "true",
-				v1alpha1.PodStayTrafficOffLabel:          "true",
+				v1alpha1.PodStayOfflineLabel:             "true",
 			},
 		},
 		Status: corev1.PodStatus{

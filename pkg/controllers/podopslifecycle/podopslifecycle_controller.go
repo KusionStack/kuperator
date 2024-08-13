@@ -133,7 +133,7 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 
 	// All lifecycles are finished, and not stay in traffic off
 	lifecyclesFinished := len(idToLabelsMap) == 0
-	_, stayTrafficOff := pod.Labels[v1alpha1.PodStayTrafficOffLabel]
+	_, stayTrafficOff := pod.Labels[v1alpha1.PodStayOfflineLabel]
 	if lifecyclesFinished && !stayTrafficOff {
 		updated, err := r.addServiceAvailable(pod)
 		if err != nil {
