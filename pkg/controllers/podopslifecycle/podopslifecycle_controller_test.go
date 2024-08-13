@@ -120,6 +120,7 @@ var _ = Describe("PodOpsLifecycle controller", func() {
 		name      = "test"
 		namespace = "default"
 		id        = "123"
+		id2       = "456"
 		timestamp = "1717505885197871195"
 	)
 
@@ -270,7 +271,7 @@ var _ = Describe("PodOpsLifecycle controller", func() {
 		}, 3*time.Second, 200*time.Millisecond).Should(BeNil())
 	})
 
-	It("Update pod with label compiling", func() {
+	It("Update pod with label completing", func() {
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
@@ -320,6 +321,67 @@ var _ = Describe("PodOpsLifecycle controller", func() {
 			}
 			if pod.Status.Conditions[0].Status != corev1.ConditionTrue {
 				return fmt.Errorf("expected status %s, got %s", corev1.ConditionTrue, pod.Status.Conditions[0].Status)
+			}
+			return nil
+		}, 3*time.Second, 200*time.Millisecond).Should(BeNil())
+	})
+
+	It("Update pod with label preparing and completing", func() {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+				Labels:    map[string]string{v1alpha1.ControlledByKusionStackLabelKey: "true"},
+			},
+			Spec: podSpec,
+		}
+		err := mgr.GetClient().Create(context.Background(), pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		<-request
+
+		Eventually(func() error {
+			pod := &corev1.Pod{}
+			err = mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
+				Name:      name,
+				Namespace: namespace,
+			}, pod)
+			if err != nil {
+				return fmt.Errorf("fail to get pod: %v", err)
+			}
+
+			pod.ObjectMeta.Labels = map[string]string{
+				v1alpha1.ControlledByKusionStackLabelKey: "true",
+
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, id):           timestamp,
+				fmt.Sprintf("%s/%s", v1alpha1.PodDoneOperationTypeLabelPrefix, id): timestamp,
+				fmt.Sprintf("%s/%s", v1alpha1.PodCompletingLabelPrefix, id):        timestamp,
+
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, id2):     timestamp,
+				fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, id2): timestamp,
+				fmt.Sprintf("%s/%s", v1alpha1.PodPreparingLabelPrefix, id2):     timestamp,
+			}
+			return mgr.GetClient().Update(context.Background(), pod)
+		}, 3*time.Second, 200*time.Millisecond).Should(BeNil())
+
+		Eventually(func() error {
+			pod := &corev1.Pod{}
+			if err := mgr.GetAPIReader().Get(context.Background(), client.ObjectKey{
+				Name:      name,
+				Namespace: namespace,
+			}, pod); err != nil {
+				return fmt.Errorf("fail to get pod: %v", err)
+			}
+
+			// Need set readiness gate to true
+			if len(pod.Status.Conditions) != 1 {
+				return fmt.Errorf("expected 1 condition, got %d", len(pod.Status.Conditions))
+			}
+			if string(pod.Status.Conditions[0].Type) != v1alpha1.ReadinessGatePodServiceReady {
+				return fmt.Errorf("expected type %s, got %s", v1alpha1.ReadinessGatePodServiceReady, pod.Status.Conditions[0].Type)
+			}
+			if pod.Status.Conditions[0].Status != corev1.ConditionFalse {
+				return fmt.Errorf("expected status %s, got %s", corev1.ConditionFalse, pod.Status.Conditions[0].Status)
 			}
 			return nil
 		}, 3*time.Second, 200*time.Millisecond).Should(BeNil())
@@ -565,7 +627,7 @@ var _ = Describe("Label service-available processing", func() {
 	})
 })
 
-var _ = Describe("Label stay-traffic-off processing", func() {
+var _ = Describe("Label stay-offline processing", func() {
 	scheme := runtime.NewScheme()
 	err := corev1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
