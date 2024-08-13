@@ -131,7 +131,7 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 		return reconcile.Result{}, err
 	}
 
-	// All lifecycles are finished, and not stay in traffic off
+	// All lifecycles are finished, and should be online
 	lifecyclesFinished := len(idToLabelsMap) == 0
 	_, stayTrafficOff := pod.Labels[v1alpha1.PodStayOfflineLabel]
 	if lifecyclesFinished && !stayTrafficOff {
