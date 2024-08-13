@@ -324,6 +324,7 @@ func (o orderByDefault) Less(i, j int) bool {
 }
 
 type PodUpdater interface {
+	SetupPodUpdater(context.Context, client.Client, *appsv1alpha1.CollaSet, podcontrol.Interface, record.EventRecorder)
 	FulfillPodUpdatedInfo(revision *appsv1.ControllerRevision, podUpdateInfo *PodUpdateInfo) error
 	BeginUpdatePod(resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (bool, error)
 	FilterAllowOpsPods(podToUpdate []*PodUpdateInfo, ownedIDs map[int]*appsv1alpha1.ContextDetail, resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (*time.Duration, error)
@@ -338,6 +339,14 @@ type GenericPodUpdater struct {
 	podControl podcontrol.Interface
 	recorder   record.EventRecorder
 	client.Client
+}
+
+func (u *GenericPodUpdater) SetupPodUpdater(ctx context.Context, client client.Client, cls *appsv1alpha1.CollaSet, podControl podcontrol.Interface, recorder record.EventRecorder) {
+	u.ctx = ctx
+	u.Client = client
+	u.collaSet = cls
+	u.podControl = podControl
+	u.recorder = recorder
 }
 
 func (u *GenericPodUpdater) BeginUpdatePod(resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (bool, error) {
@@ -448,20 +457,33 @@ func (u *GenericPodUpdater) FinishUpdatePod(podInfo *PodUpdateInfo) error {
 	return nil
 }
 
+// Support users to define inPlaceOnlyPodUpdater and register through RegisterInPlaceOnlyUpdater
+var inPlaceOnlyPodUpdater PodUpdater
+
+func RegisterInPlaceOnlyUpdater(podUpdater PodUpdater) {
+	inPlaceOnlyPodUpdater = podUpdater
+}
+
 func newPodUpdater(ctx context.Context, client client.Client, cls *appsv1alpha1.CollaSet, podControl podcontrol.Interface, recorder record.EventRecorder) PodUpdater {
-	genericPodUpdater := &GenericPodUpdater{collaSet: cls, ctx: ctx, Client: client, podControl: podControl, recorder: recorder}
+	var podUpdater PodUpdater
 	switch cls.Spec.UpdateStrategy.PodUpdatePolicy {
 	case appsv1alpha1.CollaSetRecreatePodUpdateStrategyType:
-		return &recreatePodUpdater{collaSet: cls, ctx: ctx, Client: client, podControl: podControl, recorder: recorder, GenericPodUpdater: *genericPodUpdater}
+		podUpdater = &recreatePodUpdater{}
 	case appsv1alpha1.CollaSetInPlaceOnlyPodUpdateStrategyType:
-		// In case of using native K8s, Pod is only allowed to update with container image, so InPlaceOnly policy is
-		// implemented with InPlaceIfPossible policy as default for compatibility.
-		return &inPlaceIfPossibleUpdater{collaSet: cls, ctx: ctx, Client: client}
+		if inPlaceOnlyPodUpdater != nil {
+			podUpdater = inPlaceOnlyPodUpdater
+		} else {
+			// In case of using native K8s, Pod is only allowed to update with container image, so InPlaceOnly policy is
+			// implemented with InPlaceIfPossible policy as default for compatibility.
+			podUpdater = &inPlaceIfPossibleUpdater{}
+		}
 	case appsv1alpha1.CollaSetReplacePodUpdateStrategyType:
-		return &replaceUpdatePodUpdater{collaSet: cls, ctx: ctx, Client: client, podControl: podControl, recorder: recorder}
+		podUpdater = &replaceUpdatePodUpdater{}
 	default:
-		return &inPlaceIfPossibleUpdater{collaSet: cls, ctx: ctx, Client: client, podControl: podControl, recorder: recorder, GenericPodUpdater: *genericPodUpdater}
+		podUpdater = &inPlaceIfPossibleUpdater{}
 	}
+	podUpdater.SetupPodUpdater(ctx, client, cls, podControl, recorder)
+	return podUpdater
 }
 
 type PodStatus struct {
@@ -701,30 +723,6 @@ func (u *inPlaceIfPossibleUpdater) GetPodUpdateFinishStatus(podUpdateInfo *PodUp
 	return true, "", nil
 }
 
-// TODO
-type inPlaceOnlyPodUpdater struct {
-}
-
-func (u *inPlaceOnlyPodUpdater) BeginUpdate(_ *collasetutils.RelatedResources, _ chan *PodUpdateInfo) (updating bool, err error) {
-	return
-}
-
-func (u *inPlaceOnlyPodUpdater) FilterAllowOpsPodsAndUpdatePodContext(_ []*PodUpdateInfo, _ map[int]*appsv1alpha1.ContextDetail, _ *collasetutils.RelatedResources, _ chan *PodUpdateInfo) (requeueAfter *time.Duration, err error) {
-	return
-}
-
-func (u *inPlaceOnlyPodUpdater) FulfillPodUpdatedInfo(_ *appsv1.ControllerRevision, _ *PodUpdateInfo) (inPlaceUpdateSupport bool, onlyMetadataChanged bool, updatedPod *corev1.Pod, err error) {
-	return
-}
-
-func (u *inPlaceOnlyPodUpdater) UpgradePod(_ *appsv1alpha1.CollaSet, _ *PodUpdateInfo) (err error) {
-	return
-}
-
-func (u *inPlaceOnlyPodUpdater) GetPodUpdateFinishStatus(_ *PodUpdateInfo) (finished bool, msg string, err error) {
-	return
-}
-
 type recreatePodUpdater struct {
 	collaSet   *appsv1alpha1.CollaSet
 	ctx        context.Context
@@ -753,6 +751,14 @@ type replaceUpdatePodUpdater struct {
 	podControl podcontrol.Interface
 	recorder   record.EventRecorder
 	client.Client
+}
+
+func (u *replaceUpdatePodUpdater) SetupPodUpdater(ctx context.Context, client client.Client, cls *appsv1alpha1.CollaSet, podControl podcontrol.Interface, recorder record.EventRecorder) {
+	u.ctx = ctx
+	u.Client = client
+	u.collaSet = cls
+	u.podControl = podControl
+	u.recorder = recorder
 }
 
 func (u *replaceUpdatePodUpdater) BeginUpdatePod(resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (bool, error) {
