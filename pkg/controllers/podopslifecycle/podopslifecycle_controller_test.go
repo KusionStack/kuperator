@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/klogr"
+	"kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -39,8 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	"kusionstack.io/kube-api/apps/v1alpha1"
 
 	"kusionstack.io/operating/pkg/controllers/podtransitionrule"
 	"kusionstack.io/operating/pkg/controllers/podtransitionrule/checker"
