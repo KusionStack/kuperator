@@ -181,8 +181,9 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 		v1alpha1.PodPreparingLabelPrefix:  false, // Set readiness gate to false
 		v1alpha1.PodCompletingLabelPrefix: true,  // Set readiness gate to true
 	}
-	for _, labels := range idToLabelsMap {
-		for k, v := range expected {
+	for k, v := range expected {
+		keeped := false
+		for _, labels := range idToLabelsMap {
 			if _, ok := labels[k]; !ok {
 				continue
 			}
@@ -192,8 +193,14 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 				return reconcile.Result{}, err // Only need set once
 			}
 			if updated {
-				return reconcile.Result{}, nil
+				logger.Info("update readiness gate", "status", v)
 			}
+			keeped = true
+		}
+
+		// If readiness gate has been set true, it may be set false in other lifecycles, when all lifecycles are finished, it will be set true again.
+		if keeped {
+			break
 		}
 	}
 	return reconcile.Result{}, nil
@@ -341,6 +348,7 @@ func (r *ReconcilePodOpsLifecycle) updateServiceReadiness(ctx context.Context, p
 	return true, nil
 }
 
+// setServiceReadiness set service readiness gate to pod, and return whether need update pod status
 func (r *ReconcilePodOpsLifecycle) setServiceReadiness(pod *corev1.Pod, isReady bool) (bool, string) {
 	found := false
 	for _, rg := range pod.Spec.ReadinessGates {
