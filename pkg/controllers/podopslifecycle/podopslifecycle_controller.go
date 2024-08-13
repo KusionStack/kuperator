@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"kusionstack.io/kube-api/apps/v1alpha1"
+
 	"kusionstack.io/operating/pkg/controllers/podtransitionrule"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/controllers/utils/expectations"
@@ -130,8 +131,10 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 		return reconcile.Result{}, err
 	}
 
-	// All lifecycles are finished, or no lifecycle begined
-	if len(idToLabelsMap) == 0 {
+	// All lifecycles are finished, and should be online
+	lifecyclesFinished := len(idToLabelsMap) == 0
+	_, stayOffline := pod.Labels[v1alpha1.PodStayOfflineLabel]
+	if lifecyclesFinished && !stayOffline {
 		updated, err := r.addServiceAvailable(pod)
 		if err != nil {
 			return reconcile.Result{}, err
