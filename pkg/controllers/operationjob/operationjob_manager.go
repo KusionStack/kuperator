@@ -41,7 +41,7 @@ func RegisterOperationJobActions() {
 }
 
 // getActionHandler get actions registered for operationJob
-func (r *ReconcileOperationJob) getActionHandler(ctx context.Context, logger logr.Logger, operationJob *appsv1alpha1.OperationJob) (ActionHandler, bool, error) {
+func (r *ReconcileOperationJob) getActionHandler(operationJob *appsv1alpha1.OperationJob) (ActionHandler, bool, error) {
 	action := operationJob.Spec.Action
 	handler, enablePodOpsLifecycle := GetActionResources(action)
 	if handler == nil {
@@ -50,7 +50,7 @@ func (r *ReconcileOperationJob) getActionHandler(ctx context.Context, logger log
 		return nil, false, fmt.Errorf(errMsg)
 	}
 
-	return handler, enablePodOpsLifecycle, handler.SetUpOperation(ctx, logger, r.Recorder, r.Client)
+	return handler, enablePodOpsLifecycle, nil
 }
 
 func (r *ReconcileOperationJob) listTargets(ctx context.Context, operationJob *appsv1alpha1.OperationJob) ([]*OpsCandidate, error) {
@@ -99,7 +99,6 @@ func (r *ReconcileOperationJob) listTargets(ctx context.Context, operationJob *a
 func (r *ReconcileOperationJob) operateTargets(
 	ctx context.Context,
 	operator ActionHandler,
-	logger logr.Logger,
 	candidates []*OpsCandidate,
 	enablePodOpsLifecycle bool,
 	operationJob *appsv1alpha1.OperationJob) error {
@@ -141,7 +140,7 @@ func (r *ReconcileOperationJob) operateTargets(
 
 		// 3. try to do real operation
 		if !isOpsFinished && isAllowedOps {
-			err := operator.OperateTarget(candidate, operationJob)
+			err := operator.OperateTarget(ctx, candidate, operationJob)
 			if err != nil {
 				return err
 			}
@@ -181,7 +180,6 @@ func (r *ReconcileOperationJob) operateTargets(
 func (r *ReconcileOperationJob) fulfilTargetsOpsStatus(
 	ctx context.Context,
 	operator ActionHandler,
-	logger logr.Logger,
 	candidates []*OpsCandidate,
 	enablePodOpsLifecycle bool,
 	operationJob *appsv1alpha1.OperationJob) error {
@@ -190,24 +188,22 @@ func (r *ReconcileOperationJob) fulfilTargetsOpsStatus(
 		if IsCandidateOpsFinished(candidate) {
 			return nil
 		}
-		progress, reason, message, err := operator.GetOpsProgress(candidate, operationJob)
+		actionProgress, err := operator.GetOpsProgress(ctx, candidate, operationJob)
 		// transfer ActionProgress to OperationProgress
-		var operationProgress appsv1alpha1.OperationProgress
-		switch progress {
+		switch actionProgress {
 		case ActionProgressProcessing:
-			operationProgress = appsv1alpha1.OperationProgressProcessing
+			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 		case ActionProgressFailed:
-			operationProgress = appsv1alpha1.OperationProgressFailed
+			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
 		case ActionProgressSucceeded:
 			if enablePodOpsLifecycle {
-				operationProgress = appsv1alpha1.OperationProgressFinishingOpsLifecycle
+				candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFinishingOpsLifecycle
 			} else {
-				operationProgress = appsv1alpha1.OperationProgressSucceeded
+				candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressSucceeded
 			}
 		default:
-			operationProgress = appsv1alpha1.OperationProgressProcessing
+			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 		}
-		FulfilCandidateStatus(candidate, operationProgress, reason, message)
 		return err
 	})
 	return err
@@ -250,14 +246,14 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, 
 }
 
 func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, logger logr.Logger, operationJob *appsv1alpha1.OperationJob) error {
-	actionHandler, enablePodOpsLifecycle, candidates, err := r.getActionHandlerAndTargets(ctx, logger, operationJob)
+	actionHandler, enablePodOpsLifecycle, candidates, err := r.getActionHandlerAndTargets(ctx, operationJob)
 	if err != nil {
 		return err
 	}
 
 	_, err = controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
-		err := actionHandler.ReleaseTarget(candidate, operationJob)
+		err := actionHandler.ReleaseTarget(ctx, candidate, operationJob)
 		// mark candidate as failed is not succeeded
 		if candidate.OpsStatus.Progress != appsv1alpha1.OperationProgressSucceeded {
 			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed

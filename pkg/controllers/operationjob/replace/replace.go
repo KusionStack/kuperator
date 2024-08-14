@@ -24,17 +24,17 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscore"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
+	"kusionstack.io/operating/pkg/utils/mixin"
 )
 
 const (
@@ -44,31 +44,22 @@ const (
 var _ ActionHandler = &PodReplaceHandler{}
 
 type PodReplaceHandler struct {
-	ctx      context.Context
 	logger   logr.Logger
 	recorder record.EventRecorder
 	client   client.Client
 }
 
-func (p *PodReplaceHandler) SetUpAction(c client.Client, controller controller.Controller, _ *runtime.Scheme, _ cache.Cache) error {
+func (p *PodReplaceHandler) SetUp(controller controller.Controller, _ ctrl.Manager, reconcileMixin *mixin.ReconcilerMixin) error {
+	// Setup parameters
+	p.logger = reconcileMixin.Logger.WithName(appsv1alpha1.OpsActionReplace)
+	p.recorder = reconcileMixin.Recorder
+	p.client = reconcileMixin.Client
+
 	// Watch for changes to replace new pods
-	err := controller.Watch(&source.Kind{Type: &corev1.Pod{}}, &OriginPodHandler{Client: c})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return controller.Watch(&source.Kind{Type: &corev1.Pod{}}, &OriginPodHandler{Client: reconcileMixin.Client})
 }
 
-func (p *PodReplaceHandler) SetUpOperation(ctx context.Context, logger logr.Logger, recorder record.EventRecorder, c client.Client) error {
-	p.ctx = ctx
-	p.logger = logger
-	p.recorder = recorder
-	p.client = c
-	return nil
-}
-
-func (p *PodReplaceHandler) OperateTarget(candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
+func (p *PodReplaceHandler) OperateTarget(ctx context.Context, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
 	if candidate.Pod == nil {
 		return nil
 	}
@@ -83,10 +74,10 @@ func (p *PodReplaceHandler) OperateTarget(candidate *OpsCandidate, operationJob 
 	if !replaceTriggered {
 		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, true)))
 		// add finalizer on origin pod before trigger replace
-		if err := controllerutils.AddFinalizer(p.ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
+		if err := controllerutils.AddFinalizer(ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
 			return fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
 		}
-		if err := p.client.Patch(p.ctx, candidate.Pod, patch); err != nil {
+		if err := p.client.Patch(ctx, candidate.Pod, patch); err != nil {
 			return fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %s", candidate.Pod.Namespace, candidate.Pod.Name, err)
 		}
 		p.recorder.Eventf(operationJob, corev1.EventTypeNormal, "ReplaceOriginPod", fmt.Sprintf("Succeeded to trigger originPod %s/%s to replace", operationJob.Namespace, candidate.Pod.Name))
@@ -95,10 +86,8 @@ func (p *PodReplaceHandler) OperateTarget(candidate *OpsCandidate, operationJob 
 	return nil
 }
 
-func (p *PodReplaceHandler) GetOpsProgress(candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) (progress ActionProgress, reason string, message string, err error) {
+func (p *PodReplaceHandler) GetOpsProgress(ctx context.Context, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) (progress ActionProgress, err error) {
 	progress = ActionProgressProcessing
-	reason = candidate.OpsStatus.Reason
-	message = candidate.OpsStatus.Message
 
 	if candidate.Pod != nil {
 		// mark ops status as processing if origin pod exists
@@ -107,7 +96,7 @@ func (p *PodReplaceHandler) GetOpsProgress(candidate *OpsCandidate, operationJob
 		newPodId, exist := candidate.Pod.Labels[appsv1alpha1.PodReplacePairNewId]
 		if exist {
 			newPods := corev1.PodList{}
-			if err = p.client.List(p.ctx, &newPods, client.InNamespace(operationJob.Namespace), client.MatchingLabels{
+			if err = p.client.List(ctx, &newPods, client.InNamespace(operationJob.Namespace), client.MatchingLabels{
 				appsv1alpha1.PodReplacePairOriginName: candidate.Pod.Name,
 			}); err != nil {
 				return
@@ -121,8 +110,8 @@ func (p *PodReplaceHandler) GetOpsProgress(candidate *OpsCandidate, operationJob
 				}
 
 				// update ops status if newPod exists
-				reason = appsv1alpha1.ReasonReplacedByNewPod
-				message = newPod.Name
+				candidate.OpsStatus.Reason = appsv1alpha1.ReasonReplacedByNewPod
+				candidate.OpsStatus.Message = newPod.Name
 				p.recorder.Eventf(operationJob, corev1.EventTypeNormal, "ReplaceNewPod", fmt.Sprintf("Succeeded to create newPod %s/%s for originPod %s/%s", operationJob.Namespace, newPod.Name, operationJob.Namespace, candidate.Pod.Name))
 				if _, serviceAvailable := newPod.Labels[appsv1alpha1.PodServiceAvailableLabel]; serviceAvailable {
 					p.recorder.Eventf(operationJob, corev1.EventTypeNormal, "ReplaceNewPod", fmt.Sprintf("newPod %s/%s is serviceAvailable, ready to delete originPod %s", operationJob.Namespace, newPod.Name, candidate.Pod.Name))
@@ -130,7 +119,7 @@ func (p *PodReplaceHandler) GetOpsProgress(candidate *OpsCandidate, operationJob
 
 				// remove replace-protection finalizer from origin pod
 				if candidate.Pod.DeletionTimestamp != nil {
-					if removeErr := controllerutils.RemoveFinalizer(p.ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); removeErr != nil {
+					if removeErr := controllerutils.RemoveFinalizer(ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); removeErr != nil {
 						err = fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, removeErr.Error())
 					}
 				}
@@ -140,8 +129,8 @@ func (p *PodReplaceHandler) GetOpsProgress(candidate *OpsCandidate, operationJob
 	} else {
 		if candidate.OpsStatus.Reason == appsv1alpha1.ReasonReplacedByNewPod {
 			newPod := &corev1.Pod{}
-			if getErr := p.client.Get(p.ctx, types.NamespacedName{Namespace: operationJob.Namespace, Name: message}, newPod); getErr != nil {
-				err = fmt.Errorf("fail to find replace newPod %s/%s : %s", operationJob.Namespace, message, getErr.Error())
+			if getErr := p.client.Get(ctx, types.NamespacedName{Namespace: operationJob.Namespace, Name: candidate.OpsStatus.Message}, newPod); getErr != nil {
+				err = fmt.Errorf("fail to find replace newPod %s/%s : %s", operationJob.Namespace, candidate.OpsStatus.Message, getErr.Error())
 				return
 			}
 			// mark ops status as succeeded if origin pod is replaced
@@ -149,13 +138,13 @@ func (p *PodReplaceHandler) GetOpsProgress(candidate *OpsCandidate, operationJob
 		} else {
 			// mark ops status as failed if origin pod not found
 			progress = ActionProgressFailed
-			reason = appsv1alpha1.ReasonPodNotFound
+			candidate.OpsStatus.Reason = appsv1alpha1.ReasonPodNotFound
 		}
 	}
 	return
 }
 
-func (p *PodReplaceHandler) ReleaseTarget(candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
+func (p *PodReplaceHandler) ReleaseTarget(ctx context.Context, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
 	if candidate.Pod == nil || candidate.Pod.DeletionTimestamp != nil {
 		return nil
 	}
@@ -175,9 +164,9 @@ func (p *PodReplaceHandler) ReleaseTarget(candidate *OpsCandidate, operationJob 
 		return err
 	}
 
-	if err := controllerutils.RemoveFinalizer(p.ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
+	if err := controllerutils.RemoveFinalizer(ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
 		return fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
 	}
 
-	return p.client.Patch(p.ctx, candidate.Pod, client.RawPatch(types.JSONPatchType, patchBytes))
+	return p.client.Patch(ctx, candidate.Pod, client.RawPatch(types.JSONPatchType, patchBytes))
 }

@@ -19,7 +19,6 @@ package operationjob
 import (
 	"context"
 
-	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/types"
@@ -79,15 +78,14 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to target pod
-	managerClient := mgr.GetClient()
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &PodHandler{Client: managerClient})
+	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &PodHandler{Client: mgr.GetClient()})
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to resources for actions
 	for _, actionHandler := range ActionRegistry {
-		if err = actionHandler.SetUpAction(managerClient, c, mgr.GetScheme(), mgr.GetCache()); err != nil {
+		if err = actionHandler.SetUp(c, mgr, mixin.NewReconcilerMixin(controllerName, mgr)); err != nil {
 			return err
 		}
 	}
@@ -132,7 +130,7 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 		return reconcile.Result{}, err
 	}
 
-	if err := r.doReconcile(ctx, instance, logger); err != nil {
+	if err := r.doReconcile(ctx, instance); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -146,27 +144,27 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileOperationJob) getActionHandlerAndTargets(ctx context.Context, logger logr.Logger, instance *appsv1alpha1.OperationJob) (
+func (r *ReconcileOperationJob) getActionHandlerAndTargets(ctx context.Context, instance *appsv1alpha1.OperationJob) (
 	actionHandler ActionHandler, enablePodOpsLifecycle bool, candidates []*OpsCandidate, err error) {
-	if actionHandler, enablePodOpsLifecycle, err = r.getActionHandler(ctx, logger, instance); err != nil {
+	if actionHandler, enablePodOpsLifecycle, err = r.getActionHandler(instance); err != nil {
 		return
 	}
 	candidates, err = r.listTargets(ctx, instance)
 	return
 }
 
-func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) error {
-	actionHandler, enablePodOpsLifecycle, candidates, err := r.getActionHandlerAndTargets(ctx, logger, instance)
+func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv1alpha1.OperationJob) error {
+	actionHandler, enablePodOpsLifecycle, candidates, err := r.getActionHandlerAndTargets(ctx, instance)
 	if err != nil {
 		return err
 	}
 
 	// operate targets by partition
 	filteredCandidates := DecideCandidateByPartition(instance, candidates)
-	if err := r.operateTargets(ctx, actionHandler, logger, filteredCandidates, enablePodOpsLifecycle, instance); err != nil {
+	if err := r.operateTargets(ctx, actionHandler, filteredCandidates, enablePodOpsLifecycle, instance); err != nil {
 		return err
 	}
-	if err := r.fulfilTargetsOpsStatus(ctx, actionHandler, logger, filteredCandidates, enablePodOpsLifecycle, instance); err != nil {
+	if err := r.fulfilTargetsOpsStatus(ctx, actionHandler, filteredCandidates, enablePodOpsLifecycle, instance); err != nil {
 		return err
 	}
 
