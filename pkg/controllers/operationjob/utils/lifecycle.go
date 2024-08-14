@@ -29,24 +29,13 @@ import (
 	"kusionstack.io/operating/pkg/utils"
 )
 
-func IsOperateLifecycleOnPod(lifecycleId string, pod *corev1.Pod) (bool, error) {
-	newIDToLabelsMap, _, err := podopslifecycleutil.PodIDAndTypesMap(pod)
-	_, exist := newIDToLabelsMap[lifecycleId]
-	return exist, err
-}
-
-func NumsOfOperateLifecycleOnPod(lifecycleId string, pod *corev1.Pod) (int, error) {
-	newIDToLabelsMap, _, err := podopslifecycleutil.PodIDAndTypesMap(pod)
-	return len(newIDToLabelsMap), err
-}
-
 func BeginOperateLifecycle(client client.Client, adapter podopslifecycle.LifecycleAdapter, pod *corev1.Pod) error {
 	if pod == nil {
 		return nil
 	}
 
 	// not start to operate until other lifecycles finished
-	if num, err := NumsOfOperateLifecycleOnPod(adapter.GetID(), pod); err != nil {
+	if num, err := podopslifecycleutil.NumOfLifecycleOnPod(pod); err != nil {
 		return err
 	} else if num > 0 {
 		return nil
@@ -83,7 +72,7 @@ func CancelOpsLifecycle(ctx context.Context, client client.Client, adapter podop
 	}
 
 	// only cancel when lifecycle exist on pod
-	if exist, err := IsOperateLifecycleOnPod(adapter.GetID(), pod); err != nil {
+	if exist, err := podopslifecycleutil.IsLifecycleOnPod(adapter.GetID(), pod); err != nil {
 		return err
 	} else if !exist {
 		return nil
