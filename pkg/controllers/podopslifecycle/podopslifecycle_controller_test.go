@@ -373,7 +373,7 @@ var _ = Describe("PodOpsLifecycle controller", func() {
 				return fmt.Errorf("fail to get pod: %v", err)
 			}
 
-			// Need set readiness gate to true
+			// Need set readiness gate to false
 			if len(pod.Status.Conditions) != 1 {
 				return fmt.Errorf("expected 1 condition, got %d", len(pod.Status.Conditions))
 			}

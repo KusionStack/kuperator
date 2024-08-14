@@ -28,8 +28,7 @@ type OpsCandidate struct {
 	*corev1.Pod
 	PodName    string
 	Containers []string
-	*appsv1alpha1.CollaSet
-	OpsStatus *appsv1alpha1.OpsStatus
+	OpsStatus  *appsv1alpha1.OpsStatus
 }
 
 func DecideCandidateByPartition(instance *appsv1alpha1.OperationJob, candidates []*OpsCandidate) []*OpsCandidate {

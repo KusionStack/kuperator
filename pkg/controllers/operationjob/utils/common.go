@@ -17,10 +17,7 @@ limitations under the License.
 package utils
 
 import (
-	"context"
-
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
@@ -29,7 +26,6 @@ import (
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
-	. "kusionstack.io/operating/pkg/controllers/operationjob/opscore"
 	ctrlutils "kusionstack.io/operating/pkg/controllers/utils"
 )
 
@@ -47,31 +43,6 @@ func MapOpsStatusByPod(instance *appsv1alpha1.OperationJob) map[string]*appsv1al
 		opsStatusMap[opsStatus.Name] = &instance.Status.TargetDetails[i]
 	}
 	return opsStatusMap
-}
-
-func GetCollaSetByPod(ctx context.Context, client client.Client, instance *appsv1alpha1.OperationJob, candidate *OpsCandidate) (*appsv1alpha1.CollaSet, error) {
-	var collaSet appsv1alpha1.CollaSet
-
-	pod := candidate.Pod
-	if pod == nil {
-		return nil, nil
-	}
-
-	for _, ownerRef := range pod.OwnerReferences {
-		if ownerRef.Kind != "CollaSet" {
-			continue
-		}
-
-		err := client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: ownerRef.Name}, &collaSet)
-		if errors.IsNotFound(err) {
-			return nil, nil
-		} else if err != nil {
-			return nil, err
-		}
-		break
-	}
-
-	return &collaSet, nil
 }
 
 func EnqueueOperationJobFromPod(c client.Client, pod *corev1.Pod, q *workqueue.RateLimitingInterface, fn func(client.Client, *corev1.Pod) (sets.String, bool)) {

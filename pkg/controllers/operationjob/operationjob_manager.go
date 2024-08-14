@@ -90,14 +90,7 @@ func (r *ReconcileOperationJob) listTargets(ctx context.Context, operationJob *a
 				Progress: appsv1alpha1.OperationProgressPending,
 			}
 		}
-
-		// fulfil Collaset
-		collaset, err := ojutils.GetCollaSetByPod(ctx, r.Client, operationJob, &candidate)
-		if err != nil {
-			return candidates, err
-		}
-		candidate.CollaSet = collaset
-
+		
 		candidates = append(candidates, &candidate)
 	}
 	return candidates, nil
