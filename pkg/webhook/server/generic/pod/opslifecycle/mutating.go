@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/kube-api/apps/v1alpha1"
+
 	"kusionstack.io/operating/pkg/controllers/podopslifecycle"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/utils"
@@ -58,13 +59,7 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 			}
 
 			// Clean up these labels with the ID
-			for _, v := range []string{v1alpha1.PodOperatingLabelPrefix,
-				v1alpha1.PodOperationTypeLabelPrefix,
-				v1alpha1.PodPreCheckLabelPrefix,
-				v1alpha1.PodPreCheckedLabelPrefix,
-				v1alpha1.PodPreparingLabelPrefix,
-				v1alpha1.PodOperateLabelPrefix} {
-
+			for _, v := range v1alpha1.WellKnownLabelPrefixesWithID {
 				delete(newPod.Labels, fmt.Sprintf("%s/%s", v, id))
 			}
 
