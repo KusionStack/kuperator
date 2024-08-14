@@ -28,8 +28,7 @@ type OpsCandidate struct {
 	*corev1.Pod
 	PodName    string
 	Containers []string
-	*appsv1alpha1.CollaSet
-	OpsStatus *appsv1alpha1.OpsStatus
+	OpsStatus  *appsv1alpha1.OpsStatus
 }
 
 func DecideCandidateByPartition(instance *appsv1alpha1.OperationJob, candidates []*OpsCandidate) []*OpsCandidate {
@@ -78,11 +77,6 @@ func IsCandidateOpsFinished(candidate *OpsCandidate) bool {
 		return false
 	}
 	return candidate.OpsStatus.Progress == appsv1alpha1.OperationProgressFailed ||
-		candidate.OpsStatus.Progress == appsv1alpha1.OperationProgressSucceeded
-}
-
-func FulfilCandidateStatus(candidate *OpsCandidate, progress appsv1alpha1.OperationProgress, reason string, message string) {
-	candidate.OpsStatus.Progress = progress
-	candidate.OpsStatus.Reason = reason
-	candidate.OpsStatus.Message = message
+		candidate.OpsStatus.Progress == appsv1alpha1.OperationProgressSucceeded ||
+		candidate.OpsStatus.Progress == appsv1alpha1.OperationProgressFinishingOpsLifecycle
 }

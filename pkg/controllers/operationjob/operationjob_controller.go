@@ -18,8 +18,8 @@ package operationjob
 
 import (
 	"context"
+	"time"
 
-	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/types"
@@ -79,15 +79,14 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to target pod
-	managerClient := mgr.GetClient()
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &PodHandler{Client: managerClient})
+	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &PodHandler{Client: mgr.GetClient()})
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to resources for actions
 	for _, actionHandler := range ActionRegistry {
-		if err = actionHandler.Init(managerClient, c, mgr.GetScheme(), mgr.GetCache()); err != nil {
+		if err = actionHandler.SetUp(c, mgr, mixin.NewReconcilerMixin(controllerName, mgr)); err != nil {
 			return err
 		}
 	}
@@ -118,7 +117,7 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 	}
 
 	if instance.DeletionTimestamp != nil {
-		if err := r.releaseTargets(ctx, instance); err != nil {
+		if err := r.releaseTargets(ctx, logger, instance); err != nil {
 			return reconcile.Result{}, err
 		}
 		ojutils.StatusUpToDateExpectation.DeleteExpectations(key)
@@ -127,23 +126,14 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 		return reconcile.Result{}, err
 	}
 
-	if err := r.doReconcile(ctx, instance, logger); err != nil {
-		return reconcile.Result{}, err
-	}
-
 	jobDeleted, requeueAfter, err := r.ensureActiveDeadlineAndTTL(ctx, instance, logger)
 	if jobDeleted || err != nil {
 		return reconcile.Result{}, err
 	}
 
-	if err := r.updateStatus(ctx, instance); err != nil {
-		return reconcile.Result{}, err
-	}
-
-	if requeueAfter != nil {
-		return reconcile.Result{RequeueAfter: *requeueAfter}, nil
-	}
-	return reconcile.Result{}, nil
+	reconcileErr := r.doReconcile(ctx, instance)
+	updateErr := r.updateStatus(ctx, instance)
+	return requeueResult(requeueAfter), ctrlutils.AggregateErrors([]error{reconcileErr, updateErr})
 }
 
 func (r *ReconcileOperationJob) getActionHandlerAndTargets(ctx context.Context, instance *appsv1alpha1.OperationJob) (
@@ -155,7 +145,7 @@ func (r *ReconcileOperationJob) getActionHandlerAndTargets(ctx context.Context, 
 	return
 }
 
-func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv1alpha1.OperationJob, logger logr.Logger) error {
+func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv1alpha1.OperationJob) error {
 	actionHandler, enablePodOpsLifecycle, candidates, err := r.getActionHandlerAndTargets(ctx, instance)
 	if err != nil {
 		return err
@@ -163,16 +153,12 @@ func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv
 
 	// operate targets by partition
 	filteredCandidates := DecideCandidateByPartition(instance, candidates)
-	if err := r.operateTargets(ctx, actionHandler, logger, filteredCandidates, enablePodOpsLifecycle, instance); err != nil {
-		return err
-	}
-	if err := r.fulfilTargetsOpsStatus(ctx, actionHandler, logger, filteredCandidates, instance); err != nil {
-		return err
-	}
+	operateErr := r.operateTargets(ctx, actionHandler, filteredCandidates, enablePodOpsLifecycle, instance)
+	fulfilErr := r.fulfilTargetsOpsStatus(ctx, actionHandler, filteredCandidates, enablePodOpsLifecycle, instance)
 
 	// calculate opsStatus of all candidates
 	instance.Status = r.calculateStatus(instance, candidates)
-	return nil
+	return ctrlutils.AggregateErrors([]error{operateErr, fulfilErr})
 }
 
 func (r *ReconcileOperationJob) calculateStatus(instance *appsv1alpha1.OperationJob, candidates []*OpsCandidate) (jobStatus appsv1alpha1.OperationJobStatus) {
@@ -255,4 +241,14 @@ func (r *ReconcileOperationJob) updateStatus(ctx context.Context, newJob *appsv1
 	}
 
 	return nil
+}
+
+func requeueResult(requeueTime *time.Duration) reconcile.Result {
+	if requeueTime != nil {
+		if *requeueTime == 0 {
+			return reconcile.Result{Requeue: true}
+		}
+		return reconcile.Result{RequeueAfter: *requeueTime}
+	}
+	return reconcile.Result{}
 }

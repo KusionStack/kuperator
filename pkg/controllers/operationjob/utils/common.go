@@ -17,9 +17,6 @@ limitations under the License.
 package utils
 
 import (
-	"context"
-	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -28,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	. "kusionstack.io/operating/pkg/controllers/operationjob/opscore"
+
 	ctrlutils "kusionstack.io/operating/pkg/controllers/utils"
 )
 
@@ -46,34 +43,6 @@ func MapOpsStatusByPod(instance *appsv1alpha1.OperationJob) map[string]*appsv1al
 		opsStatusMap[opsStatus.Name] = &instance.Status.TargetDetails[i]
 	}
 	return opsStatusMap
-}
-
-func GetCollaSetByPod(ctx context.Context, client client.Client, instance *appsv1alpha1.OperationJob, candidate *OpsCandidate) (*appsv1alpha1.CollaSet, error) {
-	var collaSet appsv1alpha1.CollaSet
-	ownedByCollaSet := false
-
-	pod := candidate.Pod
-	if pod == nil {
-		// replace completed, just ignore
-		return nil, nil
-	}
-
-	for _, ownerRef := range pod.OwnerReferences {
-		if ownerRef.Kind != "CollaSet" {
-			continue
-		}
-		ownedByCollaSet = true
-		err := client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: ownerRef.Name}, &collaSet)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if !ownedByCollaSet {
-		return nil, fmt.Errorf("target %s/%s is not owned by collaSet", pod.Namespace, pod.Name)
-	}
-
-	return &collaSet, nil
 }
 
 func EnqueueOperationJobFromPod(c client.Client, pod *corev1.Pod, q *workqueue.RateLimitingInterface, fn func(client.Client, *corev1.Pod) (sets.String, bool)) {

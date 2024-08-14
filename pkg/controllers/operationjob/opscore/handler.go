@@ -19,27 +19,32 @@ package opscore
 import (
 	"context"
 
-	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
+	"kusionstack.io/operating/pkg/utils/mixin"
+)
+
+type ActionProgress string
+
+const (
+	ActionProgressProcessing ActionProgress = "Processing"
+	ActionProgressFailed     ActionProgress = "Failed"
+	ActionProgressSucceeded  ActionProgress = "Succeeded"
 )
 
 type ActionHandler interface {
-	// Init Initializes resources, i.e., watch resources related to action, inject cache index to runtime...
-	Init(client.Client, controller.Controller, *runtime.Scheme, cache.Cache) error
+	// SetUp sets up action with manager in AddToMgr, i.e., watch, cache...
+	SetUp(controller.Controller, ctrl.Manager, *mixin.ReconcilerMixin) error
 
 	// OperateTarget do real operation to target
-	OperateTarget(context.Context, logr.Logger, record.EventRecorder, client.Client, *OpsCandidate, *appsv1alpha1.OperationJob) error
+	OperateTarget(context.Context, *OpsCandidate, *appsv1alpha1.OperationJob) error
 
 	// GetOpsProgress returns target's current opsStatus, e.g., progress, reason, message
-	GetOpsProgress(context.Context, logr.Logger, record.EventRecorder, client.Client, *OpsCandidate, *appsv1alpha1.OperationJob) (
-		progress appsv1alpha1.OperationProgress, reason string, message string, err error)
+	GetOpsProgress(context.Context, *OpsCandidate, *appsv1alpha1.OperationJob) (progress ActionProgress, err error)
 
 	// ReleaseTarget releases the target from operation when the operationJob is deleted
-	ReleaseTarget(context.Context, logr.Logger, record.EventRecorder, client.Client, *OpsCandidate, *appsv1alpha1.OperationJob) error
+	ReleaseTarget(context.Context, *OpsCandidate, *appsv1alpha1.OperationJob) error
 }
