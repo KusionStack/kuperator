@@ -496,12 +496,7 @@ type ContainerStatus struct {
 }
 
 type inPlaceIfPossibleUpdater struct {
-	collaSet   *appsv1alpha1.CollaSet
-	ctx        context.Context
-	podControl podcontrol.Interface
-	recorder   record.EventRecorder
 	GenericPodUpdater
-	client.Client
 }
 
 func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(
@@ -724,12 +719,7 @@ func (u *inPlaceIfPossibleUpdater) GetPodUpdateFinishStatus(podUpdateInfo *PodUp
 }
 
 type recreatePodUpdater struct {
-	collaSet   *appsv1alpha1.CollaSet
-	ctx        context.Context
-	podControl podcontrol.Interface
-	recorder   record.EventRecorder
 	GenericPodUpdater
-	client.Client
 }
 
 func (u *recreatePodUpdater) FulfillPodUpdatedInfo(_ *appsv1.ControllerRevision, _ *PodUpdateInfo) error {
