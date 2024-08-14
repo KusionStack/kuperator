@@ -21,14 +21,37 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	podopslifecycleutil "kusionstack.io/operating/pkg/controllers/podopslifecycle"
 	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/operating/pkg/utils"
 )
 
+func IsOperateLifecycleOnPod(lifecycleId string, pod *corev1.Pod) (bool, error) {
+	newIDToLabelsMap, _, err := podopslifecycleutil.PodIDAndTypesMap(pod)
+	_, exist := newIDToLabelsMap[lifecycleId]
+	return exist, err
+}
+
+func NumsOfOperateLifecycleOnPod(lifecycleId string, pod *corev1.Pod) (int, error) {
+	newIDToLabelsMap, _, err := podopslifecycleutil.PodIDAndTypesMap(pod)
+	return len(newIDToLabelsMap), err
+}
+
 func BeginOperateLifecycle(client client.Client, adapter podopslifecycle.LifecycleAdapter, pod *corev1.Pod) error {
+	if pod == nil {
+		return nil
+	}
+
+	// not start to operate until other lifecycles finished
+	if num, err := NumsOfOperateLifecycleOnPod(adapter.GetID(), pod); err != nil {
+		return err
+	} else if num > 0 {
+		return nil
+	}
+
 	if updated, err := podopslifecycle.Begin(client, adapter, pod); err != nil {
 		return fmt.Errorf("fail to begin PodOpsLifecycle for %s %s/%s: %s", adapter.GetType(), pod.Namespace, pod.Name, err)
 	} else if updated {
@@ -58,6 +81,14 @@ func CancelOpsLifecycle(ctx context.Context, client client.Client, adapter podop
 	if pod == nil {
 		return nil
 	}
+
+	// only cancel when lifecycle exist on pod
+	if exist, err := IsOperateLifecycleOnPod(adapter.GetID(), pod); err != nil {
+		return err
+	} else if !exist {
+		return nil
+	}
+
 	labelUndo := fmt.Sprintf("%s/%s", appsv1alpha1.PodUndoOperationTypeLabelPrefix, adapter.GetID())
 	if pod.Labels == nil {
 		pod.Labels = make(map[string]string)

@@ -158,13 +158,11 @@ func (r *ReconcileOperationJob) operateTargets(
 		if enablePodOpsLifecycle {
 			switch candidate.OpsStatus.Progress {
 			case appsv1alpha1.OperationProgressFailed:
-				if isDuringOps {
-					// cancel opsLifecycle if ops failed
-					if err := ojutils.CancelOpsLifecycle(ctx, r.Client, lifecycleAdapter, candidate.Pod); err != nil {
-						return err
-					}
-					r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, fmt.Sprintf("%sOpsCanceled", operationJob.Spec.Action), "pod %s/%s ops canceled due to anction failed", candidate.Pod.Namespace, candidate.Pod.Name)
+				// cancel opsLifecycle if ops failed
+				if err := ojutils.CancelOpsLifecycle(ctx, r.Client, lifecycleAdapter, candidate.Pod); err != nil {
+					return err
 				}
+				r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, fmt.Sprintf("%sOpsCanceled", operationJob.Spec.Action), "pod %s/%s ops canceled due to anction failed", candidate.Pod.Namespace, candidate.Pod.Name)
 			case appsv1alpha1.OperationProgressFinishingOpsLifecycle:
 				// finish opsLifecycle is action done
 				if isDuringOps {
@@ -267,16 +265,15 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, logger logr.
 	_, err = controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
 		err := actionHandler.ReleaseTarget(candidate, operationJob)
-		// mark candidate as failed is not finished
-		if !IsCandidateOpsFinished(candidate) {
+		// mark candidate as failed is not succeeded
+		if candidate.OpsStatus.Progress != appsv1alpha1.OperationProgressSucceeded {
 			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
 		}
 		// cancel lifecycle if pod is during ops lifecycle
 		if enablePodOpsLifecycle {
 			lifecycleAdapter := NewLifecycleAdapter(operationJob.Name, operationJob.Spec.Action)
-			if podopslifecycle.IsDuringOps(lifecycleAdapter, candidate.Pod) {
-				return ojutils.CancelOpsLifecycle(ctx, r.Client, lifecycleAdapter, candidate.Pod)
-			}
+
+			return ojutils.CancelOpsLifecycle(ctx, r.Client, lifecycleAdapter, candidate.Pod)
 		}
 		return err
 	})
