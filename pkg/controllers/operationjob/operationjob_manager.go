@@ -90,7 +90,7 @@ func (r *ReconcileOperationJob) listTargets(ctx context.Context, operationJob *a
 				Progress: appsv1alpha1.OperationProgressPending,
 			}
 		}
-		
+
 		candidates = append(candidates, &candidate)
 	}
 	return candidates, nil
