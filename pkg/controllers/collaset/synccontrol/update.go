@@ -598,12 +598,12 @@ func (u *inPlaceIfPossibleUpdater) UpgradePod(podInfo *PodUpdateInfo) error {
 		}
 	} else {
 		// if pod has changes not in-place supported, recreate it
-		return recreatePod(u.CollaSet, podInfo, u.PodControl, u.Recorder)
+		return RecreatePod(u.CollaSet, podInfo, u.PodControl, u.Recorder)
 	}
 	return nil
 }
 
-func recreatePod(collaSet *appsv1alpha1.CollaSet, podInfo *PodUpdateInfo, podControl podcontrol.Interface, recorder record.EventRecorder) error {
+func RecreatePod(collaSet *appsv1alpha1.CollaSet, podInfo *PodUpdateInfo, podControl podcontrol.Interface, recorder record.EventRecorder) error {
 	if err := podControl.DeletePod(podInfo.Pod); err != nil {
 		return fmt.Errorf("fail to delete Pod %s/%s when updating by recreate: %s", podInfo.Namespace, podInfo.Name, err)
 	}
@@ -727,7 +727,7 @@ func (u *recreatePodUpdater) FulfillPodUpdatedInfo(_ *appsv1.ControllerRevision,
 }
 
 func (u *recreatePodUpdater) UpgradePod(podInfo *PodUpdateInfo) error {
-	return recreatePod(u.CollaSet, podInfo, u.PodControl, u.Recorder)
+	return RecreatePod(u.CollaSet, podInfo, u.PodControl, u.Recorder)
 }
 
 func (u *recreatePodUpdater) GetPodUpdateFinishStatus(podInfo *PodUpdateInfo) (finished bool, msg string, err error) {
