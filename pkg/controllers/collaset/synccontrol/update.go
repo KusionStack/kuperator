@@ -324,32 +324,30 @@ func (o orderByDefault) Less(i, j int) bool {
 }
 
 type PodUpdater interface {
-	SetupPodUpdater(context.Context, client.Client, *appsv1alpha1.CollaSet, podcontrol.Interface, record.EventRecorder)
-	FulfillPodUpdatedInfo(revision *appsv1.ControllerRevision, podUpdateInfo *PodUpdateInfo) error
-	BeginUpdatePod(resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (bool, error)
-	FilterAllowOpsPods(podToUpdate []*PodUpdateInfo, ownedIDs map[int]*appsv1alpha1.ContextDetail, resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (*time.Duration, error)
-	UpgradePod(podInfo *PodUpdateInfo) error
-	GetPodUpdateFinishStatus(podUpdateInfo *PodUpdateInfo) (bool, string, error)
-	FinishUpdatePod(podInfo *PodUpdateInfo) error
+	Setup(client.Client, *appsv1alpha1.CollaSet, podcontrol.Interface, record.EventRecorder)
+	FulfillPodUpdatedInfo(ctx context.Context, revision *appsv1.ControllerRevision, podUpdateInfo *PodUpdateInfo) error
+	BeginUpdatePod(ctx context.Context, resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (bool, error)
+	FilterAllowOpsPods(ctx context.Context, podToUpdate []*PodUpdateInfo, ownedIDs map[int]*appsv1alpha1.ContextDetail, resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (*time.Duration, error)
+	UpgradePod(ctx context.Context, podInfo *PodUpdateInfo) error
+	GetPodUpdateFinishStatus(ctx context.Context, podUpdateInfo *PodUpdateInfo) (bool, string, error)
+	FinishUpdatePod(ctx context.Context, podInfo *PodUpdateInfo) error
 }
 
 type GenericPodUpdater struct {
 	*appsv1alpha1.CollaSet
-	context.Context
 	PodControl podcontrol.Interface
 	Recorder   record.EventRecorder
 	client.Client
 }
 
-func (u *GenericPodUpdater) SetupPodUpdater(ctx context.Context, client client.Client, cls *appsv1alpha1.CollaSet, podControl podcontrol.Interface, recorder record.EventRecorder) {
-	u.Context = ctx
+func (u *GenericPodUpdater) Setup(client client.Client, cls *appsv1alpha1.CollaSet, podControl podcontrol.Interface, recorder record.EventRecorder) {
 	u.Client = client
 	u.CollaSet = cls
 	u.PodControl = podControl
 	u.Recorder = recorder
 }
 
-func (u *GenericPodUpdater) BeginUpdatePod(resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (bool, error) {
+func (u *GenericPodUpdater) BeginUpdatePod(_ context.Context, resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (bool, error) {
 	succCount, err := controllerutils.SlowStartBatch(len(podCh), controllerutils.SlowStartInitialBatchSize, false, func(int, error) error {
 		podInfo := <-podCh
 		u.Recorder.Eventf(podInfo.Pod, corev1.EventTypeNormal, "PodUpdateLifecycle", "try to begin PodOpsLifecycle for updating Pod of CollaSet")
@@ -380,7 +378,7 @@ func (u *GenericPodUpdater) BeginUpdatePod(resources *collasetutils.RelatedResou
 	return updating, nil
 }
 
-func (u *GenericPodUpdater) FilterAllowOpsPods(candidates []*PodUpdateInfo, ownedIDs map[int]*appsv1alpha1.ContextDetail, resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (*time.Duration, error) {
+func (u *GenericPodUpdater) FilterAllowOpsPods(_ context.Context, candidates []*PodUpdateInfo, ownedIDs map[int]*appsv1alpha1.ContextDetail, resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (*time.Duration, error) {
 	var recordedRequeueAfter *time.Duration
 	needUpdateContext := false
 	for i := range candidates {
@@ -442,7 +440,7 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(candidates []*PodUpdateInfo, owne
 	return recordedRequeueAfter, nil
 }
 
-func (u *GenericPodUpdater) FinishUpdatePod(podInfo *PodUpdateInfo) error {
+func (u *GenericPodUpdater) FinishUpdatePod(_ context.Context, podInfo *PodUpdateInfo) error {
 	if updated, err := podopslifecycle.Finish(u.Client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod); err != nil {
 		return fmt.Errorf("failed to finish PodOpsLifecycle for updating Pod %s/%s: %s", podInfo.Namespace, podInfo.Name, err)
 	} else if updated {
@@ -464,7 +462,7 @@ func RegisterInPlaceOnlyUpdater(podUpdater PodUpdater) {
 	inPlaceOnlyPodUpdater = podUpdater
 }
 
-func newPodUpdater(ctx context.Context, client client.Client, cls *appsv1alpha1.CollaSet, podControl podcontrol.Interface, recorder record.EventRecorder) PodUpdater {
+func newPodUpdater(client client.Client, cls *appsv1alpha1.CollaSet, podControl podcontrol.Interface, recorder record.EventRecorder) PodUpdater {
 	var podUpdater PodUpdater
 	switch cls.Spec.UpdateStrategy.PodUpdatePolicy {
 	case appsv1alpha1.CollaSetRecreatePodUpdateStrategyType:
@@ -482,7 +480,7 @@ func newPodUpdater(ctx context.Context, client client.Client, cls *appsv1alpha1.
 	default:
 		podUpdater = &inPlaceIfPossibleUpdater{}
 	}
-	podUpdater.SetupPodUpdater(ctx, client, cls, podControl, recorder)
+	podUpdater.Setup(client, cls, podControl, recorder)
 	return podUpdater
 }
 
@@ -500,6 +498,7 @@ type inPlaceIfPossibleUpdater struct {
 }
 
 func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(
+	_ context.Context,
 	updatedRevision *appsv1.ControllerRevision,
 	podUpdateInfo *PodUpdateInfo) error {
 	// 1. build pod from current and updated revision
@@ -578,7 +577,7 @@ func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(
 	return nil
 }
 
-func (u *inPlaceIfPossibleUpdater) UpgradePod(podInfo *PodUpdateInfo) error {
+func (u *inPlaceIfPossibleUpdater) UpgradePod(_ context.Context, podInfo *PodUpdateInfo) error {
 	if podInfo.OnlyMetadataChanged || podInfo.InPlaceUpdateSupport {
 		// if pod template changes only include metadata or support in-place update, just apply these changes to pod directly
 		if err := u.PodControl.UpdatePod(podInfo.UpdatedPod); err != nil {
@@ -651,7 +650,7 @@ func (u *inPlaceIfPossibleUpdater) diffPod(currentPod, updatedPod *corev1.Pod) (
 	return true, false
 }
 
-func (u *inPlaceIfPossibleUpdater) GetPodUpdateFinishStatus(podUpdateInfo *PodUpdateInfo) (finished bool, msg string, err error) {
+func (u *inPlaceIfPossibleUpdater) GetPodUpdateFinishStatus(_ context.Context, podUpdateInfo *PodUpdateInfo) (finished bool, msg string, err error) {
 	if !podUpdateInfo.IsUpdatedRevision || podUpdateInfo.PodDecorationChanged {
 		return false, "not updated revision", nil
 	}
@@ -722,36 +721,34 @@ type recreatePodUpdater struct {
 	GenericPodUpdater
 }
 
-func (u *recreatePodUpdater) FulfillPodUpdatedInfo(_ *appsv1.ControllerRevision, _ *PodUpdateInfo) error {
+func (u *recreatePodUpdater) FulfillPodUpdatedInfo(_ context.Context, _ *appsv1.ControllerRevision, _ *PodUpdateInfo) error {
 	return nil
 }
 
-func (u *recreatePodUpdater) UpgradePod(podInfo *PodUpdateInfo) error {
+func (u *recreatePodUpdater) UpgradePod(_ context.Context, podInfo *PodUpdateInfo) error {
 	return RecreatePod(u.CollaSet, podInfo, u.PodControl, u.Recorder)
 }
 
-func (u *recreatePodUpdater) GetPodUpdateFinishStatus(podInfo *PodUpdateInfo) (finished bool, msg string, err error) {
+func (u *recreatePodUpdater) GetPodUpdateFinishStatus(_ context.Context, podInfo *PodUpdateInfo) (finished bool, msg string, err error) {
 	// Recreate policy always treat Pod as update finished
 	return podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged, "", nil
 }
 
 type replaceUpdatePodUpdater struct {
 	collaSet   *appsv1alpha1.CollaSet
-	ctx        context.Context
 	podControl podcontrol.Interface
 	recorder   record.EventRecorder
 	client.Client
 }
 
-func (u *replaceUpdatePodUpdater) SetupPodUpdater(ctx context.Context, client client.Client, cls *appsv1alpha1.CollaSet, podControl podcontrol.Interface, recorder record.EventRecorder) {
-	u.ctx = ctx
+func (u *replaceUpdatePodUpdater) Setup(client client.Client, cls *appsv1alpha1.CollaSet, podControl podcontrol.Interface, recorder record.EventRecorder) {
 	u.Client = client
 	u.collaSet = cls
 	u.podControl = podControl
 	u.recorder = recorder
 }
 
-func (u *replaceUpdatePodUpdater) BeginUpdatePod(resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (bool, error) {
+func (u *replaceUpdatePodUpdater) BeginUpdatePod(ctx context.Context, resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (bool, error) {
 	succCount, err := controllerutils.SlowStartBatch(len(podCh), controllerutils.SlowStartInitialBatchSize, false, func(int, error) error {
 		podInfo := <-podCh
 		if podInfo.replacePairNewPodInfo != nil {
@@ -769,7 +766,7 @@ func (u *replaceUpdatePodUpdater) BeginUpdatePod(resources *collasetutils.Relate
 				newPodRevision,
 				resources.UpdatedRevision.Name)
 			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%d"}}}`, appsv1alpha1.PodDeletionIndicationLabelKey, time.Now().UnixNano())))
-			if patchErr := u.Patch(u.ctx, podInfo.replacePairNewPodInfo.Pod, patch); patchErr != nil {
+			if patchErr := u.Patch(ctx, podInfo.replacePairNewPodInfo.Pod, patch); patchErr != nil {
 				err := fmt.Errorf("failed to delete replace pair new pod %s/%s %s",
 					podInfo.replacePairNewPodInfo.Namespace, podInfo.replacePairNewPodInfo.Name, patchErr)
 				return err
@@ -781,7 +778,7 @@ func (u *replaceUpdatePodUpdater) BeginUpdatePod(resources *collasetutils.Relate
 	return succCount > 0, err
 }
 
-func (u *replaceUpdatePodUpdater) FilterAllowOpsPods(candidates []*PodUpdateInfo, _ map[int]*appsv1alpha1.ContextDetail, _ *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (requeueAfter *time.Duration, err error) {
+func (u *replaceUpdatePodUpdater) FilterAllowOpsPods(_ context.Context, candidates []*PodUpdateInfo, _ map[int]*appsv1alpha1.ContextDetail, _ *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (requeueAfter *time.Duration, err error) {
 	activePodToUpdate := filterOutPlaceHolderUpdateInfos(candidates)
 	for i, podInfo := range activePodToUpdate {
 		if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged && !podInfo.PvcTmpHashChanged {
@@ -793,11 +790,11 @@ func (u *replaceUpdatePodUpdater) FilterAllowOpsPods(candidates []*PodUpdateInfo
 	return nil, err
 }
 
-func (u *replaceUpdatePodUpdater) FulfillPodUpdatedInfo(_ *appsv1.ControllerRevision, _ *PodUpdateInfo) (err error) {
+func (u *replaceUpdatePodUpdater) FulfillPodUpdatedInfo(_ context.Context, _ *appsv1.ControllerRevision, _ *PodUpdateInfo) (err error) {
 	return
 }
 
-func (u *replaceUpdatePodUpdater) UpgradePod(podInfo *PodUpdateInfo) error {
+func (u *replaceUpdatePodUpdater) UpgradePod(ctx context.Context, podInfo *PodUpdateInfo) error {
 	// add replace labels and wait to replace when syncPods
 	_, replaceIndicate := podInfo.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
 	_, replaceByUpdate := podInfo.Pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
@@ -805,7 +802,7 @@ func (u *replaceUpdatePodUpdater) UpgradePod(podInfo *PodUpdateInfo) error {
 		// need replace update pod, label pod with replace-indicate and replace-update
 		now := time.Now().UnixNano()
 		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v", "%s": "%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, now, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey, true)))
-		if err := u.Patch(u.ctx, podInfo.Pod, patch); err != nil {
+		if err := u.Patch(ctx, podInfo.Pod, patch); err != nil {
 			return fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %s", podInfo.Namespace, podInfo.Name, err)
 		}
 		u.recorder.Eventf(podInfo.Pod,
@@ -819,7 +816,7 @@ func (u *replaceUpdatePodUpdater) UpgradePod(podInfo *PodUpdateInfo) error {
 	return nil
 }
 
-func (u *replaceUpdatePodUpdater) GetPodUpdateFinishStatus(podUpdateInfo *PodUpdateInfo) (finished bool, msg string, err error) {
+func (u *replaceUpdatePodUpdater) GetPodUpdateFinishStatus(_ context.Context, podUpdateInfo *PodUpdateInfo) (finished bool, msg string, err error) {
 	replaceNewPodInfo := podUpdateInfo.replacePairNewPodInfo
 	if replaceNewPodInfo == nil {
 		return
@@ -828,7 +825,7 @@ func (u *replaceUpdatePodUpdater) GetPodUpdateFinishStatus(podUpdateInfo *PodUpd
 	return isPodUpdatedServiceAvailable(replaceNewPodInfo)
 }
 
-func (u *replaceUpdatePodUpdater) FinishUpdatePod(podInfo *PodUpdateInfo) error {
+func (u *replaceUpdatePodUpdater) FinishUpdatePod(_ context.Context, podInfo *PodUpdateInfo) error {
 	replacePairNewPodInfo := podInfo.replacePairNewPodInfo
 	if replacePairNewPodInfo != nil {
 		if _, exist := podInfo.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; !exist {

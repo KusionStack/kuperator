@@ -629,7 +629,7 @@ func (r *RealSyncControl) Update(
 	candidates := decidePodToUpdate(cls, podUpdateInfos)
 	activePodToUpdate := filterOutPlaceHolderUpdateInfos(candidates)
 	podCh := make(chan *PodUpdateInfo, len(activePodToUpdate))
-	updater := newPodUpdater(ctx, r.client, cls, r.podControl, r.recorder)
+	updater := newPodUpdater(r.client, cls, r.podControl, r.recorder)
 	updating := false
 
 	// 3. filter already updated revision,
@@ -639,7 +639,7 @@ func (r *RealSyncControl) Update(
 		}
 
 		// 3.1 fulfillPodUpdateInfo to all not updatedRevision pod
-		if err = updater.FulfillPodUpdatedInfo(resources.UpdatedRevision, podInfo); err != nil {
+		if err = updater.FulfillPodUpdatedInfo(ctx, resources.UpdatedRevision, podInfo); err != nil {
 			logger.Error(err, fmt.Sprintf("fail to analyse pod %s/%s in-place update support", podInfo.Namespace, podInfo.Name))
 			continue
 		}
@@ -652,13 +652,13 @@ func (r *RealSyncControl) Update(
 	}
 
 	// 4. begin pod update lifecycle
-	updating, err = updater.BeginUpdatePod(resources, podCh)
+	updating, err = updater.BeginUpdatePod(ctx, resources, podCh)
 	if err != nil {
 		return updating, recordedRequeueAfter, err
 	}
 
 	// 5. (1) filter out  pods not allow to ops now, such as OperationDelaySeconds strategy; (2) update PlaceHolder Pods resourceContext revision
-	recordedRequeueAfter, err = updater.FilterAllowOpsPods(candidates, ownedIDs, resources, podCh)
+	recordedRequeueAfter, err = updater.FilterAllowOpsPods(ctx, candidates, ownedIDs, resources, podCh)
 	if err != nil {
 		collasetutils.AddOrUpdateCondition(resources.NewStatus,
 			appsv1alpha1.CollaSetScale, err, "UpdateFailed",
@@ -687,7 +687,7 @@ func (r *RealSyncControl) Update(
 				return err
 			}
 		} else {
-			if err = updater.UpgradePod(podInfo); err != nil {
+			if err = updater.UpgradePod(ctx, podInfo); err != nil {
 				return err
 			}
 		}
@@ -712,13 +712,13 @@ func (r *RealSyncControl) Update(
 		}
 
 		// check Pod is during updating, and it is finished or not
-		finished, msg, err := updater.GetPodUpdateFinishStatus(podInfo)
+		finished, msg, err := updater.GetPodUpdateFinishStatus(ctx, podInfo)
 		if err != nil {
 			return fmt.Errorf("failed to get pod %s/%s update finished: %s", podInfo.Namespace, podInfo.Name, err)
 		}
 
 		if finished {
-			err := updater.FinishUpdatePod(podInfo)
+			err := updater.FinishUpdatePod(ctx, podInfo)
 			if err != nil {
 				return err
 			}
