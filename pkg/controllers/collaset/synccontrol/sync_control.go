@@ -704,10 +704,10 @@ func (r *RealSyncControl) Update(
 	}
 
 	// 7. try to finish all Pods'PodOpsLifecycle if its update is finished.
-	succCount, err = controllerutils.SlowStartBatch(len(activePodToUpdate), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
-		podInfo := activePodToUpdate[i]
+	succCount, err = controllerutils.SlowStartBatch(len(podUpdateInfos), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+		podInfo := podUpdateInfos[i]
 
-		if !podInfo.isDuringOps {
+		if !podInfo.isDuringOps || !podInfo.isAllowOps || podInfo.PlaceHolder {
 			return nil
 		}
 
@@ -718,10 +718,14 @@ func (r *RealSyncControl) Update(
 		}
 
 		if finished {
-			err := updater.FinishUpdatePod(ctx, podInfo)
-			if err != nil {
+			if err := updater.FinishUpdatePod(ctx, podInfo); err != nil {
 				return err
 			}
+			r.recorder.Eventf(podInfo.Pod,
+				corev1.EventTypeNormal,
+				"UpdatePodFinished",
+				"pod %s/%s is finished for upgrade to revision %s",
+				podInfo.Namespace, podInfo.Name, podInfo.CurrentRevision.Name)
 		} else {
 			r.recorder.Eventf(podInfo.Pod,
 				corev1.EventTypeNormal,
