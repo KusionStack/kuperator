@@ -73,6 +73,10 @@ type PodUpdateInfo struct {
 
 	// indicates the PodOpsLifecycle is started.
 	isDuringOps bool
+	// indicates operate is allowed for PodOpsLifecycle.
+	isAllowOps bool
+	// requeue after for operationDelaySeconds
+	requeueForOperationDelay *time.Duration
 
 	// for replace update
 	// judge pod in replace updating
@@ -141,6 +145,7 @@ func attachPodUpdateInfo(ctx context.Context, cls *appsv1alpha1.CollaSet, pods [
 
 		// decide whether the PodOpsLifecycle is during ops or not
 		updateInfo.isDuringOps = podopslifecycle.IsDuringOps(utils.UpdateOpsLifecycleAdapter, pod)
+		updateInfo.requeueForOperationDelay, updateInfo.isAllowOps = podopslifecycle.AllowOps(collasetutils.UpdateOpsLifecycleAdapter, realValue(cls.Spec.UpdateStrategy.OperationDelaySeconds), pod)
 		updateInfo.PvcTmpHashChanged, err = pvccontrol.IsPodPvcTmpChanged(cls, pod.Pod, resource.ExistingPvcs)
 		if err != nil {
 			return nil, fmt.Errorf("fail to check pvc template changed, %v", err)
@@ -160,6 +165,7 @@ func attachPodUpdateInfo(ctx context.Context, cls *appsv1alpha1.CollaSet, pods [
 			originPodInfo.isInReplacing = true
 			// replace origin pod not go through lifecycle, mark  during ops manual
 			originPodInfo.isDuringOps = true
+			originPodInfo.isAllowOps = true
 			replacePairNewPodInfo := podUpdateInfoMap[replacePairNewPod.Name]
 			replacePairNewPodInfo.isInReplacing = true
 			replacePairNewPodInfo.replacePairOriginPodName = originPodName
@@ -170,6 +176,7 @@ func attachPodUpdateInfo(ctx context.Context, cls *appsv1alpha1.CollaSet, pods [
 			if replaceIndicated && replaceByReplaceUpdate {
 				originPodInfo.isInReplacing = true
 				originPodInfo.isDuringOps = true
+				originPodInfo.isAllowOps = true
 			}
 		}
 	}
@@ -385,18 +392,23 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(_ context.Context, candidates []*
 		podInfo := candidates[i]
 
 		if !podInfo.PlaceHolder {
-			requeueAfter, allowed := podopslifecycle.AllowOps(collasetutils.UpdateOpsLifecycleAdapter, realValue(u.CollaSet.Spec.UpdateStrategy.OperationDelaySeconds), podInfo.Pod)
-			if !allowed {
+			if !podInfo.isAllowOps {
 				u.Recorder.Eventf(podInfo, corev1.EventTypeNormal, "PodUpdateLifecycle", "Pod %s is not allowed to update", commonutils.ObjectKeyString(podInfo.Pod))
 				continue
 			}
-			if requeueAfter != nil {
-				u.Recorder.Eventf(podInfo, corev1.EventTypeNormal, "PodUpdateLifecycle", "delay Pod update for %f seconds", requeueAfter.Seconds())
-				if recordedRequeueAfter == nil || *requeueAfter < *recordedRequeueAfter {
-					recordedRequeueAfter = requeueAfter
+			if podInfo.requeueForOperationDelay != nil {
+				u.Recorder.Eventf(podInfo, corev1.EventTypeNormal, "PodUpdateLifecycle", "delay Pod update for %f seconds", podInfo.requeueForOperationDelay.Seconds())
+				if recordedRequeueAfter == nil || *podInfo.requeueForOperationDelay < *recordedRequeueAfter {
+					recordedRequeueAfter = podInfo.requeueForOperationDelay
 				}
 				continue
 			}
+		}
+
+		podInfo.isAllowOps = true
+
+		if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged && !podInfo.PvcTmpHashChanged {
+			continue
 		}
 
 		if !ownedIDs[podInfo.ID].Contains(podcontext.RevisionContextDataKey, resources.UpdatedRevision.Name) {
@@ -416,10 +428,6 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(_ context.Context, candidates []*
 				needUpdateContext = true
 				ownedIDs[podInfo.ID].Put(podcontext.PodDecorationRevisionKey, decorationStr)
 			}
-		}
-
-		if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged && !podInfo.PvcTmpHashChanged {
-			continue
 		}
 
 		if podInfo.PlaceHolder {
@@ -651,8 +659,8 @@ func (u *inPlaceIfPossibleUpdater) diffPod(currentPod, updatedPod *corev1.Pod) (
 }
 
 func (u *inPlaceIfPossibleUpdater) GetPodUpdateFinishStatus(_ context.Context, podUpdateInfo *PodUpdateInfo) (finished bool, msg string, err error) {
-	if !podUpdateInfo.IsUpdatedRevision || podUpdateInfo.PodDecorationChanged {
-		return false, "not updated revision", nil
+	if podUpdateInfo.PodDecorationChanged {
+		return false, "add on not updated", nil
 	}
 
 	if podUpdateInfo.Status.ContainerStatuses == nil {
@@ -730,7 +738,7 @@ func (u *recreatePodUpdater) UpgradePod(_ context.Context, podInfo *PodUpdateInf
 }
 
 func (u *recreatePodUpdater) GetPodUpdateFinishStatus(_ context.Context, podInfo *PodUpdateInfo) (finished bool, msg string, err error) {
-	// Recreate policy always treat Pod as update finished
+	// Recreate policy always treat Pod as update not finished
 	return podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged, "", nil
 }
 
@@ -839,8 +847,8 @@ func (u *replaceUpdatePodUpdater) FinishUpdatePod(_ context.Context, podInfo *Po
 }
 
 func isPodUpdatedServiceAvailable(podInfo *PodUpdateInfo) (finished bool, msg string, err error) {
-	if !podInfo.IsUpdatedRevision || podInfo.PodDecorationChanged {
-		return false, "not updated revision", nil
+	if podInfo.PodDecorationChanged {
+		return false, "add on not updated", nil
 	}
 
 	if podInfo.Labels == nil {
