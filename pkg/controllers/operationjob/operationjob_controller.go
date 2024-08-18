@@ -86,7 +86,7 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to resources for actions
 	for _, actionHandler := range ActionRegistry {
-		if err = actionHandler.SetUp(c, mgr, mixin.NewReconcilerMixin(controllerName, mgr)); err != nil {
+		if err = actionHandler.Setup(c, mixin.NewReconcilerMixin(controllerName, mgr)); err != nil {
 			return err
 		}
 	}
@@ -117,7 +117,7 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 	}
 
 	if instance.DeletionTimestamp != nil {
-		if err := r.releaseTargets(ctx, logger, instance); err != nil {
+		if err := r.releaseTargets(ctx, instance); err != nil {
 			return reconcile.Result{}, err
 		}
 		ojutils.StatusUpToDateExpectation.DeleteExpectations(key)
