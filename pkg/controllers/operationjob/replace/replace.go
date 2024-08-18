@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -49,7 +48,7 @@ type PodReplaceHandler struct {
 	client   client.Client
 }
 
-func (p *PodReplaceHandler) SetUp(controller controller.Controller, _ ctrl.Manager, reconcileMixin *mixin.ReconcilerMixin) error {
+func (p *PodReplaceHandler) Setup(controller controller.Controller, reconcileMixin *mixin.ReconcilerMixin) error {
 	// Setup parameters
 	p.logger = reconcileMixin.Logger.WithName(appsv1alpha1.OpsActionReplace)
 	p.recorder = reconcileMixin.Recorder
