@@ -26,7 +26,7 @@ import (
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
-	ctrlutils "kusionstack.io/operating/pkg/controllers/utils"
+	ctrlutils "kusionstack.io/kuperator/pkg/controllers/utils"
 )
 
 func MarkOperationJobFailed(instance *appsv1alpha1.OperationJob) {

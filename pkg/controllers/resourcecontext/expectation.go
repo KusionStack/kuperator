@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
-	"kusionstack.io/operating/pkg/controllers/utils/expectations"
+	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 )
 
 var (

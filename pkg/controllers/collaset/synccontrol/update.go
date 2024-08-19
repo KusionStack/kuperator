@@ -35,17 +35,17 @@ import (
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
-	"kusionstack.io/operating/pkg/controllers/collaset/podcontext"
-	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
-	"kusionstack.io/operating/pkg/controllers/collaset/pvccontrol"
-	"kusionstack.io/operating/pkg/controllers/collaset/utils"
-	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
-	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
-	"kusionstack.io/operating/pkg/controllers/utils/expectations"
-	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration"
-	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/anno"
-	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
-	commonutils "kusionstack.io/operating/pkg/utils"
+	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontext"
+	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontrol"
+	"kusionstack.io/kuperator/pkg/controllers/collaset/pvccontrol"
+	"kusionstack.io/kuperator/pkg/controllers/collaset/utils"
+	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
+	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
+	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
+	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration"
+	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
+	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
+	commonutils "kusionstack.io/kuperator/pkg/utils"
 )
 
 type PodUpdateInfo struct {

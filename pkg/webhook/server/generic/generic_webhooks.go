@@ -19,14 +19,14 @@ package generic
 import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"kusionstack.io/operating/pkg/webhook/server/generic/collaset"
-	"kusionstack.io/operating/pkg/webhook/server/generic/operationjob"
-	"kusionstack.io/operating/pkg/webhook/server/generic/persistentvolumeclaim"
-	"kusionstack.io/operating/pkg/webhook/server/generic/poddecoration"
+	"kusionstack.io/kuperator/pkg/webhook/server/generic/collaset"
+	"kusionstack.io/kuperator/pkg/webhook/server/generic/operationjob"
+	"kusionstack.io/kuperator/pkg/webhook/server/generic/persistentvolumeclaim"
+	"kusionstack.io/kuperator/pkg/webhook/server/generic/poddecoration"
 
-	webhookdmission "kusionstack.io/operating/pkg/webhook/admission"
-	"kusionstack.io/operating/pkg/webhook/server/generic/pod"
-	"kusionstack.io/operating/pkg/webhook/server/generic/podtransitionrule"
+	webhookdmission "kusionstack.io/kuperator/pkg/webhook/admission"
+	"kusionstack.io/kuperator/pkg/webhook/server/generic/pod"
+	"kusionstack.io/kuperator/pkg/webhook/server/generic/podtransitionrule"
 )
 
 var (

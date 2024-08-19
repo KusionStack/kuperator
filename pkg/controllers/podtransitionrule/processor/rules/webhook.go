@@ -27,9 +27,9 @@ import (
 	"k8s.io/klog"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	controllerutils "kusionstack.io/operating/pkg/controllers/podtransitionrule/utils"
-	"kusionstack.io/operating/pkg/utils"
-	utilshttp "kusionstack.io/operating/pkg/utils/http"
+	controllerutils "kusionstack.io/kuperator/pkg/controllers/podtransitionrule/utils"
+	"kusionstack.io/kuperator/pkg/utils"
+	utilshttp "kusionstack.io/kuperator/pkg/utils/http"
 )
 
 type WebhookRuler struct {

@@ -17,7 +17,7 @@ limitations under the License.
 package controllers
 
 import (
-	"kusionstack.io/operating/pkg/controllers/poddeletion"
+	"kusionstack.io/kuperator/pkg/controllers/poddeletion"
 )
 
 func init() {

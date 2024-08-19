@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubectl/pkg/scheme"
 	"kusionstack.io/kube-api/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/utils/feature"
+	"kusionstack.io/kuperator/pkg/utils/feature"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	admissionv1 "k8s.io/api/admission/v1"

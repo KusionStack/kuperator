@@ -17,7 +17,7 @@ limitations under the License.
 package webhook
 
 import (
-	server "kusionstack.io/operating/pkg/webhook/server"
+	server "kusionstack.io/kuperator/pkg/webhook/server"
 )
 
 func init() {

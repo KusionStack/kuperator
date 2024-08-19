@@ -27,8 +27,8 @@ import (
 	"k8s.io/klog/v2"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
-	"kusionstack.io/operating/test/e2e/framework"
-	"kusionstack.io/operating/test/e2e/framework/testfiles"
+	"kusionstack.io/kuperator/test/e2e/framework"
+	"kusionstack.io/kuperator/test/e2e/framework/testfiles"
 
 	// Never, ever remove the line with "/ginkgo". Without it,
 	// the ginkgo test runner will not detect that this
@@ -37,7 +37,7 @@ import (
 	// "github.com/onsi/ginkgo"
 
 	// test sources
-	_ "kusionstack.io/operating/test/e2e/apps"
+	_ "kusionstack.io/kuperator/test/e2e/apps"
 )
 
 // handleFlags sets up all flags and parses the command line.

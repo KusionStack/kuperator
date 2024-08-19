@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
+	ojutils "kusionstack.io/kuperator/pkg/controllers/operationjob/utils"
 )
 
 type PodHandler struct {

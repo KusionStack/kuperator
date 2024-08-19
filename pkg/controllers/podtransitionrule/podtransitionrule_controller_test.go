@@ -36,8 +36,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/podtransitionrule/register"
-	"kusionstack.io/operating/pkg/utils/inject"
+	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/register"
+	"kusionstack.io/kuperator/pkg/utils/inject"
 )
 
 func TestPodTransitionRule(t *testing.T) {

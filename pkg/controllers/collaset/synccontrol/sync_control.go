@@ -34,19 +34,19 @@ import (
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
-	"kusionstack.io/operating/pkg/controllers/collaset/podcontext"
-	"kusionstack.io/operating/pkg/controllers/collaset/podcontrol"
-	"kusionstack.io/operating/pkg/controllers/collaset/pvccontrol"
-	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
-	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
-	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
-	"kusionstack.io/operating/pkg/controllers/utils/expectations"
-	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration"
-	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/anno"
-	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
-	"kusionstack.io/operating/pkg/features"
-	commonutils "kusionstack.io/operating/pkg/utils"
-	"kusionstack.io/operating/pkg/utils/feature"
+	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontext"
+	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontrol"
+	"kusionstack.io/kuperator/pkg/controllers/collaset/pvccontrol"
+	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
+	ojutils "kusionstack.io/kuperator/pkg/controllers/operationjob/utils"
+	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
+	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
+	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration"
+	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
+	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/kuperator/pkg/features"
+	commonutils "kusionstack.io/kuperator/pkg/utils"
+	"kusionstack.io/kuperator/pkg/utils/feature"
 )
 
 const (

@@ -1,4 +1,4 @@
-module kusionstack.io/operating
+module kusionstack.io/kuperator
 
 go 1.19
 

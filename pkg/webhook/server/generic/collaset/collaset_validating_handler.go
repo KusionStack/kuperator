@@ -35,9 +35,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	commonutils "kusionstack.io/operating/pkg/utils"
-	"kusionstack.io/operating/pkg/utils/mixin"
-	"kusionstack.io/operating/pkg/webhook/server/generic/utils"
+	commonutils "kusionstack.io/kuperator/pkg/utils"
+	"kusionstack.io/kuperator/pkg/utils/mixin"
+	"kusionstack.io/kuperator/pkg/webhook/server/generic/utils"
 )
 
 type ValidatingHandler struct {

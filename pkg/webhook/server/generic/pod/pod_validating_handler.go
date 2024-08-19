@@ -27,8 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	commonutils "kusionstack.io/operating/pkg/utils"
-	"kusionstack.io/operating/pkg/utils/mixin"
+	commonutils "kusionstack.io/kuperator/pkg/utils"
+	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
 var _ inject.Client = &ValidatingHandler{}

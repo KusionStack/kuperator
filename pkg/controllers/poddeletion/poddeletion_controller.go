@@ -31,10 +31,10 @@ import (
 
 	"kusionstack.io/kube-api/apps/v1alpha1"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/collaset/pvccontrol"
-	"kusionstack.io/operating/pkg/controllers/utils/expectations"
-	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
-	"kusionstack.io/operating/pkg/utils/mixin"
+	"kusionstack.io/kuperator/pkg/controllers/collaset/pvccontrol"
+	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
+	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
 const (

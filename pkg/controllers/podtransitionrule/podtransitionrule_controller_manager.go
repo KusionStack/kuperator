@@ -21,8 +21,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"kusionstack.io/operating/pkg/controllers/podtransitionrule/checker"
-	"kusionstack.io/operating/pkg/controllers/podtransitionrule/register"
+	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/checker"
+	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/register"
 )
 
 // ManagerInterface is podtransitionrule manager interface to init and setup one podtransitionrule controller

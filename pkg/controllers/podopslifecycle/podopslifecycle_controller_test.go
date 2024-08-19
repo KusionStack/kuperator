@@ -41,10 +41,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"kusionstack.io/operating/pkg/controllers/podtransitionrule"
-	"kusionstack.io/operating/pkg/controllers/podtransitionrule/checker"
-	"kusionstack.io/operating/pkg/controllers/utils/expectations"
-	"kusionstack.io/operating/pkg/utils/mixin"
+	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule"
+	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/checker"
+	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
+	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
 var (

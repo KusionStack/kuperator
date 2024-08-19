@@ -47,12 +47,12 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/collaset/synccontrol"
-	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
-	"kusionstack.io/operating/pkg/controllers/poddeletion"
-	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/strategy"
-	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
-	"kusionstack.io/operating/pkg/utils/inject"
+	"kusionstack.io/kuperator/pkg/controllers/collaset/synccontrol"
+	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
+	"kusionstack.io/kuperator/pkg/controllers/poddeletion"
+	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/strategy"
+	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/kuperator/pkg/utils/inject"
 )
 
 var (

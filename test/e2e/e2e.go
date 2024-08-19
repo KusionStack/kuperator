@@ -25,7 +25,7 @@ import (
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog"
 
-	"kusionstack.io/operating/test/e2e/framework"
+	"kusionstack.io/kuperator/test/e2e/framework"
 )
 
 // Similar to SynchronizedBeforeSuite, we want to run some operations only once (such as collecting cluster logs).

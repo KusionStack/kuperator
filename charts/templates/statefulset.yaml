@@ -4,7 +4,7 @@ metadata:
   labels:
     {{- toYaml .Values.commonLabels | nindent 4 }}
     control-plane: {{ .Values.controlPlane }}
-  name: kusionstack-operating
+  name: kusionstack-kuperator
   namespace: {{ .Values.namespace }}
 spec:
   replicas: {{ if .Values.sharding.enabled }}{{ .Values.sharding.replicas }}{{ else }}{{ .Values.managerReplicas }}{{ end }}

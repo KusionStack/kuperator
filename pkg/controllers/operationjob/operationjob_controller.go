@@ -33,12 +33,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	. "kusionstack.io/operating/pkg/controllers/operationjob/opscore"
-	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
-	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
-	ctrlutils "kusionstack.io/operating/pkg/controllers/utils"
-	"kusionstack.io/operating/pkg/utils"
-	"kusionstack.io/operating/pkg/utils/mixin"
+	. "kusionstack.io/kuperator/pkg/controllers/operationjob/opscore"
+	ojutils "kusionstack.io/kuperator/pkg/controllers/operationjob/utils"
+	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
+	ctrlutils "kusionstack.io/kuperator/pkg/controllers/utils"
+	"kusionstack.io/kuperator/pkg/utils"
+	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
 const controllerName = "operationjob-controller"

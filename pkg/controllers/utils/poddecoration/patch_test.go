@@ -28,7 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/anno"
+	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
 )
 
 var _ = Describe("PodDecoration controller", func() {

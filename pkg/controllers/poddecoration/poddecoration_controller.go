@@ -40,13 +40,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
-	"kusionstack.io/operating/pkg/controllers/utils/expectations"
-	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration/anno"
-	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/strategy"
-	"kusionstack.io/operating/pkg/controllers/utils/revision"
-	"kusionstack.io/operating/pkg/utils"
-	"kusionstack.io/operating/pkg/utils/mixin"
+	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
+	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
+	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
+	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/strategy"
+	"kusionstack.io/kuperator/pkg/controllers/utils/revision"
+	"kusionstack.io/kuperator/pkg/utils"
+	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
 const (

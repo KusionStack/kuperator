@@ -28,10 +28,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
-	"kusionstack.io/operating/pkg/controllers/utils/expectations"
-	refmanagerutil "kusionstack.io/operating/pkg/controllers/utils/refmanager"
-	"kusionstack.io/operating/pkg/utils/inject"
+	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
+	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
+	refmanagerutil "kusionstack.io/kuperator/pkg/controllers/utils/refmanager"
+	"kusionstack.io/kuperator/pkg/utils/inject"
 )
 
 type Interface interface {

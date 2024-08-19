@@ -1,6 +1,6 @@
 managerReplicas: 3
 
-project: operating
+project: kuperator
 namespace: kusionstack-system
 namespaceEnabled: true
 
@@ -13,11 +13,11 @@ sharding:
   replicas: 5
   size: 2
 
-controlPlane: kusionstack-operating
+controlPlane: kusionstack-kuperator
 
 image:
   tag: v0.5.0
-  repo: kusionstack/operating
+  repo: kusionstack/kuperator
   pullPolicy: IfNotPresent
 
 resources:
@@ -29,7 +29,7 @@ resources:
     memory: 64Mi
 
 commonLabels:
-  app.kubernetes.io/part-of: operating
+  app.kubernetes.io/part-of: kuperator
 
 
 

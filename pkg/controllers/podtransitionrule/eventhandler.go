@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	processorrules "kusionstack.io/operating/pkg/controllers/podtransitionrule/processor/rules"
-	commonutils "kusionstack.io/operating/pkg/utils"
+	processorrules "kusionstack.io/kuperator/pkg/controllers/podtransitionrule/processor/rules"
+	commonutils "kusionstack.io/kuperator/pkg/utils"
 )
 
 var _ inject.Client = &EventHandler{}

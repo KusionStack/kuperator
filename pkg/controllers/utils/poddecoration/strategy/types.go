@@ -20,7 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
+	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
 )
 
 type sortedPodInfo struct {
