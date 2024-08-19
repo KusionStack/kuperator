@@ -35,6 +35,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
+	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
+	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/operating/test/e2e/framework"
 )
 
@@ -565,6 +568,82 @@ var _ = SIGDescribe("CollaSet", func() {
 				}, 10*time.Second, 3*time.Second).Should(Equal(true))
 				Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 3-partition, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 			}
+		})
+
+		framework.ConformanceIt("finish update if out of partition", func() {
+			cls := tester.NewCollaSet("collaset-"+randStr, 2, appsv1alpha1.UpdateStrategy{PodUpdatePolicy: appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType})
+			Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
+
+			By("Wait for status replicas satisfied")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 2, 2, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+			pods, err := tester.ListPodsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Mock traffic finalizer on pods")
+			for i := range pods {
+				Expect(tester.UpdatePod(pods[i], func(pod *v1.Pod) {
+					finalizers := []string{fmt.Sprintf("%s/%s", appsv1alpha1.PodOperationProtectionFinalizerPrefix, "test")}
+					pod.Finalizers = finalizers
+				})).NotTo(HaveOccurred())
+			}
+
+			By("Update CollaSet from v1 to v2")
+			Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
+				cls.Spec.Template.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.Redis)
+			})).NotTo(HaveOccurred())
+
+			By("Wait for CollaSet reconciled")
+			Eventually(func() bool {
+				if err = tester.GetCollaSet(cls); err != nil {
+					return false
+				}
+				return cls.Generation == cls.Status.ObservedGeneration
+			}, 10*time.Second, 3*time.Second).Should(Equal(true))
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 0, 0, 0, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Update CollaSet from v2 to v3 with 1 partition")
+			Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
+				cls.Spec.Template.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.NginxNew)
+				cls.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateCollaSetStrategy{
+					ByPartition: &appsv1alpha1.ByPartition{
+						Partition: int32Pointer(1),
+					},
+				}
+			})).NotTo(HaveOccurred())
+
+			By("Wait for CollaSet reconciled")
+			Eventually(func() bool {
+				if err = tester.GetCollaSet(cls); err != nil {
+					return false
+				}
+				return cls.Generation == cls.Status.ObservedGeneration
+			}, 10*time.Second, 3*time.Second).Should(Equal(true))
+
+			By("Check update is finished due to out of partition")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 1, 1, 0, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+			Eventually(func() int {
+				pods, err := tester.ListPodsForCollaSet(cls)
+				Expect(err).NotTo(HaveOccurred())
+				duringOpsCount := 0
+				for i := range pods {
+					if podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, pods[i]) {
+						duringOpsCount++
+					}
+				}
+				return duringOpsCount
+			})
+
+			By("Remove finalizers from pods")
+			pods, err = tester.ListPodsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			for i := range pods {
+				Expect(tester.UpdatePod(pods[i], func(pod *v1.Pod) {
+					pod.Finalizers = []string{}
+				})).NotTo(HaveOccurred())
+			}
+
+			By("Wait for update finish")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 2, 2, 1, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 		})
 	})
 
