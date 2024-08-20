@@ -27,9 +27,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	operatingv1alpha1 "kusionstack.io/kuperator/apis/apps/v1alpha1"
 	commonutils "kusionstack.io/kuperator/pkg/utils"
 	"kusionstack.io/kuperator/pkg/utils/mixin"
-	operatingv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 )
 
 type MutatingHandler struct {
