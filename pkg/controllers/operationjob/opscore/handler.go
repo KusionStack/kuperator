@@ -47,3 +47,7 @@ type ActionHandler interface {
 	// ReleaseTarget releases the target from operation when the operationJob is deleted
 	ReleaseTarget(context.Context, *OpsCandidate, *appsv1alpha1.OperationJob) error
 }
+
+func IsActionFinished(actionProgress ActionProgress) bool {
+	return actionProgress == ActionProgressSucceeded || actionProgress == ActionProgressFailed
+}
