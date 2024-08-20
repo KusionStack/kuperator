@@ -224,17 +224,9 @@ func (r *ReconcileOperationJob) getTargetsOpsStatus(
 		case ActionProgressProcessing:
 			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 		case ActionProgressFailed:
-			if enablePodOpsLifecycle {
-				if err := r.cleanCandidateOpsLifecycle(ctx, false, candidate, operationJob); err != nil {
-					return err
-				}
-			}
 			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
 		case ActionProgressSucceeded:
 			if enablePodOpsLifecycle {
-				if err := r.cleanCandidateOpsLifecycle(ctx, false, candidate, operationJob); err != nil {
-					return err
-				}
 				if IsCandidateServiceAvailable(candidate) {
 					candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressSucceeded
 				}
