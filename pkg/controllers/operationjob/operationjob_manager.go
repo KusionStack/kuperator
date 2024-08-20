@@ -114,10 +114,6 @@ func (r *ReconcileOperationJob) operateTargets(
 			return nil
 		}
 
-		if IsCandidateOpsPending(candidate) {
-			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
-		}
-
 		var isDuringOps, isAllowedOps bool
 		lifecycleAdapter := NewLifecycleAdapter(operationJob.Name, operationJob.Spec.Action)
 		if enablePodOpsLifecycle {
@@ -130,11 +126,14 @@ func (r *ReconcileOperationJob) operateTargets(
 		}
 
 		// 1. begin opsLifecycle if necessary
-		if enablePodOpsLifecycle && !isDuringOps {
-			r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "PodOpsLifecycle", "try to begin PodOpsLifecycle for %s", operationJob.Spec.Action)
-			if err := ojutils.BeginOperateLifecycle(r.Client, lifecycleAdapter, candidate.Pod); err != nil {
-				return err
+		if IsCandidateOpsPending(candidate) {
+			if enablePodOpsLifecycle && !isDuringOps {
+				r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "PodOpsLifecycle", "try to begin PodOpsLifecycle for %s", operationJob.Spec.Action)
+				if err := ojutils.BeginOperateLifecycle(r.Client, lifecycleAdapter, candidate.Pod); err != nil {
+					return err
+				}
 			}
+			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 		}
 
 		// 2. try to do real operation
@@ -224,9 +223,10 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob
 		candidate := candidates[i]
 		err := actionHandler.ReleaseTarget(ctx, candidate, operationJob)
 		// mark candidate as failed if not finished
-		if !IsCandidateOpsFinished(candidate) {
-			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
+		if IsCandidateOpsFinished(candidate) {
+			return nil
 		}
+		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
 		// cancel lifecycle if necessary
 		if enablePodOpsLifecycle {
 			return r.cleanCandidateOpsLifecycle(ctx, true, candidate, operationJob)
