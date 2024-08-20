@@ -18,6 +18,7 @@ package operationjob
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -118,6 +119,7 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 
 	if instance.DeletionTimestamp != nil {
 		if err := r.releaseTargets(ctx, instance); err != nil {
+			r.Recorder.Eventf(instance, corev1.EventTypeWarning, "ReleaseTargetFailed", fmt.Sprintf("failed to release targets when job deleting: %s", err.Error()))
 			return reconcile.Result{}, err
 		}
 		ojutils.StatusUpToDateExpectation.DeleteExpectations(key)
