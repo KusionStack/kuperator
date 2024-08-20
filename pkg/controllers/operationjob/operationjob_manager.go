@@ -148,8 +148,14 @@ func (r *ReconcileOperationJob) operateTargets(
 		actionProgress, err := operator.GetOpsProgress(ctx, candidate, operationJob)
 
 		// 4. clean opsLifecycle if action finished
-		if enablePodOpsLifecycle && IsActionFinished(actionProgress) {
-			if err := r.cleanCandidateOpsLifecycle(ctx, false, candidate, operationJob); err != nil {
+		if enablePodOpsLifecycle {
+			var err error
+			if actionProgress == ActionProgressFailed {
+				err = r.cleanCandidateOpsLifecycle(ctx, true, candidate, operationJob)
+			} else if actionProgress == ActionProgressSucceeded {
+				err = r.cleanCandidateOpsLifecycle(ctx, false, candidate, operationJob)
+			}
+			if err != nil {
 				return err
 			}
 		}
