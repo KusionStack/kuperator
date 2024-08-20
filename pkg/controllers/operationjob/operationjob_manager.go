@@ -106,19 +106,19 @@ func (r *ReconcileOperationJob) operateTargets(
 	_, opsErr := controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
 
-		// 0. mark candidate ops Progressing if still Pending
-		if IsCandidateOpsPending(candidate) {
-			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
+		if IsCandidateOpsFinished(candidate) {
+			return nil
 		}
 
 		if enablePodOpsLifecycle && candidate.Pod == nil {
 			return nil
 		}
 
-		// 1. get operation stages
-		var isOpsFinished bool
+		if IsCandidateOpsPending(candidate) {
+			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
+		}
+
 		var isDuringOps, isAllowedOps bool
-		isOpsFinished = IsCandidateOpsFinished(candidate)
 		lifecycleAdapter := NewLifecycleAdapter(operationJob.Name, operationJob.Spec.Action)
 		if enablePodOpsLifecycle {
 			isDuringOps = podopslifecycle.IsDuringOps(lifecycleAdapter, candidate.Pod)
@@ -129,57 +129,40 @@ func (r *ReconcileOperationJob) operateTargets(
 			isAllowedOps = true
 		}
 
-		// 2. begin OpsLifecycle if necessary
-		if enablePodOpsLifecycle {
-			if !isOpsFinished && !isDuringOps {
-				r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "PodOpsLifecycle", "try to begin PodOpsLifecycle for %s", operationJob.Spec.Action)
-				if err := ojutils.BeginOperateLifecycle(r.Client, lifecycleAdapter, candidate.Pod); err != nil {
-					return err
-				}
+		// 1. begin opsLifecycle if necessary
+		if enablePodOpsLifecycle && !isDuringOps {
+			r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "PodOpsLifecycle", "try to begin PodOpsLifecycle for %s", operationJob.Spec.Action)
+			if err := ojutils.BeginOperateLifecycle(r.Client, lifecycleAdapter, candidate.Pod); err != nil {
+				return err
 			}
 		}
 
-		// 3. try to do real operation
-		if !isOpsFinished && isAllowedOps {
+		// 2. try to do real operation
+		if isAllowedOps {
 			err := operator.OperateTarget(ctx, candidate, operationJob)
 			if err != nil {
 				return err
 			}
 		}
-		return nil
-	})
 
-	return opsErr
-}
-
-func (r *ReconcileOperationJob) fulfilTargetsOpsStatus(
-	ctx context.Context,
-	operator ActionHandler,
-	candidates []*OpsCandidate,
-	enablePodOpsLifecycle bool,
-	operationJob *appsv1alpha1.OperationJob) error {
-	_, err := controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
-		candidate := candidates[i]
-		if IsCandidateOpsFinished(candidate) {
-			return nil
-		}
+		// 3. get ActionProgress
 		actionProgress, err := operator.GetOpsProgress(ctx, candidate, operationJob)
-		// transfer ActionProgress to OperationProgress
+
+		// 4. clean opsLifecycle if action finished
+		if enablePodOpsLifecycle && IsActionFinished(actionProgress) {
+			if err := r.cleanCandidateOpsLifecycle(ctx, false, candidate, operationJob); err != nil {
+				return err
+			}
+		}
+
+		// 5. transfer actionProgress to operationProgress
 		switch actionProgress {
 		case ActionProgressProcessing:
 			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 		case ActionProgressFailed:
-			if enablePodOpsLifecycle {
-				if err := r.cleanCandidateOpsLifecycle(ctx, false, candidate, operationJob); err != nil {
-					return err
-				}
-			}
 			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
 		case ActionProgressSucceeded:
 			if enablePodOpsLifecycle {
-				if err := r.cleanCandidateOpsLifecycle(ctx, false, candidate, operationJob); err != nil {
-					return err
-				}
 				if IsCandidateServiceAvailable(candidate) {
 					candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressSucceeded
 				}
@@ -191,7 +174,8 @@ func (r *ReconcileOperationJob) fulfilTargetsOpsStatus(
 		}
 		return err
 	})
-	return err
+
+	return opsErr
 }
 
 func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, operationJob *appsv1alpha1.OperationJob, logger logr.Logger) (bool, *time.Duration, error) {
