@@ -42,10 +42,6 @@ const (
 )
 
 const (
-	ExtraInfoReplacedByNewPodKey = "NewPod"
-)
-
-const (
 	ReasonUpdateObjectFailed = "UpdateObjectFailed"
 	ReasonGetObjectFailed    = "GetObjectFailed"
 )
@@ -129,7 +125,7 @@ func (p *PodReplaceHandler) GetOpsProgress(ctx context.Context, candidate *OpsCa
 				}
 
 				// update ops status if newPod exists
-				candidate.OpsStatus.ExtraInfo[ExtraInfoReplacedByNewPodKey] = newPod.Name
+				candidate.OpsStatus.ExtraInfo[appsv1alpha1.ExtraInfoReplacedNewPodKey] = newPod.Name
 				p.recorder.Eventf(operationJob, corev1.EventTypeNormal, "ReplaceNewPod", fmt.Sprintf("Succeeded to create newPod %s/%s for originPod %s/%s", operationJob.Namespace, newPod.Name, operationJob.Namespace, candidate.Pod.Name))
 				if _, serviceAvailable := newPod.Labels[appsv1alpha1.PodServiceAvailableLabel]; serviceAvailable {
 					p.recorder.Eventf(operationJob, corev1.EventTypeNormal, "ReplaceNewPod", fmt.Sprintf("newPod %s/%s is serviceAvailable, ready to delete originPod %s", operationJob.Namespace, newPod.Name, candidate.Pod.Name))
@@ -147,7 +143,7 @@ func (p *PodReplaceHandler) GetOpsProgress(ctx context.Context, candidate *OpsCa
 			}
 		}
 	} else {
-		newPodName, exist := candidate.OpsStatus.ExtraInfo[ExtraInfoReplacedByNewPodKey]
+		newPodName, exist := candidate.OpsStatus.ExtraInfo[appsv1alpha1.ExtraInfoReplacedNewPodKey]
 		if exist {
 			newPod := &corev1.Pod{}
 			if getErr := p.client.Get(ctx, types.NamespacedName{Namespace: operationJob.Namespace, Name: newPodName}, newPod); getErr != nil {
