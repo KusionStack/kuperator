@@ -121,17 +121,27 @@ spec:
                 description: Operation details of the target pods
                 items:
                   properties:
-                    message:
-                      description: message displays detail of reason
-                      type: string
+                    error:
+                      description: error indicates the error info of progressing
+                      properties:
+                        message:
+                          description: A human-readable message indicating details
+                            about the transition.
+                          type: string
+                        reason:
+                          description: A human-readable short word
+                          type: string
+                      type: object
+                    extraInfo:
+                      additionalProperties:
+                        type: string
+                      description: extra info of the target operating progress
+                      type: object
                     name:
                       description: name of the target pod
                       type: string
                     progress:
                       description: operation progress of target pod
-                      type: string
-                    reason:
-                      description: reason for current operation progress
                       type: string
                   type: object
                 type: array
