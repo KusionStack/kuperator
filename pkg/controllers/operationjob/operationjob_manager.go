@@ -86,8 +86,9 @@ func (r *ReconcileOperationJob) listTargets(ctx context.Context, operationJob *a
 			candidate.OpsStatus = opsStatus
 		} else {
 			candidate.OpsStatus = &appsv1alpha1.OpsStatus{
-				Name:     target.Name,
-				Progress: appsv1alpha1.OperationProgressPending,
+				Name:      target.Name,
+				Progress:  appsv1alpha1.OperationProgressPending,
+				ExtraInfo: make(map[string]string),
 			}
 		}
 
