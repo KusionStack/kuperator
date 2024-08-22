@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	. "kusionstack.io/operating/pkg/controllers/operationjob/opscore"
+	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	"kusionstack.io/operating/pkg/utils/mixin"
 )
@@ -46,6 +47,7 @@ const (
 
 const (
 	ReasonUpdateObjectFailed = "UpdateObjectFailed"
+	ReasonGetObjectFailed    = "GetObjectFailed"
 )
 
 var _ ActionHandler = &PodReplaceHandler{}
@@ -83,18 +85,12 @@ func (p *PodReplaceHandler) OperateTarget(ctx context.Context, candidate *OpsCan
 		// add finalizer on origin pod before trigger replace
 		if err := controllerutils.AddFinalizer(ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
 			retErr := fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
-			candidate.OpsStatus.Error = &appsv1alpha1.ErrorReasonMessage{
-				Reason:  ReasonUpdateObjectFailed,
-				Message: retErr.Error(),
-			}
+			ojutils.SetOpsStatusError(candidate, ReasonUpdateObjectFailed, retErr.Error())
 			return retErr
 		}
 		if err := p.client.Patch(ctx, candidate.Pod, patch); err != nil {
 			retErr := fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %s", candidate.Pod.Namespace, candidate.Pod.Name, err)
-			candidate.OpsStatus.Error = &appsv1alpha1.ErrorReasonMessage{
-				Reason:  ReasonUpdateObjectFailed,
-				Message: retErr.Error(),
-			}
+			ojutils.SetOpsStatusError(candidate, ReasonUpdateObjectFailed, retErr.Error())
 			return retErr
 		}
 		p.recorder.Eventf(operationJob, corev1.EventTypeNormal, "ReplaceOriginPod", fmt.Sprintf("Succeeded to trigger originPod %s/%s to replace", operationJob.Namespace, candidate.Pod.Name))
@@ -143,10 +139,7 @@ func (p *PodReplaceHandler) GetOpsProgress(ctx context.Context, candidate *OpsCa
 				if candidate.Pod.DeletionTimestamp != nil {
 					if removeErr := controllerutils.RemoveFinalizer(ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); removeErr != nil {
 						err = fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, removeErr.Error())
-						candidate.OpsStatus.Error = &appsv1alpha1.ErrorReasonMessage{
-							Reason:  ReasonUpdateObjectFailed,
-							Message: err.Error(),
-						}
+						ojutils.SetOpsStatusError(candidate, ReasonUpdateObjectFailed, err.Error())
 						return
 					}
 				}
@@ -159,10 +152,7 @@ func (p *PodReplaceHandler) GetOpsProgress(ctx context.Context, candidate *OpsCa
 			newPod := &corev1.Pod{}
 			if getErr := p.client.Get(ctx, types.NamespacedName{Namespace: operationJob.Namespace, Name: newPodName}, newPod); getErr != nil {
 				err = fmt.Errorf("fail to find replace newPod %s/%s : %s", operationJob.Namespace, newPodName, getErr.Error())
-				candidate.OpsStatus.Error = &appsv1alpha1.ErrorReasonMessage{
-					Reason:  appsv1alpha1.ReasonPodNotFound,
-					Message: err.Error(),
-				}
+				ojutils.SetOpsStatusError(candidate, ReasonGetObjectFailed, err.Error())
 				return
 			}
 			// mark ops status as succeeded if origin pod is replaced
@@ -170,10 +160,7 @@ func (p *PodReplaceHandler) GetOpsProgress(ctx context.Context, candidate *OpsCa
 		} else {
 			// mark ops status as failed if origin pod not found
 			progress = ActionProgressFailed
-			candidate.OpsStatus.Error = &appsv1alpha1.ErrorReasonMessage{
-				Reason:  appsv1alpha1.ReasonPodNotFound,
-				Message: "failed to replace a non-exist pod",
-			}
+			ojutils.SetOpsStatusError(candidate, appsv1alpha1.ReasonPodNotFound, "failed to replace a non-exist pod")
 		}
 	}
 	return
@@ -201,19 +188,13 @@ func (p *PodReplaceHandler) ReleaseTarget(ctx context.Context, candidate *OpsCan
 
 	if err := controllerutils.RemoveFinalizer(ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
 		retErr := fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
-		candidate.OpsStatus.Error = &appsv1alpha1.ErrorReasonMessage{
-			Reason:  ReasonUpdateObjectFailed,
-			Message: retErr.Error(),
-		}
+		ojutils.SetOpsStatusError(candidate, ReasonUpdateObjectFailed, retErr.Error())
 		return retErr
 	}
 
 	if err := p.client.Patch(ctx, candidate.Pod, client.RawPatch(types.JSONPatchType, patchBytes)); err != nil {
 		retErr := fmt.Errorf("fail patch pod %s/%s with %s : %s", candidate.Pod.Namespace, candidate.Pod.Name, patchBytes, err.Error())
-		candidate.OpsStatus.Error = &appsv1alpha1.ErrorReasonMessage{
-			Reason:  ReasonUpdateObjectFailed,
-			Message: retErr.Error(),
-		}
+		ojutils.SetOpsStatusError(candidate, ReasonUpdateObjectFailed, retErr.Error())
 		return retErr
 	}
 	return nil
