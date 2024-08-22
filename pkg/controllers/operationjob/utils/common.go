@@ -21,11 +21,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-
+	"kusionstack.io/kuperator/pkg/controllers/operationjob/opscore"
 	ctrlutils "kusionstack.io/kuperator/pkg/controllers/utils"
 )
 
@@ -64,4 +64,14 @@ func EnqueueOperationJobFromPod(c client.Client, pod *corev1.Pod, q *workqueue.R
 func IsJobFinished(instance *appsv1alpha1.OperationJob) bool {
 	return instance.Status.Progress == appsv1alpha1.OperationProgressSucceeded ||
 		instance.Status.Progress == appsv1alpha1.OperationProgressFailed
+}
+
+func SetOpsStatusError(candidate *opscore.OpsCandidate, reason string, message string) {
+	if candidate == nil || candidate.OpsStatus == nil {
+		return
+	}
+	candidate.OpsStatus.Error = &appsv1alpha1.ErrorReasonMessage{
+		Reason:  reason,
+		Message: message,
+	}
 }
