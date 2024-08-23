@@ -19,6 +19,7 @@ package opscore
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	operatingv1alpha1 "kusionstack.io/kuperator/apis/apps/v1alpha1"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 )
 
@@ -47,9 +48,9 @@ func (g GenericLifecycleAdapter) WhenFinish(_ client.Object) (bool, error) {
 	return false, nil
 }
 
-func NewLifecycleAdapter(lifecycleID, lifecycleType string) podopslifecycle.LifecycleAdapter {
+func NewLifecycleAdapter(ojName, lifecycleType string) podopslifecycle.LifecycleAdapter {
 	return &GenericLifecycleAdapter{
-		ID:   lifecycleID,
+		ID:   operatingv1alpha1.GenerateLifecycleID(ojName),
 		Type: podopslifecycle.OperationType(lifecycleType),
 	}
 }
