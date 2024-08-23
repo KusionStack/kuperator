@@ -34,6 +34,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
+	operatingv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
 	"kusionstack.io/operating/pkg/utils/mixin"
 )
 
@@ -83,6 +85,7 @@ func ValidatePodDecoration(pd *appsv1alpha1.PodDecoration) error {
 }
 
 func ValidateTemplate(template *appsv1alpha1.PodDecorationPodTemplate, fldPath *field.Path) (allErrs field.ErrorList) {
+	operatingv1alpha1.SetDefaultPodSpecVolumes(template.Volumes)
 	allErrs = append(allErrs, ValidatePrimaryContainers(template.PrimaryContainers, fldPath.Child("primaryContainers"))...)
 	allErrs = append(allErrs, ValidatePodDecorationPodTemplateMeta(template.Metadata, fldPath.Child("metadata"))...)
 	allErrs = append(allErrs, ValidateContainers(template.InitContainers, fldPath.Child("initContainers"))...)
