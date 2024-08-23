@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	k8scorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
@@ -28,64 +29,7 @@ func SetDefaultCollaSet(cls *appsv1alpha1.CollaSet) {
 
 func SetDefaultPodSpec(in *appsv1alpha1.CollaSet) {
 	k8scorev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
-	for i := range in.Spec.Template.Spec.Volumes {
-		a := &in.Spec.Template.Spec.Volumes[i]
-		k8scorev1.SetDefaults_Volume(a)
-		if a.VolumeSource.HostPath != nil {
-			k8scorev1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
-		}
-		if a.VolumeSource.Secret != nil {
-			k8scorev1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
-		}
-		if a.VolumeSource.ISCSI != nil {
-			k8scorev1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
-		}
-		if a.VolumeSource.RBD != nil {
-			k8scorev1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
-		}
-		if a.VolumeSource.DownwardAPI != nil {
-			k8scorev1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
-			for j := range a.VolumeSource.DownwardAPI.Items {
-				b := &a.VolumeSource.DownwardAPI.Items[j]
-				if b.FieldRef != nil {
-					k8scorev1.SetDefaults_ObjectFieldSelector(b.FieldRef)
-				}
-			}
-		}
-		if a.VolumeSource.ConfigMap != nil {
-			k8scorev1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
-		}
-		if a.VolumeSource.AzureDisk != nil {
-			k8scorev1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
-		}
-		if a.VolumeSource.Projected != nil {
-			k8scorev1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
-			for j := range a.VolumeSource.Projected.Sources {
-				b := &a.VolumeSource.Projected.Sources[j]
-				if b.DownwardAPI != nil {
-					for k := range b.DownwardAPI.Items {
-						c := &b.DownwardAPI.Items[k]
-						if c.FieldRef != nil {
-							k8scorev1.SetDefaults_ObjectFieldSelector(c.FieldRef)
-						}
-					}
-				}
-				if b.ServiceAccountToken != nil {
-					k8scorev1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
-				}
-			}
-		}
-		if a.VolumeSource.ScaleIO != nil {
-			k8scorev1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
-		}
-		if a.VolumeSource.Ephemeral != nil {
-			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {
-				k8scorev1.SetDefaults_PersistentVolumeClaimSpec(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec)
-				k8scorev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits)
-				k8scorev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests)
-			}
-		}
-	}
+	SetDefaultPodSpecVolumes(in.Spec.Template.Spec.Volumes)
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
 		k8scorev1.SetDefaults_Container(a)
@@ -237,6 +181,68 @@ func SetDefaultPodSpec(in *appsv1alpha1.CollaSet) {
 		}
 	}
 	k8scorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+}
+
+func SetDefaultPodSpecVolumes(volumes []corev1.Volume) {
+	for i := range volumes {
+		a := &volumes[i]
+		k8scorev1.SetDefaults_Volume(a)
+		if a.VolumeSource.HostPath != nil {
+			k8scorev1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+		}
+		if a.VolumeSource.Secret != nil {
+			k8scorev1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
+		}
+		if a.VolumeSource.ISCSI != nil {
+			k8scorev1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+		}
+		if a.VolumeSource.RBD != nil {
+			k8scorev1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+		}
+		if a.VolumeSource.DownwardAPI != nil {
+			k8scorev1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
+			for j := range a.VolumeSource.DownwardAPI.Items {
+				b := &a.VolumeSource.DownwardAPI.Items[j]
+				if b.FieldRef != nil {
+					k8scorev1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+				}
+			}
+		}
+		if a.VolumeSource.ConfigMap != nil {
+			k8scorev1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+		}
+		if a.VolumeSource.AzureDisk != nil {
+			k8scorev1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+		}
+		if a.VolumeSource.Projected != nil {
+			k8scorev1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
+			for j := range a.VolumeSource.Projected.Sources {
+				b := &a.VolumeSource.Projected.Sources[j]
+				if b.DownwardAPI != nil {
+					for k := range b.DownwardAPI.Items {
+						c := &b.DownwardAPI.Items[k]
+						if c.FieldRef != nil {
+							k8scorev1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+						}
+					}
+				}
+				if b.ServiceAccountToken != nil {
+					k8scorev1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+				}
+			}
+		}
+		if a.VolumeSource.ScaleIO != nil {
+			k8scorev1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+		}
+		if a.VolumeSource.Ephemeral != nil {
+			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {
+				k8scorev1.SetDefaults_PersistentVolumeClaimSpec(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec)
+				k8scorev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits)
+				k8scorev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests)
+			}
+		}
+	}
+
 }
 
 func SetDefaultCollaSetUpdateStrategy(cls *appsv1alpha1.CollaSet) {
