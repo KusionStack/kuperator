@@ -28,7 +28,6 @@ import (
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
-	"kusionstack.io/operating/pkg/controllers/operationjob/replace"
 	"kusionstack.io/operating/test/e2e/framework"
 )
 
@@ -166,7 +165,7 @@ var _ = SIGDescribe("OperationJob", func() {
 			Eventually(func() error { return ojTester.ExpectOperationJobProgress(oj2, appsv1alpha1.OperationProgressSucceeded) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
 			By("Check replace new pod of OperationJobs")
-			Expect(oj1.Status.TargetDetails[0].ExtraInfo[replace.ExtraInfoReplacedByNewPodKey]).To(Equal(oj2.Status.TargetDetails[0].ExtraInfo[replace.ExtraInfoReplacedByNewPodKey]))
+			Expect(oj1.Status.TargetDetails[0].ExtraInfo[appsv1alpha1.ExtraInfoReplacedNewPodKey]).To(Equal(oj2.Status.TargetDetails[0].ExtraInfo[appsv1alpha1.ExtraInfoReplacedNewPodKey]))
 		})
 
 		framework.ConformanceIt("delete operationjob to cancel replace", func() {
