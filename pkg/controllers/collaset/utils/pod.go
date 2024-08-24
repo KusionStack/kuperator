@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
 	revisionutils "kusionstack.io/operating/pkg/controllers/utils/revision"
 	"kusionstack.io/operating/pkg/utils"
@@ -41,8 +42,8 @@ type PodWrapper struct {
 	ContextDetail *appsv1alpha1.ContextDetail
 
 	PlaceHolder bool
-	// TODO ToExclude
-	ToDelete bool
+	ToDelete    bool
+	ToExclude   bool
 }
 
 func CollectPodInstanceID(pods []*PodWrapper) map[int]struct{} {
