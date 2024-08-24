@@ -255,7 +255,7 @@ func decidePodToUpdateByPartition(
 	cls *appsv1alpha1.CollaSet,
 	podInfos []*PodUpdateInfo) (podToUpdate []*PodUpdateInfo) {
 
-	filteredPodInfos := filterReplacingNewCreatedPod(podInfos)
+	filteredPodInfos := getTargetsUpdatePods(podInfos)
 	if cls.Spec.UpdateStrategy.RollingUpdate == nil ||
 		cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition == nil {
 		return filteredPodInfos
@@ -281,10 +281,14 @@ func decidePodToUpdateByPartition(
 	return podToUpdate
 }
 
-// filter these pods in replacing and is new created pod
-func filterReplacingNewCreatedPod(podInfos []*PodUpdateInfo) (filteredPodInfos []*PodUpdateInfo) {
+// when sort pods to choose update, only sort (1) replace origin pods, (2) non-exclude pods
+func getTargetsUpdatePods(podInfos []*PodUpdateInfo) (filteredPodInfos []*PodUpdateInfo) {
 	for _, podInfo := range podInfos {
 		if podInfo.isInReplacing && podInfo.replacePairOriginPodName != "" {
+			continue
+		}
+
+		if podInfo.ToExclude {
 			continue
 		}
 

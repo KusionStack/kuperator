@@ -362,7 +362,7 @@ func (r *CollaSetReconciler) ensureReclaimPvcs(ctx context.Context, cls *appsv1a
 		}
 	}
 	if len(needReclaimPvcs) > 0 {
-		_, err = pvcControl.ReleasePvcsOwnerRef(cls, needReclaimPvcs)
+		_, err = pvcControl.OrphanPvcs(cls, needReclaimPvcs)
 	}
 	return err
 }

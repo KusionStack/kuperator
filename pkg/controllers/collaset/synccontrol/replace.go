@@ -28,11 +28,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontext"
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
@@ -50,10 +48,10 @@ const (
 func (r *RealSyncControl) cleanReplacePodLabels(
 	needCleanLabelPods []*corev1.Pod,
 	podsNeedCleanLabels [][]string,
-	ownedIDs map[int]*appsv1alpha1.ContextDetail) (bool, sets.String, error) {
+	ownedIDs map[int]*appsv1alpha1.ContextDetail) (bool, []int, error) {
 
 	needUpdateContext := false
-	needDeletePodsIDs := sets.String{}
+	var needDeletePodsIDs []int
 	mapOriginToNewPodContext := mapReplaceOriginToNewPodContext(ownedIDs)
 	mapNewToOriginPodContext := mapReplaceNewToOriginPodContext(ownedIDs)
 	_, err := controllerutils.SlowStartBatch(len(needCleanLabelPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
@@ -72,7 +70,7 @@ func (r *RealSyncControl) cleanReplacePodLabels(
 				newPodId, _ := collasetutils.GetPodInstanceID(pod)
 				if originPodContext, exist := mapOriginToNewPodContext[newPodId]; exist && originPodContext != nil {
 					originPodContext.Remove(ReplaceNewPodIDContextDataKey)
-					needDeletePodsIDs.Insert(strconv.Itoa(originPodContext.ID))
+					needDeletePodsIDs = append(needDeletePodsIDs, originPodContext.ID)
 				}
 				if contextDetail, exist := ownedIDs[newPodId]; exist {
 					contextDetail.Remove(ReplaceOriginPodIDContextDataKey)
@@ -85,7 +83,7 @@ func (r *RealSyncControl) cleanReplacePodLabels(
 				originPodId, _ := collasetutils.GetPodInstanceID(pod)
 				if newPodContext, exist := mapNewToOriginPodContext[originPodId]; exist && newPodContext != nil {
 					newPodContext.Remove(ReplaceOriginPodIDContextDataKey)
-					needDeletePodsIDs.Insert(strconv.Itoa(newPodContext.ID))
+					needDeletePodsIDs = append(needDeletePodsIDs, newPodContext.ID)
 				}
 				if contextDetail, exist := ownedIDs[originPodId]; exist {
 					contextDetail.Remove(ReplaceNewPodIDContextDataKey)
