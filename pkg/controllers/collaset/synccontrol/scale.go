@@ -122,9 +122,9 @@ func (r *RealSyncControl) reclaimScaleStrategy(ctx context.Context, toDeletePodN
 	return nil
 }
 
-func (r *RealSyncControl) dealIncludeExcludePods(cls *appsv1alpha1.CollaSet, pods []*corev1.Pod, resources *collasetutils.RelatedResources) (sets.String, sets.String, bool, error) {
+func (r *RealSyncControl) dealIncludeExcludePods(cls *appsv1alpha1.CollaSet, pods []*corev1.Pod) (sets.String, sets.String) {
 	if len(cls.Spec.ScaleStrategy.PodToExclude) == 0 && len(cls.Spec.ScaleStrategy.PodToInclude) == 0 {
-		return nil, nil, false, nil
+		return nil, nil
 	}
 
 	ownedPods := sets.String{}
@@ -159,5 +159,12 @@ func (r *RealSyncControl) dealIncludeExcludePods(cls *appsv1alpha1.CollaSet, pod
 		}
 	}
 
-	return excludePodNames, includePodNames, false, nil
+	return excludePodNames, includePodNames
+}
+
+func (r *RealSyncControl) doIncludeExcludePods(excludePods sets.String, includePods sets.String) {
+	// exclude: remove ownerReference from pod, pvc
+
+	// include: add ownerReference to pod, pvc; allocate instance-id
+
 }

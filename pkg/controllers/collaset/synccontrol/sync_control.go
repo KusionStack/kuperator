@@ -112,19 +112,19 @@ func (r *RealSyncControl) SyncPods(
 		return false, nil, nil, fmt.Errorf("fail to get filtered PVCs: %s", err)
 	}
 	// adopt and retain orphaned pvcs according to PVC retention policy
-	if adoptedPvcs, err := r.pvcControl.AdoptOrphanedPvcs(ctx, instance); err != nil {
+	if adoptedPvcs, err := r.pvcControl.AdoptPvcs(ctx, instance); err != nil {
 		return false, nil, nil, fmt.Errorf("fail to adopt orphaned PVCs: %s", err)
 	} else {
 		resources.ExistingPvcs = append(resources.ExistingPvcs, adoptedPvcs...)
 	}
 
 	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods, replaceIndicateCount := dealReplacePods(filteredPods)
-	toExcludePodNames, toIncludePodNames, _, _ := r.dealIncludeExcludePods(instance, filteredPods, resources)
+	toExcludePodNames, toIncludePodNames := r.dealIncludeExcludePods(instance, filteredPods)
 
 	// get owned IDs
 	var ownedIDs map[int]*appsv1alpha1.ContextDetail
 	if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		needAllocateReplicas := int(realValue(instance.Spec.Replicas)) + replaceIndicateCount
+		needAllocateReplicas := int(realValue(instance.Spec.Replicas)) + replaceIndicateCount + len(toIncludePodNames)
 		ownedIDs, err = podcontext.AllocateID(r.client, instance, resources.UpdatedRevision.Name, needAllocateReplicas)
 		return err
 	}); err != nil {
@@ -199,19 +199,22 @@ func (r *RealSyncControl) SyncPods(
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "deal replace pods with error: %s", err.Error())
 	}
 
-	// 4.1 Reclaim Pod ID which is (1) during ScalingIn, (2) ReplaceOriginPod; besides, Pod & PVC are all non-existing
+	// 4. exclude include pods
+	r.doIncludeExcludePods(toExcludePodNames, toIncludePodNames)
+
+	// 5.1 Reclaim Pod ID which is (1) during ScalingIn, (2) ReplaceOriginPod (3) ExcludePods; besides, Pod & PVC are all non-existing
 	err = r.reclaimOwnedIDs(needUpdateContext, instance, idToReclaim, currentIDs, ownedIDs)
 	if err != nil {
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReclaimOwnedIDs", "reclaim pod contexts with error: %s", err.Error())
 	}
 
-	// 4.2 Reclaim scaleStrategy for delete, exclude, include
+	// 5.2 Reclaim scaleStrategy for delete, exclude, include
 	err = r.reclaimScaleStrategy(ctx, toDeletePodNames, toExcludePodNames, toIncludePodNames, instance)
 	if err != nil {
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReclaimScaleStrategy", "reclaim scaleStrategy with error: %s", err.Error())
 	}
 
-	// 5. create podWrappers for non-exist pods
+	// 6. create podWrappers for non-exist pods
 	for id, contextDetail := range ownedIDs {
 		if _, inUsed := currentIDs[id]; inUsed {
 			continue
