@@ -181,7 +181,8 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 		v1alpha1.PodPreparingLabelPrefix:  false, // Set readiness gate to false
 		v1alpha1.PodCompletingLabelPrefix: true,  // Set readiness gate to true
 	}
-	for k, v := range expected {
+	for _, k := range []string{v1alpha1.PodPreparingLabelPrefix, v1alpha1.PodCompletingLabelPrefix} {
+		v := expected[k]
 		keeped := false
 		for _, labels := range idToLabelsMap {
 			if _, ok := labels[k]; !ok {
