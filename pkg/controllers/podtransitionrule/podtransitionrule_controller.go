@@ -39,13 +39,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/podtransitionrule/processor"
-	"kusionstack.io/operating/pkg/controllers/podtransitionrule/register"
-	podtransitionruleutils "kusionstack.io/operating/pkg/controllers/podtransitionrule/utils"
-	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
-	"kusionstack.io/operating/pkg/utils"
-	commonutils "kusionstack.io/operating/pkg/utils"
-	"kusionstack.io/operating/pkg/utils/mixin"
+	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/processor"
+	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/register"
+	podtransitionruleutils "kusionstack.io/kuperator/pkg/controllers/podtransitionrule/utils"
+	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
+	"kusionstack.io/kuperator/pkg/utils"
+	commonutils "kusionstack.io/kuperator/pkg/utils"
+	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
 const (

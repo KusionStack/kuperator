@@ -24,9 +24,9 @@ import (
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	podopslifecycleutil "kusionstack.io/operating/pkg/controllers/podopslifecycle"
-	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
-	"kusionstack.io/operating/pkg/utils"
+	podopslifecycleutil "kusionstack.io/kuperator/pkg/controllers/podopslifecycle"
+	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/kuperator/pkg/utils"
 )
 
 func BeginOperateLifecycle(client client.Client, adapter podopslifecycle.LifecycleAdapter, pod *corev1.Pod) error {

@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	refmanagerutil "kusionstack.io/operating/pkg/controllers/utils/refmanager"
-	"kusionstack.io/operating/pkg/utils/inject"
+	refmanagerutil "kusionstack.io/kuperator/pkg/controllers/utils/refmanager"
+	"kusionstack.io/kuperator/pkg/utils/inject"
 )
 
 type Interface interface {

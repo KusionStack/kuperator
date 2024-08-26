@@ -23,8 +23,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"kusionstack.io/operating/pkg/webhook/server/generic/pod/gracedelete"
-	"kusionstack.io/operating/pkg/webhook/server/generic/pod/opslifecycle"
+	"kusionstack.io/kuperator/pkg/webhook/server/generic/pod/gracedelete"
+	"kusionstack.io/kuperator/pkg/webhook/server/generic/pod/opslifecycle"
 )
 
 var (

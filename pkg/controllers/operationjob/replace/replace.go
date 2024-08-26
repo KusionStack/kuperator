@@ -32,9 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	. "kusionstack.io/operating/pkg/controllers/operationjob/opscore"
-	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
-	"kusionstack.io/operating/pkg/utils/mixin"
+	. "kusionstack.io/kuperator/pkg/controllers/operationjob/opscore"
+	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
+	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
 const (

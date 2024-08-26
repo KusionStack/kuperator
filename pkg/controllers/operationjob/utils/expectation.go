@@ -16,7 +16,7 @@ limitations under the License.
 
 package utils
 
-import "kusionstack.io/operating/pkg/controllers/utils/expectations"
+import "kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 
 var (
 	StatusUpToDateExpectation = expectations.NewResourceVersionExpectation()

@@ -38,11 +38,11 @@ import (
 
 	"kusionstack.io/kube-api/apps/v1alpha1"
 
-	"kusionstack.io/operating/pkg/controllers/podtransitionrule"
-	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
-	"kusionstack.io/operating/pkg/controllers/utils/expectations"
-	"kusionstack.io/operating/pkg/utils"
-	"kusionstack.io/operating/pkg/utils/mixin"
+	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule"
+	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
+	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
+	"kusionstack.io/kuperator/pkg/utils"
+	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
 const (

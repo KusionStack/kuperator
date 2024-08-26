@@ -32,12 +32,12 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
-	"kusionstack.io/operating/pkg/controllers"
-	"kusionstack.io/operating/pkg/controllers/operationjob"
-	_ "kusionstack.io/operating/pkg/features"
-	"kusionstack.io/operating/pkg/utils/feature"
-	"kusionstack.io/operating/pkg/utils/inject"
-	"kusionstack.io/operating/pkg/webhook"
+	"kusionstack.io/kuperator/pkg/controllers"
+	"kusionstack.io/kuperator/pkg/controllers/operationjob"
+	_ "kusionstack.io/kuperator/pkg/features"
+	"kusionstack.io/kuperator/pkg/utils/feature"
+	"kusionstack.io/kuperator/pkg/utils/inject"
+	"kusionstack.io/kuperator/pkg/webhook"
 	//+kubebuilder:scaffold:imports
 )
 

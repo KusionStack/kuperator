@@ -23,7 +23,7 @@ import (
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
-	operatingv1alpha1 "kusionstack.io/operating/apis/apps/v1alpha1"
+	operatingv1alpha1 "kusionstack.io/kuperator/apis/apps/v1alpha1"
 )
 
 func TestMutatingCollaSet(t *testing.T) {

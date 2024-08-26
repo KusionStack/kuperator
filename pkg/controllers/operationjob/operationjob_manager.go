@@ -28,11 +28,11 @@ import (
 	"k8s.io/utils/ptr"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
-	. "kusionstack.io/operating/pkg/controllers/operationjob/opscore"
-	"kusionstack.io/operating/pkg/controllers/operationjob/replace"
-	ojutils "kusionstack.io/operating/pkg/controllers/operationjob/utils"
-	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
-	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
+	. "kusionstack.io/kuperator/pkg/controllers/operationjob/opscore"
+	"kusionstack.io/kuperator/pkg/controllers/operationjob/replace"
+	ojutils "kusionstack.io/kuperator/pkg/controllers/operationjob/utils"
+	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
+	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 )
 
 // RegisterOperationJobActions register actions for operationJob

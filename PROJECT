@@ -5,6 +5,6 @@
 domain: kusionstack.io
 layout:
 - go.kubebuilder.io/v3
-projectName: operating
-repo: kusionstack.io/operating
+projectName: kuperator
+repo: kusionstack.io/kuperator
 resources:

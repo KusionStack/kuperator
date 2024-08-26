@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration/anno"
+	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
 )
 
 func getContextName(instance *appsv1alpha1.CollaSet) string {

@@ -21,11 +21,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/anno"
-	"kusionstack.io/operating/pkg/utils"
+	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
+	"kusionstack.io/kuperator/pkg/utils"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/patch"
+	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/patch"
 )
 
 func PatchPodDecoration(pod *corev1.Pod, template *appsv1alpha1.PodDecorationPodTemplate) (err error) {

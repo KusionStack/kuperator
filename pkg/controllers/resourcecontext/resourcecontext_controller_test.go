@@ -42,11 +42,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"kusionstack.io/operating/pkg/controllers/collaset"
-	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
-	"kusionstack.io/operating/pkg/controllers/poddeletion"
-	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/strategy"
-	"kusionstack.io/operating/pkg/utils/inject"
+	"kusionstack.io/kuperator/pkg/controllers/collaset"
+	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
+	"kusionstack.io/kuperator/pkg/controllers/poddeletion"
+	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/strategy"
+	"kusionstack.io/kuperator/pkg/utils/inject"
 )
 
 var (

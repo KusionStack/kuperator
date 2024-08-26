@@ -44,9 +44,9 @@ import (
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
-	"kusionstack.io/operating/pkg/controllers/collaset"
-	"kusionstack.io/operating/pkg/controllers/poddeletion"
-	"kusionstack.io/operating/pkg/utils/inject"
+	"kusionstack.io/kuperator/pkg/controllers/collaset"
+	"kusionstack.io/kuperator/pkg/controllers/poddeletion"
+	"kusionstack.io/kuperator/pkg/utils/inject"
 )
 
 var (

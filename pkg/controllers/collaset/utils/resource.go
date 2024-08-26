@@ -21,7 +21,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration"
+	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration"
 )
 
 type RelatedResources struct {

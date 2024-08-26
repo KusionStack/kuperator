@@ -24,10 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	"kusionstack.io/operating/test/e2e/framework"
+	"kusionstack.io/kuperator/test/e2e/framework"
 )
 
 var _ = SIGDescribe("OperationJob", func() {

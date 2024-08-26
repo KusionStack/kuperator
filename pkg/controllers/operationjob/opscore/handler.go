@@ -24,7 +24,7 @@ import (
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
-	"kusionstack.io/operating/pkg/utils/mixin"
+	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
 type ActionProgress string

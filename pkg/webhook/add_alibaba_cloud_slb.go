@@ -17,7 +17,7 @@ limitations under the License.
 package webhook
 
 import (
-	"kusionstack.io/operating/pkg/webhook/alibaba_cloud_slb"
+	"kusionstack.io/kuperator/pkg/webhook/alibaba_cloud_slb"
 )
 
 func init() {

@@ -17,7 +17,7 @@ limitations under the License.
 package controllers
 
 import (
-	"kusionstack.io/operating/pkg/controllers/resourcecontext"
+	"kusionstack.io/kuperator/pkg/controllers/resourcecontext"
 )
 
 func init() {

@@ -27,8 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/kube-api/apps/v1alpha1"
-	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
-	"kusionstack.io/operating/pkg/utils"
+	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
+	"kusionstack.io/kuperator/pkg/utils"
 )
 
 func (lc *OpsLifecycle) Validating(ctx context.Context, c client.Client, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) (err error) {

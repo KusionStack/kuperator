@@ -17,7 +17,7 @@ limitations under the License.
 package controllers
 
 import (
-	"kusionstack.io/operating/pkg/controllers/operationjob"
+	"kusionstack.io/kuperator/pkg/controllers/operationjob"
 )
 
 func init() {

@@ -20,7 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 )
 
 var (

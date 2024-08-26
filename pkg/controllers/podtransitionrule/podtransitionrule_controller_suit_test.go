@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/utils/inject"
+	"kusionstack.io/kuperator/pkg/utils/inject"
 )
 
 var (

@@ -29,11 +29,11 @@ import (
 	"k8s.io/client-go/util/retry"
 	"kusionstack.io/kube-api/apps/v1alpha1"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/poddeletion"
-	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
-	"kusionstack.io/operating/pkg/features"
-	"kusionstack.io/operating/pkg/utils"
-	"kusionstack.io/operating/pkg/utils/feature"
+	"kusionstack.io/kuperator/pkg/controllers/poddeletion"
+	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/kuperator/pkg/features"
+	"kusionstack.io/kuperator/pkg/utils"
+	"kusionstack.io/kuperator/pkg/utils/feature"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

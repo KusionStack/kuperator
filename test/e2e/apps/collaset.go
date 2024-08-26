@@ -36,9 +36,9 @@ import (
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
-	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
-	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
-	"kusionstack.io/operating/test/e2e/framework"
+	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
+	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/kuperator/test/e2e/framework"
 )
 
 var _ = SIGDescribe("CollaSet", func() {

@@ -14,7 +14,7 @@
 package controllers
 
 import (
-	"kusionstack.io/operating/pkg/controllers/podtransitionrule"
+	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule"
 )
 
 func init() {

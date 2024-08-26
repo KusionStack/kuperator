@@ -42,12 +42,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	"kusionstack.io/operating/pkg/controllers/collaset"
-	collasetutils "kusionstack.io/operating/pkg/controllers/collaset/utils"
-	utilspoddecoration "kusionstack.io/operating/pkg/controllers/utils/poddecoration/anno"
-	"kusionstack.io/operating/pkg/controllers/utils/poddecoration/strategy"
-	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
-	"kusionstack.io/operating/pkg/utils/inject"
+	"kusionstack.io/kuperator/pkg/controllers/collaset"
+	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
+	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
+	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/strategy"
+	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/kuperator/pkg/utils/inject"
 )
 
 var (

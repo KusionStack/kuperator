@@ -30,9 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	controllerutils "kusionstack.io/operating/pkg/controllers/utils"
-	revisionutils "kusionstack.io/operating/pkg/controllers/utils/revision"
-	"kusionstack.io/operating/pkg/utils"
+	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
+	revisionutils "kusionstack.io/kuperator/pkg/controllers/utils/revision"
+	"kusionstack.io/kuperator/pkg/utils"
 )
 
 type PodWrapper struct {

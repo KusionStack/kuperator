@@ -19,8 +19,8 @@ package controllers
 import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"kusionstack.io/operating/pkg/features"
-	"kusionstack.io/operating/pkg/utils/feature"
+	"kusionstack.io/kuperator/pkg/features"
+	"kusionstack.io/kuperator/pkg/utils/feature"
 	"kusionstack.io/resourceconsist/pkg/adapters"
 )
 

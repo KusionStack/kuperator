@@ -6,8 +6,8 @@ metadata:
   namespace: {{ .Values.namespace }}
 spec:
   root:
-    prefix: operating
-    targetStatefulSet: kusionstack-operating
+    prefix: kuperator
+    targetStatefulSet: kusionstack-kuperator
     canary:
       replicas: 1
       inNamespaces:

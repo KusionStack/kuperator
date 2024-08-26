@@ -19,7 +19,7 @@ package poddeletion
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"kusionstack.io/operating/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 )
 
 var (
