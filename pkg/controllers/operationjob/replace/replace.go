@@ -151,6 +151,7 @@ func (p *PodReplaceHandler) GetOpsProgress(ctx context.Context, candidate *OpsCa
 				return
 			}
 			// mark ops status as succeeded if origin pod is replaced
+			ojutils.SetOpsStatusError(candidate, "", "")
 			progress = ActionProgressSucceeded
 		} else {
 			// mark ops status as failed if origin pod not found

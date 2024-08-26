@@ -70,6 +70,10 @@ func SetOpsStatusError(candidate *opscore.OpsCandidate, reason string, message s
 	if candidate == nil || candidate.OpsStatus == nil {
 		return
 	}
+	if reason == "" && message == "" {
+		candidate.OpsStatus.Error = nil
+		return
+	}
 	candidate.OpsStatus.Error = &appsv1alpha1.ErrorReasonMessage{
 		Reason:  reason,
 		Message: message,
