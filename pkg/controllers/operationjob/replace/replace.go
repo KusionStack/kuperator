@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	. "kusionstack.io/kuperator/pkg/controllers/operationjob/opscore"
 	ojutils "kusionstack.io/kuperator/pkg/controllers/operationjob/utils"
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
 	"kusionstack.io/kuperator/pkg/utils/mixin"
