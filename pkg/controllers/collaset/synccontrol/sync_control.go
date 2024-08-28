@@ -146,16 +146,16 @@ func (r *RealSyncControl) SyncPods(
 		toDelete := toDeletePodNames.Has(pod.Name)
 		toExclude := toExcludePodNames.Has(pod.Name)
 
+		// priority: toDelete > toReplace > toExclude
 		if toDelete {
+			toExcludePodNames.Delete(pod.Name)
 			toDeletePodNames.Delete(pod.Name)
 		}
-
 		if toExclude {
 			if podDuringReplace(pod) {
-				// just skip exclude and wait replace finish if pod in replace
 				toExcludePodNames.Delete(pod.Name)
 			} else {
-				// continue to exclude and reclaim podContext
+				// exclude pod and remove podContext
 				idToReclaim.Insert(id)
 			}
 		}
