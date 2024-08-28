@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -369,6 +370,82 @@ var _ = SIGDescribe("CollaSet", func() {
 			oldContainerStatus := pods[0].Status.ContainerStatuses[0]
 
 			By("Update image to nginxNew")
+			Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
+				cls.Spec.Template.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.NginxNew)
+			})).NotTo(HaveOccurred())
+
+			By("Wait for CollaSet reconciled")
+			Eventually(func() bool {
+				if err = tester.GetCollaSet(cls); err != nil {
+					return false
+				}
+				return cls.Generation == cls.Status.ObservedGeneration
+			}, 10*time.Second, 3*time.Second).Should(Equal(true))
+
+			By("Wait for all pods updated and ready")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 1, 1, 1, 1, 1) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Verify the PodUID not changed but containerID and imageID changed")
+			pods, err = tester.ListPodsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			newPodUID := pods[0].UID
+			newContainerStatus := pods[0].Status.ContainerStatuses[0]
+
+			Expect(oldPodUID).Should(Equal(newPodUID))
+			Expect(newContainerStatus.ContainerID).NotTo(Equal(oldContainerStatus.ContainerID))
+			Expect(newContainerStatus.ImageID).NotTo(Equal(oldContainerStatus.ImageID))
+		})
+
+		framework.ConformanceIt("in-place update main container with sidecar", func() {
+			By("Create poddecoration")
+			pd := &appsv1alpha1.PodDecoration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pd",
+					Namespace: ns,
+				},
+				Spec: appsv1alpha1.PodDecorationSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      appsv1alpha1.PodInstanceIDLabelKey,
+								Operator: metav1.LabelSelectorOpExists,
+							},
+						},
+					},
+					Template: appsv1alpha1.PodDecorationPodTemplate{
+						Containers: []*appsv1alpha1.ContainerPatch{
+							{
+								InjectPolicy: appsv1alpha1.AfterPrimaryContainer,
+								Container: v1.Container{
+									Name:  "sidecar-redis",
+									Image: imageutils.GetE2EImage(imageutils.Redis),
+								},
+							},
+						},
+					},
+				},
+			}
+			Expect(client.Create(context.TODO(), pd)).NotTo(HaveOccurred())
+
+			cls := tester.NewCollaSet("collaset-"+randStr, 1, appsv1alpha1.UpdateStrategy{PodUpdatePolicy: appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType})
+			Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
+
+			By("Wait for status replicas satisfied")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 1, 1, 1, 1, 1) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Check sidecar injected")
+			Eventually(func() bool {
+				pods, err := tester.ListPodsForCollaSet(cls)
+				Expect(err).NotTo(HaveOccurred())
+				return pods[0].Status.ContainerStatuses[1].Name == pd.Spec.Template.Containers[0].Name
+			})
+
+			pods, err := tester.ListPodsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			oldPodUID := pods[0].UID
+			oldContainerStatus := pods[0].Status.ContainerStatuses[0]
+
+			By("Update main image to nginxNew")
 			Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
 				cls.Spec.Template.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.NginxNew)
 			})).NotTo(HaveOccurred())
