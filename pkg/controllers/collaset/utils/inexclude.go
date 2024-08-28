@@ -17,59 +17,11 @@ limitations under the License.
 package utils
 
 import (
-	"context"
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-// AllowPodExclude checks if pod is allowed to exclude from collaset
-func AllowPodExclude(c client.Client, pod *corev1.Pod, cls *appsv1alpha1.CollaSet) (allowed bool, reason string, err error) {
-	if allowed, reason := AllowResourceExclude(pod, cls.Name, cls.Kind); !allowed {
-		return false, reason, nil
-	}
-
-	for _, volume := range pod.Spec.Volumes {
-		var pvc *corev1.PersistentVolumeClaim
-		err := c.Get(context.Background(), types.NamespacedName{Namespace: pod.Namespace, Name: volume.PersistentVolumeClaim.ClaimName}, pvc)
-		// If pvc not found, ignore it. In case of pvc is filtered out by controller-mesh
-		if errors.IsNotFound(err) {
-			continue
-		} else if err != nil {
-			return false, "", err
-		}
-		if allowed, reason := AllowResourceExclude(pvc, cls.Name, cls.Kind); !allowed {
-			return false, reason, nil
-		}
-	}
-	return true, "", nil
-}
-
-// AllowPodInclude checks if pod is allowed to include into collaset
-func AllowPodInclude(c client.Client, pod *corev1.Pod, cls *appsv1alpha1.CollaSet) (allowed bool, reason string, err error) {
-	if allowed, reason := AllowResourceInclude(pod, cls.Name, cls.Kind); !allowed {
-		return false, reason, nil
-	}
-	for _, volume := range pod.Spec.Volumes {
-		var pvc *corev1.PersistentVolumeClaim
-		err := c.Get(context.Background(), types.NamespacedName{Namespace: pod.Namespace, Name: volume.PersistentVolumeClaim.ClaimName}, pvc)
-		// If pvc not found, ignore it. In case of pvc is filtered out by controller-mesh
-		if errors.IsNotFound(err) {
-			continue
-		} else if err != nil {
-			return false, "", err
-		}
-		if allowed, reason := AllowResourceInclude(pvc, cls.Name, cls.Kind); !allowed {
-			return false, reason, nil
-		}
-	}
-	return true, "", nil
-}
 
 // AllowResourceExclude checks if pod or pvc is allowed to exclude
 func AllowResourceExclude(obj metav1.Object, ownerName, ownerKind string) (bool, string) {
