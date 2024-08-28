@@ -88,12 +88,16 @@ type ActivePodsForDeletion []*collasetutils.PodWrapper
 func (s ActivePodsForDeletion) Len() int      { return len(s) }
 func (s ActivePodsForDeletion) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
+// Less sort deletion order by: podToDelete > podToExclude > duringScaleIn > others
 func (s ActivePodsForDeletion) Less(i, j int) bool {
 	l, r := s[i], s[j]
 
-	// pods which are indicated by ScaleStrategy.PodToDelete should be deleted before others
 	if l.ToDelete != r.ToDelete {
 		return l.ToDelete
+	}
+
+	if l.ToExclude != r.ToExclude {
+		return l.ToExclude
 	}
 
 	// pods which are during scaleInOps should be deleted before those not during

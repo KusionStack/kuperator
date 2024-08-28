@@ -152,8 +152,10 @@ func (r *RealSyncControl) SyncPods(
 
 		if toExclude {
 			if podDuringReplace(pod) {
+				// just skip exclude and wait replace finish if pod in replace
 				toExcludePodNames.Delete(pod.Name)
 			} else {
+				// continue to exclude and reclaim podContext
 				idToReclaim.Insert(id)
 			}
 		}
@@ -422,6 +424,9 @@ func (r *RealSyncControl) Scale(
 		podCh := make(chan *collasetutils.PodWrapper, len(podsToScaleIn))
 		for i := range podsToScaleIn {
 			if podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, podsToScaleIn[i].Pod) {
+				continue
+			}
+			if podsToScaleIn[i].ToExclude {
 				continue
 			}
 			podCh <- podsToScaleIn[i]
