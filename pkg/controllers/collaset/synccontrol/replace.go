@@ -407,3 +407,13 @@ func mapReplaceOriginToNewPodContext(ownedIDs map[int]*appsv1alpha1.ContextDetai
 	}
 	return mapOriginToNewPodContext
 }
+
+func podDuringReplace(pod *corev1.Pod) bool {
+	if pod.Labels == nil || len(pod.Labels) == 0 {
+		return false
+	}
+	_, replaceIndicate := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
+	_, replaceOriginPod := pod.Labels[appsv1alpha1.PodReplacePairNewId]
+	_, replaceNewPod := pod.Labels[appsv1alpha1.PodReplacePairOriginName]
+	return replaceIndicate || replaceOriginPod || replaceNewPod
+}

@@ -18,11 +18,15 @@ package synccontrol
 
 import (
 	"context"
+	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
@@ -31,6 +35,7 @@ import (
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
+	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/kuperator/pkg/features"
@@ -102,12 +107,174 @@ func (s ActivePodsForDeletion) Less(i, j int) bool {
 	return collasetutils.ComparePod(l.Pod, r.Pod)
 }
 
+func (r *RealSyncControl) dealIncludeExcludePods(ctx context.Context, cls *appsv1alpha1.CollaSet, pods []*corev1.Pod) (sets.String, sets.String, error) {
+	if len(cls.Spec.ScaleStrategy.PodToExclude) == 0 && len(cls.Spec.ScaleStrategy.PodToInclude) == 0 {
+		return nil, nil, nil
+	}
+	ownedPods := sets.String{}
+	excludePodNames := sets.String{}
+	includePodNames := sets.String{}
+	for _, pod := range pods {
+		ownedPods.Insert(pod.Name)
+	}
+
+	for _, podName := range cls.Spec.ScaleStrategy.PodToExclude {
+		if ownedPods.Has(podName) {
+			excludePodNames.Insert(podName)
+		}
+	}
+
+	for _, podName := range cls.Spec.ScaleStrategy.PodToInclude {
+		includePodNames.Insert(podName)
+	}
+
+	intersection := excludePodNames.Intersection(includePodNames)
+	if len(intersection) > 0 {
+		r.recorder.Eventf(cls, corev1.EventTypeWarning, "DupExIncludedPod", "duplicated pods %s in both excluding and including sets", strings.Join(intersection.List(), ", "))
+		includePodNames.Delete(intersection.List()...)
+		excludePodNames.Delete(intersection.List()...)
+	}
+
+	if includePodNames.Len() > 0 {
+		for _, pod := range pods {
+			if includePodNames.Has(pod.Name) {
+				includePodNames.Delete(pod.Name)
+			}
+		}
+	}
+
+	toExcludePods, notAllowedExcludePods, exErr := r.allowIncludeExcludePods(ctx, cls, excludePodNames.List(), collasetutils.AllowPodExclude)
+	toIncludePods, notAllowedIncludePods, inErr := r.allowIncludeExcludePods(ctx, cls, includePodNames.List(), collasetutils.AllowPodInclude)
+	r.recorder.Eventf(cls, corev1.EventTypeWarning, "ExcludeNotAllowed", fmt.Sprintf("pods are not allowed to exclude [%v]", notAllowedExcludePods.List()))
+	r.recorder.Eventf(cls, corev1.EventTypeWarning, "IncludeNotAllowed", fmt.Sprintf("pods are not allowed to include [%v]", notAllowedIncludePods.List()))
+	return toExcludePods, toIncludePods, controllerutils.AggregateErrors([]error{exErr, inErr})
+}
+
+type checkAllowFunc func(client.Client, *corev1.Pod, *appsv1alpha1.CollaSet) (allowed bool, reason string, err error)
+
+func (r *RealSyncControl) allowIncludeExcludePods(ctx context.Context, cls *appsv1alpha1.CollaSet, podNames []string, fn checkAllowFunc) (allowPods sets.String, notAllowPods sets.String, err error) {
+	for i := range podNames {
+		var pod *corev1.Pod
+		if err = r.client.Get(ctx, types.NamespacedName{Namespace: cls.Namespace, Name: podNames[i]}, pod); err != nil {
+			return
+		}
+		var allowed bool
+		var reason string
+		if allowed, reason, err = fn(r.client, pod, cls); err != nil {
+			r.recorder.Eventf(pod, corev1.EventTypeWarning, "ExcludeIncludeNotAllowed", fmt.Sprintf("failed to check allowed to exlcude/include from/to collaset %s/%s: %v", cls.Namespace, cls.Name, err))
+			return
+		}
+		if allowed {
+			allowPods.Insert(pod.Name)
+		} else {
+			r.recorder.Eventf(pod, corev1.EventTypeWarning, "ExcludeIncludeNotAllowed", fmt.Sprintf("pod is not allowed to exlcude/include from/to collaset %s/%s: %s", cls.Namespace, cls.Name, reason))
+			notAllowPods.Insert(pod.Name)
+		}
+	}
+	return allowPods, notAllowPods, nil
+}
+
+// doIncludeExcludePods do real include and exclude pods. If all pods
+func (r *RealSyncControl) doIncludeExcludePods(ctx context.Context, cls *appsv1alpha1.CollaSet, excludePods []string, includePods []string, availableContexts []*appsv1alpha1.ContextDetail) error {
+	_, exErr := controllerutils.SlowStartBatch(len(excludePods), controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) error {
+		return r.excludePod(ctx, cls, excludePods[idx])
+	})
+	_, inErr := controllerutils.SlowStartBatch(len(includePods), controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) error {
+		return r.includePod(ctx, cls, includePods[idx], strconv.Itoa(availableContexts[idx].ID))
+	})
+	return controllerutils.AggregateErrors([]error{exErr, inErr})
+}
+
+func (r *RealSyncControl) excludePod(ctx context.Context, cls *appsv1alpha1.CollaSet, podName string) error {
+	var pod *corev1.Pod
+	if err := r.client.Get(ctx, types.NamespacedName{Namespace: cls.Namespace, Name: podName}, pod); err != nil {
+		return err
+	}
+	var pvcs []*corev1.PersistentVolumeClaim
+	for _, volume := range pod.Spec.Volumes {
+		var pvc *corev1.PersistentVolumeClaim
+		err := r.client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: volume.PersistentVolumeClaim.ClaimName}, pvc)
+		// If pvc not found, ignore it. In case of pvc is filtered out by controller-mesh
+		if errors.IsNotFound(err) {
+			continue
+		} else if err != nil {
+			return err
+		}
+		pvcs = append(pvcs, pvc)
+	}
+
+	pod.Labels[appsv1alpha1.PodOrphanedIndicateLabelKey] = "true"
+	if err := r.podControl.OrphanPod(cls, pod); err != nil {
+		return err
+	}
+	for i := range pvcs {
+		pvcs[i].Labels[appsv1alpha1.PodOrphanedIndicateLabelKey] = "true"
+		if err := r.pvcControl.OrphanPvc(cls, pvcs[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *RealSyncControl) includePod(ctx context.Context, cls *appsv1alpha1.CollaSet, podName string, instanceId string) error {
+	var pod *corev1.Pod
+	if err := r.client.Get(ctx, types.NamespacedName{Namespace: cls.Namespace, Name: podName}, pod); err != nil {
+		return err
+	}
+
+	var pvcs []*corev1.PersistentVolumeClaim
+	for _, volume := range pod.Spec.Volumes {
+		var pvc *corev1.PersistentVolumeClaim
+		err := r.client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: volume.PersistentVolumeClaim.ClaimName}, pvc)
+		// If pvc not found, ignore it. In case of pvc is filtered out by controller-mesh
+		if errors.IsNotFound(err) {
+			continue
+		} else if err != nil {
+			return err
+		}
+		pvcs = append(pvcs, pvc)
+	}
+
+	pod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
+	delete(pod.Labels, appsv1alpha1.PodOrphanedIndicateLabelKey)
+	if err := r.podControl.AdoptPod(cls, pod); err != nil {
+		return err
+	}
+	for i := range pvcs {
+		pvcs[i].Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
+		delete(pvcs[i].Labels, appsv1alpha1.PodOrphanedIndicateLabelKey)
+		if err := r.pvcControl.AdoptPvc(cls, pvcs[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *RealSyncControl) adoptPvcsLeftByRetainPolicy(ctx context.Context, cls *appsv1alpha1.CollaSet) ([]*corev1.PersistentVolumeClaim, error) {
-	orphanedPvcList := &corev1.PersistentVolumeClaimList{}
+	ownerSelector := cls.Spec.Selector.DeepCopy()
+	if ownerSelector.MatchLabels == nil {
+		ownerSelector.MatchLabels = map[string]string{}
+	}
+	ownerSelector.MatchLabels[appsv1alpha1.ControlledByKusionStackLabelKey] = "true"
+	ownerSelector.MatchExpressions = append(ownerSelector.MatchExpressions, metav1.LabelSelectorRequirement{
+		Key:      appsv1alpha1.PodOrphanedIndicateLabelKey, // should not be excluded pvcs
+		Operator: metav1.LabelSelectorOpDoesNotExist,
+	})
+	ownerSelector.MatchExpressions = append(ownerSelector.MatchExpressions, metav1.LabelSelectorRequirement{
+		Key:      appsv1alpha1.PodInstanceIDLabelKey, // instance-id label should exist
+		Operator: metav1.LabelSelectorOpExists,
+	})
+	ownerSelector.MatchExpressions = append(ownerSelector.MatchExpressions, metav1.LabelSelectorRequirement{
+		Key:      appsv1alpha1.PvcTemplateHashLabelKey, // pvc-hash label should exist
+		Operator: metav1.LabelSelectorOpExists,
+	})
+
 	selector, err := metav1.LabelSelectorAsSelector(cls.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
+
+	orphanedPvcList := &corev1.PersistentVolumeClaimList{}
 	if err = r.client.List(ctx, orphanedPvcList, &client.ListOptions{Namespace: cls.Namespace,
 		LabelSelector: selector}); err != nil {
 		return nil, err
@@ -169,97 +336,4 @@ func (r *RealSyncControl) reclaimScaleStrategy(ctx context.Context, toDeletePodN
 		return collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.CollaSet, cls.Name, cls.ResourceVersion)
 	}
 	return nil
-}
-
-func (r *RealSyncControl) dealIncludeExcludePods(cls *appsv1alpha1.CollaSet, pods []*corev1.Pod) (sets.String, sets.String, int, error) {
-	if len(cls.Spec.ScaleStrategy.PodToExclude) == 0 && len(cls.Spec.ScaleStrategy.PodToInclude) == 0 {
-		return nil, nil, 0, nil
-	}
-
-	ownedPods := sets.String{}
-	excludePodNames := sets.String{}
-	includePodNames := sets.String{}
-	for _, pod := range pods {
-		ownedPods.Insert(pod.Name)
-	}
-
-	for _, podName := range cls.Spec.ScaleStrategy.PodToExclude {
-		if ownedPods.Has(podName) {
-			excludePodNames.Insert(podName)
-		}
-	}
-
-	for _, podName := range cls.Spec.ScaleStrategy.PodToInclude {
-		includePodNames.Insert(podName)
-	}
-
-	intersection := excludePodNames.Intersection(includePodNames)
-	if len(intersection) > 0 {
-		r.recorder.Eventf(cls, corev1.EventTypeWarning, "DupExIncludedPod", "duplicated pods %s in both excluding and including sets", strings.Join(intersection.List(), ", "))
-		includePodNames.Delete(intersection.List()...)
-		excludePodNames.Delete(intersection.List()...)
-	}
-
-	if includePodNames.Len() > 0 {
-		for _, pod := range pods {
-			if includePodNames.Has(pod.Name) {
-				includePodNames.Delete(pod.Name)
-			}
-		}
-	}
-
-	notAllowedCount, err := r.doIncludeExcludePods(excludePodNames, includePodNames)
-	return excludePodNames, includePodNames, notAllowedCount, err
-}
-
-func (r *RealSyncControl) doIncludeExcludePods(excludePods sets.String, includePods sets.String) (int, error) {
-	// exclude: remove ownerReference from pod, pvc
-
-	// include: add ownerReference to pod, pvc; allocate instance-id
-	return 0, nil
-}
-
-func allowInclude(obj metav1.Object, ownerName, ownerKind string) bool {
-	labels := obj.GetLabels()
-	ownerRefs := obj.GetOwnerReferences()
-
-	// not controlled by ks manager
-	if labels == nil || len(labels) == 0 {
-		return false
-	} else if val, exist := labels[appsv1alpha1.ControlledByKusionStackLabelKey]; !exist || val != "true" {
-		return false
-	}
-
-	if ownerRefs != nil && len(ownerRefs) > 0 {
-		if controller := metav1.GetControllerOf(obj); controller != nil {
-			// controlled by others
-			if controller.Name != ownerName || controller.Kind != ownerKind {
-				return false
-			}
-			// currently being owned but not indicate orphan
-			if controller.Name == ownerName && controller.Kind == ownerName {
-				if _, exist := labels[appsv1alpha1.PodOrphanedIndicateLabelKey]; !exist {
-					return false
-				}
-			}
-		}
-	}
-	return true
-}
-
-func allowExclude(obj metav1.Object, ownerName, ownerKind string) bool {
-	labels := obj.GetLabels()
-
-	// not controlled by ks manager
-	if labels == nil || len(labels) == 0 {
-		return false
-	} else if val, exist := labels[appsv1alpha1.ControlledByKusionStackLabelKey]; !exist || val != "true" {
-		return false
-	}
-
-	// not controlled by current collaset
-	if controller := metav1.GetControllerOf(obj); controller == nil || controller.Name != ownerName || controller.Kind != ownerKind {
-		return false
-	}
-	return true
 }

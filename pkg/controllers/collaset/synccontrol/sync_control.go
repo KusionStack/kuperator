@@ -114,20 +114,15 @@ func (r *RealSyncControl) SyncPods(
 	}
 	// adopt and retain orphaned pvcs according to PVC retention policy
 	if adoptedPvcs, err := r.adoptPvcsLeftByRetainPolicy(ctx, instance); err != nil {
-		return false, nil, nil, fmt.Errorf("fail to adopt orphaned PVCs: %s", err)
+		return false, nil, nil, fmt.Errorf("fail to adopt orphaned left by whenDelete retention policy PVCs: %s", err)
 	} else {
 		resources.ExistingPvcs = append(resources.ExistingPvcs, adoptedPvcs...)
 	}
 
 	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods, replaceIndicateCount := dealReplacePods(filteredPods)
-	toExcludePodNames, toIncludePodNames, notAllowedNum, err := r.dealIncludeExcludePods(instance, filteredPods)
+	toExcludePodNames, toIncludePodNames, err := r.dealIncludeExcludePods(ctx, instance, filteredPods)
 	if err != nil {
-		return false, nil, nil, fmt.Errorf("fail to exclude include pods: %s", err)
-	} else if len(toIncludePodNames)+len(toExcludePodNames) > notAllowedNum {
-		// exclude include pods succeeded partially
-		return true, nil, nil, nil
-	} else {
-		// all to exclude include pods are not allowed, continue to reconcile
+		return false, nil, nil, fmt.Errorf("fail to deal with include exclude pods: %s", err.Error())
 	}
 
 	// get owned IDs
@@ -156,7 +151,11 @@ func (r *RealSyncControl) SyncPods(
 		}
 
 		if toExclude {
-			idToReclaim.Insert(id)
+			if podDuringReplace(pod) {
+				toExcludePodNames.Delete(pod.Name)
+			} else {
+				idToReclaim.Insert(id)
+			}
 		}
 
 		if pod.DeletionTimestamp != nil {
@@ -201,7 +200,8 @@ func (r *RealSyncControl) SyncPods(
 	needUpdateContext, needDeletePodsIDs, err := r.cleanReplacePodLabels(needCleanLabelPods, podsNeedCleanLabels, ownedIDs)
 	idToReclaim.Insert(needDeletePodsIDs...)
 	if err != nil {
-		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "clean pods replace pair origin name label with error: %s", err.Error())
+		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", fmt.Sprintf("clean pods replace pair origin name label with error: %s", err.Error()))
+		return false, nil, nil, err
 	}
 
 	// 3.3 create new pods for need replace pods
@@ -211,19 +211,29 @@ func (r *RealSyncControl) SyncPods(
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "deal replace pods with error: %s", err.Error())
 	}
 
-	// 4. exclude include pods
-	r.doIncludeExcludePods(toExcludePodNames, toIncludePodNames)
+	// 5. include exclude pods
+	var stopReconcile bool
+	if len(toExcludePodNames) > 0 || len(toIncludePodNames) > 0 {
+		availableContexts := extractAvailableContexts(len(toIncludePodNames), ownedIDs, currentIDs)
+		if err = r.doIncludeExcludePods(ctx, instance, toExcludePodNames.List(), toIncludePodNames.List(), availableContexts); err != nil {
+			r.recorder.Eventf(instance, corev1.EventTypeWarning, "DoExcludeIncludePod", "collaset syncPods include exclude with error: %s", err.Error())
+			return false, nil, nil, err
+		}
+		stopReconcile = true
+	}
 
-	// 5.1 Reclaim Pod ID which is (1) during ScalingIn, (2) ReplaceOriginPod (3) ExcludePods; besides, Pod & PVC are all non-existing
+	// 4.1 Reclaim Pod ID which is (1) during ScalingIn, (2) ReplaceOriginPod (3) ExcludePods; besides, Pod & PVC are all non-existing
 	err = r.reclaimOwnedIDs(needUpdateContext, instance, idToReclaim, currentIDs, ownedIDs)
 	if err != nil {
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReclaimOwnedIDs", "reclaim pod contexts with error: %s", err.Error())
+		return false, nil, nil, err
 	}
 
-	// 5.2 Reclaim scaleStrategy for delete, exclude, include
+	// 4.2 Reclaim scaleStrategy for delete, exclude, include
 	err = r.reclaimScaleStrategy(ctx, toDeletePodNames, toExcludePodNames, toIncludePodNames, instance)
 	if err != nil {
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReclaimScaleStrategy", "reclaim scaleStrategy with error: %s", err.Error())
+		return false, nil, nil, err
 	}
 
 	// 6. create podWrappers for non-exist pods
@@ -239,7 +249,7 @@ func (r *RealSyncControl) SyncPods(
 		})
 	}
 
-	return false, podWrappers, ownedIDs, nil
+	return stopReconcile, podWrappers, ownedIDs, nil
 }
 
 func (r *RealSyncControl) reclaimOwnedIDs(
