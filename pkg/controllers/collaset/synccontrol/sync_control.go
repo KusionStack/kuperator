@@ -113,14 +113,22 @@ func (r *RealSyncControl) SyncPods(
 		return false, nil, nil, fmt.Errorf("fail to get filtered PVCs: %s", err)
 	}
 	// adopt and retain orphaned pvcs according to PVC retention policy
-	if adoptedPvcs, err := r.pvcControl.AdoptPvcs(ctx, instance); err != nil {
+	if adoptedPvcs, err := r.adoptPvcsLeftByRetainPolicy(ctx, instance); err != nil {
 		return false, nil, nil, fmt.Errorf("fail to adopt orphaned PVCs: %s", err)
 	} else {
 		resources.ExistingPvcs = append(resources.ExistingPvcs, adoptedPvcs...)
 	}
 
 	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods, replaceIndicateCount := dealReplacePods(filteredPods)
-	toExcludePodNames, toIncludePodNames := r.dealIncludeExcludePods(instance, filteredPods)
+	toExcludePodNames, toIncludePodNames, notAllowedNum, err := r.dealIncludeExcludePods(instance, filteredPods)
+	if err != nil {
+		return false, nil, nil, fmt.Errorf("fail to exclude include pods: %s", err)
+	} else if len(toIncludePodNames)+len(toExcludePodNames) > notAllowedNum {
+		// exclude include pods succeeded partially
+		return true, nil, nil, nil
+	} else {
+		// all to exclude include pods are not allowed, continue to reconcile
+	}
 
 	// get owned IDs
 	var ownedIDs map[int]*appsv1alpha1.ContextDetail

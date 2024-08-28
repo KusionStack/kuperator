@@ -54,6 +54,8 @@ import (
 	"kusionstack.io/kuperator/pkg/controllers/poddeletion"
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/strategy"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/kuperator/pkg/features"
+	"kusionstack.io/kuperator/pkg/utils/feature"
 	"kusionstack.io/kuperator/pkg/utils/inject"
 )
 
@@ -2880,7 +2882,7 @@ var _ = Describe("collaset controller", func() {
 	It("podToDelete", func() {
 		testcase := "test-pod-to-delete"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
-
+		_ = feature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%s", features.ReclaimPodScaleStrategy, "true"))
 		cs := &appsv1alpha1.CollaSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testcase,
@@ -2958,7 +2960,7 @@ var _ = Describe("collaset controller", func() {
 	It("[podToDelete] scale", func() {
 		testcase := "test-pod-to-delete-scale"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
-
+		_ = feature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%s", features.ReclaimPodScaleStrategy, "true"))
 		cs := &appsv1alpha1.CollaSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testcase,

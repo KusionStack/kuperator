@@ -288,10 +288,6 @@ func getTargetsUpdatePods(podInfos []*PodUpdateInfo) (filteredPodInfos []*PodUpd
 			continue
 		}
 
-		if podInfo.ToExclude {
-			continue
-		}
-
 		if podInfo.PlaceHolder {
 			_, isReplaceNewPod := podInfo.ContextDetail.Data[ReplaceOriginPodIDContextDataKey]
 			_, isReplaceOriginPod := podInfo.ContextDetail.Data[ReplaceNewPodIDContextDataKey]

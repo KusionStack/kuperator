@@ -361,10 +361,12 @@ func (r *CollaSetReconciler) ensureReclaimPvcs(ctx context.Context, cls *appsv1a
 			needReclaimPvcs = append(needReclaimPvcs, pvcs[i])
 		}
 	}
-	if len(needReclaimPvcs) > 0 {
-		_, err = pvcControl.OrphanPvcs(cls, needReclaimPvcs)
+	for i := range needReclaimPvcs {
+		if err = pvcControl.OrphanPvc(cls, needReclaimPvcs[i]); err != nil {
+			return err
+		}
 	}
-	return err
+	return nil
 }
 
 func (r *CollaSetReconciler) ensureReclaimPodOwnerReferences(cls *appsv1alpha1.CollaSet) error {
