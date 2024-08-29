@@ -32,8 +32,7 @@ import (
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-
+	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontext"
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
@@ -149,8 +148,12 @@ func (r *RealSyncControl) dealIncludeExcludePods(ctx context.Context, cls *appsv
 
 	toExcludePods, notAllowedExcludePods, exErr := r.allowIncludeExcludePods(ctx, cls, excludePodNames.List(), collasetutils.AllowResourceExclude)
 	toIncludePods, notAllowedIncludePods, inErr := r.allowIncludeExcludePods(ctx, cls, includePodNames.List(), collasetutils.AllowResourceInclude)
-	r.recorder.Eventf(cls, corev1.EventTypeWarning, "ExcludeNotAllowed", fmt.Sprintf("pods are not allowed to exclude [%v]", notAllowedExcludePods.List()))
-	r.recorder.Eventf(cls, corev1.EventTypeWarning, "IncludeNotAllowed", fmt.Sprintf("pods are not allowed to include [%v]", notAllowedIncludePods.List()))
+	if len(notAllowedExcludePods) > 0 {
+		r.recorder.Eventf(cls, corev1.EventTypeWarning, "ExcludeNotAllowed", fmt.Sprintf("pods are not allowed to exclude [%v]", notAllowedExcludePods.List()))
+	}
+	if len(notAllowedIncludePods) > 0 {
+		r.recorder.Eventf(cls, corev1.EventTypeWarning, "IncludeNotAllowed", fmt.Sprintf("pods are not allowed to include [%v]", notAllowedIncludePods.List()))
+	}
 	return toExcludePods, toIncludePods, controllerutils.AggregateErrors([]error{exErr, inErr})
 }
 
@@ -161,7 +164,12 @@ func (r *RealSyncControl) allowIncludeExcludePods(ctx context.Context, cls *apps
 	notAllowPods = sets.String{}
 	for i := range podNames {
 		pod := &corev1.Pod{}
-		if err = r.client.Get(ctx, types.NamespacedName{Namespace: cls.Namespace, Name: podNames[i]}, pod); err != nil {
+		err = r.client.Get(ctx, types.NamespacedName{Namespace: cls.Namespace, Name: podNames[i]}, pod)
+		if errors.IsNotFound(err) {
+			notAllowPods.Insert(pod.Name)
+			continue
+		} else if err != nil {
+			r.recorder.Eventf(cls, corev1.EventTypeWarning, "ExcludeIncludeNotAllowed", fmt.Sprintf("failed to find pod %s: %s", podNames[i], err.Error()))
 			return
 		}
 
@@ -172,8 +180,11 @@ func (r *RealSyncControl) allowIncludeExcludePods(ctx context.Context, cls *apps
 		}
 
 		for _, volume := range pod.Spec.Volumes {
+			if volume.PersistentVolumeClaim == nil {
+				continue
+			}
 			pvc := &corev1.PersistentVolumeClaim{}
-			err = r.client.Get(context.Background(), types.NamespacedName{Namespace: pod.Namespace, Name: volume.PersistentVolumeClaim.ClaimName}, pvc)
+			err = r.client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: volume.PersistentVolumeClaim.ClaimName}, pvc)
 			// If pvc not found, ignore it. In case of pvc is filtered out by controller-mesh
 			if errors.IsNotFound(err) {
 				continue
@@ -197,6 +208,7 @@ func (r *RealSyncControl) doIncludeExcludePods(ctx context.Context, cls *appsv1a
 	_, exErr := controllerutils.SlowStartBatch(len(excludePods), controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) error {
 		return r.excludePod(ctx, cls, excludePods[idx])
 	})
+
 	_, inErr := controllerutils.SlowStartBatch(len(includePods), controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) error {
 		return r.includePod(ctx, cls, includePods[idx], strconv.Itoa(availableContexts[idx].ID))
 	})
@@ -210,6 +222,9 @@ func (r *RealSyncControl) excludePod(ctx context.Context, cls *appsv1alpha1.Coll
 	}
 	var pvcs []*corev1.PersistentVolumeClaim
 	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim == nil {
+			continue
+		}
 		pvc := &corev1.PersistentVolumeClaim{}
 		err := r.client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: volume.PersistentVolumeClaim.ClaimName}, pvc)
 		// If pvc not found, ignore it. In case of pvc is filtered out by controller-mesh
@@ -242,6 +257,9 @@ func (r *RealSyncControl) includePod(ctx context.Context, cls *appsv1alpha1.Coll
 
 	var pvcs []*corev1.PersistentVolumeClaim
 	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim == nil {
+			continue
+		}
 		pvc := &corev1.PersistentVolumeClaim{}
 		err := r.client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: volume.PersistentVolumeClaim.ClaimName}, pvc)
 		// If pvc not found, ignore it. In case of pvc is filtered out by controller-mesh
@@ -266,6 +284,32 @@ func (r *RealSyncControl) includePod(ctx context.Context, cls *appsv1alpha1.Coll
 		}
 	}
 	return collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.Pod, pod.Name, pod.ResourceVersion)
+}
+
+func (r *RealSyncControl) getIncludePodIDs(
+	want int,
+	instance *appsv1alpha1.CollaSet,
+	resources *collasetutils.RelatedResources,
+	ownedIDs map[int]*appsv1alpha1.ContextDetail,
+	currentIDs map[int]struct{}) ([]*appsv1alpha1.ContextDetail, map[int]*appsv1alpha1.ContextDetail, error) {
+
+	availableContexts := extractAvailableContexts(want, ownedIDs, currentIDs)
+	if len(availableContexts) >= want {
+		return availableContexts, ownedIDs, nil
+	}
+
+	diff := want - len(availableContexts)
+
+	var newOwnedIDs map[int]*appsv1alpha1.ContextDetail
+	var err error
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		newOwnedIDs, err = podcontext.AllocateID(r.client, instance, resources.UpdatedRevision.Name, len(ownedIDs)+diff)
+		return err
+	}); err != nil {
+		return nil, ownedIDs, fmt.Errorf("fail to allocate IDs using context when include Pods: %s", err)
+	}
+
+	return extractAvailableContexts(want, newOwnedIDs, currentIDs), newOwnedIDs, nil
 }
 
 func (r *RealSyncControl) adoptPvcsLeftByRetainPolicy(ctx context.Context, cls *appsv1alpha1.CollaSet) ([]*corev1.PersistentVolumeClaim, error) {
@@ -324,7 +368,7 @@ func (r *RealSyncControl) adoptPvcsLeftByRetainPolicy(ctx context.Context, cls *
 
 func (r *RealSyncControl) reclaimScaleStrategy(ctx context.Context, deletedPods sets.String, excludedPods sets.String, includedPods sets.String, cls *appsv1alpha1.CollaSet) error {
 	// ReclaimPodScaleStrategy FeatureGate defaults to true
-	// Add '--feature-gates=ReclaimPodScaleStrategy=false' to container args, to disable reclaim of podToDelete
+	// Add '--feature-gates=ReclaimPodScaleStrategy=false' to container args, to disable reclaim of podToDelete, podToExclude, podToInclude
 	if feature.DefaultFeatureGate.Enabled(features.ReclaimPodScaleStrategy) {
 		// reclaim PodToDelete
 		toDeletePods := sets.NewString(cls.Spec.ScaleStrategy.PodToDelete...)

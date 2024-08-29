@@ -128,7 +128,7 @@ func (r *RealSyncControl) SyncPods(
 	// get owned IDs
 	var ownedIDs map[int]*appsv1alpha1.ContextDetail
 	if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		needAllocateReplicas := int(realValue(instance.Spec.Replicas)) + replaceIndicateCount + len(toIncludePodNames)
+		needAllocateReplicas := int(realValue(instance.Spec.Replicas)) + replaceIndicateCount
 		ownedIDs, err = podcontext.AllocateID(r.client, instance, resources.UpdatedRevision.Name, needAllocateReplicas)
 		return err
 	}); err != nil {
@@ -148,14 +148,13 @@ func (r *RealSyncControl) SyncPods(
 
 		// priority: toDelete > toReplace > toExclude
 		if toDelete {
-			toExcludePodNames.Delete(pod.Name)
 			toDeletePodNames.Delete(pod.Name)
 		}
 		if toExclude {
-			if podDuringReplace(pod) {
+			if podDuringReplace(pod) || toDelete {
 				toExcludePodNames.Delete(pod.Name)
 			} else {
-				// exclude pod and remove podContext
+				// exclude pod and delete its podContext
 				idToReclaim.Insert(id)
 			}
 		}
@@ -215,14 +214,19 @@ func (r *RealSyncControl) SyncPods(
 	}
 
 	// 5. include exclude pods
-	var stopReconcile bool
+	var inExSucceed bool
 	if len(toExcludePodNames) > 0 || len(toIncludePodNames) > 0 {
-		availableContexts := extractAvailableContexts(len(toIncludePodNames), ownedIDs, currentIDs)
+		var availableContexts []*appsv1alpha1.ContextDetail
+		var getErr error
+		availableContexts, ownedIDs, getErr = r.getIncludePodIDs(len(toIncludePodNames), instance, resources, ownedIDs, currentIDs)
+		if getErr != nil {
+			return false, nil, nil, getErr
+		}
 		if err = r.doIncludeExcludePods(ctx, instance, toExcludePodNames.List(), toIncludePodNames.List(), availableContexts); err != nil {
 			r.recorder.Eventf(instance, corev1.EventTypeWarning, "DoExcludeIncludePod", "collaset syncPods include exclude with error: %s", err.Error())
 			return false, nil, nil, err
 		}
-		stopReconcile = true
+		inExSucceed = true
 	}
 
 	// 4.1 Reclaim Pod ID which is (1) during ScalingIn, (2) ReplaceOriginPod (3) ExcludePods; besides, Pod & PVC are all non-existing
@@ -252,7 +256,11 @@ func (r *RealSyncControl) SyncPods(
 		})
 	}
 
-	return stopReconcile, podWrappers, ownedIDs, nil
+	return inExSucceed, podWrappers, ownedIDs, nil
+}
+
+func (r *RealSyncControl) IncludeExcludePods() {
+
 }
 
 func (r *RealSyncControl) reclaimOwnedIDs(
