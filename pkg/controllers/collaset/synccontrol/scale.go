@@ -157,10 +157,11 @@ func (r *RealSyncControl) dealIncludeExcludePods(ctx context.Context, cls *appsv
 type checkAllowFunc func(obj metav1.Object, ownerName, ownerKind string) (bool, string)
 
 func (r *RealSyncControl) allowIncludeExcludePods(ctx context.Context, cls *appsv1alpha1.CollaSet, podNames []string, fn checkAllowFunc) (allowPods sets.String, notAllowPods sets.String, err error) {
+	allowPods = sets.String{}
+	notAllowPods = sets.String{}
 	for i := range podNames {
-		var pod *corev1.Pod
+		pod := &corev1.Pod{}
 		if err = r.client.Get(ctx, types.NamespacedName{Namespace: cls.Namespace, Name: podNames[i]}, pod); err != nil {
-			r.recorder.Eventf(pod, corev1.EventTypeWarning, "ExcludeIncludeNotAllowed", fmt.Sprintf("failed to check allowed to exlcude/include from/to collaset %s/%s: %s", cls.Namespace, cls.Name, err.Error()))
 			return
 		}
 
@@ -171,7 +172,7 @@ func (r *RealSyncControl) allowIncludeExcludePods(ctx context.Context, cls *apps
 		}
 
 		for _, volume := range pod.Spec.Volumes {
-			var pvc *corev1.PersistentVolumeClaim
+			pvc := &corev1.PersistentVolumeClaim{}
 			err = r.client.Get(context.Background(), types.NamespacedName{Namespace: pod.Namespace, Name: volume.PersistentVolumeClaim.ClaimName}, pvc)
 			// If pvc not found, ignore it. In case of pvc is filtered out by controller-mesh
 			if errors.IsNotFound(err) {
@@ -203,13 +204,13 @@ func (r *RealSyncControl) doIncludeExcludePods(ctx context.Context, cls *appsv1a
 }
 
 func (r *RealSyncControl) excludePod(ctx context.Context, cls *appsv1alpha1.CollaSet, podName string) error {
-	var pod *corev1.Pod
+	pod := &corev1.Pod{}
 	if err := r.client.Get(ctx, types.NamespacedName{Namespace: cls.Namespace, Name: podName}, pod); err != nil {
 		return err
 	}
 	var pvcs []*corev1.PersistentVolumeClaim
 	for _, volume := range pod.Spec.Volumes {
-		var pvc *corev1.PersistentVolumeClaim
+		pvc := &corev1.PersistentVolumeClaim{}
 		err := r.client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: volume.PersistentVolumeClaim.ClaimName}, pvc)
 		// If pvc not found, ignore it. In case of pvc is filtered out by controller-mesh
 		if errors.IsNotFound(err) {
@@ -234,14 +235,14 @@ func (r *RealSyncControl) excludePod(ctx context.Context, cls *appsv1alpha1.Coll
 }
 
 func (r *RealSyncControl) includePod(ctx context.Context, cls *appsv1alpha1.CollaSet, podName string, instanceId string) error {
-	var pod *corev1.Pod
+	pod := &corev1.Pod{}
 	if err := r.client.Get(ctx, types.NamespacedName{Namespace: cls.Namespace, Name: podName}, pod); err != nil {
 		return err
 	}
 
 	var pvcs []*corev1.PersistentVolumeClaim
 	for _, volume := range pod.Spec.Volumes {
-		var pvc *corev1.PersistentVolumeClaim
+		pvc := &corev1.PersistentVolumeClaim{}
 		err := r.client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: volume.PersistentVolumeClaim.ClaimName}, pvc)
 		// If pvc not found, ignore it. In case of pvc is filtered out by controller-mesh
 		if errors.IsNotFound(err) {
@@ -286,7 +287,7 @@ func (r *RealSyncControl) adoptPvcsLeftByRetainPolicy(ctx context.Context, cls *
 		Operator: metav1.LabelSelectorOpExists,
 	})
 
-	selector, err := metav1.LabelSelectorAsSelector(cls.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(ownerSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -321,30 +322,23 @@ func (r *RealSyncControl) adoptPvcsLeftByRetainPolicy(ctx context.Context, cls *
 	return claims, nil
 }
 
-func (r *RealSyncControl) reclaimScaleStrategy(ctx context.Context, toDeletePodNames sets.String, toExcludePodNames sets.String, toIncludedPodNames sets.String, cls *appsv1alpha1.CollaSet) error {
+func (r *RealSyncControl) reclaimScaleStrategy(ctx context.Context, deletedPods sets.String, excludedPods sets.String, includedPods sets.String, cls *appsv1alpha1.CollaSet) error {
 	// ReclaimPodScaleStrategy FeatureGate defaults to true
 	// Add '--feature-gates=ReclaimPodScaleStrategy=false' to container args, to disable reclaim of podToDelete
-	if feature.DefaultFeatureGate.Enabled(features.ReclaimPodScaleStrategy) && len(toDeletePodNames) > 0 {
-		var newPodToDelete []string
-		var newPodToExclude []string
-		var newPodToInclude []string
-
-		for _, podName := range cls.Spec.ScaleStrategy.PodToDelete {
-			if !toDeletePodNames.Has(podName) {
-				newPodToDelete = append(newPodToDelete, podName)
-			}
-		}
-		for podName := range toExcludePodNames {
-			newPodToExclude = append(newPodToExclude, podName)
-
-		}
-		for podName := range toIncludedPodNames {
-			newPodToInclude = append(newPodToInclude, podName)
-		}
+	if feature.DefaultFeatureGate.Enabled(features.ReclaimPodScaleStrategy) {
+		// reclaim PodToDelete
+		toDeletePods := sets.NewString(cls.Spec.ScaleStrategy.PodToDelete...)
+		notDeletedPods := toDeletePods.Delete(deletedPods.List()...)
+		cls.Spec.ScaleStrategy.PodToDelete = notDeletedPods.List()
+		// reclaim PodToExclude
+		toExcludePods := sets.NewString(cls.Spec.ScaleStrategy.PodToExclude...)
+		notExcludePods := toExcludePods.Delete(excludedPods.List()...)
+		cls.Spec.ScaleStrategy.PodToExclude = notExcludePods.List()
+		// reclaim PodToInclude
+		toIncludePodNames := sets.NewString(cls.Spec.ScaleStrategy.PodToInclude...)
+		notIncludePods := toIncludePodNames.Delete(includedPods.List()...)
+		cls.Spec.ScaleStrategy.PodToInclude = notIncludePods.List()
 		// update cls.spec.scaleStrategy
-		cls.Spec.ScaleStrategy.PodToDelete = newPodToDelete
-		cls.Spec.ScaleStrategy.PodToExclude = newPodToExclude
-		cls.Spec.ScaleStrategy.PodToInclude = newPodToInclude
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			return r.client.Update(ctx, cls)
 		}); err != nil {
