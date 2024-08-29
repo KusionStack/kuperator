@@ -199,7 +199,7 @@ func (r *RealSyncControl) SyncPods(
 	}
 
 	// 3.2 clean labels for replace pods
-	needUpdateContext, needDeletePodsIDs, err := r.cleanReplacePodLabels(needCleanLabelPods, podsNeedCleanLabels, ownedIDs)
+	needUpdateContext, needDeletePodsIDs, err := r.cleanReplacePodLabels(needCleanLabelPods, podsNeedCleanLabels, ownedIDs, currentIDs)
 	idToReclaim.Insert(needDeletePodsIDs...)
 	if err != nil {
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", fmt.Sprintf("clean pods replace pair origin name label with error: %s", err.Error()))
@@ -226,7 +226,7 @@ func (r *RealSyncControl) SyncPods(
 	}
 
 	// 4.1 Reclaim Pod ID which is (1) during ScalingIn, (2) ReplaceOriginPod (3) ExcludePods; besides, Pod & PVC are all non-existing
-	err = r.reclaimOwnedIDs(needUpdateContext, instance, idToReclaim, currentIDs, ownedIDs)
+	err = r.reclaimOwnedIDs(needUpdateContext, instance, idToReclaim, ownedIDs)
 	if err != nil {
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReclaimOwnedIDs", "reclaim pod contexts with error: %s", err.Error())
 		return false, nil, nil, err
@@ -259,26 +259,18 @@ func (r *RealSyncControl) reclaimOwnedIDs(
 	needUpdateContext bool,
 	cls *appsv1alpha1.CollaSet,
 	idToReclaim sets.Int,
-	currentIDs map[int]struct{},
 	ownedIDs map[int]*appsv1alpha1.ContextDetail) error {
 	// TODO stateful case
 	// 1) only reclaim non-existing Pods' ID. Do not reclaim terminating Pods' ID until these Pods and PVC have been deleted from ETCD
 	// 2) do not filter out these terminating Pods
-	for id, contextDetail := range ownedIDs {
-		if _, exist := currentIDs[id]; exist {
-			continue
-		}
-		if contextDetail.Contains(ScaleInContextDataKey, "true") {
-			idToReclaim.Insert(id)
-		}
-	}
-
 	for _, id := range idToReclaim.List() {
 		needUpdateContext = true
 		delete(ownedIDs, id)
 	}
 
-	// TODO clean replace-pair-keys or dirty podContext: (1) pod is not exists, or (2) pod is not replaceIndicated
+	// TODO clean replace-pair-keys or dirty podContext
+	// 1) replace pair pod are not exists
+	// 2) pod exists but is not replaceIndicated
 
 	if needUpdateContext {
 		logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))

@@ -48,7 +48,8 @@ const (
 func (r *RealSyncControl) cleanReplacePodLabels(
 	needCleanLabelPods []*corev1.Pod,
 	podsNeedCleanLabels [][]string,
-	ownedIDs map[int]*appsv1alpha1.ContextDetail) (bool, []int, error) {
+	ownedIDs map[int]*appsv1alpha1.ContextDetail,
+	currentIDs map[int]struct{}) (bool, []int, error) {
 
 	needUpdateContext := false
 	var needDeletePodsIDs []int
@@ -70,7 +71,9 @@ func (r *RealSyncControl) cleanReplacePodLabels(
 				newPodId, _ := collasetutils.GetPodInstanceID(pod)
 				if originPodContext, exist := mapOriginToNewPodContext[newPodId]; exist && originPodContext != nil {
 					originPodContext.Remove(ReplaceNewPodIDContextDataKey)
-					needDeletePodsIDs = append(needDeletePodsIDs, originPodContext.ID)
+					if _, exist := currentIDs[originPodContext.ID]; !exist {
+						needDeletePodsIDs = append(needDeletePodsIDs, originPodContext.ID)
+					}
 				}
 				if contextDetail, exist := ownedIDs[newPodId]; exist {
 					contextDetail.Remove(ReplaceOriginPodIDContextDataKey)
@@ -83,7 +86,9 @@ func (r *RealSyncControl) cleanReplacePodLabels(
 				originPodId, _ := collasetutils.GetPodInstanceID(pod)
 				if newPodContext, exist := mapNewToOriginPodContext[originPodId]; exist && newPodContext != nil {
 					newPodContext.Remove(ReplaceOriginPodIDContextDataKey)
-					needDeletePodsIDs = append(needDeletePodsIDs, newPodContext.ID)
+					if _, exist := currentIDs[newPodContext.ID]; !exist {
+						needDeletePodsIDs = append(needDeletePodsIDs, newPodContext.ID)
+					}
 				}
 				if contextDetail, exist := ownedIDs[originPodId]; exist {
 					contextDetail.Remove(ReplaceNewPodIDContextDataKey)
