@@ -653,7 +653,7 @@ func (r *RealSyncControl) Update(
 	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
 	var recordedRequeueAfter *time.Duration
 	// 1. scan and analysis pods update info for active pods and PlaceHolder pods
-	podUpdateInfos, err := attachPodUpdateInfo(ctx, cls, podWrappers, resources)
+	podUpdateInfos, err := r.attachPodUpdateInfo(ctx, cls, podWrappers, resources)
 	if err != nil {
 		return false, nil, fmt.Errorf("fail to attach pod update info, %v", err)
 	}

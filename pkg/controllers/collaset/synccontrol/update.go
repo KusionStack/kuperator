@@ -90,7 +90,7 @@ type PodUpdateInfo struct {
 	replacePairOriginPodName string
 }
 
-func attachPodUpdateInfo(ctx context.Context, cls *appsv1alpha1.CollaSet, pods []*collasetutils.PodWrapper, resource *collasetutils.RelatedResources) ([]*PodUpdateInfo, error) {
+func (r *RealSyncControl) attachPodUpdateInfo(ctx context.Context, cls *appsv1alpha1.CollaSet, pods []*collasetutils.PodWrapper, resource *collasetutils.RelatedResources) ([]*PodUpdateInfo, error) {
 	activePods := FilterOutPlaceHolderPodWrappers(pods)
 	podUpdateInfoList := make([]*PodUpdateInfo, len(activePods))
 
@@ -151,6 +151,10 @@ func attachPodUpdateInfo(ctx context.Context, cls *appsv1alpha1.CollaSet, pods [
 					Name: UnknownRevision,
 				},
 			}
+			r.recorder.Eventf(pod.Pod,
+				corev1.EventTypeWarning,
+				"PodCurrentRevisionNotFound",
+				"pod is going to delete becasue: (1) controller-revision-hash label not found, or (2) not found in history revisions")
 		}
 
 		// decide whether the PodOpsLifecycle is during ops or not
