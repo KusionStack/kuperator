@@ -47,6 +47,8 @@ import (
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 )
 
+const UnknownRevision = "UnknownRevision"
+
 type PodUpdateInfo struct {
 	*utils.PodWrapper
 
@@ -139,6 +141,15 @@ func attachPodUpdateInfo(ctx context.Context, cls *appsv1alpha1.CollaSet, pods [
 						}
 					}
 				}
+			}
+		}
+
+		// default CurrentRevision is an empty revision
+		if updateInfo.CurrentRevision == nil {
+			updateInfo.CurrentRevision = &appsv1.ControllerRevision{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: UnknownRevision,
+				},
 			}
 		}
 

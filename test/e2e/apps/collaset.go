@@ -39,6 +39,8 @@ import (
 
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/kuperator/pkg/features"
+	"kusionstack.io/kuperator/pkg/utils/feature"
 	"kusionstack.io/kuperator/test/e2e/framework"
 )
 
@@ -166,7 +168,7 @@ var _ = SIGDescribe("CollaSet", func() {
 		framework.ConformanceIt("Selective delete and scale in pods", func() {
 			cls := tester.NewCollaSet("collaset-"+randStr, 3, appsv1alpha1.UpdateStrategy{})
 			Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
-
+			_ = feature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%s", features.ReclaimPodScaleStrategy, "true"))
 			By("Wait for status replicas satisfied")
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 3, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 

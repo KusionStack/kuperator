@@ -277,6 +277,10 @@ func (r *RealSyncControl) reclaimOwnedIDs(
 		delete(ownedIDs, id)
 	}
 
+	// TODO
+	// 1. clean ReplaceNew PodID key: (1) pod is not exists, or (2) pod is not replaceIndicated
+	// 2. delete
+
 	if needUpdateContext {
 		logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
 		logger.V(1).Info("try to update ResourceContext for CollaSet when sync")
@@ -668,9 +672,11 @@ func (r *RealSyncControl) Update(
 		}
 
 		// 3.1 fulfillPodUpdateInfo to all not updatedRevision pod
-		if err = updater.FulfillPodUpdatedInfo(ctx, resources.UpdatedRevision, podInfo); err != nil {
-			logger.Error(err, fmt.Sprintf("fail to analyse pod %s/%s in-place update support", podInfo.Namespace, podInfo.Name))
-			continue
+		if podInfo.CurrentRevision.Name != UnknownRevision {
+			if err = updater.FulfillPodUpdatedInfo(ctx, resources.UpdatedRevision, podInfo); err != nil {
+				logger.Error(err, fmt.Sprintf("fail to analyse pod %s/%s in-place update support", podInfo.Namespace, podInfo.Name))
+				continue
+			}
 		}
 
 		if podInfo.DeletionTimestamp != nil {
@@ -754,7 +760,7 @@ func (r *RealSyncControl) Update(
 				r.recorder.Eventf(podInfo.Pod,
 					corev1.EventTypeNormal,
 					"UpdatePodCanceled",
-					"pod %s/%s update is canceled due to not started and not included partition %s",
+					"pod %s/%s with revision %s update is canceled due to not started and not included by partition",
 					podInfo.Namespace, podInfo.Name, podInfo.CurrentRevision.Name)
 				return ojutils.CancelOpsLifecycle(ctx, r.client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod)
 			}
@@ -776,7 +782,7 @@ func (r *RealSyncControl) Update(
 				corev1.EventTypeNormal,
 				"UpdatePodFinished",
 				"pod %s/%s is finished for upgrade to revision %s",
-				podInfo.Namespace, podInfo.Name, podInfo.CurrentRevision.Name)
+				podInfo.Namespace, podInfo.Name, podInfo.UpdateRevision.Name)
 		} else {
 			r.recorder.Eventf(podInfo.Pod,
 				corev1.EventTypeNormal,
