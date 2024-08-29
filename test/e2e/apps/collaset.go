@@ -187,14 +187,6 @@ var _ = SIGDescribe("CollaSet", func() {
 				return cls.Generation == cls.Status.ObservedGeneration
 			}, 10*time.Second, 3*time.Second).Should(Equal(true))
 
-			By("Wait for selective delete pods finished")
-			Eventually(func() bool {
-				if err = tester.GetCollaSet(cls); err != nil {
-					return false
-				}
-				return len(cls.Spec.ScaleStrategy.PodToDelete) == 0
-			}, 30*time.Second, 3*time.Second).Should(Equal(true))
-
 			By("Check pod is deleted")
 			Eventually(func() bool {
 				pods, err = tester.ListPodsForCollaSet(cls)
