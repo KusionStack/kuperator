@@ -226,7 +226,7 @@ func (r *RealSyncControl) SyncPods(
 	}
 
 	// 4.1 Reclaim Pod ID which is (1) during ScalingIn, (2) ReplaceOriginPod (3) ExcludePods; besides, Pod & PVC are all non-existing
-	err = r.reclaimOwnedIDs(needUpdateContext, instance, idToReclaim, ownedIDs)
+	err = r.reclaimOwnedIDs(needUpdateContext, instance, idToReclaim, ownedIDs, currentIDs)
 	if err != nil {
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReclaimOwnedIDs", "reclaim pod contexts with error: %s", err.Error())
 		return false, nil, nil, err
@@ -259,10 +259,20 @@ func (r *RealSyncControl) reclaimOwnedIDs(
 	needUpdateContext bool,
 	cls *appsv1alpha1.CollaSet,
 	idToReclaim sets.Int,
-	ownedIDs map[int]*appsv1alpha1.ContextDetail) error {
+	ownedIDs map[int]*appsv1alpha1.ContextDetail,
+	currentIDs map[int]struct{}) error {
 	// TODO stateful case
 	// 1) only reclaim non-existing Pods' ID. Do not reclaim terminating Pods' ID until these Pods and PVC have been deleted from ETCD
 	// 2) do not filter out these terminating Pods
+	for id, contextDetail := range ownedIDs {
+		if _, exist := currentIDs[id]; exist {
+			continue
+		}
+		if contextDetail.Contains(ScaleInContextDataKey, "true") {
+			idToReclaim.Insert(id)
+		}
+	}
+
 	for _, id := range idToReclaim.List() {
 		needUpdateContext = true
 		delete(ownedIDs, id)
