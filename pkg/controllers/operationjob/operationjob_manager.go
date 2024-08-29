@@ -128,13 +128,20 @@ func (r *ReconcileOperationJob) operateTargets(
 
 		// 1. begin opsLifecycle if necessary
 		if IsCandidateOpsPending(candidate) {
-			if enablePodOpsLifecycle && !isDuringOps {
-				r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "PodOpsLifecycle", "try to begin PodOpsLifecycle for %s", operationJob.Spec.Action)
-				if err := ojutils.BeginOperateLifecycle(r.Client, lifecycleAdapter, candidate.Pod); err != nil {
-					return err
+			if enablePodOpsLifecycle {
+				if isDuringOps {
+					candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
+				} else {
+					r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "PodOpsLifecycle", "try to begin PodOpsLifecycle for %s", operationJob.Spec.Action)
+					if updated, err := ojutils.BeginOperateLifecycle(r.Client, lifecycleAdapter, candidate.Pod); err != nil {
+						return err
+					} else if updated {
+						candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
+					}
 				}
+			} else {
+				candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 			}
-			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 		}
 
 		// 2. try to do real operation
