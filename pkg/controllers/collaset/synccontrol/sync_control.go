@@ -211,6 +211,7 @@ func (r *RealSyncControl) SyncPods(
 	needUpdateContext = needUpdateContext || successCount > 0
 	if err != nil {
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "deal replace pods with error: %s", err.Error())
+		return false, nil, nil, err
 	}
 
 	// 5. include exclude pods
@@ -277,9 +278,7 @@ func (r *RealSyncControl) reclaimOwnedIDs(
 		delete(ownedIDs, id)
 	}
 
-	// TODO
-	// 1. clean ReplaceNew PodID key: (1) pod is not exists, or (2) pod is not replaceIndicated
-	// 2. delete
+	// TODO clean replace-pair-keys or dirty podContext: (1) pod is not exists, or (2) pod is not replaceIndicated
 
 	if needUpdateContext {
 		logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))

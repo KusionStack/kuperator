@@ -230,7 +230,7 @@ func (r *RealSyncControl) excludePod(ctx context.Context, cls *appsv1alpha1.Coll
 			return err
 		}
 	}
-	return nil
+	return collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.Pod, pod.Name, pod.ResourceVersion)
 }
 
 func (r *RealSyncControl) includePod(ctx context.Context, cls *appsv1alpha1.CollaSet, podName string, instanceId string) error {
@@ -264,7 +264,7 @@ func (r *RealSyncControl) includePod(ctx context.Context, cls *appsv1alpha1.Coll
 			return err
 		}
 	}
-	return nil
+	return collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.Pod, pod.Name, pod.ResourceVersion)
 }
 
 func (r *RealSyncControl) adoptPvcsLeftByRetainPolicy(ctx context.Context, cls *appsv1alpha1.CollaSet) ([]*corev1.PersistentVolumeClaim, error) {
