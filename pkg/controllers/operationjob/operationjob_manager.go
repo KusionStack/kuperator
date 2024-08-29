@@ -135,7 +135,9 @@ func (r *ReconcileOperationJob) operateTargets(
 					r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "PodOpsLifecycle", "try to begin PodOpsLifecycle for %s", operationJob.Spec.Action)
 					if updated, err := ojutils.BeginOperateLifecycle(r.Client, lifecycleAdapter, candidate.Pod); err != nil {
 						return err
-					} else if updated {
+					} else if !updated {
+						return nil
+					} else {
 						candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 					}
 				}
