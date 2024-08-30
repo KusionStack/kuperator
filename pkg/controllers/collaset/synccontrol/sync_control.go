@@ -119,7 +119,7 @@ func (r *RealSyncControl) SyncPods(
 		resources.ExistingPvcs = append(resources.ExistingPvcs, adoptedPvcs...)
 	}
 
-	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods, replaceIndicateCount := dealReplacePods(filteredPods)
+	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(filteredPods)
 	toExcludePodNames, toIncludePodNames, err := r.dealIncludeExcludePods(ctx, instance, filteredPods)
 	if err != nil {
 		return false, nil, nil, fmt.Errorf("fail to deal with include exclude pods: %s", err.Error())
@@ -128,7 +128,7 @@ func (r *RealSyncControl) SyncPods(
 	// get owned IDs
 	var ownedIDs map[int]*appsv1alpha1.ContextDetail
 	if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		needAllocateReplicas := int(realValue(instance.Spec.Replicas)) + replaceIndicateCount
+		needAllocateReplicas := int(realValue(instance.Spec.Replicas))
 		ownedIDs, err = podcontext.AllocateID(r.client, instance, resources.UpdatedRevision.Name, needAllocateReplicas)
 		return err
 	}); err != nil {
@@ -152,6 +152,7 @@ func (r *RealSyncControl) SyncPods(
 		}
 		if toExclude {
 			if podDuringReplace(pod) || toDelete {
+				// skip exclude until replace and toDelete done
 				toExcludePodNames.Delete(pod.Name)
 			} else {
 				// exclude pod and delete its podContext
@@ -195,6 +196,7 @@ func (r *RealSyncControl) SyncPods(
 	err = r.deletePodsByLabel(needDeletePods)
 	if err != nil {
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "delete pods by label with error: %s", err.Error())
+		return false, nil, nil, err
 	}
 
 	// 3.2 clean labels for replace pods
@@ -206,11 +208,19 @@ func (r *RealSyncControl) SyncPods(
 	}
 
 	// 3.3 create new pods for need replace pods
-	successCount, err := r.replaceOriginPods(ctx, instance, resources, needReplaceOriginPods, ownedIDs, currentIDs)
-	needUpdateContext = needUpdateContext || successCount > 0
-	if err != nil {
-		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "deal replace pods with error: %s", err.Error())
-		return false, nil, nil, err
+	if len(needReplaceOriginPods) > 0 {
+		var availableContexts []*appsv1alpha1.ContextDetail
+		var getErr error
+		availableContexts, ownedIDs, getErr = r.getAvailablePodIDs(len(needReplaceOriginPods), instance, resources, ownedIDs, currentIDs)
+		if getErr != nil {
+			return false, nil, nil, getErr
+		}
+		successCount, err := r.replaceOriginPods(ctx, instance, resources, needReplaceOriginPods, ownedIDs, availableContexts)
+		needUpdateContext = needUpdateContext || successCount > 0
+		if err != nil {
+			r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "deal replace pods with error: %s", err.Error())
+			return false, nil, nil, err
+		}
 	}
 
 	// 5. include exclude pods
@@ -218,7 +228,7 @@ func (r *RealSyncControl) SyncPods(
 	if len(toExcludePodNames) > 0 || len(toIncludePodNames) > 0 {
 		var availableContexts []*appsv1alpha1.ContextDetail
 		var getErr error
-		availableContexts, ownedIDs, getErr = r.getIncludePodIDs(len(toIncludePodNames), instance, resources, ownedIDs, currentIDs)
+		availableContexts, ownedIDs, getErr = r.getAvailablePodIDs(len(toIncludePodNames), instance, resources, ownedIDs, currentIDs)
 		if getErr != nil {
 			return false, nil, nil, getErr
 		}
@@ -439,9 +449,6 @@ func (r *RealSyncControl) Scale(
 			if podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, podsToScaleIn[i].Pod) {
 				continue
 			}
-			if podsToScaleIn[i].ToExclude {
-				continue
-			}
 			podCh <- podsToScaleIn[i]
 		}
 
@@ -587,7 +594,7 @@ func FilterOutPlaceHolderPodWrappers(pods []*collasetutils.PodWrapper) []*collas
 }
 
 func extractAvailableContexts(diff int, ownedIDs map[int]*appsv1alpha1.ContextDetail, podInstanceIDSet map[int]struct{}) []*appsv1alpha1.ContextDetail {
-	availableContexts := make([]*appsv1alpha1.ContextDetail, diff)
+	var availableContexts []*appsv1alpha1.ContextDetail
 	if diff <= 0 {
 		return availableContexts
 	}
@@ -603,7 +610,7 @@ func extractAvailableContexts(diff int, ownedIDs map[int]*appsv1alpha1.ContextDe
 			continue
 		}
 
-		availableContexts[idx] = ownedIDs[id]
+		availableContexts = append(availableContexts, ownedIDs[id])
 		idx++
 		if idx == diff {
 			break

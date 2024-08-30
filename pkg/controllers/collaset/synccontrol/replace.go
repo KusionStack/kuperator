@@ -115,9 +115,8 @@ func (r *RealSyncControl) replaceOriginPods(
 	resources *collasetutils.RelatedResources,
 	needReplaceOriginPods []*corev1.Pod,
 	ownedIDs map[int]*appsv1alpha1.ContextDetail,
-	currentIDs map[int]struct{}) (int, error) {
+	availableContexts []*appsv1alpha1.ContextDetail) (int, error) {
 
-	availableContexts := extractAvailableContexts(len(needReplaceOriginPods), ownedIDs, currentIDs)
 	mapNewToOriginPodContext := mapReplaceNewToOriginPodContext(ownedIDs)
 	successCount, err := controllerutils.SlowStartBatch(len(needReplaceOriginPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		originPod := needReplaceOriginPods[i]
@@ -195,7 +194,7 @@ func (r *RealSyncControl) replaceOriginPods(
 	return successCount, err
 }
 
-func dealReplacePods(pods []*corev1.Pod) (needReplacePods []*corev1.Pod, needCleanLabelPods []*corev1.Pod, podNeedCleanLabels [][]string, needDeletePods []*corev1.Pod, replaceIndicateCount int) {
+func dealReplacePods(pods []*corev1.Pod) (needReplacePods []*corev1.Pod, needCleanLabelPods []*corev1.Pod, podNeedCleanLabels [][]string, needDeletePods []*corev1.Pod) {
 	var podInstanceIdMap = make(map[string]*corev1.Pod)
 	var podNameMap = make(map[string]*corev1.Pod)
 	for _, pod := range pods {
@@ -211,8 +210,6 @@ func dealReplacePods(pods []*corev1.Pod) (needReplacePods []*corev1.Pod, needCle
 		if _, exist := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist {
 			continue
 		}
-
-		replaceIndicateCount++
 
 		// origin pod is about to scaleIn, skip replace
 		if podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, pod) {
@@ -366,6 +363,8 @@ func classifyPodReplacingMapping(podWrappers []*collasetutils.PodWrapper) map[st
 		if replacePairNewIdStr, exist := podWrapper.Labels[appsv1alpha1.PodReplacePairNewId]; exist {
 			if pairNewPod, exist := podIdMap[replacePairNewIdStr]; exist {
 				replacePodMapping[name] = pairNewPod
+				// if one of pair pods is to Exclude, both pods should not scaleIn
+				podWrapper.ToExclude = podWrapper.ToExclude || pairNewPod.ToExclude
 				continue
 			}
 		} else if replaceOriginStr, exist := podWrapper.Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
@@ -414,7 +413,7 @@ func mapReplaceOriginToNewPodContext(ownedIDs map[int]*appsv1alpha1.ContextDetai
 }
 
 func podDuringReplace(pod *corev1.Pod) bool {
-	if pod.Labels == nil || len(pod.Labels) == 0 {
+	if pod.Labels == nil {
 		return false
 	}
 	_, replaceIndicate := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]

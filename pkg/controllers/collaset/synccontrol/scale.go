@@ -52,8 +52,13 @@ func getPodsToDelete(filteredPods []*collasetutils.PodWrapper, replaceMapping ma
 	var needDeletePods []*collasetutils.PodWrapper
 	// 2. select pods to delete in second round according to replace, delete...
 	for _, pod := range targetsPods[:diff] {
+		//  don't scaleIn exclude pod and its newPod (if exist)
+		if pod.ToExclude {
+			continue
+		}
+
 		if replacePairPod, exist := replaceMapping[pod.Name]; exist && replacePairPod != nil {
-			// do not scaleIn new pod until origin pod is deleted, if you want to delete new pod, please delete it by label
+			// don't scaleIn new pod until origin pod is deleted, if you want to delete new pod, please delete it by label
 			if replacePairPod.ToDelete {
 				continue
 			}
