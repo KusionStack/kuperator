@@ -235,6 +235,11 @@ func (r *CollaSetReconciler) doSync(
 		return podWrappers, nil, err
 	}
 
+	podWrappers, ownedIDs, err = r.syncControl.ReplacePods(ctx, instance, podWrappers, ownedIDs, resources)
+	if err != nil {
+		return podWrappers, nil, err
+	}
+
 	_, scaleRequeueAfter, scaleErr := r.syncControl.Scale(ctx, instance, resources, podWrappers, ownedIDs)
 	_, updateRequeueAfter, updateErr := r.syncControl.Update(ctx, instance, resources, podWrappers, ownedIDs)
 

@@ -2593,7 +2593,7 @@ var _ = Describe("collaset controller", func() {
 		}, 5*time.Second, 1*time.Second).Should(BeTrue())
 		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 3, 3, 0, 0, 0)).Should(BeNil())
-		for _, partition := range []int32{3, 2, 1, 0} {
+		for _, partition := range []int32{2, 1, 0} {
 			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 			Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
 				cls.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateCollaSetStrategy{
@@ -2611,20 +2611,39 @@ var _ = Describe("collaset controller", func() {
 				Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 				return cs.Status.UpdatedReplicas
 			}, time.Second*10, time.Second).Should(BeEquivalentTo(3 - partition))
-			// allow Pod to do replace
-			podList := &corev1.PodList{}
+			// there should be 1 new pod, mock new pod service available
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-			for i := range podList.Items {
-				pod := &podList.Items[i]
-				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID())
-					pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
-					if _, exist := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
-						pod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] = fmt.Sprintf("%d", time.Now().UnixNano())
-					}
-					return true
-				})).Should(BeNil())
+			for _, pod := range podList.Items {
+				if _, exist := pod.Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
+					Expect(pod.Spec.Containers[0].Image).Should(BeEquivalentTo("nginx:v2"))
+					Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+						pod.Labels[appsv1alpha1.PodServiceAvailableLabel] = "true"
+						//replaceNewPod++
+						return true
+					})).Should(BeNil())
+				}
 			}
+			// allow Pod to delete
+			podList := &corev1.PodList{}
+			Eventually(func() bool {
+				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+				for i := range podList.Items {
+					pod := &podList.Items[i]
+					if _, exist := pod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; exist {
+						Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+							labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID())
+							pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+							return true
+						})).Should(BeNil())
+						return true
+					}
+				}
+				return false
+			}, time.Second*10, time.Second).Should(BeTrue())
+			// wait for replace finished
+			Eventually(func() error {
+				return expectedStatusReplicas(c, cs, 0, 0, 3-partition, 3, 3-partition, 0, 0, 3-partition)
+			}, 10*time.Second, time.Second).Should(BeNil())
 			// there should be 6 pvcs
 			allPvcs := &corev1.PersistentVolumeClaimList{}
 			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)

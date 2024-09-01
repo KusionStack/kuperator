@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,10 +50,10 @@ func (r *RealSyncControl) cleanReplacePodLabels(
 	needCleanLabelPods []*corev1.Pod,
 	podsNeedCleanLabels [][]string,
 	ownedIDs map[int]*appsv1alpha1.ContextDetail,
-	currentIDs map[int]struct{}) (bool, []int, error) {
+	currentIDs map[int]struct{}) (bool, sets.Int, error) {
 
 	needUpdateContext := false
-	var needDeletePodsIDs []int
+	needDeletePodsIDs := sets.Int{}
 	mapOriginToNewPodContext := mapReplaceOriginToNewPodContext(ownedIDs)
 	mapNewToOriginPodContext := mapReplaceNewToOriginPodContext(ownedIDs)
 	_, err := controllerutils.SlowStartBatch(len(needCleanLabelPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
@@ -72,7 +73,7 @@ func (r *RealSyncControl) cleanReplacePodLabels(
 				if originPodContext, exist := mapOriginToNewPodContext[newPodId]; exist && originPodContext != nil {
 					originPodContext.Remove(ReplaceNewPodIDContextDataKey)
 					if _, exist := currentIDs[originPodContext.ID]; !exist {
-						needDeletePodsIDs = append(needDeletePodsIDs, originPodContext.ID)
+						needDeletePodsIDs.Insert(originPodContext.ID)
 					}
 				}
 				if contextDetail, exist := ownedIDs[newPodId]; exist {
@@ -87,7 +88,7 @@ func (r *RealSyncControl) cleanReplacePodLabels(
 				if newPodContext, exist := mapNewToOriginPodContext[originPodId]; exist && newPodContext != nil {
 					newPodContext.Remove(ReplaceOriginPodIDContextDataKey)
 					if _, exist := currentIDs[newPodContext.ID]; !exist {
-						needDeletePodsIDs = append(needDeletePodsIDs, newPodContext.ID)
+						needDeletePodsIDs.Insert(newPodContext.ID)
 					}
 				}
 				if contextDetail, exist := ownedIDs[originPodId]; exist {
