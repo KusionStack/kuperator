@@ -58,7 +58,7 @@ type Interface interface {
 		resources *collasetutils.RelatedResources,
 	) (bool, []*collasetutils.PodWrapper, map[int]*appsv1alpha1.ContextDetail, error)
 
-	ReplacePods(
+	Replace(
 		ctx context.Context,
 		instance *appsv1alpha1.CollaSet,
 		podWrappers []*collasetutils.PodWrapper,
@@ -232,7 +232,7 @@ func (r *RealSyncControl) SyncPods(
 	return inExSucceed, podWrappers, ownedIDs, nil
 }
 
-func (r *RealSyncControl) ReplacePods(
+func (r *RealSyncControl) Replace(
 	ctx context.Context,
 	instance *appsv1alpha1.CollaSet,
 	podWrappers []*collasetutils.PodWrapper,
