@@ -59,7 +59,7 @@ func AllowResourceInclude(obj metav1.Object, ownerName, ownerKind string) (bool,
 				return false, fmt.Sprintf("object's ownerReference controller is not %s/%s", ownerKind, ownerName)
 			}
 			// currently being owned but not indicate orphan
-			if controller.Name == ownerName && controller.Kind == ownerName {
+			if controller.Name == ownerName && controller.Kind == ownerKind {
 				if _, exist := labels[appsv1alpha1.PodOrphanedIndicateLabelKey]; !exist {
 					return false, fmt.Sprintf("object's is controlled by %s/%s, but marked as orphaned", ownerKind, ownerName)
 				}
