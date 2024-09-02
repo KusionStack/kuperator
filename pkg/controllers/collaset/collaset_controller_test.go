@@ -3265,7 +3265,7 @@ var _ = Describe("collaset controller", func() {
 		}, 5*time.Second, 1*time.Second).Should(BeNil())
 	})
 
-	It("[Exclude] replace pod", func() {
+	It("[Exclude] replace origin pod", func() {
 		testcase := "test-exclude-replace-pod"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
 
@@ -3358,11 +3358,14 @@ var _ = Describe("collaset controller", func() {
 						pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 						return true
 					})).Should(BeNil())
-					return false
+					return true
 				}
 			}
-			return true
+			return false
 		}, 5*time.Second, time.Second).Should(BeTrue())
+		Eventually(func() error {
+			return expectedStatusReplicas(c, cs, 0, 0, 1, 2, 2, 1, 0, 1)
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
 
 		// allow Pods to scaleIn
 		Eventually(func() bool {
@@ -3387,10 +3390,363 @@ var _ = Describe("collaset controller", func() {
 			return expectedStatusReplicas(c, cs, 0, 0, 0, 1, 1, 0, 0, 0)
 		}, 5*time.Second, 1*time.Second).Should(BeNil())
 
-		// exclude pod is deleted
+		// origin pod is deleted
 		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 		Expect(len(podList.Items)).Should(BeEquivalentTo(1))
 		Expect(podList.Items[0].Name).ShouldNot(BeEquivalentTo(originPod.Name))
+	})
+
+	It("[Exclude] replace new pod", func() {
+		testcase := "test-exclude-new-pod"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+
+		cs := &appsv1alpha1.CollaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.CollaSetSpec{
+				Replicas: int32Pointer(2),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "foo",
+								Image: "nginx:v1",
+							},
+						},
+					},
+				},
+				UpdateStrategy: appsv1alpha1.UpdateStrategy{
+					OperationDelaySeconds: int32Pointer(1),
+					PodUpdatePolicy:       appsv1alpha1.CollaSetReplacePodUpdateStrategyType,
+				},
+			},
+		}
+
+		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
+		podList := &corev1.PodList{}
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 2
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
+
+		// label pod to trigger replace
+		originPod := podList.Items[0]
+		Expect(updatePodWithRetry(c, originPod.Namespace, originPod.Name, func(pod *corev1.Pod) bool {
+			pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] = "true"
+			return true
+		})).Should(BeNil())
+		Eventually(func() error {
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 3, 3, 0, 0, 0)
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
+
+		// find newPod
+		newPod := &corev1.Pod{}
+		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+		Eventually(func() bool {
+			for i := range podList.Items {
+				pod := podList.Items[i]
+				if pod.Labels[appsv1alpha1.PodReplacePairOriginName] != "" {
+					newPod = &pod
+					return true
+				}
+			}
+			return false
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+
+		// exclude new pod, and scale in to replicas - 1
+		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+			cls.Spec.Replicas = int32Pointer(1)
+			cls.Spec.ScaleStrategy = appsv1alpha1.ScaleStrategy{
+				PodToExclude: []string{newPod.Name},
+			}
+			return true
+		})).Should(BeNil())
+
+		// no pod is excluded and scale in
+		Eventually(func() error {
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 3, 3, 0, 0, 0)
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
+
+		// mock newPod service available
+		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+		for _, pod := range podList.Items {
+			if pod.Labels[appsv1alpha1.PodReplacePairOriginName] == originPod.Name {
+				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+					pod.Labels[appsv1alpha1.PodServiceAvailableLabel] = "true"
+					return true
+				})).Should(BeNil())
+			}
+		}
+
+		// wait for originPod is deleted
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for _, pod := range podList.Items {
+				if pod.Name == originPod.Name {
+					// allow originPod pod to be deleted
+					Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+						labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID())
+						pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+						return true
+					})).Should(BeNil())
+					return true
+				}
+			}
+			return false
+		}, 5*time.Second, time.Second).Should(BeTrue())
+
+		// wait for exclude completed
+		Eventually(func() error {
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 1, 1, 0, 0, 0)
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
+
+		// exclude pod is deleted
+		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+		Expect(len(podList.Items)).Should(BeEquivalentTo(2))
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range podList.Items {
+				pod := podList.Items[i]
+				if pod.Name == newPod.Name {
+					return len(pod.OwnerReferences) == 0 && pod.Labels[appsv1alpha1.PodOrphanedIndicateLabelKey] == "true"
+				}
+			}
+			return false
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+	})
+
+	It("[Include] pod without revision", func() {
+		testcase := "test-include-pod-without-revision"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+		_ = feature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%s", features.ReclaimPodScaleStrategy, "true"))
+		cs := &appsv1alpha1.CollaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.CollaSetSpec{
+				Replicas: int32Pointer(2),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "foo",
+								Image: "nginx:v1",
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										Name:      "pvc",
+										MountPath: "/tmp/pvc",
+									},
+								},
+							},
+						},
+					},
+				},
+				VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pvc",
+						},
+						Spec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									"storage": resource.MustParse("100m"),
+								},
+							},
+							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
+
+		podList := &corev1.PodList{}
+		pvcList := &corev1.PersistentVolumeClaimList{}
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 2
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
+
+		// exclude 1 pod, and scale in to replicas - 1
+		toExcludeName := podList.Items[0].Name
+		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+			cls.Spec.Replicas = int32Pointer(1)
+			cls.Spec.ScaleStrategy = appsv1alpha1.ScaleStrategy{
+				PodToExclude: []string{toExcludeName},
+			}
+			return true
+		})).Should(BeNil())
+
+		// excluded pod should not have ownerReference
+		var excludedPodID string
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			podExcluded := false
+			for i := range podList.Items {
+				pod := podList.Items[i]
+				if pod.Name == toExcludeName {
+					podExcluded = len(pod.OwnerReferences) == 0
+					podExcluded = podExcluded && pod.Labels[appsv1alpha1.PodOrphanedIndicateLabelKey] == "true"
+					excludedPodID = pod.Labels[appsv1alpha1.PodInstanceIDLabelKey]
+					break
+				}
+			}
+			return podExcluded
+		}, 10*time.Second, 1*time.Second).Should(BeTrue())
+
+		// excluded pvc should not have ownerReference
+		Eventually(func() bool {
+			pvcExcluded := false
+			Expect(c.List(context.TODO(), pvcList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range pvcList.Items {
+				pvc := pvcList.Items[i]
+				if pvc.Labels[appsv1alpha1.PodInstanceIDLabelKey] == excludedPodID {
+					pvcExcluded = len(pvc.OwnerReferences) == 0
+					pvcExcluded = pvcExcluded && pvc.Labels[appsv1alpha1.PodOrphanedIndicateLabelKey] == "true"
+					break
+				}
+			}
+			return pvcExcluded
+		}, 10*time.Second, 1*time.Second).Should(BeTrue())
+
+		// cls.spec.scaleStrategy.podToExclude should be reclaimed
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(len(cs.Spec.ScaleStrategy.PodToExclude)).Should(BeEquivalentTo(0))
+
+		// wait for collaset reconcile finished
+		Eventually(func() error {
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 1, 1, 0, 0, 0)
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
+
+		// delete include pod's revision
+		toIncludeName := toExcludeName
+		Expect(updatePodWithRetry(c, cs.Namespace, toIncludeName, func(pod *corev1.Pod) bool {
+			delete(pod.Labels, appsv1.ControllerRevisionHashLabelKey)
+			return true
+		})).Should(BeNil())
+
+		// include 1 pod, and scale out to replicas + 1
+		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+			cls.Spec.Replicas = int32Pointer(2)
+			cls.Spec.ScaleStrategy = appsv1alpha1.ScaleStrategy{
+				PodToExclude: []string{},
+				PodToInclude: []string{toIncludeName},
+			}
+			cls.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateCollaSetStrategy{
+				ByPartition: &appsv1alpha1.ByPartition{
+					Partition: int32Pointer(2),
+				},
+			}
+			return true
+		})).Should(BeNil())
+
+		// included pod should not have ownerReference
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			podIncluded := false
+			//var podId string
+			for i := range podList.Items {
+				pod := podList.Items[i]
+				if pod.Name == toExcludeName {
+					podIncluded = len(pod.OwnerReferences) == 1
+					podIncluded = podIncluded && pod.Labels[appsv1alpha1.PodOrphanedIndicateLabelKey] == ""
+					excludedPodID = pod.Labels[appsv1alpha1.PodInstanceIDLabelKey]
+					break
+				}
+			}
+			return podIncluded
+		}, 10*time.Second, 1*time.Second).Should(BeTrue())
+
+		// included pvc should not have ownerReference
+		Eventually(func() bool {
+			pvcIncluded := false
+			Expect(c.List(context.TODO(), pvcList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range pvcList.Items {
+				pvc := pvcList.Items[i]
+				if pvc.Labels[appsv1alpha1.PodInstanceIDLabelKey] == excludedPodID {
+					pvcIncluded = len(pvc.OwnerReferences) == 1
+					pvcIncluded = pvcIncluded && pvc.Labels[appsv1alpha1.PodOrphanedIndicateLabelKey] == ""
+					break
+				}
+			}
+			return pvcIncluded
+		}, 10*time.Second, 1*time.Second).Should(BeTrue())
+
+		// wait for cls.spec.scaleStrategy.podToInclude should be reclaimed
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(len(cs.Spec.ScaleStrategy.PodToInclude)).Should(BeEquivalentTo(0))
+
+		// wait for collaset reconcile finished
+		Eventually(func() error {
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 1, 0, 0, 0)
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
+
+		// update collaset image to nginx:v2
+		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+			cls.Spec.Template.Spec.Containers[0].Image = "nginx:v2"
+			cls.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateCollaSetStrategy{
+				ByPartition: &appsv1alpha1.ByPartition{
+					Partition: int32Pointer(0),
+				},
+			}
+			return true
+		})).Should(BeNil())
+
+		// allow pod to update
+		Expect(c.List(context.TODO(), pvcList, client.InNamespace(cs.Namespace))).Should(BeNil())
+		for i := range podList.Items {
+			pod := podList.Items[i]
+			Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+				return true
+			})).Should(BeNil())
+		}
+
+		// check include pod is recreate
+		Eventually(func() error {
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 1, 0, 0)
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			if len(podList.Items) != 2 {
+				return false
+			}
+			for i := range podList.Items {
+				if podList.Items[i].Name == toIncludeName {
+					return false
+				}
+			}
+			return true
+		}, 10*time.Second, 1*time.Second).Should(BeTrue())
 	})
 
 	It("clean up CollaSet", func() {

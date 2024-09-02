@@ -32,7 +32,6 @@ import (
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontext"
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
@@ -41,6 +40,7 @@ import (
 	"kusionstack.io/kuperator/pkg/utils/feature"
 )
 
+// getPodsToDelete finds number of diff pods from filteredPods to do scaleIn
 func getPodsToDelete(filteredPods []*collasetutils.PodWrapper, replaceMapping map[string]*collasetutils.PodWrapper, diff int) []*collasetutils.PodWrapper {
 	targetsPods := getTargetsDeletePods(filteredPods, replaceMapping)
 	// 1. select pods to delete in first round according to diff
@@ -73,7 +73,7 @@ func getPodsToDelete(filteredPods []*collasetutils.PodWrapper, replaceMapping ma
 	return needDeletePods
 }
 
-// when sort pods to choose delete, only sort (1) replace origin pods, (2) non-exclude pods
+// getTargetsDeletePods finds pods to choose delete, only finds those (1) replace origin pods, (2) non-exclude pods
 func getTargetsDeletePods(filteredPods []*collasetutils.PodWrapper, replaceMapping map[string]*collasetutils.PodWrapper) []*collasetutils.PodWrapper {
 	targetPods := make([]*collasetutils.PodWrapper, len(replaceMapping))
 	index := 0
@@ -115,6 +115,7 @@ func (s ActivePodsForDeletion) Less(i, j int) bool {
 	return collasetutils.ComparePod(l.Pod, r.Pod)
 }
 
+// dealIncludeExcludePods returns pods which are allowed to exclude and include
 func (r *RealSyncControl) dealIncludeExcludePods(ctx context.Context, cls *appsv1alpha1.CollaSet, pods []*corev1.Pod) (sets.String, sets.String, error) {
 	if len(cls.Spec.ScaleStrategy.PodToExclude) == 0 && len(cls.Spec.ScaleStrategy.PodToInclude) == 0 {
 		return nil, nil, nil
@@ -162,8 +163,10 @@ func (r *RealSyncControl) dealIncludeExcludePods(ctx context.Context, cls *appsv
 	return toExcludePods, toIncludePods, controllerutils.AggregateErrors([]error{exErr, inErr})
 }
 
+// checkAllowFunc refers to AllowResourceExclude and AllowResourceInclude
 type checkAllowFunc func(obj metav1.Object, ownerName, ownerKind string) (bool, string)
 
+// allowIncludeExcludePods try to classify podNames to allowedPods and notAllowedPods, using checkAllowFunc func
 func (r *RealSyncControl) allowIncludeExcludePods(ctx context.Context, cls *appsv1alpha1.CollaSet, podNames []string, fn checkAllowFunc) (allowPods sets.String, notAllowPods sets.String, err error) {
 	allowPods = sets.String{}
 	notAllowPods = sets.String{}
@@ -208,7 +211,7 @@ func (r *RealSyncControl) allowIncludeExcludePods(ctx context.Context, cls *apps
 	return allowPods, notAllowPods, nil
 }
 
-// doIncludeExcludePods do real include and exclude pods. If all pods
+// doIncludeExcludePods do real include and exclude for pods which are allowed to in/exclude
 func (r *RealSyncControl) doIncludeExcludePods(ctx context.Context, cls *appsv1alpha1.CollaSet, excludePods []string, includePods []string, availableContexts []*appsv1alpha1.ContextDetail) error {
 	_, exErr := controllerutils.SlowStartBatch(len(excludePods), controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) error {
 		return r.excludePod(ctx, cls, excludePods[idx])
@@ -220,6 +223,7 @@ func (r *RealSyncControl) doIncludeExcludePods(ctx context.Context, cls *appsv1a
 	return controllerutils.AggregateErrors([]error{exErr, inErr})
 }
 
+// excludePod try to exclude a pod from collaset
 func (r *RealSyncControl) excludePod(ctx context.Context, cls *appsv1alpha1.CollaSet, podName string) error {
 	pod := &corev1.Pod{}
 	if err := r.client.Get(ctx, types.NamespacedName{Namespace: cls.Namespace, Name: podName}, pod); err != nil {
@@ -254,6 +258,7 @@ func (r *RealSyncControl) excludePod(ctx context.Context, cls *appsv1alpha1.Coll
 	return collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.Pod, pod.Name, pod.ResourceVersion)
 }
 
+// includePod try to include a pod into collaset
 func (r *RealSyncControl) includePod(ctx context.Context, cls *appsv1alpha1.CollaSet, podName string, instanceId string) error {
 	pod := &corev1.Pod{}
 	if err := r.client.Get(ctx, types.NamespacedName{Namespace: cls.Namespace, Name: podName}, pod); err != nil {
@@ -291,32 +296,7 @@ func (r *RealSyncControl) includePod(ctx context.Context, cls *appsv1alpha1.Coll
 	return collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.Pod, pod.Name, pod.ResourceVersion)
 }
 
-func (r *RealSyncControl) getIncludePodIDs(
-	want int,
-	instance *appsv1alpha1.CollaSet,
-	resources *collasetutils.RelatedResources,
-	ownedIDs map[int]*appsv1alpha1.ContextDetail,
-	currentIDs map[int]struct{}) ([]*appsv1alpha1.ContextDetail, map[int]*appsv1alpha1.ContextDetail, error) {
-
-	availableContexts := extractAvailableContexts(want, ownedIDs, currentIDs)
-	if len(availableContexts) >= want {
-		return availableContexts, ownedIDs, nil
-	}
-
-	diff := want - len(availableContexts)
-
-	var newOwnedIDs map[int]*appsv1alpha1.ContextDetail
-	var err error
-	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		newOwnedIDs, err = podcontext.AllocateID(r.client, instance, resources.UpdatedRevision.Name, len(ownedIDs)+diff)
-		return err
-	}); err != nil {
-		return nil, ownedIDs, fmt.Errorf("fail to allocate IDs using context when include Pods: %s", err)
-	}
-
-	return extractAvailableContexts(want, newOwnedIDs, currentIDs), newOwnedIDs, nil
-}
-
+// adoptPvcsLeftByRetainPolicy adopts pvcs with respect of "whenDelete=true" pvc retention policy
 func (r *RealSyncControl) adoptPvcsLeftByRetainPolicy(ctx context.Context, cls *appsv1alpha1.CollaSet) ([]*corev1.PersistentVolumeClaim, error) {
 	ownerSelector := cls.Spec.Selector.DeepCopy()
 	if ownerSelector.MatchLabels == nil {
@@ -371,6 +351,7 @@ func (r *RealSyncControl) adoptPvcsLeftByRetainPolicy(ctx context.Context, cls *
 	return claims, nil
 }
 
+// reclaimScaleStrategy updates podToDelete, podToExclude, podToInclude in scaleStrategy
 func (r *RealSyncControl) reclaimScaleStrategy(ctx context.Context, deletedPods sets.String, excludedPods sets.String, includedPods sets.String, cls *appsv1alpha1.CollaSet) error {
 	// ReclaimPodScaleStrategy FeatureGate defaults to true
 	// Add '--feature-gates=ReclaimPodScaleStrategy=false' to container args, to disable reclaim of podToDelete, podToExclude, podToInclude
