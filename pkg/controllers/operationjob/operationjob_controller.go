@@ -18,6 +18,7 @@ package operationjob
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -86,7 +87,7 @@ func AddToMgr(mgr ctrl.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to resources for actions
 	for _, actionHandler := range ActionRegistry {
-		if err = actionHandler.SetUp(c, mgr, mixin.NewReconcilerMixin(controllerName, mgr)); err != nil {
+		if err = actionHandler.Setup(c, mixin.NewReconcilerMixin(controllerName, mgr)); err != nil {
 			return err
 		}
 	}
@@ -117,7 +118,8 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 	}
 
 	if instance.DeletionTimestamp != nil {
-		if err := r.releaseTargets(ctx, logger, instance); err != nil {
+		if err := r.releaseTargets(ctx, instance); err != nil {
+			r.Recorder.Eventf(instance, corev1.EventTypeWarning, "ReleaseTargetFailed", fmt.Sprintf("failed to release targets when job deleting: %s", err.Error()))
 			return reconcile.Result{}, err
 		}
 		ojutils.StatusUpToDateExpectation.DeleteExpectations(key)
@@ -153,12 +155,10 @@ func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv
 
 	// operate targets by partition
 	filteredCandidates := DecideCandidateByPartition(instance, candidates)
-	operateErr := r.operateTargets(ctx, actionHandler, filteredCandidates, enablePodOpsLifecycle, instance)
-	fulfilErr := r.fulfilTargetsOpsStatus(ctx, actionHandler, filteredCandidates, enablePodOpsLifecycle, instance)
-
+	err = r.operateTargets(ctx, actionHandler, filteredCandidates, enablePodOpsLifecycle, instance)
 	// calculate opsStatus of all candidates
 	instance.Status = r.calculateStatus(instance, candidates)
-	return ctrlutils.AggregateErrors([]error{operateErr, fulfilErr})
+	return err
 }
 
 func (r *ReconcileOperationJob) calculateStatus(instance *appsv1alpha1.OperationJob, candidates []*OpsCandidate) (jobStatus appsv1alpha1.OperationJobStatus) {

@@ -29,26 +29,26 @@ import (
 	"kusionstack.io/kuperator/pkg/utils"
 )
 
-func BeginOperateLifecycle(client client.Client, adapter podopslifecycle.LifecycleAdapter, pod *corev1.Pod) error {
+func BeginOperateLifecycle(client client.Client, adapter podopslifecycle.LifecycleAdapter, pod *corev1.Pod) (bool, error) {
 	if pod == nil {
-		return nil
+		return false, nil
 	}
 
 	// not start to operate until other lifecycles finished
 	if num, err := podopslifecycleutil.NumOfLifecycleOnPod(pod); err != nil {
-		return err
+		return false, err
 	} else if num > 0 {
-		return nil
+		return false, nil
 	}
 
 	if updated, err := podopslifecycle.Begin(client, adapter, pod); err != nil {
-		return fmt.Errorf("fail to begin PodOpsLifecycle for %s %s/%s: %s", adapter.GetType(), pod.Namespace, pod.Name, err)
+		return false, fmt.Errorf("fail to begin PodOpsLifecycle for %s %s/%s: %s", adapter.GetType(), pod.Namespace, pod.Name, err)
 	} else if updated {
 		if err := StatusUpToDateExpectation.ExpectUpdate(utils.ObjectKeyString(pod), pod.ResourceVersion); err != nil {
-			return err
+			return true, err
 		}
 	}
-	return nil
+	return true, nil
 }
 
 func FinishOperateLifecycle(client client.Client, adapter podopslifecycle.LifecycleAdapter, pod *corev1.Pod) error {

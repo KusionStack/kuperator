@@ -21,11 +21,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-
+	"kusionstack.io/kuperator/pkg/controllers/operationjob/opscore"
 	ctrlutils "kusionstack.io/kuperator/pkg/controllers/utils"
 )
 
@@ -40,6 +40,9 @@ func MarkOperationJobFailed(instance *appsv1alpha1.OperationJob) {
 func MapOpsStatusByPod(instance *appsv1alpha1.OperationJob) map[string]*appsv1alpha1.OpsStatus {
 	opsStatusMap := make(map[string]*appsv1alpha1.OpsStatus)
 	for i, opsStatus := range instance.Status.TargetDetails {
+		if instance.Status.TargetDetails[i].ExtraInfo == nil {
+			instance.Status.TargetDetails[i].ExtraInfo = make(map[string]string)
+		}
 		opsStatusMap[opsStatus.Name] = &instance.Status.TargetDetails[i]
 	}
 	return opsStatusMap
@@ -61,4 +64,18 @@ func EnqueueOperationJobFromPod(c client.Client, pod *corev1.Pod, q *workqueue.R
 func IsJobFinished(instance *appsv1alpha1.OperationJob) bool {
 	return instance.Status.Progress == appsv1alpha1.OperationProgressSucceeded ||
 		instance.Status.Progress == appsv1alpha1.OperationProgressFailed
+}
+
+func SetOpsStatusError(candidate *opscore.OpsCandidate, reason string, message string) {
+	if candidate == nil || candidate.OpsStatus == nil {
+		return
+	}
+	if reason == "" && message == "" {
+		candidate.OpsStatus.Error = nil
+		return
+	}
+	candidate.OpsStatus.Error = &appsv1alpha1.ErrorReasonMessage{
+		Reason:  reason,
+		Message: message,
+	}
 }

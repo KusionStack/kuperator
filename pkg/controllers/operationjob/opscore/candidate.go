@@ -77,6 +77,13 @@ func IsCandidateOpsFinished(candidate *OpsCandidate) bool {
 		return false
 	}
 	return candidate.OpsStatus.Progress == appsv1alpha1.OperationProgressFailed ||
-		candidate.OpsStatus.Progress == appsv1alpha1.OperationProgressSucceeded ||
-		candidate.OpsStatus.Progress == appsv1alpha1.OperationProgressFinishingOpsLifecycle
+		candidate.OpsStatus.Progress == appsv1alpha1.OperationProgressSucceeded
+}
+
+func IsCandidateServiceAvailable(candidate *OpsCandidate) bool {
+	if candidate.Pod == nil || candidate.Pod.Labels == nil {
+		return false
+	}
+	_, serviceAvailable := candidate.Pod.Labels[appsv1alpha1.PodServiceAvailableLabel]
+	return serviceAvailable
 }

@@ -19,7 +19,6 @@ package opscore
 import (
 	"context"
 
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
@@ -36,8 +35,8 @@ const (
 )
 
 type ActionHandler interface {
-	// SetUp sets up action with manager in AddToMgr, i.e., watch, cache...
-	SetUp(controller.Controller, ctrl.Manager, *mixin.ReconcilerMixin) error
+	// Setup sets up action with manager in AddToMgr, i.e., watch, cache...
+	Setup(controller.Controller, *mixin.ReconcilerMixin) error
 
 	// OperateTarget do real operation to target
 	OperateTarget(context.Context, *OpsCandidate, *appsv1alpha1.OperationJob) error
@@ -47,4 +46,8 @@ type ActionHandler interface {
 
 	// ReleaseTarget releases the target from operation when the operationJob is deleted
 	ReleaseTarget(context.Context, *OpsCandidate, *appsv1alpha1.OperationJob) error
+}
+
+func IsActionFinished(actionProgress ActionProgress) bool {
+	return actionProgress == ActionProgressSucceeded || actionProgress == ActionProgressFailed
 }
