@@ -994,6 +994,10 @@ var _ = SIGDescribe("CollaSet", func() {
 									Container: v1.Container{
 										Name:  "sidecar",
 										Image: imageutils.GetE2EImage(imageutils.Nginx),
+										Command: []string{
+											"sleep",
+											"2h",
+										},
 									},
 								},
 							},
