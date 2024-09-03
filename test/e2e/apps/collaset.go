@@ -34,9 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
@@ -1023,7 +1022,7 @@ var _ = SIGDescribe("CollaSet", func() {
 				Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 1, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 				Eventually(func() int32 {
 					Expect(client.Get(context.Background(), types.NamespacedName{Namespace: podDecoration.Namespace, Name: podDecoration.Name}, podDecoration)).Should(BeNil())
-					return podDecoration.Status.UpdatedReadyPods
+					return podDecoration.Status.UpdatedPods
 				}, 30*time.Second, 3*time.Second).Should(BeEquivalentTo(3))
 
 				By("Update PodDecoration 2 pod")
@@ -1037,7 +1036,7 @@ var _ = SIGDescribe("CollaSet", func() {
 				Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 1, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 				Eventually(func() int32 {
 					Expect(client.Get(context.Background(), types.NamespacedName{Namespace: podDecoration.Namespace, Name: podDecoration.Name}, podDecoration)).Should(BeNil())
-					return podDecoration.Status.UpdatedReadyPods
+					return podDecoration.Status.UpdatedPods
 				}, 30*time.Second, 3*time.Second).Should(BeEquivalentTo(2))
 
 				By("Update CollaSet all pods")
@@ -1054,7 +1053,7 @@ var _ = SIGDescribe("CollaSet", func() {
 				Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 3, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 				Eventually(func() int32 {
 					Expect(client.Get(context.Background(), types.NamespacedName{Namespace: podDecoration.Namespace, Name: podDecoration.Name}, podDecoration)).Should(BeNil())
-					return podDecoration.Status.UpdatedReadyPods
+					return podDecoration.Status.UpdatedPods
 				}, 30*time.Second, 3*time.Second).Should(BeEquivalentTo(2))
 
 				By("Update PodDecoration all pods")
