@@ -40,6 +40,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
+	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontrol"
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
@@ -167,6 +169,9 @@ func (r *ReconcilePodDecoration) Reconcile(ctx context.Context, request reconcil
 		return reconcile.Result{}, err
 	}
 	for i := range podList.Items {
+		if podcontrol.IsPodInactive(&podList.Items[i]) || podList.Items[i].DeletionTimestamp != nil {
+			continue
+		}
 		selectedPods = append(selectedPods, &podList.Items[i])
 	}
 	affectedPods, affectedCollaSets, err := r.filterOutPodAndCollaSet(selectedPods)
