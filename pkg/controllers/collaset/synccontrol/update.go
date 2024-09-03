@@ -264,13 +264,13 @@ func decidePodToUpdateByPartition(
 
 	partition := int(*cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition)
 	if partition >= podsNum {
-		return podToUpdate
+		partition = podsNum
 	}
 
 	podToUpdate = ordered[:podsNum-partition]
 	for i := podsNum - partition; i < podsNum; i++ {
-		if podInfos[i].PodDecorationChanged {
-			podToUpdate = append(podToUpdate, podInfos[i])
+		if ordered[i].PodDecorationChanged {
+			podToUpdate = append(podToUpdate, ordered[i])
 		}
 	}
 	return podToUpdate
