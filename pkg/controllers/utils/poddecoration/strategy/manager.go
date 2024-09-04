@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	"kusionstack.io/kuperator/pkg/controllers/utils"
 )
 
@@ -336,6 +337,10 @@ func (pm *podDecorationManager) updateSelectedPods(ctx context.Context, pd *apps
 		if !ok {
 			resource, err := getter.relatePodInfo(info, pd.Name)
 			if err != nil {
+				if errors.IsNotFound(err) {
+					// Ignore case: related resource already deleted
+					continue
+				}
 				return err
 			}
 			// Placeholder case: pod deleted but instanceId exists.
