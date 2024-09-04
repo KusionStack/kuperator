@@ -20,11 +20,13 @@ import (
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
 	"kusionstack.io/kuperator/pkg/utils"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/patch"
 )
 
@@ -58,6 +60,17 @@ func PatchPodDecoration(pod *corev1.Pod, template *appsv1alpha1.PodDecorationPod
 	return
 }
 
+func AddPodDecorationOwnerRef(pod *corev1.Pod, sortedPds []*appsv1alpha1.PodDecoration) {
+	for _, pd := range sortedPds {
+		pod.OwnerReferences = append(pod.OwnerReferences, v1.OwnerReference{
+			APIVersion: pd.APIVersion,
+			Kind:       pd.Kind,
+			Name:       pd.Name,
+			UID:        pd.UID,
+		})
+	}
+}
+
 func PatchListOfDecorations(pod *corev1.Pod, podDecorations map[string]*appsv1alpha1.PodDecoration) (err error) {
 	var pds []*appsv1alpha1.PodDecoration
 	if pod.Labels == nil {
@@ -73,5 +86,6 @@ func PatchListOfDecorations(pod *corev1.Pod, podDecorations map[string]*appsv1al
 		}
 	}
 	anno.SetDecorationInfo(pod, podDecorations)
+	AddPodDecorationOwnerRef(pod, pds)
 	return
 }
