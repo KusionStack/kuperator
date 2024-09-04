@@ -32,8 +32,10 @@ func MergeWithOverwriteVolumes(original []corev1.Volume, additional []corev1.Vol
 			delete(volumeMap, original[i].Name)
 		}
 	}
-	for _, v := range volumeMap {
-		original = append(original, *v)
+	for _, volume := range additional {
+		if added, ok := volumeMap[volume.Name]; ok {
+			original = append(original, *added)
+		}
 	}
 	return original
 }
