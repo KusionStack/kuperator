@@ -229,8 +229,8 @@ func dealReplacePods(pods []*corev1.Pod) (needReplacePods []*corev1.Pod, needCle
 			if originPod, exist := podNameMap[originPodName]; !exist {
 				needCleanLabels = append(needCleanLabels, appsv1alpha1.PodReplacePairOriginName)
 			} else if originPod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] == "" {
-				// replace canceled, delete replace new pod if origin pod is active
-				if originPod.DeletionTimestamp == nil {
+				// replace canceled, delete replace new pod if new pod is not service available
+				if _, exist := pod.Labels[appsv1alpha1.PodServiceAvailableLabel]; !exist {
 					needDeletePods = append(needDeletePods, pod)
 				}
 			} else if !replaceByUpdate {
