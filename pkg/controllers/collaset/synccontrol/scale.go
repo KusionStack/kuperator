@@ -19,6 +19,8 @@ package synccontrol
 import (
 	"sort"
 
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 )
@@ -30,8 +32,13 @@ func getPodsToDelete(filteredPods []*collasetutils.PodWrapper, replaceMapping ma
 		diff = len(targetsPods)
 	}
 
-	needDeletePods := targetsPods[:diff]
-	for _, pod := range needDeletePods {
+	var needDeletePods []*collasetutils.PodWrapper
+	for _, pod := range targetsPods[:diff] {
+		// don't scale in replace newPod
+		if _, isReplaceNewPod := pod.Labels[appsv1alpha1.PodReplacePairOriginName]; isReplaceNewPod {
+			continue
+		}
+		needDeletePods = append(needDeletePods, pod)
 		if replacePairPod, exist := replaceMapping[pod.Name]; exist && replacePairPod != nil {
 			needDeletePods = append(needDeletePods, replacePairPod)
 		}
