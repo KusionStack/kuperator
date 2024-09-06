@@ -771,6 +771,10 @@ func (u *replaceUpdatePodUpdater) BeginUpdatePod(ctx context.Context, resources 
 			if exist && newPodRevision == resources.UpdatedRevision.Name {
 				return nil
 			}
+			if _, exist := replacePairNewPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; exist {
+				return nil
+			}
+
 			u.recorder.Eventf(podInfo.Pod,
 				corev1.EventTypeNormal,
 				"ReplaceUpdatePod",
