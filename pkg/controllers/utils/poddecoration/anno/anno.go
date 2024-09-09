@@ -129,7 +129,7 @@ func copyMetadataFromRevOwnerRef(pd *appsv1alpha1.PodDecoration, rev *appsv1.Con
 		return
 	}
 	for _, ownerRef := range rev.OwnerReferences {
-		if *ownerRef.Controller == true && ownerRef.Kind == "PodDecoration" {
+		if *ownerRef.Controller && ownerRef.Kind == "PodDecoration" {
 			retPD.APIVersion = ownerRef.APIVersion
 			retPD.UID = ownerRef.UID
 			return
