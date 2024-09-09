@@ -120,7 +120,22 @@ func ApplyPatch(revision *appsv1.ControllerRevision) (*appsv1alpha1.PodDecoratio
 	if err != nil {
 		return nil, err
 	}
-	return clone, nil
+	return copyMetadataFromRevOwnerRef(clone, revision), nil
+}
+
+func copyMetadataFromRevOwnerRef(pd *appsv1alpha1.PodDecoration, rev *appsv1.ControllerRevision) (retPD *appsv1alpha1.PodDecoration) {
+	retPD = pd
+	if rev == nil || len(rev.OwnerReferences) == 0 {
+		return
+	}
+	for _, ownerRef := range rev.OwnerReferences {
+		if *ownerRef.Controller && ownerRef.Kind == "PodDecoration" {
+			retPD.APIVersion = ownerRef.APIVersion
+			retPD.UID = ownerRef.UID
+			return
+		}
+	}
+	return
 }
 
 func GetPodDecorationFromRevision(revision *appsv1.ControllerRevision) (*appsv1alpha1.PodDecoration, error) {
