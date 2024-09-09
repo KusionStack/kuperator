@@ -390,11 +390,11 @@ func (r *RealSyncControl) Scale(
 					err = controllerutils.AggregateErrors([]error{updateContextErr, err})
 				}
 			}
-			r.recorder.Eventf(cls, corev1.EventTypeNormal, "ScaleOut", "scale out %d Pod(s)", succCount)
 			if err != nil {
 				collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, err, "ScaleOutFailed", err.Error())
 				return succCount > 0, recordedRequeueAfter, err
 			}
+			r.recorder.Eventf(cls, corev1.EventTypeNormal, "ScaleOut", "scale out %d Pod(s)", succCount)
 			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleOut", "")
 			return succCount > 0, recordedRequeueAfter, err
 		}
@@ -662,12 +662,12 @@ func (r *RealSyncControl) Update(
 	recordedRequeueAfter, err = updater.FilterAllowOpsPods(ctx, candidates, ownedIDs, resources, podCh)
 	if err != nil {
 		collasetutils.AddOrUpdateCondition(resources.NewStatus,
-			appsv1alpha1.CollaSetScale, err, "UpdateFailed",
+			appsv1alpha1.CollaSetUpdate, err, "UpdateFailed",
 			fmt.Sprintf("fail to update Context for updating: %s", err))
 		return updating, recordedRequeueAfter, err
 	} else {
 		collasetutils.AddOrUpdateCondition(resources.NewStatus,
-			appsv1alpha1.CollaSetScale, nil, "Updated", "")
+			appsv1alpha1.CollaSetUpdate, nil, "Updated", "")
 	}
 
 	// 6. update Pod

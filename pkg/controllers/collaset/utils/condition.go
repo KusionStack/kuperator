@@ -34,14 +34,10 @@ func AddOrUpdateCondition(status *appsv1alpha1.CollaSetStatus, conditionType app
 	}
 
 	existCond := GetCondition(status, conditionType)
-	if existCond != nil {
-		if existCond.Reason == reason &&
-			existCond.Message == message &&
-			existCond.Status == condStatus {
-			now := metav1.Now()
-			if now.Sub(existCond.LastTransitionTime.Time) < ConditionUpdatePeriodBackOff {
-				return
-			}
+	if existCond != nil && existCond.Reason == reason && existCond.Status == condStatus {
+		now := metav1.Now()
+		if now.Sub(existCond.LastTransitionTime.Time) < ConditionUpdatePeriodBackOff {
+			return
 		}
 	}
 
