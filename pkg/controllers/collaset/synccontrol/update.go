@@ -243,6 +243,9 @@ func decidePodToUpdateByLabel(_ *appsv1alpha1.CollaSet, podInfos []*PodUpdateInf
 			if podInfos[i].isInReplacing && podInfos[i].replacePairOriginPodName != "" {
 				continue
 			}
+			// separate pd and collaset update progress
+			podInfos[i].IsUpdatedRevision = true
+			podInfos[i].UpdateRevision = podInfos[i].CurrentRevision
 			podToUpdate = append(podToUpdate, podInfos[i])
 		}
 	}
@@ -264,13 +267,16 @@ func decidePodToUpdateByPartition(
 
 	partition := int(*cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition)
 	if partition >= podsNum {
-		return podToUpdate
+		partition = podsNum
 	}
 
 	podToUpdate = ordered[:podsNum-partition]
 	for i := podsNum - partition; i < podsNum; i++ {
-		if podInfos[i].PodDecorationChanged {
-			podToUpdate = append(podToUpdate, podInfos[i])
+		if ordered[i].PodDecorationChanged {
+			// separate pd and collaset update progress
+			podInfos[i].IsUpdatedRevision = true
+			ordered[i].UpdateRevision = ordered[i].CurrentRevision
+			podToUpdate = append(podToUpdate, ordered[i])
 		}
 	}
 	return podToUpdate
@@ -385,7 +391,7 @@ func (u *GenericPodUpdater) BeginUpdatePod(_ context.Context, resources *collase
 	return updating, nil
 }
 
-func (u *GenericPodUpdater) FilterAllowOpsPods(_ context.Context, candidates []*PodUpdateInfo, ownedIDs map[int]*appsv1alpha1.ContextDetail, resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (*time.Duration, error) {
+func (u *GenericPodUpdater) FilterAllowOpsPods(_ context.Context, candidates []*PodUpdateInfo, ownedIDs map[int]*appsv1alpha1.ContextDetail, _ *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (*time.Duration, error) {
 	var recordedRequeueAfter *time.Duration
 	needUpdateContext := false
 	for i := range candidates {
@@ -411,9 +417,9 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(_ context.Context, candidates []*
 			continue
 		}
 
-		if !ownedIDs[podInfo.ID].Contains(podcontext.RevisionContextDataKey, resources.UpdatedRevision.Name) {
+		if !ownedIDs[podInfo.ID].Contains(podcontext.RevisionContextDataKey, podInfo.UpdateRevision.Name) {
 			needUpdateContext = true
-			ownedIDs[podInfo.ID].Put(podcontext.RevisionContextDataKey, resources.UpdatedRevision.Name)
+			ownedIDs[podInfo.ID].Put(podcontext.RevisionContextDataKey, podInfo.UpdateRevision.Name)
 		}
 
 		// mark podContext "PodRecreateUpgrade" if upgrade by recreate
@@ -505,10 +511,7 @@ type inPlaceIfPossibleUpdater struct {
 	GenericPodUpdater
 }
 
-func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(
-	_ context.Context,
-	updatedRevision *appsv1.ControllerRevision,
-	podUpdateInfo *PodUpdateInfo) error {
+func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(_ context.Context, _ *appsv1.ControllerRevision, podUpdateInfo *PodUpdateInfo) error {
 	// 1. build pod from current and updated revision
 	ownerRef := metav1.NewControllerRef(u.CollaSet, appsv1alpha1.SchemeGroupVersion.WithKind("CollaSet"))
 	// TODO: use cache
@@ -520,11 +523,11 @@ func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(
 	}
 
 	// TODO: use cache
-	podUpdateInfo.UpdatedPod, err = collasetutils.NewPodFrom(u.CollaSet, ownerRef, updatedRevision, func(in *corev1.Pod) error {
+	podUpdateInfo.UpdatedPod, err = collasetutils.NewPodFrom(u.CollaSet, ownerRef, podUpdateInfo.UpdateRevision, func(in *corev1.Pod) error {
 		return utilspoddecoration.PatchListOfDecorations(in, podUpdateInfo.UpdatedPodDecorations)
 	})
 	if err != nil {
-		return fmt.Errorf("fail to build Pod from updated revision %s: %v", updatedRevision.Name, err)
+		return fmt.Errorf("fail to build Pod from updated revision %s: %v", podUpdateInfo.UpdateRevision.Name, err)
 	}
 
 	if podUpdateInfo.PvcTmpHashChanged {
@@ -768,7 +771,7 @@ func (u *replaceUpdatePodUpdater) BeginUpdatePod(ctx context.Context, resources 
 		if podInfo.replacePairNewPodInfo != nil {
 			replacePairNewPod := podInfo.replacePairNewPodInfo.Pod
 			newPodRevision, exist := replacePairNewPod.Labels[appsv1.ControllerRevisionHashLabelKey]
-			if exist && newPodRevision == resources.UpdatedRevision.Name {
+			if exist && newPodRevision == podInfo.UpdateRevision.Name {
 				return nil
 			}
 			u.recorder.Eventf(podInfo.Pod,
@@ -815,7 +818,7 @@ func (u *replaceUpdatePodUpdater) UpgradePod(ctx context.Context, podInfo *PodUp
 	if !replaceIndicate || !replaceByUpdate {
 		// need replace update pod, label pod with replace-indicate and replace-update
 		now := time.Now().UnixNano()
-		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v", "%s": "%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, now, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey, true)))
+		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v", "%s": "%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, now, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey, podInfo.UpdateRevision.Name)))
 		if err := u.Patch(ctx, podInfo.Pod, patch); err != nil {
 			return fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %s", podInfo.Namespace, podInfo.Name, err)
 		}

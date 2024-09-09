@@ -684,7 +684,7 @@ func (r *RealSyncControl) Update(
 		isReplaceUpdate := cls.Spec.UpdateStrategy.PodUpdatePolicy == appsv1alpha1.CollaSetReplacePodUpdateStrategyType
 		if podInfo.isInReplacing && !isReplaceUpdate {
 			// a replacing pod should be replaced by an updated revision pod when encountering upgrade
-			if err = updateReplaceOriginPod(ctx, r.client, r.recorder, podInfo, podInfo.replacePairNewPodInfo, resources.UpdatedRevision); err != nil {
+			if err = updateReplaceOriginPod(ctx, r.client, r.recorder, podInfo, podInfo.replacePairNewPodInfo); err != nil {
 				return err
 			}
 		} else {

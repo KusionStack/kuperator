@@ -29,13 +29,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
@@ -956,8 +956,127 @@ var _ = SIGDescribe("CollaSet", func() {
 				}, 30*time.Second, 3*time.Second).Should(BeTrue())
 			}
 		})
-	})
 
+		framework.ConformanceIt("separate pd and collaset update", func() {
+			for _, updateStrategy := range []appsv1alpha1.PodUpdateStrategyType{appsv1alpha1.CollaSetRecreatePodUpdateStrategyType, appsv1alpha1.CollaSetReplacePodUpdateStrategyType, appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType} {
+				By(fmt.Sprintf("Test separate pd and collaset update %s strategy", updateStrategy))
+				cls := tester.NewCollaSet(fmt.Sprintf("collaset-%s-%s", randStr, strings.ToLower(string(updateStrategy))), 3, appsv1alpha1.UpdateStrategy{PodUpdatePolicy: appsv1alpha1.CollaSetRecreatePodUpdateStrategyType})
+
+				By("Create CollaSet")
+				Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
+
+				By("Wait for CollaSet status replicas satisfied")
+				Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 3, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+				By("Create PodDecoration")
+				podDecoration := &appsv1alpha1.PodDecoration{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: cls.Namespace,
+						Name:      fmt.Sprintf("pd-%s-%s", randStr, strings.ToLower(string(updateStrategy))),
+					},
+					Spec: appsv1alpha1.PodDecorationSpec{
+						HistoryLimit: 5,
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"owner": cls.Name,
+							},
+						},
+						Weight: int32Pointer(1),
+						UpdateStrategy: appsv1alpha1.PodDecorationUpdateStrategy{
+							RollingUpdate: &appsv1alpha1.PodDecorationRollingUpdate{
+								Partition: int32Pointer(0),
+							},
+						},
+						Template: appsv1alpha1.PodDecorationPodTemplate{
+							Containers: []*appsv1alpha1.ContainerPatch{
+								{
+									InjectPolicy: appsv1alpha1.AfterPrimaryContainer,
+									Container: v1.Container{
+										Name:  "sidecar",
+										Image: imageutils.GetE2EImage(imageutils.Nginx),
+										Command: []string{
+											"sleep",
+											"2h",
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+				Expect(client.Create(context.Background(), podDecoration)).Should(BeNil())
+
+				By("Wait for PodDecoration status replicas satisfied")
+				Eventually(func() int32 {
+					Expect(client.Get(context.Background(), types.NamespacedName{Namespace: podDecoration.Namespace, Name: podDecoration.Name}, podDecoration)).Should(BeNil())
+					return podDecoration.Status.UpdatedPods
+				}, 30*time.Second, 3*time.Second).Should(BeEquivalentTo(3))
+
+				By("Update CollaSet 1 pod")
+				Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
+					cls.Spec.Template.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.NginxNew)
+					cls.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateCollaSetStrategy{
+						ByPartition: &appsv1alpha1.ByPartition{
+							Partition: int32Pointer(2),
+						},
+					}
+				})).NotTo(HaveOccurred())
+
+				By("Check CollaSet and PodDecoration upgrade progress")
+				Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 1, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+				Eventually(func() int32 {
+					Expect(client.Get(context.Background(), types.NamespacedName{Namespace: podDecoration.Namespace, Name: podDecoration.Name}, podDecoration)).Should(BeNil())
+					return podDecoration.Status.UpdatedPods
+				}, 30*time.Second, 3*time.Second).Should(BeEquivalentTo(3))
+
+				By("Update PodDecoration 2 pod")
+				Eventually(func() error {
+					podDecoration.Spec.Template.Containers[0].Image = imageutils.GetE2EImage(imageutils.NginxNew)
+					podDecoration.Spec.UpdateStrategy.RollingUpdate.Partition = int32Pointer(1)
+					return client.Update(context.Background(), podDecoration)
+				}, 30*time.Second, 3*time.Second).Should(BeNil())
+
+				By("Check CollaSet and PodDecoration upgrade progress")
+				Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 1, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+				Eventually(func() int32 {
+					Expect(client.Get(context.Background(), types.NamespacedName{Namespace: podDecoration.Namespace, Name: podDecoration.Name}, podDecoration)).Should(BeNil())
+					return podDecoration.Status.UpdatedPods
+				}, 30*time.Second, 3*time.Second).Should(BeEquivalentTo(2))
+
+				By("Update CollaSet all pods")
+				Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
+					cls.Spec.Template.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.NginxNew)
+					cls.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateCollaSetStrategy{
+						ByPartition: &appsv1alpha1.ByPartition{
+							Partition: int32Pointer(0),
+						},
+					}
+				})).NotTo(HaveOccurred())
+
+				By("Check CollaSet and PodDecoration upgrade progress")
+				Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 3, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+				Eventually(func() int32 {
+					Expect(client.Get(context.Background(), types.NamespacedName{Namespace: podDecoration.Namespace, Name: podDecoration.Name}, podDecoration)).Should(BeNil())
+					return podDecoration.Status.UpdatedPods
+				}, 30*time.Second, 3*time.Second).Should(BeEquivalentTo(2))
+
+				By("Update PodDecoration all pods")
+				Eventually(func() error {
+					podDecoration.Spec.Template.Containers[0].Image = imageutils.GetE2EImage(imageutils.NginxNew)
+					podDecoration.Spec.UpdateStrategy.RollingUpdate.Partition = int32Pointer(0)
+					return client.Update(context.Background(), podDecoration)
+				}, 30*time.Second, 3*time.Second).Should(BeNil())
+
+				By("Check CollaSet and PodDecoration upgrade progress")
+				Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 3, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+				Eventually(func() int32 {
+					Expect(client.Get(context.Background(), types.NamespacedName{Namespace: podDecoration.Namespace, Name: podDecoration.Name}, podDecoration)).Should(BeNil())
+					return podDecoration.Status.UpdatedPods
+				}, 30*time.Second, 3*time.Second).Should(BeEquivalentTo(3))
+			}
+		})
+
+	})
 })
 
 func int32Pointer(val int32) *int32 {
