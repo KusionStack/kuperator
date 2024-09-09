@@ -349,12 +349,6 @@ var _ = Describe("PodDecoration controller", func() {
 				Labels: map[string]string{
 					"app": "foo",
 				},
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						Kind: "PodDecoration",
-						Name: "mock-pd",
-					},
-				},
 			},
 		}
 		i0Int32 := int32(0)
@@ -421,7 +415,7 @@ var _ = Describe("PodDecoration controller", func() {
 		}
 		Expect(PatchListOfDecorations(pod, pds)).Should(BeNil())
 		Expect(anno.GetDecorationRevisionInfo(pod).Size()).Should(Equal(2))
-		Expect(len(pod.OwnerReferences)).Should(BeEquivalentTo(3))
+		Expect(len(pod.OwnerReferences)).Should(BeEquivalentTo(2))
 	})
 })
 

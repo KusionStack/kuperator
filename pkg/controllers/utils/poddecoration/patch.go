@@ -60,7 +60,7 @@ func PatchPodDecoration(pod *corev1.Pod, template *appsv1alpha1.PodDecorationPod
 	return
 }
 
-func AddPodDecorationOwnerRef(pod *corev1.Pod, sortedPds []*appsv1alpha1.PodDecoration) {
+func addPodDecorationOwnerRef(pod *corev1.Pod, sortedPds []*appsv1alpha1.PodDecoration) {
 	for _, pd := range sortedPds {
 		pod.OwnerReferences = append(pod.OwnerReferences, v1.OwnerReference{
 			APIVersion: pd.APIVersion,
@@ -86,6 +86,6 @@ func PatchListOfDecorations(pod *corev1.Pod, podDecorations map[string]*appsv1al
 		}
 	}
 	anno.SetDecorationInfo(pod, podDecorations)
-	AddPodDecorationOwnerRef(pod, pds)
+	addPodDecorationOwnerRef(pod, pds)
 	return
 }
