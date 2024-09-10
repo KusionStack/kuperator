@@ -35,6 +35,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
+	kuperatorv1alpha1 "kusionstack.io/kuperator/apis/apps/v1alpha1"
 	commonutils "kusionstack.io/kuperator/pkg/utils"
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 	"kusionstack.io/kuperator/pkg/webhook/server/generic/utils"
@@ -73,6 +75,9 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to unmarshal old object: %s", err))
 		}
 	}
+
+	kuperatorv1alpha1.SetDefaultPodSpec(cls)
+	kuperatorv1alpha1.SetDefaultPodSpec(oldCls)
 
 	if err := h.validate(cls, oldCls); err != nil {
 		return admission.Errored(http.StatusUnprocessableEntity, err)
