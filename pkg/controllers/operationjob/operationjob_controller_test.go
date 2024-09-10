@@ -122,6 +122,67 @@ var _ = Describe("operationjob controller", func() {
 		assertJobProgressSucceeded(oj, time.Second*5)
 	})
 
+	It("[replace] delete origin pod manually", func() {
+		testcase := "test-delete-origin-pod"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+		cs := createCollaSetWithReplicas("foo", testcase, 2)
+		podNames := getPodNamesFromCollaSet(cs)
+
+		oj := &appsv1alpha1.OperationJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.OperationJobSpec{
+				Action: appsv1alpha1.OpsActionReplace,
+				Targets: []appsv1alpha1.PodOpsTarget{
+					{
+						Name: podNames[0],
+					},
+					{
+						Name: podNames[1],
+					},
+				},
+			},
+		}
+
+		Expect(c.Create(ctx, oj)).Should(BeNil())
+
+		// wait for new pod created
+		podList := &corev1.PodList{}
+		Eventually(func() bool {
+			Expect(c.List(ctx, podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 4
+		}, time.Second*10, time.Second).Should(BeTrue())
+
+		// delete origin pod
+		for i := range podList.Items {
+			pod := podList.Items[i]
+			if pod.Name == podNames[0] || pod.Name == podNames[1] {
+				Expect(c.Delete(context.Background(), &pod)).Should(BeNil())
+			}
+		}
+		Eventually(func() bool {
+			Expect(c.List(ctx, podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 2
+		}, time.Second*10, time.Second).Should(BeTrue())
+
+		// check opj is still in processing
+		assertJobProgressProcessing(oj, time.Second*5)
+
+		// mock new pods serviceAvailable
+		Expect(c.List(ctx, podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+		for i := range podList.Items {
+			Expect(updatePodWithRetry(podList.Items[i].Namespace, podList.Items[i].Name, func(pod *corev1.Pod) bool {
+				pod.Labels[appsv1alpha1.PodServiceAvailableLabel] = "true"
+				return true
+			})).Should(BeNil())
+		}
+
+		// wait for replace completed
+		assertJobProgressSucceeded(oj, time.Second*5)
+	})
+
 	It("[replace] by partition", func() {
 		testcase := "test-replace-by-partition"
 		Expect(createNamespace(c, testcase)).Should(BeNil())

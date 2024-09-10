@@ -151,7 +151,10 @@ func (p *PodReplaceHandler) GetOpsProgress(ctx context.Context, candidate *OpsCa
 				ojutils.SetOpsStatusError(candidate, ReasonGetObjectFailed, err.Error())
 				return
 			}
-			// mark ops status as succeeded if origin pod is replaced
+			if _, serviceAvailable := newPod.Labels[appsv1alpha1.PodServiceAvailableLabel]; !serviceAvailable {
+				return
+			}
+			// mark ops status as succeeded if origin pod is replaced, and new pod is service available
 			ojutils.SetOpsStatusError(candidate, "", "")
 			progress = ActionProgressSucceeded
 		} else {

@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	ojutils "kusionstack.io/kuperator/pkg/controllers/operationjob/utils"
 )
 
@@ -66,8 +67,16 @@ func replacedByOperationJob(c client.Client, pod *corev1.Pod) (sets.String, bool
 	originPodName := pod.Labels[appsv1alpha1.PodReplacePairOriginName]
 
 	for _, oj := range ojList.Items {
+		// find and watch newPod if pair-labels matched
 		for _, target := range oj.Spec.Targets {
 			if originPodName == target.Name {
+				ojNames.Insert(oj.Name)
+				break
+			}
+		}
+		// find and watch newPod if recorded in extraInfo
+		for _, opsStatus := range oj.Status.TargetDetails {
+			if opsStatus.ExtraInfo != nil && pod.Name == opsStatus.ExtraInfo[appsv1alpha1.ExtraInfoReplacedNewPodKey] {
 				ojNames.Insert(oj.Name)
 				break
 			}
