@@ -67,6 +67,7 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 		logger.Error(err, "failed to decode collaset")
 		return admission.Errored(http.StatusBadRequest, err)
 	}
+	kuperatorv1alpha1.SetDefaultPodSpec(cls)
 
 	var oldCls *appsv1alpha1.CollaSet
 	if req.Operation == admissionv1.Update || req.Operation == admissionv1.Delete {
@@ -74,10 +75,8 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 		if err := h.Decoder.DecodeRaw(req.OldObject, oldCls); err != nil {
 			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to unmarshal old object: %s", err))
 		}
+		kuperatorv1alpha1.SetDefaultPodSpec(oldCls)
 	}
-
-	kuperatorv1alpha1.SetDefaultPodSpec(cls)
-	kuperatorv1alpha1.SetDefaultPodSpec(oldCls)
 
 	if err := h.validate(cls, oldCls); err != nil {
 		return admission.Errored(http.StatusUnprocessableEntity, err)
