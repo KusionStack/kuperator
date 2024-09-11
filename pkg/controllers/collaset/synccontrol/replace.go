@@ -346,11 +346,6 @@ func classifyPodReplacingMapping(podWrappers []*collasetutils.PodWrapper) map[st
 	var replacePodMapping = make(map[string]*collasetutils.PodWrapper)
 	for _, podWrapper := range podWrappers {
 		name := podWrapper.Name
-		if podWrapper.DeletionTimestamp != nil {
-			replacePodMapping[name] = nil
-			continue
-		}
-
 		if replacePairNewIdStr, exist := podWrapper.Labels[appsv1alpha1.PodReplacePairNewId]; exist {
 			if pairNewPod, exist := podIdMap[replacePairNewIdStr]; exist {
 				replacePodMapping[name] = pairNewPod

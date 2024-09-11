@@ -157,8 +157,11 @@ func (r *RealSyncControl) SyncPods(
 				idToReclaim.Insert(id)
 			}
 
-			// 2. filter out Pods which are terminating
-			continue
+			_, replaceIndicate := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
+			// 2. filter out Pods which are terminating and not replace indicate
+			if !replaceIndicate {
+				continue
+			}
 		}
 
 		// delete unused pvcs

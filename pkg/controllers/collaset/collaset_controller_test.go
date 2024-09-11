@@ -1853,6 +1853,13 @@ var _ = Describe("collaset controller", func() {
 			return true
 		})).Should(BeNil())
 
+		// allow new pod to scaleIn
+		Expect(updatePodWithRetry(c, newPod.Namespace, newPod.Name, func(pod *corev1.Pod) bool {
+			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+			pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+			return true
+		})).Should(BeNil())
+
 		// new pod is not allowed to scaleIn if origin pod terminating
 		Eventually(func() error {
 			// check updated pod replicas by CollaSet status
@@ -1864,24 +1871,6 @@ var _ = Describe("collaset controller", func() {
 			pod.Finalizers = []string{}
 			return true
 		})).Should(BeNil())
-		Eventually(func() error {
-			// check updated pod replicas by CollaSet status
-			return expectedStatusReplicas(c, cs, 0, 0, 1, 1, 1, 1, 0, 1)
-		}, 30*time.Second, 1*time.Second).Should(BeNil())
-
-		// check resource context
-		rc := &appsv1alpha1.ResourceContext{}
-		Expect(c.Get(ctx, types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, rc)).Should(BeNil())
-		Expect(len(rc.Spec.Contexts)).Should(BeEquivalentTo(1))
-		Expect(rc.Spec.Contexts[0].Data[synccontrol.ReplaceOriginPodIDContextDataKey]).Should(BeEquivalentTo(""))
-		Expect(rc.Spec.Contexts[0].Data[synccontrol.ReplaceNewPodIDContextDataKey]).Should(BeEquivalentTo(""))
-
-		// allow new pod to scaleIn
-		Expect(updatePodWithRetry(c, newPod.Namespace, newPod.Name, func(pod *corev1.Pod) bool {
-			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
-			pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
-			return true
-		})).Should(BeNil())
 
 		// wait for pods are deleted
 		Eventually(func() error {
@@ -1890,6 +1879,7 @@ var _ = Describe("collaset controller", func() {
 		}, 30*time.Second, 1*time.Second).Should(BeNil())
 
 		// check resource context
+		rc := &appsv1alpha1.ResourceContext{}
 		Expect(errors.IsNotFound(c.Get(ctx, types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, rc))).Should(BeTrue())
 	})
 
