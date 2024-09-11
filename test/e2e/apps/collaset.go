@@ -1076,6 +1076,55 @@ var _ = SIGDescribe("CollaSet", func() {
 			}
 		})
 
+		framework.ConformanceIt("scaleIn origin pod", func() {
+			cls := tester.NewCollaSet("collaset-"+randStr, 1, appsv1alpha1.UpdateStrategy{})
+			// use bad image to mock new replace pod unavailable
+			cls.Spec.Template.Spec.Containers[0].Image = "nginx:non-exist"
+			Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
+
+			By("Wait for status replicas satisfied")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 1, 0, 0, 1, 1) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Replace pod by label")
+			pods, err := tester.ListPodsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			podToReplace := pods[0]
+			Expect(tester.UpdatePod(podToReplace, func(pod *v1.Pod) {
+				podToReplace.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] = "true"
+			})).NotTo(HaveOccurred())
+
+			By("Wait for replace new pod created")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 0, 0, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+			Eventually(func() bool {
+				pvcs, err := tester.ListPVCForCollaSet(cls)
+				if err != nil {
+					return false
+				}
+				if len(pvcs) != 2 {
+					return false
+				}
+				return true
+			}, 30*time.Second, 3*time.Second).Should(Equal(true))
+
+			By("Selective scaleIn origin pod")
+			Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
+				cls.Spec.Replicas = int32Pointer(0)
+				cls.Spec.ScaleStrategy = appsv1alpha1.ScaleStrategy{
+					PodToDelete: []string{podToReplace.Name},
+				}
+			})).NotTo(HaveOccurred())
+
+			By("Wait for pods deleted")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 0, 0, 0, 0, 0) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Check resourceContext")
+			var currResourceContexts []*appsv1alpha1.ResourceContext
+			Eventually(func() bool {
+				currResourceContexts, err = tester.ListResourceContextsForCollaSet(cls)
+				Expect(err).Should(BeNil())
+				return len(currResourceContexts) == 0
+			}, 30*time.Second, 3*time.Second).Should(BeTrue())
+		})
 	})
 })
 
