@@ -458,9 +458,9 @@ func (r *RealSyncControl) Scale(
 			}
 
 			// if Pod is allowed to operate or Pod has already been deleted, promte to delete Pod
-			if podWrapper.ID >= 0 && !ownedIDs[podWrapper.ID].Contains(ScaleInContextDataKey, "true") {
+			if contextDetail, exist := ownedIDs[podWrapper.ID]; exist && !contextDetail.Contains(ScaleInContextDataKey, "true") {
 				needUpdateContext = true
-				ownedIDs[podWrapper.ID].Put(ScaleInContextDataKey, "true")
+				contextDetail.Put(ScaleInContextDataKey, "true")
 			}
 
 			if podWrapper.DeletionTimestamp != nil {
@@ -524,9 +524,10 @@ func (r *RealSyncControl) Scale(
 	// reset ContextDetail.ScalingIn, if there are Pods had its PodOpsLifecycle reverted
 	needUpdatePodContext := false
 	for _, podWrapper := range activePods {
-		if !podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, podWrapper) && ownedIDs[podWrapper.ID].Contains(ScaleInContextDataKey, "true") {
+		if contextDetail, exist := ownedIDs[podWrapper.ID]; exist && contextDetail.Contains(ScaleInContextDataKey, "true") &&
+			!podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, podWrapper) {
 			needUpdatePodContext = true
-			ownedIDs[podWrapper.ID].Remove(ScaleInContextDataKey)
+			contextDetail.Remove(ScaleInContextDataKey)
 		}
 	}
 

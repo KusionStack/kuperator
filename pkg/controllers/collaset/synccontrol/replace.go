@@ -73,7 +73,9 @@ func (r *RealSyncControl) cleanReplacePodLabels(
 					originPodContext.Remove(ReplaceNewPodIDContextDataKey)
 					needDeletePodsIDs.Insert(strconv.Itoa(originPodContext.ID))
 				}
-				ownedIDs[newPodId].Remove(ReplaceOriginPodIDContextDataKey)
+				if contextDetail, exist := ownedIDs[newPodId]; exist {
+					contextDetail.Remove(ReplaceOriginPodIDContextDataKey)
+				}
 			}
 			// replace canceled, (1) remove ReplaceNewPodID, ReplaceOriginPodID key from IDs, (2) try to delete new Pod's ID
 			_, replaceIndicate := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
@@ -84,7 +86,9 @@ func (r *RealSyncControl) cleanReplacePodLabels(
 					newPodContext.Remove(ReplaceOriginPodIDContextDataKey)
 					needDeletePodsIDs.Insert(strconv.Itoa(newPodContext.ID))
 				}
-				ownedIDs[originPodId].Remove(ReplaceNewPodIDContextDataKey)
+				if contextDetail, exist := ownedIDs[originPodId]; exist {
+					contextDetail.Remove(ReplaceNewPodIDContextDataKey)
+				}
 			}
 		}
 		// patch to bytes

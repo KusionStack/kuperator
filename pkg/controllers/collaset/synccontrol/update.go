@@ -417,6 +417,10 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(_ context.Context, candidates []*
 			continue
 		}
 
+		if _, exist := ownedIDs[podInfo.ID]; !exist {
+			continue
+		}
+
 		if !ownedIDs[podInfo.ID].Contains(podcontext.RevisionContextDataKey, podInfo.UpdateRevision.Name) {
 			needUpdateContext = true
 			ownedIDs[podInfo.ID].Put(podcontext.RevisionContextDataKey, podInfo.UpdateRevision.Name)
