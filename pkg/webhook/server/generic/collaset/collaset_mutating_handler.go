@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	operatingv1alpha1 "kusionstack.io/kuperator/apis/apps/v1alpha1"
+	kuperatorv1alpha1 "kusionstack.io/kuperator/apis/apps/v1alpha1"
 	commonutils "kusionstack.io/kuperator/pkg/utils"
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
@@ -57,7 +57,7 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 		logger.Error(err, "failed to decode collaset")
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	operatingv1alpha1.SetDefaultCollaSet(cls)
+	kuperatorv1alpha1.SetDefaultCollaSetUpdateStrategy(cls)
 
 	marshalled, err := json.Marshal(cls)
 	if err != nil {
