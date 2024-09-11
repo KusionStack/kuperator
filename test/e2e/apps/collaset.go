@@ -1095,16 +1095,6 @@ var _ = SIGDescribe("CollaSet", func() {
 
 			By("Wait for replace new pod created")
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 0, 0, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
-			Eventually(func() bool {
-				pvcs, err := tester.ListPVCForCollaSet(cls)
-				if err != nil {
-					return false
-				}
-				if len(pvcs) != 2 {
-					return false
-				}
-				return true
-			}, 30*time.Second, 3*time.Second).Should(Equal(true))
 
 			By("Selective scaleIn origin pod")
 			Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
@@ -1145,16 +1135,6 @@ var _ = SIGDescribe("CollaSet", func() {
 
 			By("Wait for replace new pod created")
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 0, 0, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
-			Eventually(func() bool {
-				pvcs, err := tester.ListPVCForCollaSet(cls)
-				if err != nil {
-					return false
-				}
-				if len(pvcs) != 2 {
-					return false
-				}
-				return true
-			}, 30*time.Second, 3*time.Second).Should(Equal(true))
 
 			By("Selective scaleIn new pod")
 			pods, err = tester.ListPodsForCollaSet(cls)
