@@ -418,6 +418,7 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(_ context.Context, candidates []*
 		}
 
 		if _, exist := ownedIDs[podInfo.ID]; !exist {
+			u.Recorder.Eventf(u.CollaSet, corev1.EventTypeWarning, "PodBeforeUpdate", "pod %s/%s is not allowed to update because cannnot find context id %s in resourceContext", podInfo.Namespace, podInfo.Name, podInfo.Labels[appsv1alpha1.PodInstanceIDLabelKey])
 			continue
 		}
 
