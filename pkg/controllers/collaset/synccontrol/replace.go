@@ -39,6 +39,7 @@ import (
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration"
+	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 )
 
 const (
@@ -140,6 +141,9 @@ func (r *RealSyncControl) replaceOriginPods(
 			instanceId = fmt.Sprintf("%d", newPodContext.ID)
 			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
 		} else {
+			if availableContexts[i] == nil {
+				return fmt.Errorf("cannot found available context for replace new pod when replacing origin pod %s/%s", originPod.Namespace, originPod.Name)
+			}
 			newPodContext = availableContexts[i]
 			// add replace pair-relation to podContexts for originPod and newPod
 			instanceId = fmt.Sprintf("%d", newPodContext.ID)
@@ -204,6 +208,12 @@ func dealReplacePods(pods []*corev1.Pod) (needReplacePods []*corev1.Pod, needCle
 		if _, exist := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist {
 			continue
 		}
+
+		// origin pod is about to scaleIn, skip replace
+		if podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, pod) {
+			continue
+		}
+
 		replaceIndicateCount++
 
 		// pod is replace new created pod, skip replace

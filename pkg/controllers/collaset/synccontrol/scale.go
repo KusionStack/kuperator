@@ -19,26 +19,32 @@ package synccontrol
 import (
 	"sort"
 
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 )
 
 func getPodsToDelete(filteredPods []*collasetutils.PodWrapper, replaceMapping map[string]*collasetutils.PodWrapper, diff int) []*collasetutils.PodWrapper {
 	targetsPods := getTargetsDeletePods(filteredPods, replaceMapping)
+	// 1. select pods to delete in first round according to diff
 	sort.Sort(ActivePodsForDeletion(targetsPods))
 	if diff > len(targetsPods) {
 		diff = len(targetsPods)
 	}
 
 	var needDeletePods []*collasetutils.PodWrapper
+	// 2. select pods to delete in second round according to replace, delete...
 	for _, pod := range targetsPods[:diff] {
 		if replacePairPod, exist := replaceMapping[pod.Name]; exist && replacePairPod != nil {
+			// do not scaleIn new pod until origin pod is deleted, if you want to delete new pod, please delete it by label
 			if replacePairPod.ToDelete {
-				// do not scaleIn new pod until origin pod is deleted
-				// if you want to delete new pod, please delete it by label
 				continue
 			}
-			needDeletePods = append(needDeletePods, replacePairPod)
+			// new pod not service available, just scaleIn it
+			if _, serviceAvailable := replacePairPod.Labels[appsv1alpha1.PodServiceAvailableLabel]; !serviceAvailable {
+				needDeletePods = append(needDeletePods, replacePairPod)
+			}
 		}
 		needDeletePods = append(needDeletePods, pod)
 	}
@@ -76,10 +82,10 @@ func (s ActivePodsForDeletion) Less(i, j int) bool {
 	// pods which are during scaleInOps should be deleted before those not during
 	lDuringScaleIn := podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, l)
 	rDuringScaleIn := podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, r)
-
 	if lDuringScaleIn != rDuringScaleIn {
 		return lDuringScaleIn
 	}
 
+	// TODO consider service available timestamps
 	return collasetutils.ComparePod(l.Pod, r.Pod)
 }
