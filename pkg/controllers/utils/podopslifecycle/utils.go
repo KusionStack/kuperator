@@ -147,11 +147,8 @@ func checkOperatingID(adapter LifecycleAdapter, obj client.Object) (val string, 
 
 func checkOperationType(adapter LifecycleAdapter, obj client.Object) (val OperationType, ok bool) {
 	labelType := fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, adapter.GetID())
-
-	var labelVal string
-	labelVal, ok = obj.GetLabels()[labelType]
+	labelVal := obj.GetLabels()[labelType]
 	val = OperationType(labelVal)
-
 	return val, val == adapter.GetType()
 }
 
