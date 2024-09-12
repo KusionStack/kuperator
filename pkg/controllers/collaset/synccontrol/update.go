@@ -45,7 +45,6 @@ import (
 	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration"
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
-	commonutils "kusionstack.io/kuperator/pkg/utils"
 )
 
 type PodUpdateInfo struct {
@@ -399,7 +398,6 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(_ context.Context, candidates []*
 
 		if !podInfo.PlaceHolder {
 			if !podInfo.isAllowOps {
-				u.Recorder.Eventf(podInfo, corev1.EventTypeNormal, "PodUpdateLifecycle", "Pod %s is not allowed to update", commonutils.ObjectKeyString(podInfo.Pod))
 				continue
 			}
 			if podInfo.requeueForOperationDelay != nil {
@@ -414,6 +412,11 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(_ context.Context, candidates []*
 		podInfo.isAllowOps = true
 
 		if podInfo.IsUpdatedRevision && !podInfo.PodDecorationChanged && !podInfo.PvcTmpHashChanged {
+			continue
+		}
+
+		if _, exist := ownedIDs[podInfo.ID]; !exist {
+			u.Recorder.Eventf(u.CollaSet, corev1.EventTypeWarning, "PodBeforeUpdate", "pod %s/%s is not allowed to update because cannot find context id %s in resourceContext", podInfo.Namespace, podInfo.Name, podInfo.Labels[appsv1alpha1.PodInstanceIDLabelKey])
 			continue
 		}
 
@@ -774,6 +777,10 @@ func (u *replaceUpdatePodUpdater) BeginUpdatePod(ctx context.Context, resources 
 			if exist && newPodRevision == podInfo.UpdateRevision.Name {
 				return nil
 			}
+			if _, exist := replacePairNewPod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; exist {
+				return nil
+			}
+
 			u.recorder.Eventf(podInfo.Pod,
 				corev1.EventTypeNormal,
 				"ReplaceUpdatePod",

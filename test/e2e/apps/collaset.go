@@ -892,7 +892,7 @@ var _ = SIGDescribe("CollaSet", func() {
 			}
 		})
 
-		framework.ConformanceIt("replace pod with recreate update", func() {
+		framework.ConformanceIt("replace pod with update", func() {
 			for _, updateStrategy := range []appsv1alpha1.PodUpdateStrategyType{appsv1alpha1.CollaSetRecreatePodUpdateStrategyType, appsv1alpha1.CollaSetReplacePodUpdateStrategyType, appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType} {
 				By(fmt.Sprintf("Test replace pod with %s update", updateStrategy))
 				cls := tester.NewCollaSet(fmt.Sprintf("collaset-%s-%s", randStr, strings.ToLower(string(updateStrategy))), 1, appsv1alpha1.UpdateStrategy{PodUpdatePolicy: appsv1alpha1.CollaSetRecreatePodUpdateStrategyType})
@@ -1076,6 +1076,109 @@ var _ = SIGDescribe("CollaSet", func() {
 			}
 		})
 
+		framework.ConformanceIt("scaleIn origin pod before new pod service available", func() {
+			cls := tester.NewCollaSet("collaset-"+randStr, 1, appsv1alpha1.UpdateStrategy{})
+			// use bad image to mock new replace pod unavailable
+			cls.Spec.Template.Spec.Containers[0].Image = "nginx:non-exist"
+			Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
+
+			By("Wait for status replicas satisfied")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 1, 0, 0, 1, 1) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Replace pod by label")
+			pods, err := tester.ListPodsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			podToReplace := pods[0]
+			Expect(tester.UpdatePod(podToReplace, func(pod *v1.Pod) {
+				pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] = "true"
+			})).NotTo(HaveOccurred())
+
+			By("Wait for replace new pod created")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 0, 0, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Selective scaleIn origin pod")
+			Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
+				cls.Spec.Replicas = int32Pointer(0)
+				cls.Spec.ScaleStrategy = appsv1alpha1.ScaleStrategy{
+					PodToDelete: []string{podToReplace.Name},
+				}
+			})).NotTo(HaveOccurred())
+
+			By("Wait for pods deleted")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 0, 0, 0, 0, 0) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Check resourceContext")
+			var currResourceContexts []*appsv1alpha1.ResourceContext
+			Eventually(func() bool {
+				currResourceContexts, err = tester.ListResourceContextsForCollaSet(cls)
+				Expect(err).Should(BeNil())
+				return len(currResourceContexts) == 0
+			}, 30*time.Second, 3*time.Second).Should(BeTrue())
+		})
+
+		framework.ConformanceIt("scaleIn new pod", func() {
+			cls := tester.NewCollaSet("collaset-"+randStr, 1, appsv1alpha1.UpdateStrategy{})
+			// use bad image to mock new replace pod unavailable
+			cls.Spec.Template.Spec.Containers[0].Image = "nginx:non-exist"
+			Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
+
+			By("Wait for status replicas satisfied")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 1, 0, 0, 1, 1) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Replace pod by label")
+			pods, err := tester.ListPodsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			podToReplace := pods[0]
+			Expect(tester.UpdatePod(podToReplace, func(pod *v1.Pod) {
+				pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] = "true"
+			})).NotTo(HaveOccurred())
+
+			By("Wait for replace new pod created")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 0, 0, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Selective scaleIn new pod")
+			pods, err = tester.ListPodsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			var newPod *v1.Pod
+			for _, pod := range pods {
+				if pod.Name != podToReplace.Name {
+					newPod = pod
+				}
+			}
+			Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
+				cls.Spec.Replicas = int32Pointer(0)
+				cls.Spec.ScaleStrategy = appsv1alpha1.ScaleStrategy{
+					PodToDelete: []string{newPod.Name},
+				}
+			})).NotTo(HaveOccurred())
+
+			By("Wait for CollaSet reconciled")
+			Eventually(func() bool {
+				if err := tester.GetCollaSet(cls); err != nil {
+					return false
+				}
+				return cls.Generation == cls.Status.ObservedGeneration
+			}, 10*time.Second, 3*time.Second).Should(Equal(true))
+
+			By("New pod will not be deleted")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 0, 0, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Mock new pod service available")
+			Expect(tester.UpdatePod(newPod, func(pod *v1.Pod) {
+				newPod.Labels[appsv1alpha1.PodServiceAvailableLabel] = "true"
+			})).NotTo(HaveOccurred())
+
+			By("Wait for pods are deleted")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 0, 0, 0, 0, 0) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Check resourceContext")
+			var currResourceContexts []*appsv1alpha1.ResourceContext
+			Eventually(func() bool {
+				currResourceContexts, err = tester.ListResourceContextsForCollaSet(cls)
+				Expect(err).Should(BeNil())
+				return len(currResourceContexts) == 0
+			}, 30*time.Second, 3*time.Second).Should(BeTrue())
+		})
 	})
 })
 

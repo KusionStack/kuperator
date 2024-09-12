@@ -39,6 +39,7 @@ import (
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration"
+	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 )
 
 const (
@@ -73,7 +74,9 @@ func (r *RealSyncControl) cleanReplacePodLabels(
 					originPodContext.Remove(ReplaceNewPodIDContextDataKey)
 					needDeletePodsIDs.Insert(strconv.Itoa(originPodContext.ID))
 				}
-				ownedIDs[newPodId].Remove(ReplaceOriginPodIDContextDataKey)
+				if contextDetail, exist := ownedIDs[newPodId]; exist {
+					contextDetail.Remove(ReplaceOriginPodIDContextDataKey)
+				}
 			}
 			// replace canceled, (1) remove ReplaceNewPodID, ReplaceOriginPodID key from IDs, (2) try to delete new Pod's ID
 			_, replaceIndicate := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
@@ -84,7 +87,9 @@ func (r *RealSyncControl) cleanReplacePodLabels(
 					newPodContext.Remove(ReplaceOriginPodIDContextDataKey)
 					needDeletePodsIDs.Insert(strconv.Itoa(newPodContext.ID))
 				}
-				ownedIDs[originPodId].Remove(ReplaceNewPodIDContextDataKey)
+				if contextDetail, exist := ownedIDs[originPodId]; exist {
+					contextDetail.Remove(ReplaceNewPodIDContextDataKey)
+				}
 			}
 		}
 		// patch to bytes
@@ -136,6 +141,9 @@ func (r *RealSyncControl) replaceOriginPods(
 			instanceId = fmt.Sprintf("%d", newPodContext.ID)
 			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
 		} else {
+			if availableContexts[i] == nil {
+				return fmt.Errorf("cannot found available context for replace new pod when replacing origin pod %s/%s", originPod.Namespace, originPod.Name)
+			}
 			newPodContext = availableContexts[i]
 			// add replace pair-relation to podContexts for originPod and newPod
 			instanceId = fmt.Sprintf("%d", newPodContext.ID)
@@ -200,7 +208,13 @@ func dealReplacePods(pods []*corev1.Pod) (needReplacePods []*corev1.Pod, needCle
 		if _, exist := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist {
 			continue
 		}
+
 		replaceIndicateCount++
+
+		// origin pod is about to scaleIn, skip replace
+		if podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, pod) {
+			continue
+		}
 
 		// pod is replace new created pod, skip replace
 		if originPodName, exist := pod.Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
@@ -346,11 +360,6 @@ func classifyPodReplacingMapping(podWrappers []*collasetutils.PodWrapper) map[st
 	var replacePodMapping = make(map[string]*collasetutils.PodWrapper)
 	for _, podWrapper := range podWrappers {
 		name := podWrapper.Name
-		if podWrapper.DeletionTimestamp != nil {
-			replacePodMapping[name] = nil
-			continue
-		}
-
 		if replacePairNewIdStr, exist := podWrapper.Labels[appsv1alpha1.PodReplacePairNewId]; exist {
 			if pairNewPod, exist := podIdMap[replacePairNewIdStr]; exist {
 				replacePodMapping[name] = pairNewPod

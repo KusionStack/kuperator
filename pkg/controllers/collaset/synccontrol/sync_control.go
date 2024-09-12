@@ -157,8 +157,11 @@ func (r *RealSyncControl) SyncPods(
 				idToReclaim.Insert(id)
 			}
 
-			// 2. filter out Pods which are terminating
-			continue
+			_, replaceIndicate := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
+			// 2. filter out Pods which are terminating and not replace indicate
+			if !replaceIndicate {
+				continue
+			}
 		}
 
 		// delete unused pvcs
@@ -455,9 +458,9 @@ func (r *RealSyncControl) Scale(
 			}
 
 			// if Pod is allowed to operate or Pod has already been deleted, promte to delete Pod
-			if podWrapper.ID >= 0 && !ownedIDs[podWrapper.ID].Contains(ScaleInContextDataKey, "true") {
+			if contextDetail, exist := ownedIDs[podWrapper.ID]; exist && !contextDetail.Contains(ScaleInContextDataKey, "true") {
 				needUpdateContext = true
-				ownedIDs[podWrapper.ID].Put(ScaleInContextDataKey, "true")
+				contextDetail.Put(ScaleInContextDataKey, "true")
 			}
 
 			if podWrapper.DeletionTimestamp != nil {
@@ -521,9 +524,10 @@ func (r *RealSyncControl) Scale(
 	// reset ContextDetail.ScalingIn, if there are Pods had its PodOpsLifecycle reverted
 	needUpdatePodContext := false
 	for _, podWrapper := range activePods {
-		if !podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, podWrapper) && ownedIDs[podWrapper.ID].Contains(ScaleInContextDataKey, "true") {
+		if contextDetail, exist := ownedIDs[podWrapper.ID]; exist && contextDetail.Contains(ScaleInContextDataKey, "true") &&
+			!podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, podWrapper) {
 			needUpdatePodContext = true
-			ownedIDs[podWrapper.ID].Remove(ScaleInContextDataKey)
+			contextDetail.Remove(ScaleInContextDataKey)
 		}
 	}
 
@@ -645,6 +649,10 @@ func (r *RealSyncControl) Update(
 			continue
 		}
 
+		if podInfo.DeletionTimestamp != nil {
+			continue
+		}
+
 		if podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, podInfo) {
 			continue
 		}
@@ -712,7 +720,7 @@ func (r *RealSyncControl) Update(
 	succCount, err = controllerutils.SlowStartBatch(len(podUpdateInfos), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		podInfo := podUpdateInfos[i]
 
-		if !podInfo.isDuringOps || podInfo.PlaceHolder {
+		if !podInfo.isDuringOps || podInfo.PlaceHolder || podInfo.DeletionTimestamp != nil {
 			return nil
 		}
 

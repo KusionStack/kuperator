@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontext"
 	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontrol"
 	"kusionstack.io/kuperator/pkg/controllers/collaset/pvccontrol"
@@ -253,6 +254,10 @@ func calculateStatus(
 
 	activePods := synccontrol.FilterOutPlaceHolderPodWrappers(podWrappers)
 	for _, podWrapper := range activePods {
+		if podWrapper.DeletionTimestamp != nil {
+			continue
+		}
+
 		replicas++
 
 		isUpdated := false
