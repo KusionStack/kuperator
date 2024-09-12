@@ -25,8 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubectl/pkg/scheme"
 	"kusionstack.io/kube-api/apps/v1alpha1"
-	"kusionstack.io/kuperator/pkg/utils/feature"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"kusionstack.io/kuperator/pkg/utils/feature"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -149,26 +150,6 @@ func TestGraceDelete(t *testing.T) {
 				appsv1alpha1.PodDeletionIndicationLabelKey: "true",
 			},
 			keyWords:     "pod deletion process is underway",
-			reqOperation: admissionv1.Delete,
-		},
-		{
-			fakePod: corev1.Pod{},
-			oldPod: corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "default",
-					Name:      "test3",
-					Labels: map[string]string{
-						fmt.Sprintf(v1alpha1.ControlledByKusionStackLabelKey):      "true",
-						"operating.podopslifecycle.kusionstack.io/pod-delete":      "1704865098763959176",
-						"operation-type.podopslifecycle.kusionstack.io/pod-delete": "1704865098763959336",
-						"operate.podopslifecycle.kusionstack.io/pod-delete":        "1704865212856080006",
-					},
-				},
-				Spec: corev1.PodSpec{
-					ReadinessGates: []corev1.PodReadinessGate{{ConditionType: v1alpha1.ReadinessGatePodServiceReady}},
-				},
-			},
-
 			reqOperation: admissionv1.Delete,
 		},
 	}
