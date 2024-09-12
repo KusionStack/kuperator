@@ -457,14 +457,10 @@ func (r *RealSyncControl) Scale(
 				continue
 			}
 
-			if _, exist := ownedIDs[podWrapper.ID]; exist {
-				r.recorder.Eventf(cls, corev1.EventTypeWarning, "PodBeforeScaleIn", "pod %s/%s is not allowed to scaleIn because cannnot find context id %s in resourceContext", podWrapper.Namespace, podWrapper.Name, podWrapper.Labels[appsv1alpha1.PodInstanceIDLabelKey])
-			}
-
 			// if Pod is allowed to operate or Pod has already been deleted, promte to delete Pod
-			if podWrapper.ID >= 0 && !ownedIDs[podWrapper.ID].Contains(ScaleInContextDataKey, "true") {
+			if contextDetail, exist := ownedIDs[podWrapper.ID]; exist && !contextDetail.Contains(ScaleInContextDataKey, "true") {
 				needUpdateContext = true
-				ownedIDs[podWrapper.ID].Put(ScaleInContextDataKey, "true")
+				contextDetail.Put(ScaleInContextDataKey, "true")
 			}
 
 			if podWrapper.DeletionTimestamp != nil {
