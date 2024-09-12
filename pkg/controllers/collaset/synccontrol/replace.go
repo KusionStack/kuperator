@@ -209,12 +209,12 @@ func dealReplacePods(pods []*corev1.Pod) (needReplacePods []*corev1.Pod, needCle
 			continue
 		}
 
+		replaceIndicateCount++
+
 		// origin pod is about to scaleIn, skip replace
 		if podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, pod) {
 			continue
 		}
-
-		replaceIndicateCount++
 
 		// pod is replace new created pod, skip replace
 		if originPodName, exist := pod.Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
