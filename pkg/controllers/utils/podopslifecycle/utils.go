@@ -152,7 +152,7 @@ func checkOperationType(adapter LifecycleAdapter, obj client.Object) (val Operat
 	labelVal, ok = obj.GetLabels()[labelType]
 	val = OperationType(labelVal)
 
-	return
+	return val, val == adapter.GetType()
 }
 
 func checkOperate(adapter LifecycleAdapter, obj client.Object) (val string, ok bool) {
