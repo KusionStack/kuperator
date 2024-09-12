@@ -649,7 +649,7 @@ func (r *RealSyncControl) Update(
 			continue
 		}
 
-		if podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, podInfo) {
+		if podInfo.DeletionTimestamp != nil {
 			continue
 		}
 
@@ -720,7 +720,7 @@ func (r *RealSyncControl) Update(
 	succCount, err = controllerutils.SlowStartBatch(len(podUpdateInfos), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		podInfo := podUpdateInfos[i]
 
-		if !podInfo.isDuringOps || podInfo.PlaceHolder {
+		if !podInfo.isDuringOps || podInfo.PlaceHolder || podInfo.DeletionTimestamp != nil {
 			return nil
 		}
 
