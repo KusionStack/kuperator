@@ -649,6 +649,10 @@ func (r *RealSyncControl) Update(
 			continue
 		}
 
+		if podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, podInfo) {
+			continue
+		}
+
 		if podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, podInfo) {
 			continue
 		}
