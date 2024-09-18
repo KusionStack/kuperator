@@ -28,6 +28,9 @@ extends native Pod lifecycle with more phase, like `PreCheck`, `Preparing`, `Pos
 
 * Streamlined pod operation
 
+[**OperationJob**](https://www.kusionstack.io/kuperator/manuals/operationjob) performs one-shot operational tasks on a batch of pods,
+and provides scaffolding for pod operation.
+
 [**ResourceConsist**](https://www.kusionstack.io/kuperator/manuals/resourceconsist) framework offers 
 a graceful way to integrate resource management around Pods, like traffic control, into PodOpsLifecycle.
 
