@@ -235,7 +235,7 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob
 		return err
 	}
 
-	_, err = controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+	_, releaseErr := controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
 		err := actionHandler.ReleaseTarget(ctx, candidate, operationJob)
 		// mark candidate as failed if not finished
@@ -249,7 +249,9 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob
 		}
 		return err
 	})
-	return err
+	operationJob.Status = r.calculateStatus(operationJob, candidates)
+	updateErr := r.updateStatus(ctx, operationJob)
+	return controllerutils.AggregateErrors([]error{releaseErr, updateErr})
 }
 
 func (r *ReconcileOperationJob) cleanCandidateOpsLifecycle(ctx context.Context, forced bool, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
