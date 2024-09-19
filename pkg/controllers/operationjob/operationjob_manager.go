@@ -99,22 +99,20 @@ func (r *ReconcileOperationJob) listTargets(ctx context.Context, operationJob *a
 	return candidates, nil
 }
 
-func (r *ReconcileOperationJob) operateTargets(
-	ctx context.Context,
-	operator ActionHandler,
+func (r *ReconcileOperationJob) filterAllowOpsTargets(
 	candidates []*OpsCandidate,
 	enablePodOpsLifecycle bool,
-	operationJob *appsv1alpha1.OperationJob) error {
+	operationJob *appsv1alpha1.OperationJob) (allowOpsCandidates []*OpsCandidate, err error) {
 
-	_, opsErr := controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+	for i := range candidates {
 		candidate := candidates[i]
 
 		if IsCandidateOpsFinished(candidate) {
-			return nil
+			continue
 		}
 
 		if enablePodOpsLifecycle && candidate.Pod == nil {
-			return nil
+			continue
 		}
 
 		var isDuringOps, isAllowedOps bool
@@ -123,22 +121,22 @@ func (r *ReconcileOperationJob) operateTargets(
 			isDuringOps = podopslifecycle.IsDuringOps(lifecycleAdapter, candidate.Pod)
 			_, isAllowedOps = podopslifecycle.AllowOps(lifecycleAdapter, ptr.Deref(operationJob.Spec.OperationDelaySeconds, 0), candidate.Pod)
 		} else {
-			// just ignore if opsLifecycle not enabled, i.e., Replace.
+			// if opsLifecycle not enabled, target pod is always allowOps
 			isDuringOps = false
 			isAllowedOps = true
 		}
 
-		// 1. begin opsLifecycle if necessary
 		if IsCandidateOpsPending(candidate) {
 			if enablePodOpsLifecycle {
 				if isDuringOps {
 					candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 				} else {
 					r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "PodOpsLifecycle", "try to begin PodOpsLifecycle for %s", operationJob.Spec.Action)
-					if updated, err := ojutils.BeginOperateLifecycle(r.Client, lifecycleAdapter, candidate.Pod); err != nil {
-						return err
+					if updated, updateErr := ojutils.BeginOperateLifecycle(r.Client, lifecycleAdapter, candidate.Pod); err != nil {
+						err = controllerutils.AggregateErrors([]error{err, updateErr})
+						continue
 					} else if !updated {
-						return nil
+						continue
 					} else {
 						candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 					}
@@ -148,18 +146,31 @@ func (r *ReconcileOperationJob) operateTargets(
 			}
 		}
 
-		// 2. try to do real operation
 		if isAllowedOps {
-			err := operator.OperateTarget(ctx, candidate, operationJob)
-			if err != nil {
-				return err
-			}
+			allowOpsCandidates = append(allowOpsCandidates, candidate)
 		}
+	}
+	return
+}
 
-		// 3. get ActionProgress
+func (r *ReconcileOperationJob) operateTargets(
+	ctx context.Context,
+	operator ActionHandler,
+	candidates []*OpsCandidate,
+	enablePodOpsLifecycle bool,
+	operationJob *appsv1alpha1.OperationJob) error {
+	var opsErr, updateErr error
+	// operate targets
+	if len(candidates) > 0 {
+		opsErr = operator.OperateTargets(ctx, candidates, operationJob)
+	}
+	// update targets status
+	_, updateErr = controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+		candidate := candidates[i]
+		// get action progress
 		actionProgress, err := operator.GetOpsProgress(ctx, candidate, operationJob)
 
-		// 4. clean opsLifecycle if action finished
+		// clean opsLifecycle if action operate finished
 		if enablePodOpsLifecycle {
 			var err error
 			if actionProgress == ActionProgressFailed {
@@ -172,7 +183,7 @@ func (r *ReconcileOperationJob) operateTargets(
 			}
 		}
 
-		// 5. transfer actionProgress to operationProgress
+		// transfer actionProgress to operationProgress
 		switch actionProgress {
 		case ActionProgressProcessing:
 			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
@@ -191,8 +202,7 @@ func (r *ReconcileOperationJob) operateTargets(
 		}
 		return err
 	})
-
-	return opsErr
+	return controllerutils.AggregateErrors([]error{opsErr, updateErr})
 }
 
 func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, operationJob *appsv1alpha1.OperationJob, logger logr.Logger) (bool, *time.Duration, error) {

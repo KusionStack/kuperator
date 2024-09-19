@@ -64,35 +64,39 @@ func (p *PodReplaceHandler) Setup(controller controller.Controller, reconcileMix
 	return controller.Watch(&source.Kind{Type: &corev1.Pod{}}, &OriginPodHandler{Client: reconcileMixin.Client})
 }
 
-func (p *PodReplaceHandler) OperateTarget(ctx context.Context, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
-	if candidate.Pod == nil {
+func (p *PodReplaceHandler) OperateTargets(ctx context.Context, candidates []*OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
+	_, opsErr := controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+		candidate := candidates[i]
+		if candidate.Pod == nil {
+			return nil
+		}
+
+		// parse replace information from origin pod
+		_, replaceIndicated := candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
+		_, replaceByReplaceUpdate := candidate.Pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
+		_, replaceNewPodExists := candidate.Pod.Labels[appsv1alpha1.PodReplacePairNewId]
+
+		// label pod to trigger replace
+		replaceTriggered := replaceIndicated || replaceByReplaceUpdate || replaceNewPodExists
+		if !replaceTriggered {
+			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, true)))
+			// add finalizer on origin pod before trigger replace
+			if err := controllerutils.AddFinalizer(ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
+				retErr := fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
+				ojutils.SetOpsStatusError(candidate, ReasonUpdateObjectFailed, retErr.Error())
+				return retErr
+			}
+			if err := p.client.Patch(ctx, candidate.Pod, patch); err != nil {
+				retErr := fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %s", candidate.Pod.Namespace, candidate.Pod.Name, err)
+				ojutils.SetOpsStatusError(candidate, ReasonUpdateObjectFailed, retErr.Error())
+				return retErr
+			}
+			p.recorder.Eventf(operationJob, corev1.EventTypeNormal, "ReplaceOriginPod", fmt.Sprintf("Succeeded to trigger originPod %s/%s to replace", operationJob.Namespace, candidate.Pod.Name))
+		}
 		return nil
-	}
+	})
 
-	// parse replace information from origin pod
-	_, replaceIndicated := candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
-	_, replaceByReplaceUpdate := candidate.Pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
-	_, replaceNewPodExists := candidate.Pod.Labels[appsv1alpha1.PodReplacePairNewId]
-
-	// label pod to trigger replace
-	replaceTriggered := replaceIndicated || replaceByReplaceUpdate || replaceNewPodExists
-	if !replaceTriggered {
-		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, true)))
-		// add finalizer on origin pod before trigger replace
-		if err := controllerutils.AddFinalizer(ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
-			retErr := fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
-			ojutils.SetOpsStatusError(candidate, ReasonUpdateObjectFailed, retErr.Error())
-			return retErr
-		}
-		if err := p.client.Patch(ctx, candidate.Pod, patch); err != nil {
-			retErr := fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %s", candidate.Pod.Namespace, candidate.Pod.Name, err)
-			ojutils.SetOpsStatusError(candidate, ReasonUpdateObjectFailed, retErr.Error())
-			return retErr
-		}
-		p.recorder.Eventf(operationJob, corev1.EventTypeNormal, "ReplaceOriginPod", fmt.Sprintf("Succeeded to trigger originPod %s/%s to replace", operationJob.Namespace, candidate.Pod.Name))
-	}
-
-	return nil
+	return opsErr
 }
 
 func (p *PodReplaceHandler) GetOpsProgress(ctx context.Context, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) (progress ActionProgress, err error) {
