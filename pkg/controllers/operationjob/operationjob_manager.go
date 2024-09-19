@@ -159,6 +159,7 @@ func (r *ReconcileOperationJob) operateTargets(
 	candidates []*OpsCandidate,
 	enablePodOpsLifecycle bool,
 	operationJob *appsv1alpha1.OperationJob) error {
+
 	var opsErr, updateErr error
 	// operate targets
 	if len(candidates) > 0 {
@@ -246,24 +247,22 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob
 	if err != nil {
 		return err
 	}
-
-	_, releaseErr := controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+	err = actionHandler.ReleaseTargets(ctx, candidates, operationJob)
+	for i := range candidates {
 		candidate := candidates[i]
-		err := actionHandler.ReleaseTarget(ctx, candidate, operationJob)
+		// cancel lifecycle if necessary
+		if enablePodOpsLifecycle {
+			cleanErr := r.cleanCandidateOpsLifecycle(ctx, true, candidate, operationJob)
+			err = controllerutils.AggregateErrors([]error{err, cleanErr})
+		}
 		// mark candidate as failed if not finished
 		if IsCandidateOpsFinished(candidate) {
 			return nil
 		}
 		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
-		// cancel lifecycle if necessary
-		if enablePodOpsLifecycle {
-			return r.cleanCandidateOpsLifecycle(ctx, true, candidate, operationJob)
-		}
-		return err
-	})
-	operationJob.Status = r.calculateStatus(operationJob, candidates)
-	updateErr := r.updateStatus(ctx, operationJob)
-	return controllerutils.AggregateErrors([]error{releaseErr, updateErr})
+	}
+	return err
+
 }
 
 func (r *ReconcileOperationJob) cleanCandidateOpsLifecycle(ctx context.Context, forced bool, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {

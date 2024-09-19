@@ -44,6 +44,6 @@ type ActionHandler interface {
 	// GetOpsProgress returns target's current opsStatus, e.g., progress, reason, message
 	GetOpsProgress(context.Context, *OpsCandidate, *appsv1alpha1.OperationJob) (progress ActionProgress, err error)
 
-	// ReleaseTarget releases the target from operation when the operationJob is deleted
-	ReleaseTarget(context.Context, *OpsCandidate, *appsv1alpha1.OperationJob) error
+	// ReleaseTargets releases the target from operation when the operationJob is deleted
+	ReleaseTargets(context.Context, []*OpsCandidate, *appsv1alpha1.OperationJob) error
 }

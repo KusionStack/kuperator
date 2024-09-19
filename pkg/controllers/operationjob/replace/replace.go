@@ -65,7 +65,7 @@ func (p *PodReplaceHandler) Setup(controller controller.Controller, reconcileMix
 }
 
 func (p *PodReplaceHandler) OperateTargets(ctx context.Context, candidates []*OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
-	_, opsErr := controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+	_, err := controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
 		if candidate.Pod == nil {
 			return nil
@@ -95,8 +95,7 @@ func (p *PodReplaceHandler) OperateTargets(ctx context.Context, candidates []*Op
 		}
 		return nil
 	})
-
-	return opsErr
+	return err
 }
 
 func (p *PodReplaceHandler) GetOpsProgress(ctx context.Context, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) (progress ActionProgress, err error) {
@@ -170,36 +169,40 @@ func (p *PodReplaceHandler) GetOpsProgress(ctx context.Context, candidate *OpsCa
 	return
 }
 
-func (p *PodReplaceHandler) ReleaseTarget(ctx context.Context, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
-	if candidate.Pod == nil || candidate.Pod.DeletionTimestamp != nil {
+func (p *PodReplaceHandler) ReleaseTargets(ctx context.Context, candidates []*OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
+	_, err := controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+		candidate := candidates[i]
+		if candidate.Pod == nil || candidate.Pod.DeletionTimestamp != nil {
+			return nil
+		}
+
+		if _, exist := candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist {
+			return nil
+		}
+
+		// try to remove replace label from origin pod
+		patchOperation := map[string]string{
+			"op":   "remove",
+			"path": fmt.Sprintf("/metadata/labels/%s", strings.ReplaceAll(appsv1alpha1.PodReplaceIndicationLabelKey, "/", "~1")),
+		}
+
+		patchBytes, err := json.Marshal([]map[string]string{patchOperation})
+		if err != nil {
+			return err
+		}
+
+		if err := controllerutils.RemoveFinalizer(ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
+			retErr := fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
+			ojutils.SetOpsStatusError(candidate, ReasonUpdateObjectFailed, retErr.Error())
+			return retErr
+		}
+
+		if err := p.client.Patch(ctx, candidate.Pod, client.RawPatch(types.JSONPatchType, patchBytes)); err != nil {
+			retErr := fmt.Errorf("fail patch pod %s/%s with %s : %s", candidate.Pod.Namespace, candidate.Pod.Name, patchBytes, err.Error())
+			ojutils.SetOpsStatusError(candidate, ReasonUpdateObjectFailed, retErr.Error())
+			return retErr
+		}
 		return nil
-	}
-
-	if _, exist := candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist {
-		return nil
-	}
-
-	// try to remove replace label from origin pod
-	patchOperation := map[string]string{
-		"op":   "remove",
-		"path": fmt.Sprintf("/metadata/labels/%s", strings.ReplaceAll(appsv1alpha1.PodReplaceIndicationLabelKey, "/", "~1")),
-	}
-
-	patchBytes, err := json.Marshal([]map[string]string{patchOperation})
-	if err != nil {
-		return err
-	}
-
-	if err := controllerutils.RemoveFinalizer(ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
-		retErr := fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
-		ojutils.SetOpsStatusError(candidate, ReasonUpdateObjectFailed, retErr.Error())
-		return retErr
-	}
-
-	if err := p.client.Patch(ctx, candidate.Pod, client.RawPatch(types.JSONPatchType, patchBytes)); err != nil {
-		retErr := fmt.Errorf("fail patch pod %s/%s with %s : %s", candidate.Pod.Namespace, candidate.Pod.Name, patchBytes, err.Error())
-		ojutils.SetOpsStatusError(candidate, ReasonUpdateObjectFailed, retErr.Error())
-		return retErr
-	}
-	return nil
+	})
+	return err
 }
