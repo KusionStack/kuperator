@@ -42,7 +42,7 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 		addReadinessGates(newPod, v1alpha1.ReadinessGatePodServiceReady)
 	}
 
-	newIDToLabelsMap, typeToNumsMap, err := podopslifecycle.PodIDAndTypesMap(newPod)
+	newIDToLabelsMap, typeToNumsMap, err := podopslifecycle.IDToLabelsMap(newPod)
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 	}
 
 	if operateCount == numOfIDs { // All operations are going to be done
-		oldIdToLabelsMap, _, err := podopslifecycle.PodIDAndTypesMap(oldPod)
+		oldIdToLabelsMap, _, err := podopslifecycle.IDToLabelsMap(oldPod)
 		if err != nil {
 			return err
 		}
