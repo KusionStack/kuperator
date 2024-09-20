@@ -262,7 +262,6 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob
 		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
 	}
 	return err
-
 }
 
 func (r *ReconcileOperationJob) cleanCandidateOpsLifecycle(ctx context.Context, forced bool, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
