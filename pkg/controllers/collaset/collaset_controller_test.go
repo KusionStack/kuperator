@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -50,6 +51,7 @@ import (
 
 	"kusionstack.io/kuperator/pkg/controllers/collaset/synccontrol"
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
+	"kusionstack.io/kuperator/pkg/controllers/poddecoration"
 	"kusionstack.io/kuperator/pkg/controllers/poddeletion"
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/strategy"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
@@ -3139,6 +3141,141 @@ var _ = Describe("collaset controller", func() {
 		}, 5*time.Second, 1*time.Second).Should(BeTrue())
 	})
 
+	It("clean up CollaSet with PodDecoration", func() {
+		testcase := "test-collaset-cleanup-with-poddecoration"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+
+		cs := &appsv1alpha1.CollaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.CollaSetSpec{
+				Replicas: int32Pointer(2),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "foo",
+								Image: "nginx:v1",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
+
+		podList := &corev1.PodList{}
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 2
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+
+		podDecoration := &appsv1alpha1.PodDecoration{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: cs.Namespace,
+				Name:      "pd-foo",
+			},
+			Spec: appsv1alpha1.PodDecorationSpec{
+				HistoryLimit: 5,
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Weight: int32Pointer(1),
+				UpdateStrategy: appsv1alpha1.PodDecorationUpdateStrategy{
+					RollingUpdate: &appsv1alpha1.PodDecorationRollingUpdate{
+						Partition: int32Pointer(0),
+					},
+				},
+				Template: appsv1alpha1.PodDecorationPodTemplate{
+					Containers: []*appsv1alpha1.ContainerPatch{
+						{
+							InjectPolicy: appsv1alpha1.AfterPrimaryContainer,
+							Container: corev1.Container{
+								Name:  "sidecar",
+								Image: imageutils.GetE2EImage(imageutils.Nginx),
+								Command: []string{
+									"sleep",
+									"2h",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		// allow Pod to do update
+		for i := range podList.Items {
+			pod := podList.Items[i]
+			Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+				return true
+			})).Should(BeNil())
+		}
+
+		Expect(c.Create(context.TODO(), podDecoration)).Should(BeNil())
+		Eventually(func() int32 {
+			err := c.Get(context.TODO(), types.NamespacedName{Namespace: podDecoration.Namespace, Name: podDecoration.Name}, podDecoration)
+			if !errors.IsNotFound(err) {
+				Expect(err).Should(BeNil())
+			}
+			return podDecoration.Status.UpdatedPods
+		}, 300*time.Second, 3*time.Second).Should(BeEquivalentTo(2))
+
+		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
+		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+		for i := range podList.Items {
+			Expect(len(podList.Items[i].OwnerReferences)).Should(BeEquivalentTo(2))
+		}
+
+		resourceContextList := &appsv1alpha1.ResourceContextList{}
+		Expect(c.List(context.TODO(), resourceContextList, client.InNamespace(testcase))).Should(BeNil())
+		Expect(len(resourceContextList.Items)).Should(BeEquivalentTo(1))
+		Expect(len(resourceContextList.Items[0].Spec.Contexts)).Should(BeEquivalentTo(2))
+
+		// delete this CollaSet
+		Expect(c.Delete(context.TODO(), cs)).Should(BeNil())
+		Eventually(func() bool {
+			if err := c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs); err != nil && errors.IsNotFound(err) {
+				return true
+			}
+
+			return false
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range podList.Items {
+				if len(podList.Items[i].OwnerReferences) != 1 && podList.Items[i].OwnerReferences[0].Kind == "CollaSet" {
+					return false
+				}
+			}
+			return true
+		}, 50*time.Second, 1*time.Second).Should(BeTrue())
+
+		rc := &resourceContextList.Items[0]
+		Eventually(func() bool {
+			err := c.Get(context.TODO(), types.NamespacedName{Namespace: rc.Namespace, Name: rc.Name}, rc)
+			return errors.IsNotFound(err)
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+	})
 })
 
 func expectedStatusReplicas(c client.Client, cls *appsv1alpha1.CollaSet, scheduledReplicas, readyReplicas, availableReplicas, replicas, updatedReplicas, operatingReplicas,
@@ -3284,6 +3421,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	r, request = testReconcile(poddeletion.NewReconciler(mgr))
 	err = poddeletion.AddToMgr(mgr, r)
+	r, request = testReconcile(poddecoration.NewReconciler(mgr))
+	err = poddecoration.AddToMgr(mgr, r)
 	Expect(err).NotTo(HaveOccurred())
 
 	go func() {
