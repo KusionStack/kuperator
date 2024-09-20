@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -157,6 +158,10 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if instance.DeletionTimestamp != nil {
 		if err := r.ensureReclaimPvcs(ctx, instance); err != nil {
 			// reclaim pvcs before remove finalizers
+			return ctrl.Result{}, err
+		}
+		if err := r.ensureReclaimPodOwnerReferences(instance); err != nil {
+			// reclaim pods ownerReferences before remove finalizers
 			return ctrl.Result{}, err
 		}
 		if controllerutil.ContainsFinalizer(instance, preReclaimFinalizer) {
@@ -359,4 +364,32 @@ func (r *CollaSetReconciler) ensureReclaimPvcs(ctx context.Context, cls *appsv1a
 		_, err = pvcControl.ReleasePvcsOwnerRef(cls, needReclaimPvcs)
 	}
 	return err
+}
+
+func (r *CollaSetReconciler) ensureReclaimPodOwnerReferences(cls *appsv1alpha1.CollaSet) error {
+	podControl := podcontrol.NewRealPodControl(r.Client, r.Scheme)
+	pods, err := podControl.GetFilteredPods(cls.Spec.Selector, cls)
+	if err != nil {
+		return fmt.Errorf("fail to get filtered Pods: %s", err)
+	}
+	// reclaim podDecoration ownerReferences on pods
+	for i := range pods {
+		if len(pods[i].OwnerReferences) == 0 {
+			continue
+		}
+		var newOwnerRefs []v1.OwnerReference
+		for j := range pods[i].OwnerReferences {
+			if pods[i].OwnerReferences[j].Kind == "PodDecoration" {
+				continue
+			}
+			newOwnerRefs = append(newOwnerRefs, pods[i].OwnerReferences[j])
+		}
+		if len(newOwnerRefs) != len(pods[i].OwnerReferences) {
+			pods[i].OwnerReferences = newOwnerRefs
+			if err := podControl.UpdatePod(pods[i]); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
