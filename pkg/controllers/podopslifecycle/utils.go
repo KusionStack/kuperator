@@ -26,8 +26,8 @@ import (
 	"kusionstack.io/kube-api/apps/v1alpha1"
 )
 
-// PodIDAndTypesMap returns a map of pod id to labels map and a map of operation type to number of pods.
-func PodIDAndTypesMap(pod *corev1.Pod) (map[string]map[string]string, map[string]int, error) {
+// IDToLabelsMap returns a map of pod id to labels map and a map of operation type to number of pods.
+func IDToLabelsMap(pod *corev1.Pod) (map[string]map[string]string, map[string]int, error) {
 	idToLabelsMap := map[string]map[string]string{}
 	typeToNumsMap := map[string]int{}
 
@@ -80,7 +80,7 @@ func IsLifecycleOnPod(lifecycleId string, pod *corev1.Pod) (bool, error) {
 	if pod == nil {
 		return false, nil
 	}
-	newIDToLabelsMap, _, err := PodIDAndTypesMap(pod)
+	newIDToLabelsMap, _, err := IDToLabelsMap(pod)
 	_, exist := newIDToLabelsMap[lifecycleId]
 	return exist, err
 }
@@ -90,6 +90,6 @@ func NumOfLifecycleOnPod(pod *corev1.Pod) (int, error) {
 	if pod == nil {
 		return 0, nil
 	}
-	newIDToLabelsMap, _, err := PodIDAndTypesMap(pod)
+	newIDToLabelsMap, _, err := IDToLabelsMap(pod)
 	return len(newIDToLabelsMap), err
 }

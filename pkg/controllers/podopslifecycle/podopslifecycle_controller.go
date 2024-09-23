@@ -39,7 +39,7 @@ import (
 	"kusionstack.io/kube-api/apps/v1alpha1"
 
 	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule"
-	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
+	controllersutils "kusionstack.io/kuperator/pkg/controllers/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	"kusionstack.io/kuperator/pkg/utils"
 	"kusionstack.io/kuperator/pkg/utils/mixin"
@@ -47,6 +47,10 @@ import (
 
 const (
 	controllerName = "podopslifecycle-controller"
+)
+
+var (
+	IsPodReadyFunc = controllersutils.IsPodReady
 )
 
 func Add(mgr manager.Manager) error {
@@ -126,7 +130,7 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 		return reconcile.Result{}, nil
 	}
 
-	idToLabelsMap, _, err := PodIDAndTypesMap(pod)
+	idToLabelsMap, _, err := IDToLabelsMap(pod)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -204,6 +208,13 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 			break
 		}
 	}
+
+	// Remove label service-available if pod is not ready
+	if !IsPodReadyFunc(pod) {
+		err := r.removeLabels(ctx, pod, []string{v1alpha1.PodServiceAvailableLabel})
+		return reconcile.Result{}, err
+	}
+
 	return reconcile.Result{}, nil
 }
 
@@ -217,7 +228,7 @@ func (r *ReconcilePodOpsLifecycle) addServiceAvailable(pod *corev1.Pod) (bool, e
 	}
 
 	// Whether all expected finalizers are satisfied
-	satisfied, notSatisfiedFinalizers, err := controllerutils.IsExpectedFinalizerSatisfied(pod)
+	satisfied, notSatisfiedFinalizers, err := controllersutils.IsExpectedFinalizerSatisfied(pod)
 	if err != nil {
 		return false, err
 	}
@@ -233,7 +244,7 @@ func (r *ReconcilePodOpsLifecycle) addServiceAvailable(pod *corev1.Pod) (bool, e
 		// All not satisfied finalizers are dirty, so actually the pod satisfied expected finalizers now
 	}
 
-	if !controllerutils.IsPodReady(pod) {
+	if !controllersutils.IsPodReady(pod) {
 		return false, nil
 	}
 
@@ -260,7 +271,7 @@ func (r *ReconcilePodOpsLifecycle) removeDirtyExpectedFinalizer(pod *corev1.Pod,
 	}
 
 	if len(dirtyExpectedFinalizer) > 0 {
-		podAvailableConditions, err := controllerutils.PodAvailableConditions(pod)
+		podAvailableConditions, err := controllersutils.PodAvailableConditions(pod)
 		if err != nil {
 			return allDirty, err
 		}
@@ -462,6 +473,32 @@ func (r *ReconcilePodOpsLifecycle) addLabels(ctx context.Context, pod *corev1.Po
 	return err
 }
 
+func (r *ReconcilePodOpsLifecycle) removeLabels(ctx context.Context, pod *corev1.Pod, labels []string) error {
+	if len(labels) == 0 {
+		return nil
+	}
+
+	key := controllerKey(pod)
+	r.expectation.ExpectUpdate(key, pod.ResourceVersion)
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		newPod := &corev1.Pod{}
+		err := r.Client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, newPod)
+		if err != nil {
+			return err
+		}
+		for _, label := range labels {
+			delete(newPod.Labels, label)
+		}
+		return r.Client.Update(ctx, newPod)
+	})
+	if err != nil {
+		r.Logger.Error(err, "failed to remove pod labels", "pod", utils.ObjectKeyString(pod), "labels", labels)
+		r.expectation.DeleteExpectations(key)
+	}
+
+	return err
+}
+
 func (r *ReconcilePodOpsLifecycle) initPodTransitionRuleManager() {
 	r.podTransitionRuleManager.RegisterStage(v1alpha1.PodOpsLifecyclePreCheckStage, func(po client.Object) bool {
 		labels := po.GetLabels()
@@ -472,7 +509,7 @@ func (r *ReconcilePodOpsLifecycle) initPodTransitionRuleManager() {
 		return labels != nil && labelHasPrefix(labels, v1alpha1.PodPostCheckLabelPrefix)
 	})
 	podtransitionrule.AddUnAvailableFunc(func(po *corev1.Pod) (bool, *int64) {
-		return !controllerutils.IsPodServiceAvailable(po), nil
+		return !controllersutils.IsPodServiceAvailable(po), nil
 	})
 }
 

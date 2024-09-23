@@ -43,6 +43,7 @@ import (
 
 	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule"
 	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/checker"
+	controllersutils "kusionstack.io/kuperator/pkg/controllers/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
@@ -86,6 +87,10 @@ var _ = BeforeSuite(func() {
 	r, request = testReconcile(podOpsLifecycle)
 	err = AddToMgr(mgr, r)
 	Expect(err).NotTo(HaveOccurred())
+
+	IsPodReadyFunc = func(pod *corev1.Pod) bool {
+		return true
+	}
 
 	go func() {
 		err = mgr.Start(ctx)
@@ -423,7 +428,7 @@ var _ = Describe("Stage processing", func() {
 			Spec: podSpec,
 		}
 
-		idToLabelsMap, _, err := PodIDAndTypesMap(pod)
+		idToLabelsMap, _, err := IDToLabelsMap(pod)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(idToLabelsMap)).To(Equal(2))
 		fmt.Println(idToLabelsMap)
@@ -459,7 +464,7 @@ var _ = Describe("Stage processing", func() {
 			Spec: podSpec,
 		}
 
-		idToLabelsMap, _, err := PodIDAndTypesMap(pod)
+		idToLabelsMap, _, err := IDToLabelsMap(pod)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(idToLabelsMap)).To(Equal(2))
 		fmt.Println(idToLabelsMap)
@@ -577,20 +582,41 @@ var _ = Describe("Label service-available processing", func() {
 	err := corev1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test1",
-			Namespace: "default",
-			Labels: map[string]string{
-				v1alpha1.ControlledByKusionStackLabelKey: "true",
+	pods := []client.Object{
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test0",
+				Namespace: "default",
+				Labels: map[string]string{
+					v1alpha1.ControlledByKusionStackLabelKey: "true",
+				},
+			},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+				Conditions: []corev1.PodCondition{
+					{
+						Type:   corev1.PodReady,
+						Status: corev1.ConditionTrue,
+					},
+				},
 			},
 		},
-		Status: corev1.PodStatus{
-			Phase: corev1.PodRunning,
-			Conditions: []corev1.PodCondition{
-				{
-					Type:   corev1.PodReady,
-					Status: corev1.ConditionTrue,
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test1",
+				Namespace: "default",
+				Labels: map[string]string{
+					v1alpha1.ControlledByKusionStackLabelKey: "true",
+					v1alpha1.PodServiceAvailableLabel:        "true",
+				},
+			},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodFailed,
+				Conditions: []corev1.PodCondition{
+					{
+						Type:   corev1.PodReady,
+						Status: corev1.ConditionFalse,
+					},
 				},
 			},
 		},
@@ -598,7 +624,7 @@ var _ = Describe("Label service-available processing", func() {
 
 	fakeClient := fake.NewClientBuilder().
 		WithScheme(scheme).
-		WithObjects(pod).
+		WithObjects(pods...).
 		Build()
 
 	podOpsLifecycle := &ReconcilePodOpsLifecycle{
@@ -606,10 +632,30 @@ var _ = Describe("Label service-available processing", func() {
 			Client: fakeClient,
 			Logger: klogr.New().WithName(controllerName),
 		},
-		expectation: expectations.NewResourceVersionExpectation(),
+		podTransitionRuleManager: &mockPodTransitionRuleManager{},
+		expectation:              expectations.NewResourceVersionExpectation(),
 	}
 
-	It("Service is available", func() {
+	It("Pod is ready", func() {
+		_, err := podOpsLifecycle.Reconcile(context.Background(), reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      "test0",
+				Namespace: "default",
+			},
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		pod1 := &corev1.Pod{}
+		fakeClient.Get(context.Background(), client.ObjectKey{
+			Name:      "test0",
+			Namespace: "default",
+		}, pod1)
+		Expect(pod1.Labels[v1alpha1.PodServiceAvailableLabel]).NotTo(BeEmpty())
+	})
+
+	It("Pod is not ready", func() {
+		IsPodReadyFunc = controllersutils.IsPodReady
+
 		_, err := podOpsLifecycle.Reconcile(context.Background(), reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Name:      "test1",
@@ -623,7 +669,11 @@ var _ = Describe("Label service-available processing", func() {
 			Name:      "test1",
 			Namespace: "default",
 		}, pod1)
-		Expect(pod1.Labels[v1alpha1.PodServiceAvailableLabel]).NotTo(BeEmpty())
+		Expect(pod1.Labels[v1alpha1.PodServiceAvailableLabel]).To(BeEmpty())
+
+		IsPodReadyFunc = func(pod *corev1.Pod) bool {
+			return true
+		}
 	})
 })
 

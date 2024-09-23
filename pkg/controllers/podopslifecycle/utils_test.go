@@ -31,7 +31,7 @@ var (
 	namespace = "default"
 )
 
-func TestPodIDAndTypesMap(t *testing.T) {
+func TestIDToLabelsMap(t *testing.T) {
 	casee := []struct {
 		keyWords string
 
@@ -162,7 +162,7 @@ func TestPodIDAndTypesMap(t *testing.T) {
 			},
 		}
 
-		idToLabelsMap, typeToNumsMap, err := PodIDAndTypesMap(pod)
+		idToLabelsMap, typeToNumsMap, err := IDToLabelsMap(pod)
 		if c.err != nil {
 			if err == nil {
 				t.Errorf("%s, expect err %v, got nil", c.keyWords, c.err)
