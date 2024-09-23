@@ -28,6 +28,8 @@ extends native Pod lifecycle with more phase, like `PreCheck`, `Preparing`, `Pos
 
 * Streamlined pod operation
 
+[**OperationJob**](https://www.kusionstack.io/kuperator/manuals/operationjob) controller provides scaffolding for pod operations, such as `Replace`.
+
 [**ResourceConsist**](https://www.kusionstack.io/kuperator/manuals/resourceconsist) framework offers 
 a graceful way to integrate resource management around Pods, like traffic control, into PodOpsLifecycle.
 
