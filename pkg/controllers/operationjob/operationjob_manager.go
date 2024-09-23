@@ -32,6 +32,7 @@ import (
 	"kusionstack.io/kuperator/pkg/controllers/operationjob/replace"
 	ojutils "kusionstack.io/kuperator/pkg/controllers/operationjob/utils"
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
+	ctrlutils "kusionstack.io/kuperator/pkg/controllers/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 )
 
@@ -149,6 +150,10 @@ func (r *ReconcileOperationJob) filterAndOperateAllowOpsTargets(
 			} else {
 				candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 			}
+			if candidate.OpsStatus.StartTimestamp == nil {
+				now := ctrlutils.FormatTimeNow()
+				candidate.OpsStatus.StartTimestamp = &now
+			}
 		}
 
 		if isAllowedOps {
@@ -237,27 +242,36 @@ func (r *ReconcileOperationJob) getTargetsOpsStatus(
 }
 
 // ensureActiveDeadlineAndTTL calculate time to ActiveDeadlineSeconds and TTLSecondsAfterFinished and release targets
-func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, operationJob *appsv1alpha1.OperationJob, logger logr.Logger) (bool, *time.Duration, error) {
-	isFailed := operationJob.Status.Progress == appsv1alpha1.OperationProgressFailed
-	isSucceeded := operationJob.Status.Progress == appsv1alpha1.OperationProgressSucceeded
-
+func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, operationJob *appsv1alpha1.OperationJob, candidates []*OpsCandidate, logger logr.Logger) (bool, *time.Duration, error) {
 	if operationJob.Spec.ActiveDeadlineSeconds != nil {
-		if !isFailed && !isSucceeded {
-			leftTime := time.Duration(*operationJob.Spec.ActiveDeadlineSeconds)*time.Second - time.Since(operationJob.CreationTimestamp.Time)
+		var allowReleaseCandidates []*OpsCandidate
+		for i := range candidates {
+			candidate := candidates[i]
+			// just skip if target operation already finished, or not started
+			if IsCandidateOpsFinished(candidate) || candidate.OpsStatus.StartTimestamp == nil {
+				continue
+			}
+			leftTime := time.Duration(*operationJob.Spec.ActiveDeadlineSeconds)*time.Second - time.Since(candidate.OpsStatus.StartTimestamp.Time)
 			if leftTime > 0 {
 				return false, &leftTime, nil
 			} else {
 				logger.Info("should end but still processing")
 				r.Recorder.Eventf(operationJob, corev1.EventTypeNormal, "Timeout", "Try to fail OperationJob for timeout...")
 				// mark operationjob and targets failed and release targets
-				ojutils.MarkOperationJobFailed(operationJob)
-				return false, nil, r.releaseTargets(ctx, operationJob)
+				MarkCandidateFailed(candidate)
+				allowReleaseCandidates = append(allowReleaseCandidates, candidate)
 			}
+		}
+		if len(allowReleaseCandidates) > 0 {
+			releaseErr := r.releaseTargets(ctx, operationJob, allowReleaseCandidates, false)
+			operationJob.Status = r.calculateStatus(operationJob, candidates)
+			updateErr := r.updateStatus(ctx, operationJob)
+			return false, nil, controllerutils.AggregateErrors([]error{releaseErr, updateErr})
 		}
 	}
 
 	if operationJob.Spec.TTLSecondsAfterFinished != nil {
-		if isFailed || isSucceeded {
+		if ojutils.IsJobFinished(operationJob) {
 			leftTime := time.Duration(*operationJob.Spec.TTLSecondsAfterFinished)*time.Second - time.Since(operationJob.Status.EndTimestamp.Time)
 			if leftTime > 0 {
 				return false, &leftTime, nil
@@ -269,13 +283,12 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, 
 			}
 		}
 	}
-
 	return false, nil, nil
 }
 
 // releaseTargets try to release the targets from operation when the operationJob is deleted
-func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob *appsv1alpha1.OperationJob) error {
-	actionHandler, enablePodOpsLifecycle, candidates, err := r.getActionHandlerAndTargets(ctx, operationJob)
+func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob *appsv1alpha1.OperationJob, candidates []*OpsCandidate, needUpdateStatus bool) error {
+	actionHandler, enablePodOpsLifecycle, err := r.getActionHandler(operationJob)
 	if err != nil {
 		return err
 	}
@@ -288,12 +301,14 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob
 			releaseErr = controllerutils.AggregateErrors([]error{releaseErr, err})
 		}
 		// mark candidate as failed if not finished
-		if IsCandidateOpsFinished(candidate) {
-			return nil
+		if !IsCandidateOpsFinished(candidate) {
+			candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
 		}
-		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
 		return nil
 	})
+	if !needUpdateStatus {
+		return releaseErr
+	}
 	operationJob.Status = r.calculateStatus(operationJob, candidates)
 	updateErr := r.updateStatus(ctx, operationJob)
 	return controllerutils.AggregateErrors([]error{releaseErr, updateErr})

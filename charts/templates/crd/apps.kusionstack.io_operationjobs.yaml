@@ -59,7 +59,7 @@ spec:
               activeDeadlineSeconds:
                 description: |-
                   Specify the duration in seconds relative to the startTime
-                  that the job may be active before the system tries to terminate it
+                  that the target may be active before the system tries to terminate it
                 format: int32
                 type: integer
               operationDelaySeconds:
@@ -142,6 +142,10 @@ spec:
                       type: string
                     progress:
                       description: operation progress of target pod
+                      type: string
+                    startTimestamp:
+                      description: target operation start time
+                      format: date-time
                       type: string
                   type: object
                 type: array
