@@ -160,11 +160,12 @@ func (r *ReconcileOperationJob) operateTargets(
 	enablePodOpsLifecycle bool,
 	operationJob *appsv1alpha1.OperationJob) error {
 
+	if len(candidates) == 0 {
+		return nil
+	}
 	var opsErr, updateErr error
 	// operate targets
-	if len(candidates) > 0 {
-		opsErr = operator.OperateTargets(ctx, candidates, operationJob)
-	}
+	opsErr = operator.OperateTargets(ctx, candidates, operationJob)
 	// update targets status
 	_, updateErr = controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
