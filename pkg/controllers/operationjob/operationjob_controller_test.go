@@ -236,7 +236,8 @@ var _ = Describe("operationjob controller", func() {
 					Expect(c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)).Should(BeNil())
 					replacingPod := 0
 					for i := range podList.Items {
-						if _, exist := podList.Items[i].Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
+						if name, exist := podList.Items[i].Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
+							Expect(name).Should(BeEquivalentTo(oj.Spec.Targets[partition-1].Name))
 							replacingPod++
 						}
 					}

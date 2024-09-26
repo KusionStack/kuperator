@@ -56,10 +56,12 @@ func (r *ReconcileOperationJob) getActionHandler(operationJob *appsv1alpha1.Oper
 func (r *ReconcileOperationJob) listTargets(ctx context.Context, operationJob *appsv1alpha1.OperationJob) ([]*OpsCandidate, error) {
 	var candidates []*OpsCandidate
 	podOpsStatusMap := ojutils.MapOpsStatusByPod(operationJob)
-	for _, target := range operationJob.Spec.Targets {
+	for idx := range operationJob.Spec.Targets {
+		target := operationJob.Spec.Targets[idx]
 		var candidate OpsCandidate
 		var pod corev1.Pod
 
+		candidate.Idx = idx
 		// fulfil target pod
 		candidate.PodName = target.Name
 		err := r.Client.Get(ctx, types.NamespacedName{Namespace: operationJob.Namespace, Name: target.Name}, &pod)
