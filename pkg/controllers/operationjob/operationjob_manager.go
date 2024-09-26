@@ -108,16 +108,16 @@ func (r *ReconcileOperationJob) filterAndOperateAllowOpsTargets(
 	enablePodOpsLifecycle bool,
 	operationJob *appsv1alpha1.OperationJob) (opsErr error) {
 
-	var allowOpsCandidates []*OpsCandidate
-	for i := range candidates {
+	allowOpsCandidatesCh := make(chan *OpsCandidate, len(candidates))
+	_, _ = controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
 
 		if IsCandidateOpsFinished(candidate) {
-			continue
+			return nil
 		}
 
 		if enablePodOpsLifecycle && candidate.Pod == nil {
-			continue
+			return nil
 		}
 
 		var isDuringOps, isAllowedOps bool
@@ -139,9 +139,9 @@ func (r *ReconcileOperationJob) filterAndOperateAllowOpsTargets(
 					r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, "PodOpsLifecycle", "try to begin PodOpsLifecycle for %s", operationJob.Spec.Action)
 					if updated, err := ojutils.BeginOperateLifecycle(r.Client, lifecycleAdapter, candidate.Pod); err != nil {
 						opsErr = controllerutils.AggregateErrors([]error{opsErr, err})
-						continue
+						return err
 					} else if !updated {
-						continue
+						return nil
 					} else {
 						candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 					}
@@ -152,10 +152,11 @@ func (r *ReconcileOperationJob) filterAndOperateAllowOpsTargets(
 		}
 
 		if isAllowedOps {
-			allowOpsCandidates = append(allowOpsCandidates, candidate)
+			allowOpsCandidatesCh <- candidate
 		}
-	}
-	err := r.operateTargets(ctx, operator, allowOpsCandidates, operationJob)
+		return nil
+	})
+	err := r.operateTargets(ctx, operator, convertChanToList(allowOpsCandidatesCh), operationJob)
 	return controllerutils.AggregateErrors([]error{opsErr, err})
 }
 
@@ -316,4 +317,13 @@ func (r *ReconcileOperationJob) cleanCandidateOpsLifecycle(ctx context.Context, 
 		r.Recorder.Eventf(candidate.Pod, corev1.EventTypeNormal, fmt.Sprintf("%sOpsLifecycleFinished", operationJob.Spec.Action), "pod %s/%s ops finished", candidate.Pod.Namespace, candidate.Pod.Name)
 	}
 	return nil
+}
+
+func convertChanToList(ch chan *OpsCandidate) []*OpsCandidate {
+	var l []*OpsCandidate
+	close(ch)
+	for c := range ch {
+		l = append(l, c)
+	}
+	return l
 }
