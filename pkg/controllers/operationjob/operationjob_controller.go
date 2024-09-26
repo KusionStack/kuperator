@@ -155,12 +155,12 @@ func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv
 
 	// operate targets by partition
 	selectedCandidates := DecideCandidateByPartition(instance, candidates)
-	// filter allow ops targets and operate them
-	allowOpsCandidates, filterErr := r.filterAllowOpsTargets(selectedCandidates, enablePodOpsLifecycle, instance)
-	opsErr := r.operateTargets(ctx, actionHandler, allowOpsCandidates, enablePodOpsLifecycle, instance)
+	// operate allow ops targets
+	opsErr := r.filterAndOperateAllowOpsTargets(ctx, actionHandler, selectedCandidates, enablePodOpsLifecycle, instance)
+	getErr := r.getTargetsOpsStatus(ctx, actionHandler, selectedCandidates, enablePodOpsLifecycle, instance)
 	// calculate opsStatus of all candidates
 	instance.Status = r.calculateStatus(instance, candidates)
-	return controllerutils.AggregateErrors([]error{filterErr, opsErr})
+	return controllerutils.AggregateErrors([]error{opsErr, getErr})
 }
 
 func (r *ReconcileOperationJob) calculateStatus(instance *appsv1alpha1.OperationJob, candidates []*OpsCandidate) (jobStatus appsv1alpha1.OperationJobStatus) {
