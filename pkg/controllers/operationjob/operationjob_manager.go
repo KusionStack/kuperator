@@ -53,6 +53,7 @@ func (r *ReconcileOperationJob) getActionHandler(operationJob *appsv1alpha1.Oper
 	return handler, enablePodOpsLifecycle, nil
 }
 
+// listTargets get real targets from operationJob.Spec.Targets
 func (r *ReconcileOperationJob) listTargets(ctx context.Context, operationJob *appsv1alpha1.OperationJob) ([]*OpsCandidate, error) {
 	var candidates []*OpsCandidate
 	podOpsStatusMap := ojutils.MapOpsStatusByPod(operationJob)
@@ -99,6 +100,7 @@ func (r *ReconcileOperationJob) listTargets(ctx context.Context, operationJob *a
 	return candidates, nil
 }
 
+// filterAllowOpsTargets get targets which are allowed to operate
 func (r *ReconcileOperationJob) filterAllowOpsTargets(
 	candidates []*OpsCandidate,
 	enablePodOpsLifecycle bool,
@@ -153,6 +155,7 @@ func (r *ReconcileOperationJob) filterAllowOpsTargets(
 	return
 }
 
+// operateTargets operate targets which are allowed to operate
 func (r *ReconcileOperationJob) operateTargets(
 	ctx context.Context,
 	operator ActionHandler,
@@ -207,6 +210,7 @@ func (r *ReconcileOperationJob) operateTargets(
 	return controllerutils.AggregateErrors([]error{opsErr, updateErr})
 }
 
+// ensureActiveDeadlineAndTTL calculate time to ActiveDeadlineSeconds and TTLSecondsAfterFinished and release targets
 func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, operationJob *appsv1alpha1.OperationJob, logger logr.Logger) (bool, *time.Duration, error) {
 	isFailed := operationJob.Status.Progress == appsv1alpha1.OperationProgressFailed
 	isSucceeded := operationJob.Status.Progress == appsv1alpha1.OperationProgressSucceeded
@@ -243,6 +247,7 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, 
 	return false, nil, nil
 }
 
+// releaseTargets try to release the targets from operation when the operationJob is deleted
 func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob *appsv1alpha1.OperationJob) error {
 	actionHandler, enablePodOpsLifecycle, candidates, err := r.getActionHandlerAndTargets(ctx, operationJob)
 	if err != nil {
@@ -265,6 +270,7 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob
 	return err
 }
 
+// cleanCandidateOpsLifecycle finishes lifecycle resources from target pod if forced==true gracefully, otherwise remove with force
 func (r *ReconcileOperationJob) cleanCandidateOpsLifecycle(ctx context.Context, forced bool, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
 	if candidate.Pod == nil {
 		return nil
