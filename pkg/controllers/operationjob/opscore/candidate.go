@@ -25,6 +25,7 @@ import (
 )
 
 type OpsCandidate struct {
+	Idx int
 	*corev1.Pod
 	PodName    string
 	Containers []string
@@ -62,7 +63,7 @@ func (o activeCandidateToStart) Less(i, j int) bool {
 	if lNotStarted != rNotStarted {
 		return rNotStarted
 	}
-	return true
+	return l.Idx < r.Idx
 }
 
 func IsCandidateOpsPending(candidate *OpsCandidate) bool {
