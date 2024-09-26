@@ -29,6 +29,11 @@ import (
 	ctrlutils "kusionstack.io/kuperator/pkg/controllers/utils"
 )
 
+const (
+	ReasonUpdateObjectFailed = "UpdateObjectFailed"
+	ReasonGetObjectFailed    = "GetObjectFailed"
+)
+
 func MarkOperationJobFailed(instance *appsv1alpha1.OperationJob) {
 	if instance.Status.Progress != appsv1alpha1.OperationProgressSucceeded {
 		now := ctrlutils.FormatTimeNow()

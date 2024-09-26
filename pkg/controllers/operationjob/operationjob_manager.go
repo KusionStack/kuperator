@@ -170,10 +170,14 @@ func (r *ReconcileOperationJob) operateTargets(
 	// operate targets
 	opsErr = operator.OperateTargets(ctx, candidates, operationJob)
 	// update targets status
-	_, updateErr = controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+	_, _ = controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
 		// get action progress
 		actionProgress, err := operator.GetOpsProgress(ctx, candidate, operationJob)
+		if err != nil {
+			updateErr = controllerutils.AggregateErrors([]error{updateErr, err})
+			return err
+		}
 
 		// clean opsLifecycle if action operate finished
 		if enablePodOpsLifecycle {
@@ -184,6 +188,8 @@ func (r *ReconcileOperationJob) operateTargets(
 				err = r.cleanCandidateOpsLifecycle(ctx, false, candidate, operationJob)
 			}
 			if err != nil {
+				ojutils.SetOpsStatusError(candidate, ojutils.ReasonUpdateObjectFailed, err.Error())
+				updateErr = controllerutils.AggregateErrors([]error{updateErr, err})
 				return err
 			}
 		}
