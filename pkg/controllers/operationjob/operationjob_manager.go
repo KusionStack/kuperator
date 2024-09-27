@@ -279,13 +279,13 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob
 	if err != nil {
 		return err
 	}
-	err = actionHandler.ReleaseTargets(ctx, candidates, operationJob)
+	releaseErr := actionHandler.ReleaseTargets(ctx, candidates, operationJob)
 	for i := range candidates {
 		candidate := candidates[i]
 		// cancel lifecycle if necessary
 		if enablePodOpsLifecycle {
-			cleanErr := r.cleanCandidateOpsLifecycle(ctx, true, candidate, operationJob)
-			err = controllerutils.AggregateErrors([]error{err, cleanErr})
+			err = r.cleanCandidateOpsLifecycle(ctx, true, candidate, operationJob)
+			releaseErr = controllerutils.AggregateErrors([]error{releaseErr, err})
 		}
 		// mark candidate as failed if not finished
 		if IsCandidateOpsFinished(candidate) {
@@ -293,7 +293,9 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob
 		}
 		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
 	}
-	return err
+	operationJob.Status = r.calculateStatus(operationJob, candidates)
+	updateErr := r.updateStatus(ctx, operationJob)
+	return controllerutils.AggregateErrors([]error{releaseErr, updateErr})
 }
 
 // cleanCandidateOpsLifecycle finishes lifecycle resources from target pod if forced==true gracefully, otherwise remove with force
