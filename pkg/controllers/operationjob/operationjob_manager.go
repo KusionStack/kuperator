@@ -280,7 +280,7 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob
 		return err
 	}
 	releaseErr := actionHandler.ReleaseTargets(ctx, candidates, operationJob)
-	for i := range candidates {
+	_, _ = controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
 		// cancel lifecycle if necessary
 		if enablePodOpsLifecycle {
@@ -292,7 +292,8 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob
 			return nil
 		}
 		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
-	}
+		return nil
+	})
 	operationJob.Status = r.calculateStatus(operationJob, candidates)
 	updateErr := r.updateStatus(ctx, operationJob)
 	return controllerutils.AggregateErrors([]error{releaseErr, updateErr})
