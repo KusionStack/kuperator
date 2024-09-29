@@ -321,7 +321,7 @@ func (r *RealSyncControl) Scale(
 				availableIDContext := availableContext[idx]
 				shouldInitPDContext := false
 				defer func() {
-					needUpdateContext = decideContextRevision(availableIDContext, resources.UpdatedRevision, err == nil) || shouldInitPDContext
+					needUpdateContext = decideContextRevision(availableIDContext, resources.UpdatedRevision, err == nil) || shouldInitPDContext || needUpdateContext
 				}()
 				// use revision recorded in Context
 				revision := resources.UpdatedRevision
