@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -316,12 +317,13 @@ func (r *RealSyncControl) Scale(
 			podInstanceIDSet := collasetutils.CollectPodInstanceID(activePods)
 			// find IDs and their contexts which have not been used by owned Pods
 			availableContext := extractAvailableContexts(diff, ownedIDs, podInstanceIDSet)
-			needUpdateContext := false
+			needUpdateContext := atomic.Bool{}
 			succCount, err := controllerutils.SlowStartBatch(diff, controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) (err error) {
 				availableIDContext := availableContext[idx]
-				shouldInitPDContext := false
 				defer func() {
-					needUpdateContext = decideContextRevision(availableIDContext, resources.UpdatedRevision, err == nil) || shouldInitPDContext
+					if decideContextRevision(availableIDContext, resources.UpdatedRevision, err == nil) {
+						needUpdateContext.Store(true)
+					}
 				}()
 				// use revision recorded in Context
 				revision := resources.UpdatedRevision
@@ -349,7 +351,7 @@ func (r *RealSyncControl) Scale(
 							if localErr != nil {
 								return localErr
 							}
-							shouldInitPDContext = true
+							needUpdateContext.Store(true)
 							availableIDContext.Put(podcontext.PodDecorationRevisionKey, anno.GetDecorationInfoString(pds))
 						} else {
 							// upgrade by recreate pod case
@@ -385,7 +387,7 @@ func (r *RealSyncControl) Scale(
 				// add an expectation for this pod creation, before next reconciling
 				return collasetutils.ActiveExpectations.ExpectCreate(cls, expectations.Pod, pod.Name)
 			})
-			if needUpdateContext {
+			if needUpdateContext.Load() {
 				logger.V(1).Info("try to update ResourceContext for CollaSet after scaling out")
 				if updateContextErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 					return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
@@ -599,9 +601,11 @@ func decideContextRevision(contextDetail *appsv1alpha1.ContextDetail, updatedRev
 		if contextDetail.Contains(podcontext.JustCreateContextDataKey, "true") {
 			// TODO choose just create pods' revision according to scaleStrategy
 			contextDetail.Put(podcontext.RevisionContextDataKey, updatedRevision.Name)
+			delete(contextDetail.Data, podcontext.PodDecorationRevisionKey)
 			needUpdateContext = true
 		} else if contextDetail.Contains(podcontext.RecreateUpdateContextDataKey, "true") {
 			contextDetail.Put(podcontext.RevisionContextDataKey, updatedRevision.Name)
+			delete(contextDetail.Data, podcontext.PodDecorationRevisionKey)
 			needUpdateContext = true
 		}
 		// if pod is delete and recreate, never change revisionKey

@@ -3237,7 +3237,7 @@ var _ = Describe("collaset controller", func() {
 				Expect(err).Should(BeNil())
 			}
 			return podDecoration.Status.UpdatedPods
-		}, 300*time.Second, 3*time.Second).Should(BeEquivalentTo(2))
+		}, 30*time.Second, 3*time.Second).Should(BeEquivalentTo(2))
 
 		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
 		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
@@ -3275,6 +3275,115 @@ var _ = Describe("collaset controller", func() {
 			err := c.Get(context.TODO(), types.NamespacedName{Namespace: rc.Namespace, Name: rc.Name}, rc)
 			return errors.IsNotFound(err)
 		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+	})
+
+	It("pod create failed with PodDecoration", func() {
+		testcase := "test-pod-create-failed-with-poddecoration"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+
+		// create a bad podDecoration
+		podDecoration := &appsv1alpha1.PodDecoration{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "pd-foo",
+			},
+			Spec: appsv1alpha1.PodDecorationSpec{
+				HistoryLimit: 5,
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Weight: int32Pointer(1),
+				UpdateStrategy: appsv1alpha1.PodDecorationUpdateStrategy{
+					RollingUpdate: &appsv1alpha1.PodDecorationRollingUpdate{
+						Partition: int32Pointer(0),
+					},
+				},
+				Template: appsv1alpha1.PodDecorationPodTemplate{
+					Containers: []*appsv1alpha1.ContainerPatch{
+						{
+							InjectPolicy: appsv1alpha1.AfterPrimaryContainer,
+							Container: corev1.Container{
+								Name:  "sidecar",
+								Image: imageutils.GetE2EImage(imageutils.Nginx),
+								Command: []string{
+									"sleep",
+									"2h",
+								},
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										Name:      "non-exist",
+										MountPath: "/non/exist",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		Expect(c.Create(context.TODO(), podDecoration)).Should(BeNil())
+
+		cs := &appsv1alpha1.CollaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.CollaSetSpec{
+				Replicas: int32Pointer(2),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "foo",
+								Image: "nginx:v1",
+							},
+						},
+					},
+				},
+			},
+		}
+		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
+
+		// create pod failed
+		Eventually(func() bool {
+			err := c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)
+			if errors.IsNotFound(err) {
+				return false
+			}
+			Expect(err).Should(BeNil())
+
+			for _, cond := range cs.Status.Conditions {
+				if cond.Reason == "ScaleOutFailed" {
+					return true
+				}
+			}
+			return false
+		}, 30*time.Second, 3*time.Second).Should(BeTrue())
+
+		// update podDecoration with good manner
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: podDecoration.Namespace, Name: podDecoration.Name}, podDecoration)).Should(BeNil())
+		podDecoration.Spec.Template.Containers[0].VolumeMounts = []corev1.VolumeMount{}
+		Expect(c.Update(ctx, podDecoration)).Should(BeNil())
+
+		// check pod create succeeded
+		podList := &corev1.PodList{}
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 2
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 	})
 })
 
