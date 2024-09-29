@@ -320,9 +320,8 @@ func (r *RealSyncControl) Scale(
 			needUpdateContext := atomic.Bool{}
 			succCount, err := controllerutils.SlowStartBatch(diff, controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) (err error) {
 				availableIDContext := availableContext[idx]
-				shouldInitPDContext := false
 				defer func() {
-					if decideContextRevision(availableIDContext, resources.UpdatedRevision, err == nil) || shouldInitPDContext {
+					if decideContextRevision(availableIDContext, resources.UpdatedRevision, err == nil) {
 						needUpdateContext.Store(true)
 					}
 				}()
@@ -352,7 +351,7 @@ func (r *RealSyncControl) Scale(
 							if localErr != nil {
 								return localErr
 							}
-							shouldInitPDContext = true
+							needUpdateContext.Store(true)
 							availableIDContext.Put(podcontext.PodDecorationRevisionKey, anno.GetDecorationInfoString(pds))
 						} else {
 							// upgrade by recreate pod case
