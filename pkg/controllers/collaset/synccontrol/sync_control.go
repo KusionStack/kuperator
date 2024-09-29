@@ -599,9 +599,11 @@ func decideContextRevision(contextDetail *appsv1alpha1.ContextDetail, updatedRev
 		if contextDetail.Contains(podcontext.JustCreateContextDataKey, "true") {
 			// TODO choose just create pods' revision according to scaleStrategy
 			contextDetail.Put(podcontext.RevisionContextDataKey, updatedRevision.Name)
+			delete(contextDetail.Data, podcontext.PodDecorationRevisionKey)
 			needUpdateContext = true
 		} else if contextDetail.Contains(podcontext.RecreateUpdateContextDataKey, "true") {
 			contextDetail.Put(podcontext.RevisionContextDataKey, updatedRevision.Name)
+			delete(contextDetail.Data, podcontext.PodDecorationRevisionKey)
 			needUpdateContext = true
 		}
 		// if pod is delete and recreate, never change revisionKey
