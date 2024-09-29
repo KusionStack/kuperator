@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -316,12 +317,14 @@ func (r *RealSyncControl) Scale(
 			podInstanceIDSet := collasetutils.CollectPodInstanceID(activePods)
 			// find IDs and their contexts which have not been used by owned Pods
 			availableContext := extractAvailableContexts(diff, ownedIDs, podInstanceIDSet)
-			needUpdateContext := false
+			needUpdateContext := atomic.Bool{}
 			succCount, err := controllerutils.SlowStartBatch(diff, controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) (err error) {
 				availableIDContext := availableContext[idx]
 				shouldInitPDContext := false
 				defer func() {
-					needUpdateContext = decideContextRevision(availableIDContext, resources.UpdatedRevision, err == nil) || shouldInitPDContext || needUpdateContext
+					if decideContextRevision(availableIDContext, resources.UpdatedRevision, err == nil) || shouldInitPDContext {
+						needUpdateContext.Store(true)
+					}
 				}()
 				// use revision recorded in Context
 				revision := resources.UpdatedRevision
@@ -385,7 +388,7 @@ func (r *RealSyncControl) Scale(
 				// add an expectation for this pod creation, before next reconciling
 				return collasetutils.ActiveExpectations.ExpectCreate(cls, expectations.Pod, pod.Name)
 			})
-			if needUpdateContext {
+			if needUpdateContext.Load() {
 				logger.V(1).Info("try to update ResourceContext for CollaSet after scaling out")
 				if updateContextErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 					return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
