@@ -188,6 +188,7 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		CollisionCount:  collisionCount,
 		CurrentRevision: currentRevision.Name,
 		UpdatedRevision: updatedRevision.Name,
+		Conditions:      instance.Status.Conditions,
 	}
 
 	getter, err := utilspoddecoration.NewPodDecorationGetter(r.Client, instance.Namespace)
