@@ -88,15 +88,13 @@ func SetOpsStatusError(candidate *opscore.OpsCandidate, reason string, message s
 	}
 }
 
-func UpdatePodWithRetry(ctx context.Context, c client.Client, obj client.Object) error {
+func UpdatePodWithRetry(ctx context.Context, c client.Client, obj client.Object, updateFn func(*corev1.Pod)) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		var updateErr error
-		if updateErr = c.Update(ctx, obj); updateErr == nil {
-			return nil
-		}
-		if err := c.Get(ctx, types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}, obj); err != nil {
+		pod := &corev1.Pod{}
+		if err := c.Get(ctx, types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}, pod); err != nil {
 			return err
 		}
-		return updateErr
+		updateFn(pod)
+		return c.Update(ctx, pod)
 	})
 }

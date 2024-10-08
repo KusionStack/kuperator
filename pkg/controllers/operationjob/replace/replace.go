@@ -73,11 +73,12 @@ func (p *PodReplaceHandler) OperateTargets(ctx context.Context, candidates []*Op
 		// label pod to trigger replace
 		replaceTriggered := replaceIndicated || replaceByReplaceUpdate || replaceNewPodExists
 		if !replaceTriggered {
-			// add replace indicate label on origin pod to trigger replace
-			candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] = "true"
-			// add finalizer on origin pod before trigger replace
-			controllerutil.AddFinalizer(candidate.Pod, OperationJobReplacePodFinalizer)
-			if err := ojutils.UpdatePodWithRetry(ctx, p.client, candidate.Pod); err != nil {
+			if err := ojutils.UpdatePodWithRetry(ctx, p.client, candidate.Pod, func(pod *corev1.Pod) {
+				// add replace indicate label on origin pod to trigger replace
+				pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] = "true"
+				// add finalizer on origin pod before trigger replace
+				controllerutil.AddFinalizer(pod, OperationJobReplacePodFinalizer)
+			}); err != nil {
 				retErr := fmt.Errorf("fail to add %s finalizer or replace indicate label to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
 				ojutils.SetOpsStatusError(candidate, ojutils.ReasonUpdateObjectFailed, retErr.Error())
 				return retErr
@@ -173,11 +174,12 @@ func (p *PodReplaceHandler) ReleaseTargets(ctx context.Context, candidates []*Op
 			return nil
 		}
 
-		// try to remove replace label from origin pod
-		delete(candidate.Pod.Labels, appsv1alpha1.PodReplaceIndicationLabelKey)
-		// try to remove finalizer from origin pod
-		controllerutil.RemoveFinalizer(candidate.Pod, OperationJobReplacePodFinalizer)
-		if err := ojutils.UpdatePodWithRetry(ctx, p.client, candidate.Pod); err != nil {
+		if err := ojutils.UpdatePodWithRetry(ctx, p.client, candidate.Pod, func(pod *corev1.Pod) {
+			// try to remove replace label from origin pod
+			delete(pod.Labels, appsv1alpha1.PodReplaceIndicationLabelKey)
+			// try to remove finalizer from origin pod
+			controllerutil.RemoveFinalizer(pod, OperationJobReplacePodFinalizer)
+		}); err != nil {
 			retErr := fmt.Errorf("fail to remove %s finalizer or replace indicate label from origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
 			ojutils.SetOpsStatusError(candidate, ojutils.ReasonUpdateObjectFailed, retErr.Error())
 			return retErr
