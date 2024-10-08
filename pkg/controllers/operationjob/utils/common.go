@@ -17,9 +17,12 @@ limitations under the License.
 package utils
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -27,6 +30,11 @@ import (
 
 	"kusionstack.io/kuperator/pkg/controllers/operationjob/opscore"
 	ctrlutils "kusionstack.io/kuperator/pkg/controllers/utils"
+)
+
+const (
+	ReasonUpdateObjectFailed = "UpdateObjectFailed"
+	ReasonGetObjectFailed    = "GetObjectFailed"
 )
 
 func MarkOperationJobFailed(instance *appsv1alpha1.OperationJob) {
@@ -78,4 +86,15 @@ func SetOpsStatusError(candidate *opscore.OpsCandidate, reason string, message s
 		Reason:  reason,
 		Message: message,
 	}
+}
+
+func UpdatePodWithRetry(ctx context.Context, c client.Client, obj client.Object, updateFn func(*corev1.Pod)) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		pod := &corev1.Pod{}
+		if err := c.Get(ctx, types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}, pod); err != nil {
+			return err
+		}
+		updateFn(pod)
+		return c.Update(ctx, pod)
+	})
 }

@@ -18,9 +18,7 @@ package replace
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -29,6 +27,7 @@ import (
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	. "kusionstack.io/kuperator/pkg/controllers/operationjob/opscore"
@@ -39,11 +38,6 @@ import (
 
 const (
 	OperationJobReplacePodFinalizer = "finalizer.operationjob.kusionstack.io/replace-protected"
-)
-
-const (
-	ReasonUpdateObjectFailed = "UpdateObjectFailed"
-	ReasonGetObjectFailed    = "GetObjectFailed"
 )
 
 var _ ActionHandler = &PodReplaceHandler{}
@@ -64,35 +58,36 @@ func (p *PodReplaceHandler) Setup(controller controller.Controller, reconcileMix
 	return controller.Watch(&source.Kind{Type: &corev1.Pod{}}, &OriginPodHandler{Client: reconcileMixin.Client})
 }
 
-func (p *PodReplaceHandler) OperateTarget(ctx context.Context, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
-	if candidate.Pod == nil {
+func (p *PodReplaceHandler) OperateTargets(ctx context.Context, candidates []*OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
+	_, err := controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+		candidate := candidates[i]
+		if candidate.Pod == nil {
+			return nil
+		}
+
+		// parse replace information from origin pod
+		_, replaceIndicated := candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
+		_, replaceByReplaceUpdate := candidate.Pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
+		_, replaceNewPodExists := candidate.Pod.Labels[appsv1alpha1.PodReplacePairNewId]
+
+		// label pod to trigger replace
+		replaceTriggered := replaceIndicated || replaceByReplaceUpdate || replaceNewPodExists
+		if !replaceTriggered {
+			if err := ojutils.UpdatePodWithRetry(ctx, p.client, candidate.Pod, func(pod *corev1.Pod) {
+				// add replace indicate label on origin pod to trigger replace
+				pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] = "true"
+				// add finalizer on origin pod before trigger replace
+				controllerutil.AddFinalizer(pod, OperationJobReplacePodFinalizer)
+			}); err != nil {
+				retErr := fmt.Errorf("fail to add %s finalizer or replace indicate label to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
+				ojutils.SetOpsStatusError(candidate, ojutils.ReasonUpdateObjectFailed, retErr.Error())
+				return retErr
+			}
+			p.recorder.Eventf(operationJob, corev1.EventTypeNormal, "ReplaceOriginPod", fmt.Sprintf("Succeeded to trigger originPod %s/%s to replace", operationJob.Namespace, candidate.Pod.Name))
+		}
 		return nil
-	}
-
-	// parse replace information from origin pod
-	_, replaceIndicated := candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
-	_, replaceByReplaceUpdate := candidate.Pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
-	_, replaceNewPodExists := candidate.Pod.Labels[appsv1alpha1.PodReplacePairNewId]
-
-	// label pod to trigger replace
-	replaceTriggered := replaceIndicated || replaceByReplaceUpdate || replaceNewPodExists
-	if !replaceTriggered {
-		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, true)))
-		// add finalizer on origin pod before trigger replace
-		if err := controllerutils.AddFinalizer(ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
-			retErr := fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
-			ojutils.SetOpsStatusError(candidate, ReasonUpdateObjectFailed, retErr.Error())
-			return retErr
-		}
-		if err := p.client.Patch(ctx, candidate.Pod, patch); err != nil {
-			retErr := fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %s", candidate.Pod.Namespace, candidate.Pod.Name, err)
-			ojutils.SetOpsStatusError(candidate, ReasonUpdateObjectFailed, retErr.Error())
-			return retErr
-		}
-		p.recorder.Eventf(operationJob, corev1.EventTypeNormal, "ReplaceOriginPod", fmt.Sprintf("Succeeded to trigger originPod %s/%s to replace", operationJob.Namespace, candidate.Pod.Name))
-	}
-
-	return nil
+	})
+	return err
 }
 
 func (p *PodReplaceHandler) GetOpsProgress(ctx context.Context, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) (progress ActionProgress, err error) {
@@ -135,7 +130,7 @@ func (p *PodReplaceHandler) GetOpsProgress(ctx context.Context, candidate *OpsCa
 				if candidate.Pod.DeletionTimestamp != nil {
 					if removeErr := controllerutils.RemoveFinalizer(ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); removeErr != nil {
 						err = fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, removeErr.Error())
-						ojutils.SetOpsStatusError(candidate, ReasonUpdateObjectFailed, err.Error())
+						ojutils.SetOpsStatusError(candidate, ojutils.ReasonUpdateObjectFailed, err.Error())
 						return
 					}
 				}
@@ -148,7 +143,7 @@ func (p *PodReplaceHandler) GetOpsProgress(ctx context.Context, candidate *OpsCa
 			newPod := &corev1.Pod{}
 			if getErr := p.client.Get(ctx, types.NamespacedName{Namespace: operationJob.Namespace, Name: newPodName}, newPod); getErr != nil {
 				err = fmt.Errorf("fail to find replace newPod %s/%s : %s", operationJob.Namespace, newPodName, getErr.Error())
-				ojutils.SetOpsStatusError(candidate, ReasonGetObjectFailed, err.Error())
+				ojutils.SetOpsStatusError(candidate, ojutils.ReasonGetObjectFailed, err.Error())
 				return
 			}
 			if _, serviceAvailable := newPod.Labels[appsv1alpha1.PodServiceAvailableLabel]; !serviceAvailable {
@@ -166,36 +161,30 @@ func (p *PodReplaceHandler) GetOpsProgress(ctx context.Context, candidate *OpsCa
 	return
 }
 
-func (p *PodReplaceHandler) ReleaseTarget(ctx context.Context, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
-	if candidate.Pod == nil || candidate.Pod.DeletionTimestamp != nil {
+func (p *PodReplaceHandler) ReleaseTargets(ctx context.Context, candidates []*OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
+	_, err := controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+		candidate := candidates[i]
+		if candidate.Pod == nil || candidate.Pod.DeletionTimestamp != nil {
+			return nil
+		}
+
+		// skip if replace is canceled and finalizer is removed
+		if _, exist := candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist &&
+			!controllerutils.ContainsFinalizer(candidate.Pod, OperationJobReplacePodFinalizer) {
+			return nil
+		}
+
+		if err := ojutils.UpdatePodWithRetry(ctx, p.client, candidate.Pod, func(pod *corev1.Pod) {
+			// try to remove replace label from origin pod
+			delete(pod.Labels, appsv1alpha1.PodReplaceIndicationLabelKey)
+			// try to remove finalizer from origin pod
+			controllerutil.RemoveFinalizer(pod, OperationJobReplacePodFinalizer)
+		}); err != nil {
+			retErr := fmt.Errorf("fail to remove %s finalizer or replace indicate label from origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
+			ojutils.SetOpsStatusError(candidate, ojutils.ReasonUpdateObjectFailed, retErr.Error())
+			return retErr
+		}
 		return nil
-	}
-
-	if _, exist := candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist {
-		return nil
-	}
-
-	// try to remove replace label from origin pod
-	patchOperation := map[string]string{
-		"op":   "remove",
-		"path": fmt.Sprintf("/metadata/labels/%s", strings.ReplaceAll(appsv1alpha1.PodReplaceIndicationLabelKey, "/", "~1")),
-	}
-
-	patchBytes, err := json.Marshal([]map[string]string{patchOperation})
-	if err != nil {
-		return err
-	}
-
-	if err := controllerutils.RemoveFinalizer(ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
-		retErr := fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
-		ojutils.SetOpsStatusError(candidate, ReasonUpdateObjectFailed, retErr.Error())
-		return retErr
-	}
-
-	if err := p.client.Patch(ctx, candidate.Pod, client.RawPatch(types.JSONPatchType, patchBytes)); err != nil {
-		retErr := fmt.Errorf("fail patch pod %s/%s with %s : %s", candidate.Pod.Namespace, candidate.Pod.Name, patchBytes, err.Error())
-		ojutils.SetOpsStatusError(candidate, ReasonUpdateObjectFailed, retErr.Error())
-		return retErr
-	}
-	return nil
+	})
+	return err
 }

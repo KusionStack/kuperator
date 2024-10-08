@@ -453,15 +453,49 @@ var _ = Describe("operationjob controller", func() {
 						Name: podNames[1],
 					},
 				},
-				ActiveDeadlineSeconds:   int32Pointer(5),
-				TTLSecondsAfterFinished: int32Pointer(10),
+				ActiveDeadlineSeconds:   int32Pointer(10),
+				TTLSecondsAfterFinished: int32Pointer(5),
 			},
 		}
 
 		Expect(c.Create(ctx, oj)).Should(BeNil())
 
+		// wait for new pod created
+		podList := &corev1.PodList{}
+		Eventually(func() bool {
+			Expect(c.List(ctx, podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 4
+		}, time.Second*10, time.Second).Should(BeTrue())
+
+		// mock only 1 new pod serviceAvailable
+		Expect(c.List(ctx, podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+		for i := range podList.Items {
+			if _, exist := podList.Items[i].Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
+				Expect(updatePodWithRetry(podList.Items[i].Namespace, podList.Items[i].Name, func(pod *corev1.Pod) bool {
+					pod.Labels[appsv1alpha1.PodServiceAvailableLabel] = "true"
+					return true
+				})).Should(BeNil())
+				break
+			}
+		}
+
+		// allow origin pod to be deleted
+		for i := range podList.Items {
+			pod := &podList.Items[i]
+			if _, exist := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
+				Expect(updatePodWithRetry(pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID())
+					pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+					pod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] = fmt.Sprintf("%d", time.Now().UnixNano())
+					return true
+				})).Should(BeNil())
+			}
+		}
+		assertSucceededReplicas(oj, 1, time.Second*10)
+
 		// wait for replace failed after ActiveDeadlineSeconds
 		assertJobProgressFailed(oj, time.Second*10)
+		assertFailedReplicas(oj, 1, time.Second*10)
 
 		// wait for operationJob deleted after TTL
 		Eventually(func() bool {
@@ -476,6 +510,18 @@ var _ = Describe("operationjob controller", func() {
 	})
 
 })
+
+func assertFailedReplicas(oj *appsv1alpha1.OperationJob, failedPodCount int32, timeout time.Duration) {
+	Eventually(func() bool {
+		err := c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
+		if errors.IsNotFound(err) {
+			return false
+		} else {
+			Expect(err).Should(BeNil())
+		}
+		return oj.Status.FailedPodCount == failedPodCount
+	}, timeout, time.Second).Should(BeTrue())
+}
 
 func assertSucceededReplicas(oj *appsv1alpha1.OperationJob, succeededPodCount int32, timeout time.Duration) {
 	Eventually(func() bool {
