@@ -27,6 +27,7 @@ import (
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	. "kusionstack.io/kuperator/pkg/controllers/operationjob/opscore"
@@ -74,8 +75,9 @@ func (p *PodReplaceHandler) OperateTargets(ctx context.Context, candidates []*Op
 		if !replaceTriggered {
 			// add replace indicate label on origin pod to trigger replace
 			candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] = "true"
-			// add finalizer on origin pod before trigger replace, note that AddFinalizer always do update pod
-			if err := controllerutils.AddFinalizer(ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
+			// add finalizer on origin pod before trigger replace
+			controllerutil.AddFinalizer(candidate.Pod, OperationJobReplacePodFinalizer)
+			if err := ojutils.UpdatePodWithRetry(ctx, p.client, candidate.Pod); err != nil {
 				retErr := fmt.Errorf("fail to add %s finalizer or replace indicate label to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
 				ojutils.SetOpsStatusError(candidate, ojutils.ReasonUpdateObjectFailed, retErr.Error())
 				return retErr
@@ -165,11 +167,17 @@ func (p *PodReplaceHandler) ReleaseTargets(ctx context.Context, candidates []*Op
 			return nil
 		}
 
+		// skip if replace is canceled and finalizer is removed
+		if _, exist := candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist &&
+			!controllerutils.ContainsFinalizer(candidate.Pod, OperationJobReplacePodFinalizer) {
+			return nil
+		}
+
 		// try to remove replace label from origin pod
 		delete(candidate.Pod.Labels, appsv1alpha1.PodReplaceIndicationLabelKey)
-
-		// try to remove finalizer from origin pod, note that RemoveFinalizer always do update pod
-		if err := controllerutils.RemoveFinalizer(ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
+		// try to remove finalizer from origin pod
+		controllerutil.RemoveFinalizer(candidate.Pod, OperationJobReplacePodFinalizer)
+		if err := ojutils.UpdatePodWithRetry(ctx, p.client, candidate.Pod); err != nil {
 			retErr := fmt.Errorf("fail to remove %s finalizer or replace indicate label from origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
 			ojutils.SetOpsStatusError(candidate, ojutils.ReasonUpdateObjectFailed, retErr.Error())
 			return retErr

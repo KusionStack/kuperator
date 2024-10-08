@@ -17,9 +17,12 @@ limitations under the License.
 package utils
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -83,4 +86,17 @@ func SetOpsStatusError(candidate *opscore.OpsCandidate, reason string, message s
 		Reason:  reason,
 		Message: message,
 	}
+}
+
+func UpdatePodWithRetry(ctx context.Context, c client.Client, obj client.Object) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var updateErr error
+		if updateErr = c.Update(ctx, obj); updateErr == nil {
+			return nil
+		}
+		if err := c.Get(ctx, types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}, obj); err != nil {
+			return err
+		}
+		return updateErr
+	})
 }
