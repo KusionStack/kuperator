@@ -18,9 +18,7 @@ package replace
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -74,15 +72,11 @@ func (p *PodReplaceHandler) OperateTargets(ctx context.Context, candidates []*Op
 		// label pod to trigger replace
 		replaceTriggered := replaceIndicated || replaceByReplaceUpdate || replaceNewPodExists
 		if !replaceTriggered {
-			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, true)))
-			// add finalizer on origin pod before trigger replace
+			// add replace indicate label on origin pod to trigger replace
+			candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] = "true"
+			// add finalizer on origin pod before trigger replace, note that AddFinalizer always do update pod
 			if err := controllerutils.AddFinalizer(ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
-				retErr := fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
-				ojutils.SetOpsStatusError(candidate, ojutils.ReasonUpdateObjectFailed, retErr.Error())
-				return retErr
-			}
-			if err := p.client.Patch(ctx, candidate.Pod, patch); err != nil {
-				retErr := fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %s", candidate.Pod.Namespace, candidate.Pod.Name, err)
+				retErr := fmt.Errorf("fail to add %s finalizer or replace indicate label to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
 				ojutils.SetOpsStatusError(candidate, ojutils.ReasonUpdateObjectFailed, retErr.Error())
 				return retErr
 			}
@@ -171,29 +165,14 @@ func (p *PodReplaceHandler) ReleaseTargets(ctx context.Context, candidates []*Op
 			return nil
 		}
 
-		if _, exist := candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; !exist {
-			return nil
-		}
-
 		// try to remove replace label from origin pod
-		patchOperation := map[string]string{
-			"op":   "remove",
-			"path": fmt.Sprintf("/metadata/labels/%s", strings.ReplaceAll(appsv1alpha1.PodReplaceIndicationLabelKey, "/", "~1")),
+		if _, exist := candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
+			delete(candidate.Pod.Labels, appsv1alpha1.PodReplaceIndicationLabelKey)
 		}
 
-		patchBytes, err := json.Marshal([]map[string]string{patchOperation})
-		if err != nil {
-			return err
-		}
-
+		// try to remove finalizer from origin pod, note that RemoveFinalizer always do update pod
 		if err := controllerutils.RemoveFinalizer(ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
-			retErr := fmt.Errorf("fail to add %s finalizer to origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
-			ojutils.SetOpsStatusError(candidate, ojutils.ReasonUpdateObjectFailed, retErr.Error())
-			return retErr
-		}
-
-		if err := p.client.Patch(ctx, candidate.Pod, client.RawPatch(types.JSONPatchType, patchBytes)); err != nil {
-			retErr := fmt.Errorf("fail patch pod %s/%s with %s : %s", candidate.Pod.Namespace, candidate.Pod.Name, patchBytes, err.Error())
+			retErr := fmt.Errorf("fail to remove %s finalizer or replace indicate label from origin pod %s/%s : %s", OperationJobReplacePodFinalizer, candidate.Pod.Namespace, candidate.Pod.Name, err.Error())
 			ojutils.SetOpsStatusError(candidate, ojutils.ReasonUpdateObjectFailed, retErr.Error())
 			return retErr
 		}
