@@ -166,9 +166,7 @@ func (p *PodReplaceHandler) ReleaseTargets(ctx context.Context, candidates []*Op
 		}
 
 		// try to remove replace label from origin pod
-		if _, exist := candidate.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
-			delete(candidate.Pod.Labels, appsv1alpha1.PodReplaceIndicationLabelKey)
-		}
+		delete(candidate.Pod.Labels, appsv1alpha1.PodReplaceIndicationLabelKey)
 
 		// try to remove finalizer from origin pod, note that RemoveFinalizer always do update pod
 		if err := controllerutils.RemoveFinalizer(ctx, p.client, candidate.Pod, OperationJobReplacePodFinalizer); err != nil {
