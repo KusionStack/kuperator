@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -3208,7 +3207,7 @@ var _ = Describe("collaset controller", func() {
 							InjectPolicy: appsv1alpha1.AfterPrimaryContainer,
 							Container: corev1.Container{
 								Name:  "sidecar",
-								Image: imageutils.GetE2EImage(imageutils.Nginx),
+								Image: "nginx:v1",
 								Command: []string{
 									"sleep",
 									"2h",
@@ -3306,7 +3305,7 @@ var _ = Describe("collaset controller", func() {
 							InjectPolicy: appsv1alpha1.AfterPrimaryContainer,
 							Container: corev1.Container{
 								Name:  "sidecar",
-								Image: imageutils.GetE2EImage(imageutils.Nginx),
+								Image: "nginx:v1",
 								Command: []string{
 									"sleep",
 									"2h",
