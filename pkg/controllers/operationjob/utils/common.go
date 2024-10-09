@@ -29,21 +29,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"kusionstack.io/kuperator/pkg/controllers/operationjob/opscore"
-	ctrlutils "kusionstack.io/kuperator/pkg/controllers/utils"
 )
 
 const (
 	ReasonUpdateObjectFailed = "UpdateObjectFailed"
 	ReasonGetObjectFailed    = "GetObjectFailed"
 )
-
-func MarkOperationJobFailed(instance *appsv1alpha1.OperationJob) {
-	if instance.Status.Progress != appsv1alpha1.OperationProgressSucceeded {
-		now := ctrlutils.FormatTimeNow()
-		instance.Status.Progress = appsv1alpha1.OperationProgressFailed
-		instance.Status.EndTimestamp = &now
-	}
-}
 
 func MapOpsStatusByPod(instance *appsv1alpha1.OperationJob) map[string]*appsv1alpha1.OpsStatus {
 	opsStatusMap := make(map[string]*appsv1alpha1.OpsStatus)

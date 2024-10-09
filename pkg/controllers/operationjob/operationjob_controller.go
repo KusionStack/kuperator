@@ -117,7 +117,6 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	//actionHandler, enablePodOpsLifecycle := r.getActionHandler(instance)
 	candidates, err := r.listTargets(ctx, instance)
 	if err != nil {
 		return reconcile.Result{}, err
