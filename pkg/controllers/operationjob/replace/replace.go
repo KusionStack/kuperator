@@ -73,7 +73,7 @@ func (p *PodReplaceHandler) OperateTargets(ctx context.Context, candidates []*Op
 		if _, replaceOriginPodExists := candidate.Pod.Labels[appsv1alpha1.PodReplacePairOriginName]; replaceOriginPodExists {
 			candidate.OpsStatus.ExtraInfo[ExtraInfoBlockedByReplacedNewPod] = "Pod is replace new pod, not allowed to replace"
 			return nil
-		} else if _, exist := candidate.OpsStatus.ExtraInfo[ExtraInfoBlockedByReplacedNewPod]; exist {
+		} else {
 			delete(candidate.OpsStatus.ExtraInfo, ExtraInfoBlockedByReplacedNewPod)
 		}
 
