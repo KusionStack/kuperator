@@ -40,6 +40,10 @@ const (
 	OperationJobReplacePodFinalizer = "finalizer.operationjob.kusionstack.io/replace-protected"
 )
 
+const (
+	ExtraInfoBlockedByReplacedNewPod = "BlockedByReplaceNewPod"
+)
+
 var _ ActionHandler = &PodReplaceHandler{}
 
 type PodReplaceHandler struct {
@@ -61,8 +65,16 @@ func (p *PodReplaceHandler) Setup(controller controller.Controller, reconcileMix
 func (p *PodReplaceHandler) OperateTargets(ctx context.Context, candidates []*OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
 	_, err := controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
-		if candidate.Pod == nil {
+		if candidate.Pod == nil || candidate.Pod.Labels == nil {
 			return nil
+		}
+
+		// parse replace information from new pod
+		if _, replaceOriginPodExists := candidate.Pod.Labels[appsv1alpha1.PodReplacePairOriginName]; replaceOriginPodExists {
+			candidate.OpsStatus.ExtraInfo[ExtraInfoBlockedByReplacedNewPod] = "Pod is replace new pod, not allowed to replace"
+			return nil
+		} else if _, exist := candidate.OpsStatus.ExtraInfo[ExtraInfoBlockedByReplacedNewPod]; exist {
+			delete(candidate.OpsStatus.ExtraInfo, ExtraInfoBlockedByReplacedNewPod)
 		}
 
 		// parse replace information from origin pod
