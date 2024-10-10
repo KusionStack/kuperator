@@ -150,9 +150,9 @@ func (r *ReconcileOperationJob) filterAndOperateAllowOpsTargets(
 			} else {
 				candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressProcessing
 			}
-			if candidate.OpsStatus.StartTimestamp == nil {
+			if candidate.OpsStatus.StartTime == nil {
 				now := ctrlutils.FormatTimeNow()
-				candidate.OpsStatus.StartTimestamp = &now
+				candidate.OpsStatus.StartTime = &now
 			}
 		}
 
@@ -248,10 +248,10 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, 
 		for i := range candidates {
 			candidate := candidates[i]
 			// just skip if target operation already finished, or not started
-			if IsCandidateOpsFinished(candidate) || candidate.OpsStatus.StartTimestamp == nil {
+			if IsCandidateOpsFinished(candidate) || candidate.OpsStatus.StartTime == nil {
 				continue
 			}
-			leftTime := time.Duration(*operationJob.Spec.ActiveDeadlineSeconds)*time.Second - time.Since(candidate.OpsStatus.StartTimestamp.Time)
+			leftTime := time.Duration(*operationJob.Spec.ActiveDeadlineSeconds)*time.Second - time.Since(candidate.OpsStatus.StartTime.Time)
 			if leftTime > 0 {
 				return false, &leftTime, nil
 			} else {
@@ -272,7 +272,7 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, 
 
 	if operationJob.Spec.TTLSecondsAfterFinished != nil {
 		if ojutils.IsJobFinished(operationJob) {
-			leftTime := time.Duration(*operationJob.Spec.TTLSecondsAfterFinished)*time.Second - time.Since(operationJob.Status.EndTimestamp.Time)
+			leftTime := time.Duration(*operationJob.Spec.TTLSecondsAfterFinished)*time.Second - time.Since(operationJob.Status.EndTime.Time)
 			if leftTime > 0 {
 				return false, &leftTime, nil
 			} else {

@@ -163,13 +163,16 @@ func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv
 func (r *ReconcileOperationJob) calculateStatus(instance *appsv1alpha1.OperationJob, candidates []*OpsCandidate) (jobStatus appsv1alpha1.OperationJobStatus) {
 	now := ctrlutils.FormatTimeNow()
 	jobStatus = appsv1alpha1.OperationJobStatus{
-		StartTimestamp:     instance.Status.StartTimestamp,
-		EndTimestamp:       instance.Status.EndTimestamp,
+		StartTime:          instance.Status.StartTime,
+		EndTime:            instance.Status.EndTime,
 		Progress:           instance.Status.Progress,
 		ObservedGeneration: instance.Generation,
 	}
 
 	for _, candidate := range candidates {
+		if candidate.OpsStatus.EndTime == nil && IsCandidateOpsFinished(candidate) {
+			candidate.OpsStatus.EndTime = &now
+		}
 		jobStatus.TargetDetails = append(jobStatus.TargetDetails, *candidate.OpsStatus)
 	}
 
@@ -194,8 +197,8 @@ func (r *ReconcileOperationJob) calculateStatus(instance *appsv1alpha1.Operation
 	if !ojutils.IsJobFinished(&appsv1alpha1.OperationJob{Status: jobStatus}) {
 		jobStatus.Progress = appsv1alpha1.OperationProgressProcessing
 
-		if jobStatus.StartTimestamp == nil {
-			jobStatus.StartTimestamp = &now
+		if jobStatus.StartTime == nil {
+			jobStatus.StartTime = &now
 		}
 
 		if pendingPodCount == totalPodCount {
@@ -209,8 +212,8 @@ func (r *ReconcileOperationJob) calculateStatus(instance *appsv1alpha1.Operation
 				jobStatus.Progress = appsv1alpha1.OperationProgressSucceeded
 			}
 
-			if jobStatus.EndTimestamp == nil {
-				jobStatus.EndTimestamp = &now
+			if jobStatus.EndTime == nil {
+				jobStatus.EndTime = &now
 			}
 		}
 	}
