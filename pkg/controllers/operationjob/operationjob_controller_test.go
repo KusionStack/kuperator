@@ -344,7 +344,7 @@ var _ = Describe("operationjob controller", func() {
 		assertJobProgressProcessing(oj2, time.Second*10)
 
 		// the oj which replaces new pod should be blocked
-		_, exist := oj2.Status.TargetDetails[0].ExtraInfo[replace.ExtraInfoBlockedByReplacedNewPod]
+		_, exist := oj2.Status.TargetDetails[0].ExtraInfo[replace.ExtraInfoNotAllowedToReplaceNewPod]
 		Expect(exist).Should(BeTrue())
 	})
 

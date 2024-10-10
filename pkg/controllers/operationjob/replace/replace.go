@@ -41,7 +41,7 @@ const (
 )
 
 const (
-	ExtraInfoBlockedByReplacedNewPod = "BlockedByReplaceNewPod"
+	ExtraInfoNotAllowedToReplaceNewPod = "NotAllowedToReplaceNewPod"
 )
 
 var _ ActionHandler = &PodReplaceHandler{}
@@ -71,10 +71,10 @@ func (p *PodReplaceHandler) OperateTargets(ctx context.Context, candidates []*Op
 
 		// parse replace information from new pod
 		if originPodName, replaceOriginPodExists := candidate.Pod.Labels[appsv1alpha1.PodReplacePairOriginName]; replaceOriginPodExists {
-			candidate.OpsStatus.ExtraInfo[ExtraInfoBlockedByReplacedNewPod] = fmt.Sprintf("Pod is replace for origin pod [%s], replace is block", originPodName)
+			candidate.OpsStatus.ExtraInfo[ExtraInfoNotAllowedToReplaceNewPod] = fmt.Sprintf("Not allowed to replace pod when it is a new pod for origin pod [%s]", originPodName)
 			return nil
 		} else {
-			delete(candidate.OpsStatus.ExtraInfo, ExtraInfoBlockedByReplacedNewPod)
+			delete(candidate.OpsStatus.ExtraInfo, ExtraInfoNotAllowedToReplaceNewPod)
 		}
 
 		// parse replace information from origin pod
