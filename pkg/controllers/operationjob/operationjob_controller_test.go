@@ -45,6 +45,7 @@ import (
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
 	"kusionstack.io/kuperator/pkg/controllers/collaset"
+	"kusionstack.io/kuperator/pkg/controllers/operationjob/replace"
 	"kusionstack.io/kuperator/pkg/controllers/poddeletion"
 	"kusionstack.io/kuperator/pkg/utils/inject"
 )
@@ -283,6 +284,68 @@ var _ = Describe("operationjob controller", func() {
 			}
 		}
 
+	})
+
+	It("[replace] new pod", func() {
+		testcase := "test-replace-new-pod"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+		cs := createCollaSetWithReplicas("foo", testcase, 1)
+		podNames := getPodNamesFromCollaSet(cs)
+
+		oj := &appsv1alpha1.OperationJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.OperationJobSpec{
+				Action: appsv1alpha1.OpsActionReplace,
+				Targets: []appsv1alpha1.PodOpsTarget{
+					{
+						Name: podNames[0],
+					},
+				},
+			},
+		}
+
+		Expect(c.Create(ctx, oj)).Should(BeNil())
+
+		// wait for new pod created
+		podList := &corev1.PodList{}
+		Eventually(func() bool {
+			Expect(c.List(ctx, podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 2
+		}, time.Second*10, time.Second).Should(BeTrue())
+
+		// replace new pod
+		newPod := corev1.Pod{}
+		Expect(c.List(ctx, podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+		for i := range podList.Items {
+			if _, exist := podList.Items[i].Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
+				newPod = podList.Items[i]
+			}
+		}
+
+		oj2 := &appsv1alpha1.OperationJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo1",
+			},
+			Spec: appsv1alpha1.OperationJobSpec{
+				Action: appsv1alpha1.OpsActionReplace,
+				Targets: []appsv1alpha1.PodOpsTarget{
+					{
+						Name: newPod.Name,
+					},
+				},
+			},
+		}
+
+		Expect(c.Create(ctx, oj2)).Should(BeNil())
+		assertJobProgressProcessing(oj2, time.Second*10)
+
+		// the oj which replaces new pod should be blocked
+		_, exist := oj2.Status.TargetDetails[0].ExtraInfo[replace.ExtraInfoNotAllowedToReplaceNewPod]
+		Expect(exist).Should(BeTrue())
 	})
 
 	It("[replace] non-exist pod", func() {
