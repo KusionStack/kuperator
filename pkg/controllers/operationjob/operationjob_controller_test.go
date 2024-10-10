@@ -61,63 +61,6 @@ var (
 
 var _ = Describe("operationjob controller", func() {
 
-	It("deadline and ttl", func() {
-		testcase := "test-deadline-ttl"
-		Expect(createNamespace(c, testcase)).Should(BeNil())
-		cs := createCollaSetWithReplicas("foo", testcase, 3)
-		podNames := getPodNamesFromCollaSet(cs)
-
-		oj := &appsv1alpha1.OperationJob{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: testcase,
-				Name:      "foo",
-			},
-			Spec: appsv1alpha1.OperationJobSpec{
-				Partition: int32Pointer(0),
-				Action:    appsv1alpha1.OpsActionReplace,
-				Targets: []appsv1alpha1.PodOpsTarget{
-					{
-						Name: podNames[0],
-					},
-					{
-						Name: podNames[1],
-					},
-					{
-						Name: podNames[2],
-					},
-				},
-				ActiveDeadlineSeconds:   int32Pointer(3),
-				TTLSecondsAfterFinished: int32Pointer(5),
-			},
-		}
-
-		Expect(c.Create(ctx, oj)).Should(BeNil())
-
-		for _, partition := range []int32{0, 1, 2, 3} {
-			// update partition
-			Eventually(func() error {
-				return c.Get(context.TODO(), types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
-			}, time.Second*5, time.Second).Should(BeNil())
-			Expect(updateOperationJobWithRetry(oj.Namespace, oj.Name, func(job *appsv1alpha1.OperationJob) bool {
-				job.Spec.Partition = &partition
-				return true
-			})).Should(BeNil())
-			// wait for replace failed after ActiveDeadlineSeconds
-			assertFailedReplicas(oj, partition, time.Second*1000)
-		}
-
-		// wait for operationJob deleted after TTL
-		Eventually(func() bool {
-			err := c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
-			if errors.IsNotFound(err) {
-				return true
-			} else {
-				Expect(err).Should(BeNil())
-			}
-			return false
-		}, time.Second*20, time.Second).Should(BeTrue())
-	})
-
 	It("[replace] reconcile", func() {
 		testcase := "test-replace"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
@@ -487,6 +430,63 @@ var _ = Describe("operationjob controller", func() {
 			Expect(c.List(ctx, podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 			return len(podList.Items) == 1 && podList.Items[0].Name == podNames[0]
 		}, time.Second*10, time.Second).Should(BeTrue())
+	})
+
+	It("deadline and ttl", func() {
+		testcase := "test-deadline-ttl"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+		cs := createCollaSetWithReplicas("foo", testcase, 3)
+		podNames := getPodNamesFromCollaSet(cs)
+
+		oj := &appsv1alpha1.OperationJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.OperationJobSpec{
+				Partition: int32Pointer(0),
+				Action:    appsv1alpha1.OpsActionReplace,
+				Targets: []appsv1alpha1.PodOpsTarget{
+					{
+						Name: podNames[0],
+					},
+					{
+						Name: podNames[1],
+					},
+					{
+						Name: podNames[2],
+					},
+				},
+				ActiveDeadlineSeconds:   int32Pointer(3),
+				TTLSecondsAfterFinished: int32Pointer(5),
+			},
+		}
+
+		Expect(c.Create(ctx, oj)).Should(BeNil())
+
+		for _, partition := range []int32{0, 1, 2, 3} {
+			// update partition
+			Eventually(func() error {
+				return c.Get(context.TODO(), types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
+			}, time.Second*5, time.Second).Should(BeNil())
+			Expect(updateOperationJobWithRetry(oj.Namespace, oj.Name, func(job *appsv1alpha1.OperationJob) bool {
+				job.Spec.Partition = &partition
+				return true
+			})).Should(BeNil())
+			// wait for replace failed after ActiveDeadlineSeconds
+			assertFailedReplicas(oj, partition, time.Second*1000)
+		}
+
+		// wait for operationJob deleted after TTL
+		Eventually(func() bool {
+			err := c.Get(ctx, types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
+			if errors.IsNotFound(err) {
+				return true
+			} else {
+				Expect(err).Should(BeNil())
+			}
+			return false
+		}, time.Second*20, time.Second).Should(BeTrue())
 	})
 
 })
