@@ -59,7 +59,7 @@ spec:
               activeDeadlineSeconds:
                 description: |-
                   Specify the duration in seconds relative to the startTime
-                  that the job may be active before the system tries to terminate it
+                  that the target may be active before the system tries to terminate it
                 format: int32
                 type: integer
               operationDelaySeconds:
@@ -92,7 +92,7 @@ spec:
           status:
             description: OperationJobStatus defines the observed state of OperationJob
             properties:
-              endTimestamp:
+              endTime:
                 description: Operation end time
                 format: date-time
                 type: string
@@ -109,7 +109,7 @@ spec:
               progress:
                 description: Phase indicates the of the OperationJob
                 type: string
-              startTimestamp:
+              startTime:
                 description: Operation start time
                 format: date-time
                 type: string
@@ -121,6 +121,10 @@ spec:
                 description: Operation details of the target pods
                 items:
                   properties:
+                    endTime:
+                      description: target operation end time
+                      format: date-time
+                      type: string
                     error:
                       description: error indicates the error info of progressing
                       properties:
@@ -142,6 +146,10 @@ spec:
                       type: string
                     progress:
                       description: operation progress of target pod
+                      type: string
+                    startTime:
+                      description: target operation start time
+                      format: date-time
                       type: string
                   type: object
                 type: array

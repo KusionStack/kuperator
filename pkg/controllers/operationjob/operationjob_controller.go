@@ -117,8 +117,13 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	candidates, err := r.listTargets(ctx, instance)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	if instance.DeletionTimestamp != nil {
-		if err := r.releaseTargets(ctx, instance); err != nil {
+		if err := r.releaseTargets(ctx, instance, candidates, true); err != nil {
 			r.Recorder.Eventf(instance, corev1.EventTypeWarning, "ReleaseTargetFailed", fmt.Sprintf("failed to release targets when job deleting: %s", err.Error()))
 			return reconcile.Result{}, err
 		}
@@ -128,27 +133,17 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 		return reconcile.Result{}, err
 	}
 
-	jobDeleted, requeueAfter, err := r.ensureActiveDeadlineAndTTL(ctx, instance, logger)
+	jobDeleted, requeueAfter, err := r.ensureActiveDeadlineAndTTL(ctx, instance, candidates, logger)
 	if jobDeleted || err != nil {
 		return reconcile.Result{}, err
 	}
 
-	reconcileErr := r.doReconcile(ctx, instance)
-	updateErr := r.updateStatus(ctx, instance)
-	return requeueResult(requeueAfter), ctrlutils.AggregateErrors([]error{reconcileErr, updateErr})
+	err = r.doReconcile(ctx, instance, candidates)
+	return requeueResult(requeueAfter), err
 }
 
-func (r *ReconcileOperationJob) getActionHandlerAndTargets(ctx context.Context, instance *appsv1alpha1.OperationJob) (
-	actionHandler ActionHandler, enablePodOpsLifecycle bool, candidates []*OpsCandidate, err error) {
-	if actionHandler, enablePodOpsLifecycle, err = r.getActionHandler(instance); err != nil {
-		return
-	}
-	candidates, err = r.listTargets(ctx, instance)
-	return
-}
-
-func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv1alpha1.OperationJob) error {
-	actionHandler, enablePodOpsLifecycle, candidates, err := r.getActionHandlerAndTargets(ctx, instance)
+func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv1alpha1.OperationJob, candidates []*OpsCandidate) error {
+	actionHandler, enablePodOpsLifecycle, err := r.getActionHandler(instance)
 	if err != nil {
 		return err
 	}
@@ -160,19 +155,24 @@ func (r *ReconcileOperationJob) doReconcile(ctx context.Context, instance *appsv
 	getErr := r.getTargetsOpsStatus(ctx, actionHandler, selectedCandidates, enablePodOpsLifecycle, instance)
 	// calculate opsStatus of all candidates
 	instance.Status = r.calculateStatus(instance, candidates)
-	return controllerutils.AggregateErrors([]error{opsErr, getErr})
+	// update operationjob status
+	updateErr := r.updateStatus(ctx, instance)
+	return controllerutils.AggregateErrors([]error{opsErr, getErr, updateErr})
 }
 
 func (r *ReconcileOperationJob) calculateStatus(instance *appsv1alpha1.OperationJob, candidates []*OpsCandidate) (jobStatus appsv1alpha1.OperationJobStatus) {
 	now := ctrlutils.FormatTimeNow()
 	jobStatus = appsv1alpha1.OperationJobStatus{
-		StartTimestamp:     instance.Status.StartTimestamp,
-		EndTimestamp:       instance.Status.EndTimestamp,
+		StartTime:          instance.Status.StartTime,
+		EndTime:            instance.Status.EndTime,
 		Progress:           instance.Status.Progress,
 		ObservedGeneration: instance.Generation,
 	}
 
 	for _, candidate := range candidates {
+		if candidate.OpsStatus.EndTime == nil && IsCandidateOpsFinished(candidate) {
+			candidate.OpsStatus.EndTime = &now
+		}
 		jobStatus.TargetDetails = append(jobStatus.TargetDetails, *candidate.OpsStatus)
 	}
 
@@ -197,6 +197,10 @@ func (r *ReconcileOperationJob) calculateStatus(instance *appsv1alpha1.Operation
 	if !ojutils.IsJobFinished(&appsv1alpha1.OperationJob{Status: jobStatus}) {
 		jobStatus.Progress = appsv1alpha1.OperationProgressProcessing
 
+		if jobStatus.StartTime == nil {
+			jobStatus.StartTime = &now
+		}
+
 		if pendingPodCount == totalPodCount {
 			jobStatus.Progress = appsv1alpha1.OperationProgressPending
 		}
@@ -208,8 +212,8 @@ func (r *ReconcileOperationJob) calculateStatus(instance *appsv1alpha1.Operation
 				jobStatus.Progress = appsv1alpha1.OperationProgressSucceeded
 			}
 
-			if jobStatus.EndTimestamp == nil {
-				jobStatus.EndTimestamp = &now
+			if jobStatus.EndTime == nil {
+				jobStatus.EndTime = &now
 			}
 		}
 	}

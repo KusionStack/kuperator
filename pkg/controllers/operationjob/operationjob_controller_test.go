@@ -498,7 +498,7 @@ var _ = Describe("operationjob controller", func() {
 	It("deadline and ttl", func() {
 		testcase := "test-deadline-ttl"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
-		cs := createCollaSetWithReplicas("foo", testcase, 2)
+		cs := createCollaSetWithReplicas("foo", testcase, 3)
 		podNames := getPodNamesFromCollaSet(cs)
 
 		oj := &appsv1alpha1.OperationJob{
@@ -507,7 +507,8 @@ var _ = Describe("operationjob controller", func() {
 				Name:      "foo",
 			},
 			Spec: appsv1alpha1.OperationJobSpec{
-				Action: appsv1alpha1.OpsActionReplace,
+				Partition: int32Pointer(0),
+				Action:    appsv1alpha1.OpsActionReplace,
 				Targets: []appsv1alpha1.PodOpsTarget{
 					{
 						Name: podNames[0],
@@ -515,50 +516,29 @@ var _ = Describe("operationjob controller", func() {
 					{
 						Name: podNames[1],
 					},
+					{
+						Name: podNames[2],
+					},
 				},
-				ActiveDeadlineSeconds:   int32Pointer(10),
+				ActiveDeadlineSeconds:   int32Pointer(3),
 				TTLSecondsAfterFinished: int32Pointer(5),
 			},
 		}
 
 		Expect(c.Create(ctx, oj)).Should(BeNil())
 
-		// wait for new pod created
-		podList := &corev1.PodList{}
-		Eventually(func() bool {
-			Expect(c.List(ctx, podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-			return len(podList.Items) == 4
-		}, time.Second*10, time.Second).Should(BeTrue())
-
-		// mock only 1 new pod serviceAvailable
-		Expect(c.List(ctx, podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-		for i := range podList.Items {
-			if _, exist := podList.Items[i].Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
-				Expect(updatePodWithRetry(podList.Items[i].Namespace, podList.Items[i].Name, func(pod *corev1.Pod) bool {
-					pod.Labels[appsv1alpha1.PodServiceAvailableLabel] = "true"
-					return true
-				})).Should(BeNil())
-				break
-			}
+		for _, partition := range []int32{0, 1, 2, 3} {
+			// update partition
+			Eventually(func() error {
+				return c.Get(context.TODO(), types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, oj)
+			}, time.Second*5, time.Second).Should(BeNil())
+			Expect(updateOperationJobWithRetry(oj.Namespace, oj.Name, func(job *appsv1alpha1.OperationJob) bool {
+				job.Spec.Partition = &partition
+				return true
+			})).Should(BeNil())
+			// wait for replace failed after ActiveDeadlineSeconds
+			assertFailedReplicas(oj, partition, time.Second*1000)
 		}
-
-		// allow origin pod to be deleted
-		for i := range podList.Items {
-			pod := &podList.Items[i]
-			if _, exist := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
-				Expect(updatePodWithRetry(pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID())
-					pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
-					pod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey] = fmt.Sprintf("%d", time.Now().UnixNano())
-					return true
-				})).Should(BeNil())
-			}
-		}
-		assertSucceededReplicas(oj, 1, time.Second*10)
-
-		// wait for replace failed after ActiveDeadlineSeconds
-		assertJobProgressFailed(oj, time.Second*10)
-		assertFailedReplicas(oj, 1, time.Second*10)
 
 		// wait for operationJob deleted after TTL
 		Eventually(func() bool {

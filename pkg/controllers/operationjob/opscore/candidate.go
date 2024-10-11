@@ -88,3 +88,9 @@ func IsCandidateServiceAvailable(candidate *OpsCandidate) bool {
 	_, serviceAvailable := candidate.Pod.Labels[appsv1alpha1.PodServiceAvailableLabel]
 	return serviceAvailable
 }
+
+func MarkCandidateFailed(candidate *OpsCandidate) {
+	if candidate.OpsStatus.Progress != appsv1alpha1.OperationProgressSucceeded {
+		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
+	}
+}
