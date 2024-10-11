@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	refmanagerutil "kusionstack.io/kuperator/pkg/controllers/utils/refmanager"
+	"kusionstack.io/kuperator/pkg/utils"
 	"kusionstack.io/kuperator/pkg/utils/inject"
 )
 
@@ -60,6 +61,7 @@ func (pc *RealPodControl) GetFilteredPods(selector *metav1.LabelSelector, owner 
 	}
 
 	filteredPods := FilterOutInactivePod(podList.Items)
+	filteredPods = FilterOutIgnoredPod(filteredPods)
 	filteredPods, err = pc.getPodSetPods(filteredPods, selector, owner)
 	if err != nil {
 		return nil, err
@@ -128,4 +130,17 @@ func FilterOutInactivePod(pods []corev1.Pod) []*corev1.Pod {
 
 func IsPodInactive(pod *corev1.Pod) bool {
 	return pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed
+}
+
+func FilterOutIgnoredPod(pods []*corev1.Pod) []*corev1.Pod {
+	var filteredPod []*corev1.Pod
+
+	for i := range pods {
+		if utils.IgnoredByCollaSet(pods[i]) {
+			continue
+		}
+
+		filteredPod = append(filteredPod, pods[i])
+	}
+	return filteredPod
 }

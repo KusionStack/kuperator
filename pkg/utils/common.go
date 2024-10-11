@@ -48,7 +48,7 @@ func ControlByKusionStack(obj client.Object) {
 	}
 }
 
-func NotIgnoredByCollaSet(obj client.Object) bool {
+func IgnoredByCollaSet(obj client.Object) bool {
 	if obj == nil || obj.GetLabels() == nil {
 		return false
 	}
