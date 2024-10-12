@@ -47,11 +47,3 @@ func ControlByKusionStack(obj client.Object) {
 		obj.GetLabels()[v1alpha1.ControlledByKusionStackLabelKey] = "true"
 	}
 }
-
-func IgnoredByCollaSet(obj client.Object) bool {
-	if obj == nil || obj.GetLabels() == nil {
-		return false
-	}
-	_, ok := obj.GetLabels()[v1alpha1.PodIgnoringIndicationLabelKey]
-	return ok
-}

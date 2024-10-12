@@ -24,10 +24,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	refmanagerutil "kusionstack.io/kuperator/pkg/controllers/utils/refmanager"
-	"kusionstack.io/kuperator/pkg/utils"
 	"kusionstack.io/kuperator/pkg/utils/inject"
 )
 
@@ -136,11 +136,19 @@ func FilterOutIgnoredPod(pods []*corev1.Pod) []*corev1.Pod {
 	var filteredPod []*corev1.Pod
 
 	for i := range pods {
-		if utils.IgnoredByCollaSet(pods[i]) {
+		if IgnoredByCollaSet(pods[i]) {
 			continue
 		}
 
 		filteredPod = append(filteredPod, pods[i])
 	}
 	return filteredPod
+}
+
+func IgnoredByCollaSet(obj client.Object) bool {
+	if obj == nil || obj.GetLabels() == nil {
+		return false
+	}
+	_, ok := obj.GetLabels()[v1alpha1.PodIgnoringIndicationLabelKey]
+	return ok
 }
