@@ -63,8 +63,6 @@ func (pc *RealPodControl) GetFilteredPods(selector *metav1.LabelSelector, owner 
 	}
 
 	filteredPods := FilterOutInactivePod(podList.Items)
-	// TODO remove ownerReference instead of filtering
-	filteredPods = FilterOutExcludedPod(filteredPods)
 	filteredPods, err = pc.getPodSetPods(filteredPods, selector, owner)
 	if err != nil {
 		return nil, err
@@ -167,25 +165,4 @@ func FilterOutInactivePod(pods []corev1.Pod) []*corev1.Pod {
 
 func IsPodInactive(pod *corev1.Pod) bool {
 	return pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed
-}
-
-func FilterOutExcludedPod(pods []*corev1.Pod) []*corev1.Pod {
-	var filteredPod []*corev1.Pod
-
-	for i := range pods {
-		if ExcludedByCollaSet(pods[i]) {
-			continue
-		}
-
-		filteredPod = append(filteredPod, pods[i])
-	}
-	return filteredPod
-}
-
-func ExcludedByCollaSet(obj client.Object) bool {
-	if obj == nil || obj.GetLabels() == nil {
-		return false
-	}
-	_, ok := obj.GetLabels()[appsv1alpha1.PodExcludeIndicationLabelKey]
-	return ok
 }

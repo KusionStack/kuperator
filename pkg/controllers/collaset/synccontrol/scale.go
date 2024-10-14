@@ -125,6 +125,9 @@ func (r *RealSyncControl) dealIncludeExcludePods(ctx context.Context, cls *appsv
 	includePodNames := sets.String{}
 	for _, pod := range pods {
 		ownedPods.Insert(pod.Name)
+		if _, exist := pod.Labels[appsv1alpha1.PodExcludeIndicationLabelKey]; exist {
+			excludePodNames.Insert(pod.Name)
+		}
 	}
 
 	for _, podName := range cls.Spec.ScaleStrategy.PodToExclude {
