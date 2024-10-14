@@ -139,6 +139,12 @@ func Finish(c client.Client, adapter LifecycleAdapter, obj client.Object, update
 	return false, err
 }
 
+// Undo is used for an CRD Operator to undo a lifecycle
+func Undo(c client.Client, adapter LifecycleAdapter, obj client.Object) error {
+	setUndo(adapter, obj)
+	return c.Update(context.Background(), obj)
+}
+
 func checkOperatingID(adapter LifecycleAdapter, obj client.Object) (val string, ok bool) {
 	labelID := fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, adapter.GetID())
 	_, ok = obj.GetLabels()[labelID]
@@ -175,6 +181,11 @@ func setOperate(adapter LifecycleAdapter, obj client.Object) (val string, ok boo
 	labelOperate := fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, adapter.GetID())
 	obj.GetLabels()[labelOperate] = "true"
 	return
+}
+
+func setUndo(adapter LifecycleAdapter, obj client.Object) {
+	labelUndo := fmt.Sprintf("%s/%s", v1alpha1.PodUndoOperationTypeLabelPrefix, adapter.GetID())
+	obj.GetLabels()[labelUndo] = string(adapter.GetType())
 }
 
 func deleteOperatingID(adapter LifecycleAdapter, obj client.Object) (val string, ok bool) {

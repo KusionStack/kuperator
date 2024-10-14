@@ -323,7 +323,7 @@ func (r *ReconcileOperationJob) cleanCandidateOpsLifecycle(ctx context.Context, 
 	lifecycleAdapter := NewLifecycleAdapter(operationJob.Name, operationJob.Spec.Action)
 
 	if forced {
-		err := ojutils.CancelOpsLifecycle(ctx, r.Client, lifecycleAdapter, candidate.Pod)
+		err := ojutils.CancelOpsLifecycle(r.Client, lifecycleAdapter, candidate.Pod)
 		if err != nil {
 			return err
 		}

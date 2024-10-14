@@ -736,7 +736,7 @@ func (r *RealSyncControl) Update(
 					"UpdatePodCanceled",
 					"pod %s/%s update is canceled due to not started and not included partition %s",
 					podInfo.Namespace, podInfo.Name, podInfo.CurrentRevision.Name)
-				return ojutils.CancelOpsLifecycle(ctx, r.client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod)
+				return ojutils.CancelOpsLifecycle(r.client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod)
 			}
 			// not allowedOps, skip GetPodUpdateFinishStatus
 			return nil
