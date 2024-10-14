@@ -537,7 +537,7 @@ var _ = Describe("operationjob controller", func() {
 				return true
 			})).Should(BeNil())
 			// wait for replace failed after ActiveDeadlineSeconds
-			assertFailedReplicas(oj, partition, time.Second*1000)
+			assertFailedReplicas(oj, partition, time.Second*10)
 		}
 
 		// wait for operationJob deleted after TTL
