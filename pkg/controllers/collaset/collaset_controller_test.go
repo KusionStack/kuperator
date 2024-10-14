@@ -614,6 +614,9 @@ var _ = Describe("collaset controller", func() {
 		}, 5*time.Second, 1*time.Second).Should(BeTrue())
 
 		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+		for i := range podList.Items {
+			Expect(cleanPodLifecycleLabels(c, podList.Items[i].Namespace, podList.Items[i].Name)).Should(BeNil())
+		}
 		for _, number := range []int32{1, 2, 3, 4} {
 			pod := podList.Items[number-1]
 			// label pod to trigger update
@@ -625,10 +628,24 @@ var _ = Describe("collaset controller", func() {
 				return true
 			})).Should(BeNil())
 
+			Eventually(func() bool {
+				Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, &pod)).Should(BeNil())
+				if !podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, &pod) {
+					return false
+				}
+				// allow Pod to do update
+				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+					pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+					return true
+				})).Should(BeNil())
+				return true
+			}, 10*time.Second, 1*time.Second).Should(BeTrue())
+
 			Eventually(func() error {
 				// check updated pod replicas by CollaSet status
 				return expectedStatusReplicas(c, cs, 0, 0, 0, 4, number, 1, 0, 0)
-			}, 5*time.Second, 1*time.Second).Should(BeNil())
+			}, 10*time.Second, 1*time.Second).Should(BeNil())
 
 			Expect(updatePodStatusWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
 				pod.Status.ContainerStatuses = []corev1.ContainerStatus{
@@ -957,6 +974,16 @@ var _ = Describe("collaset controller", func() {
 			return true
 		})).Should(BeNil())
 
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for k := range podList.Items[0].Labels {
+				if strings.HasPrefix(k, appsv1alpha1.PodOperatingLabelPrefix) {
+					return true
+				}
+			}
+			return false
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+
 		// allow Pod to update
 		Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
 			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
@@ -1069,15 +1096,27 @@ var _ = Describe("collaset controller", func() {
 			return true
 		}))
 
-		for i := range podList.Items {
-			pod := &podList.Items[i]
-			// allow Pod to update
-			Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
-				pod.Labels[labelOperate] = "true"
-				return true
-			})).Should(BeNil())
-		}
+		Eventually(func() int {
+			count := 0
+			for i := range podList.Items {
+				pod := &podList.Items[i]
+				Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, pod)).Should(BeNil())
+				for k := range pod.Labels {
+					if strings.HasPrefix(k, appsv1alpha1.PodOperatingLabelPrefix) {
+						count++
+						// allow Pod to update
+						Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+							labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+							pod.Labels[labelOperate] = "true"
+							return true
+						})).Should(BeNil())
+					}
+				}
+
+			}
+			return count
+		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(1))
+
 		Eventually(func() error {
 			// check updated pod replicas by CollaSet status
 			return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 1, 1, 0, 0)
@@ -2082,8 +2121,7 @@ var _ = Describe("collaset controller", func() {
 
 		Eventually(func() bool {
 			pod := &corev1.Pod{}
-			error := c.Get(context.TODO(), types.NamespacedName{Namespace: originPod1.Namespace, Name: originPod1.Name}, pod)
-			Expect(error).Should(BeNil())
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: originPod1.Namespace, Name: originPod1.Name}, pod)).Should(BeNil())
 			Expect(pod.Labels).ShouldNot(BeNil())
 			_, replaceIndicate := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
 			_, replaceByUpdate := pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
@@ -2101,13 +2139,20 @@ var _ = Describe("collaset controller", func() {
 		})).Should(BeNil())
 
 		// allow originPod2 to do inPlace update
+		Eventually(func() bool {
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: originPod2.Namespace, Name: originPod2.Name}, &originPod2)).Should(BeNil())
+			for k := range originPod2.Labels {
+				if strings.HasPrefix(k, appsv1alpha1.PodOperatingLabelPrefix) {
+					return true
+				}
+			}
+			return false
+		}, time.Second*10, time.Second).Should(BeTrue())
 		Expect(updatePodWithRetry(c, originPod2.Namespace, originPod2.Name, func(pod *corev1.Pod) bool {
 			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
 			pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 			return true
 		})).Should(BeNil())
-
-		time.Sleep(3 * time.Second)
 
 		Eventually(func() error {
 			// check updated pod replicas by CollaSet status
@@ -3912,9 +3957,20 @@ var _ = Describe("collaset controller", func() {
 			},
 		}
 
+		Expect(c.Create(context.TODO(), podDecoration)).Should(BeNil())
+
 		// allow Pod to do update
 		for i := range podList.Items {
 			pod := podList.Items[i]
+			Eventually(func() bool {
+				Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, &pod)).Should(BeNil())
+				for k := range pod.Labels {
+					if strings.HasPrefix(k, appsv1alpha1.PodOperatingLabelPrefix) {
+						return true
+					}
+				}
+				return false
+			}, time.Second*10, time.Second).Should(BeTrue())
 			Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
 				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
 				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
@@ -3922,7 +3978,6 @@ var _ = Describe("collaset controller", func() {
 			})).Should(BeNil())
 		}
 
-		Expect(c.Create(context.TODO(), podDecoration)).Should(BeNil())
 		Eventually(func() int32 {
 			err := c.Get(context.TODO(), types.NamespacedName{Namespace: podDecoration.Namespace, Name: podDecoration.Name}, podDecoration)
 			if !errors.IsNotFound(err) {
@@ -4162,6 +4217,33 @@ func updatePodStatusWithRetry(c client.Client, namespace, name string, updateFn 
 		}
 
 		return c.Status().Update(context.TODO(), pod)
+	})
+}
+
+func cleanPodLifecycleLabels(c client.Client, namespace, name string) error {
+	pod := &corev1.Pod{}
+	if err := c.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: name}, pod); err != nil {
+		return err
+	}
+	newLabels := make(map[string]string)
+	for k, v := range pod.Labels {
+		has := false
+		for _, prefix := range appsv1alpha1.WellKnownLabelPrefixesWithID {
+			if strings.HasPrefix(k, prefix) {
+				has = true
+				break
+			}
+		}
+		if !has {
+			newLabels[k] = v
+		}
+	}
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if err := c.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: name}, pod); err != nil {
+			return err
+		}
+		pod.Labels = newLabels
+		return c.Update(context.TODO(), pod)
 	})
 }
 

@@ -378,7 +378,8 @@ func (u *GenericPodUpdater) BeginUpdatePod(_ context.Context, resources *collase
 	succCount, err := controllerutils.SlowStartBatch(len(podCh), controllerutils.SlowStartInitialBatchSize, false, func(int, error) error {
 		podInfo := <-podCh
 		u.Recorder.Eventf(podInfo.Pod, corev1.EventTypeNormal, "PodUpdateLifecycle", "try to begin PodOpsLifecycle for updating Pod of CollaSet")
-		if updated, err := podopslifecycle.Begin(u.Client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod, func(obj client.Object) (bool, error) {
+
+		if updated, err := podopslifecycle.BeginWithCleaningOld(u.Client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod, func(obj client.Object) (bool, error) {
 			if !podInfo.OnlyMetadataChanged && !podInfo.InPlaceUpdateSupport {
 				return podopslifecycle.WhenBeginDelete(obj)
 			}

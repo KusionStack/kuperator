@@ -27,6 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/kube-api/apps/v1alpha1"
+
+	podopslifecycleutil "kusionstack.io/kuperator/pkg/controllers/podopslifecycle"
 )
 
 // IsDuringOps decides whether the Pod is during ops or not
@@ -85,6 +87,16 @@ func Begin(c client.Client, adapter LifecycleAdapter, obj client.Object, updateF
 	return false, nil
 }
 
+// BeginWithCleaningOld is used for an CRD Operator to begin a lifecycle with cleaning the old lifecycle
+func BeginWithCleaningOld(c client.Client, adapter LifecycleAdapter, obj client.Object, updateFunc ...UpdateFunc) (updated bool, err error) {
+	if podInUpdateLifecycle, err := podopslifecycleutil.IsLifecycleOnPod(adapter.GetID(), obj); err != nil {
+		return false, fmt.Errorf("fail to check %s PodOpsLifecycle on Pod %s/%s: %s", adapter.GetID(), obj.GetNamespace(), obj.GetName(), err)
+	} else if podInUpdateLifecycle {
+		return false, Undo(c, adapter, obj)
+	}
+	return Begin(c, adapter, obj, updateFunc...)
+}
+
 // AllowOps is used to check whether the PodOpsLifecycle phase is in UPGRADE to do following operations.
 func AllowOps(adapter LifecycleAdapter, operationDelaySeconds int32, obj client.Object) (requeueAfter *time.Duration, allow bool) {
 	if !IsDuringOps(adapter, obj) {
@@ -139,6 +151,12 @@ func Finish(c client.Client, adapter LifecycleAdapter, obj client.Object, update
 	return false, err
 }
 
+// Undo is used for an CRD Operator to undo a lifecycle
+func Undo(c client.Client, adapter LifecycleAdapter, obj client.Object) error {
+	setUndo(adapter, obj)
+	return c.Update(context.Background(), obj)
+}
+
 func checkOperatingID(adapter LifecycleAdapter, obj client.Object) (val string, ok bool) {
 	labelID := fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, adapter.GetID())
 	_, ok = obj.GetLabels()[labelID]
@@ -175,6 +193,11 @@ func setOperate(adapter LifecycleAdapter, obj client.Object) (val string, ok boo
 	labelOperate := fmt.Sprintf("%s/%s", v1alpha1.PodOperateLabelPrefix, adapter.GetID())
 	obj.GetLabels()[labelOperate] = "true"
 	return
+}
+
+func setUndo(adapter LifecycleAdapter, obj client.Object) {
+	labelUndo := fmt.Sprintf("%s/%s", v1alpha1.PodUndoOperationTypeLabelPrefix, adapter.GetID())
+	obj.GetLabels()[labelUndo] = string(adapter.GetType())
 }
 
 func deleteOperatingID(adapter LifecycleAdapter, obj client.Object) (val string, ok bool) {
