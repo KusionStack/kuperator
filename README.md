@@ -5,6 +5,7 @@
 [![GitHub release](https://img.shields.io/github/release/KusionStack/kuperator.svg)](https://github.com/KusionStack/kuperator/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/KusionStack/kuperator)](https://goreportcard.com/report/github.com/KusionStack/kuperator)
 [![codecov](https://codecov.io/gh/KusionStack/kuperator/graph/badge.svg?token=CEQX77G7UH)](https://codecov.io/gh/KusionStack/kuperator)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FKusionStack%2Fkuperator.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FKusionStack%2Fkuperator?ref=badge_shield)
 
 KusionStack Kuperator ([official site](https://www.kusionstack.io/kuperator/introduction/)) provides a set of workloads and operators
 built on Kubernetes Custom Resource Definitions (CRDs), with a primary aim of bridging the gap 
@@ -65,3 +66,6 @@ We will continue building in areas such as application operations, observability
 We welcome everyone to participate in construction with us. Visit the [Contribution Guide](docs/contributing.md) 
 to understand how to participate in the contribution KusionStack project. 
 If you have any questions, please [Submit the Issue](https://github.com/KusionStack/kuperator/issues).
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FKusionStack%2Fkuperator.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FKusionStack%2Fkuperator?ref=badge_large)
