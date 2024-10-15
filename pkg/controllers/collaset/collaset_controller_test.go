@@ -956,6 +956,16 @@ var _ = Describe("collaset controller", func() {
 			return true
 		})).Should(BeNil())
 
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for k := range podList.Items[0].Labels {
+				if strings.HasPrefix(k, appsv1alpha1.PodOperatingLabelPrefix) {
+					return true
+				}
+			}
+			return false
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+
 		// allow Pod to update
 		Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
 			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
@@ -1066,15 +1076,27 @@ var _ = Describe("collaset controller", func() {
 			return true
 		}))
 
-		for i := range podList.Items {
-			pod := &podList.Items[i]
-			// allow Pod to update
-			Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
-				pod.Labels[labelOperate] = "true"
-				return true
-			})).Should(BeNil())
-		}
+		Eventually(func() int {
+			count := 0
+			for i := range podList.Items {
+				pod := &podList.Items[i]
+				Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, pod)).Should(BeNil())
+				for k := range pod.Labels {
+					if strings.HasPrefix(k, appsv1alpha1.PodOperatingLabelPrefix) {
+						count++
+						// allow Pod to update
+						Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+							labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+							pod.Labels[labelOperate] = "true"
+							return true
+						})).Should(BeNil())
+					}
+				}
+
+			}
+			return count
+		}, 5*time.Second, 1*time.Second).Should(BeEquivalentTo(1))
+
 		Eventually(func() error {
 			// check updated pod replicas by CollaSet status
 			return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 1, 1, 0, 0)
