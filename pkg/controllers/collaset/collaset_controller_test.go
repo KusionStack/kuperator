@@ -2101,8 +2101,7 @@ var _ = Describe("collaset controller", func() {
 
 		Eventually(func() bool {
 			pod := &corev1.Pod{}
-			error := c.Get(context.TODO(), types.NamespacedName{Namespace: originPod1.Namespace, Name: originPod1.Name}, pod)
-			Expect(error).Should(BeNil())
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: originPod1.Namespace, Name: originPod1.Name}, pod)).Should(BeNil())
 			Expect(pod.Labels).ShouldNot(BeNil())
 			_, replaceIndicate := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
 			_, replaceByUpdate := pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
@@ -2120,13 +2119,20 @@ var _ = Describe("collaset controller", func() {
 		})).Should(BeNil())
 
 		// allow originPod2 to do inPlace update
+		Eventually(func() bool {
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: originPod2.Namespace, Name: originPod2.Name}, &originPod2)).Should(BeNil())
+			for k := range originPod2.Labels {
+				if strings.HasPrefix(k, appsv1alpha1.PodOperatingLabelPrefix) {
+					return true
+				}
+			}
+			return false
+		}, time.Second*10, time.Second).Should(BeTrue())
 		Expect(updatePodWithRetry(c, originPod2.Namespace, originPod2.Name, func(pod *corev1.Pod) bool {
 			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
 			pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 			return true
 		})).Should(BeNil())
-
-		time.Sleep(3 * time.Second)
 
 		Eventually(func() error {
 			// check updated pod replicas by CollaSet status
