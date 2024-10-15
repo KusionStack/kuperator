@@ -50,7 +50,7 @@ func getPodsToDelete(filteredPods []*collasetutils.PodWrapper, replaceMapping ma
 	}
 
 	var needDeletePods []*collasetutils.PodWrapper
-	// 2. select pods to delete in second round according to replace, delete...
+	// 2. select pods to delete in second round according to replace, delete, exclude
 	for _, pod := range targetsPods[:diff] {
 		//  don't scaleIn exclude pod and its newPod (if exist)
 		if pod.ToExclude {
@@ -58,11 +58,11 @@ func getPodsToDelete(filteredPods []*collasetutils.PodWrapper, replaceMapping ma
 		}
 
 		if replacePairPod, exist := replaceMapping[pod.Name]; exist && replacePairPod != nil {
-			// don't scaleIn new pod until origin pod is deleted, if you want to delete new pod, please delete it by label
+			// don't selective scaleIn newPod (and its originPod) until replace finished
 			if replacePairPod.ToDelete {
 				continue
 			}
-			// new pod not service available, just scaleIn it
+			// when scaleIn origin Pod, newPod should be deleted if not service available
 			if _, serviceAvailable := replacePairPod.Labels[appsv1alpha1.PodServiceAvailableLabel]; !serviceAvailable {
 				needDeletePods = append(needDeletePods, replacePairPod)
 			}
