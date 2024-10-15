@@ -21,13 +21,12 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	refmanagerutil "kusionstack.io/kuperator/pkg/controllers/utils/refmanager"
@@ -36,12 +35,11 @@ import (
 
 type Interface interface {
 	GetFilteredPvcs(context.Context, *appsv1alpha1.CollaSet) ([]*corev1.PersistentVolumeClaim, error)
-	AdoptOrphanedPvcs(context.Context, *appsv1alpha1.CollaSet) ([]*corev1.PersistentVolumeClaim, error)
 	CreatePodPvcs(context.Context, *appsv1alpha1.CollaSet, *corev1.Pod, []*corev1.PersistentVolumeClaim) error
 	DeletePodPvcs(context.Context, *appsv1alpha1.CollaSet, *corev1.Pod, []*corev1.PersistentVolumeClaim) error
 	DeletePodUnusedPvcs(context.Context, *appsv1alpha1.CollaSet, *corev1.Pod, []*corev1.PersistentVolumeClaim) error
-	SetPvcsOwnerRef(*appsv1alpha1.CollaSet, []*corev1.PersistentVolumeClaim) ([]*corev1.PersistentVolumeClaim, error)
-	ReleasePvcsOwnerRef(*appsv1alpha1.CollaSet, []*corev1.PersistentVolumeClaim) ([]*corev1.PersistentVolumeClaim, error)
+	OrphanPvc(*appsv1alpha1.CollaSet, *corev1.PersistentVolumeClaim) error
+	AdoptPvc(*appsv1alpha1.CollaSet, *corev1.PersistentVolumeClaim) error
 }
 
 type RealPvcControl struct {
@@ -72,29 +70,6 @@ func (pc *RealPvcControl) GetFilteredPvcs(ctx context.Context, cls *appsv1alpha1
 		}
 	}
 	return filteredPVCs, nil
-}
-
-func (pc *RealPvcControl) AdoptOrphanedPvcs(ctx context.Context, cls *appsv1alpha1.CollaSet) ([]*corev1.PersistentVolumeClaim, error) {
-	orphanedPvcList := &corev1.PersistentVolumeClaimList{}
-	selector, err := metav1.LabelSelectorAsSelector(cls.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
-	if err = pc.client.List(ctx, orphanedPvcList, &client.ListOptions{Namespace: cls.Namespace,
-		LabelSelector: selector}); err != nil {
-		return nil, err
-	}
-
-	// adopt orphaned pvcs
-	var claims []*corev1.PersistentVolumeClaim
-	for i := range orphanedPvcList.Items {
-		pvc := orphanedPvcList.Items[i]
-		if pvc.OwnerReferences != nil && len(pvc.OwnerReferences) > 0 {
-			continue
-		}
-		claims = append(claims, &pvc)
-	}
-	return pc.SetPvcsOwnerRef(cls, claims)
 }
 
 func (pc *RealPvcControl) CreatePodPvcs(ctx context.Context, cls *appsv1alpha1.CollaSet, pod *corev1.Pod, existingPvcs []*corev1.PersistentVolumeClaim) error {
@@ -215,49 +190,38 @@ func (pc *RealPvcControl) DeletePodUnusedPvcs(ctx context.Context, cls *appsv1al
 	return nil
 }
 
-func (pc *RealPvcControl) SetPvcsOwnerRef(cls *appsv1alpha1.CollaSet, pvcs []*corev1.PersistentVolumeClaim) ([]*corev1.PersistentVolumeClaim, error) {
-	claimPvcs := make([]*corev1.PersistentVolumeClaim, len(pvcs))
-
+func (pc *RealPvcControl) OrphanPvc(cls *appsv1alpha1.CollaSet, pvc *corev1.PersistentVolumeClaim) error {
 	if cls.Spec.Selector.MatchLabels == nil {
-		return claimPvcs, nil
+		return nil
 	}
 	cm, err := refmanagerutil.NewRefManager(pc.client, cls.Spec.Selector, cls, pc.scheme)
 	if err != nil {
-		return claimPvcs, fmt.Errorf("fail to create ref manager: %s", err)
+		return fmt.Errorf("fail to create ref manager: %s", err)
 	}
 
-	var candidates = make([]client.Object, len(pvcs))
-	for i, pvc := range pvcs {
-		candidates[i] = pvc
+	if pvc.Labels == nil {
+		pvc.Labels = make(map[string]string)
 	}
-	claims, err := cm.ClaimOwned(candidates)
-	if err != nil {
-		return claimPvcs, err
+	if pvc.Annotations == nil {
+		pvc.Annotations = make(map[string]string)
 	}
-	for i, mt := range claims {
-		claimPvcs[i] = mt.(*corev1.PersistentVolumeClaim)
-	}
-
-	return claimPvcs, nil
+	return cm.Release(pvc)
 }
 
-func (pc *RealPvcControl) ReleasePvcsOwnerRef(cls *appsv1alpha1.CollaSet, pvcs []*corev1.PersistentVolumeClaim) ([]*corev1.PersistentVolumeClaim, error) {
+func (pc *RealPvcControl) AdoptPvc(cls *appsv1alpha1.CollaSet, pvc *corev1.PersistentVolumeClaim) error {
 	if cls.Spec.Selector.MatchLabels == nil {
-		return pvcs, nil
+		return nil
 	}
-
 	cm, err := refmanagerutil.NewRefManager(pc.client, cls.Spec.Selector, cls, pc.scheme)
 	if err != nil {
-		return pvcs, fmt.Errorf("fail to create ref manager: %s", err)
+		return fmt.Errorf("fail to create ref manager: %s", err)
 	}
 
-	for _, pvc := range pvcs {
-		if err = cm.Release(pvc); err != nil {
-			return pvcs, err
-		}
+	_, err = cm.ClaimOwned([]client.Object{pvc})
+	if err != nil {
+		return err
 	}
-
-	return pvcs, nil
+	return nil
 }
 
 // classify pvcs into old and new ones

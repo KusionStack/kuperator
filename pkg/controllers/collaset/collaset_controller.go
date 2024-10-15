@@ -235,6 +235,11 @@ func (r *CollaSetReconciler) doSync(
 		return podWrappers, nil, err
 	}
 
+	podWrappers, ownedIDs, err = r.syncControl.Replace(ctx, instance, podWrappers, ownedIDs, resources)
+	if err != nil {
+		return podWrappers, nil, err
+	}
+
 	_, scaleRequeueAfter, scaleErr := r.syncControl.Scale(ctx, instance, resources, podWrappers, ownedIDs)
 	_, updateRequeueAfter, updateErr := r.syncControl.Update(ctx, instance, resources, podWrappers, ownedIDs)
 
@@ -361,10 +366,12 @@ func (r *CollaSetReconciler) ensureReclaimPvcs(ctx context.Context, cls *appsv1a
 			needReclaimPvcs = append(needReclaimPvcs, pvcs[i])
 		}
 	}
-	if len(needReclaimPvcs) > 0 {
-		_, err = pvcControl.ReleasePvcsOwnerRef(cls, needReclaimPvcs)
+	for i := range needReclaimPvcs {
+		if err = pvcControl.OrphanPvc(cls, needReclaimPvcs[i]); err != nil {
+			return err
+		}
 	}
-	return err
+	return nil
 }
 
 func (r *CollaSetReconciler) ensureReclaimPodOwnerReferences(cls *appsv1alpha1.CollaSet) error {

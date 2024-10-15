@@ -126,7 +126,10 @@ func (t *CollaSetTester) ListPVCForCollaSet(cls *appsv1alpha1.CollaSet) (pvcs []
 	}
 	for i := range pvcList.Items {
 		pvc := &pvcList.Items[i]
-		if pvc.DeletionTimestamp.IsZero() {
+		if pvc.DeletionTimestamp != nil {
+			continue
+		}
+		if owner := metav1.GetControllerOf(pvc); owner != nil && owner.Name == cls.Name {
 			pvcs = append(pvcs, pvc)
 		}
 	}
