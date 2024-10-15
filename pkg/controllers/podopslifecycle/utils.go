@@ -79,8 +79,8 @@ func IDToLabelsMap(pod *corev1.Pod) (map[string]map[string]string, map[string]in
 	return idToLabelsMap, typeToNumsMap, nil
 }
 
-// IsLifecycleIDOnPod returns true if the lifecycle with lifecycleId exist on pod, otherwise returns false
-func IsLifecycleIDOnPod(lifecycleId string, obj client.Object) (bool, error) {
+// IsLifecycleOnPod returns true if the lifecycle with lifecycleId exist on pod, otherwise returns false
+func IsLifecycleOnPod(lifecycleId string, obj client.Object) (bool, error) {
 	pod := obj.(*corev1.Pod)
 	if pod == nil {
 		return false, nil
@@ -90,8 +90,8 @@ func IsLifecycleIDOnPod(lifecycleId string, obj client.Object) (bool, error) {
 	return exist, err
 }
 
-// NumOfLifecycleIDOnPod returns the nums of lifecycles on pod
-func NumOfLifecycleIDOnPod(pod *corev1.Pod) (int, error) {
+// NumOfLifecycleOnPod returns the nums of lifecycles on pod
+func NumOfLifecycleOnPod(pod *corev1.Pod) (int, error) {
 	if pod == nil {
 		return 0, nil
 	}

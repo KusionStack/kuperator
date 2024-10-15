@@ -89,7 +89,7 @@ func Begin(c client.Client, adapter LifecycleAdapter, obj client.Object, updateF
 
 // BeginWithCleaningOld is used for an CRD Operator to begin a lifecycle with cleaning the old lifecycle
 func BeginWithCleaningOld(c client.Client, adapter LifecycleAdapter, obj client.Object, updateFunc ...UpdateFunc) (updated bool, err error) {
-	if podInUpdateLifecycle, err := podopslifecycleutil.IsLifecycleIDOnPod(adapter.GetID(), obj); err != nil {
+	if podInUpdateLifecycle, err := podopslifecycleutil.IsLifecycleOnPod(adapter.GetID(), obj); err != nil {
 		return false, fmt.Errorf("fail to check %s PodOpsLifecycle on Pod %s/%s: %s", adapter.GetID(), obj.GetNamespace(), obj.GetName(), err)
 	} else if podInUpdateLifecycle {
 		return false, Undo(c, adapter, obj)
