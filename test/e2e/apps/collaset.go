@@ -511,6 +511,68 @@ var _ = SIGDescribe("CollaSet", func() {
 
 		})
 
+		framework.ConformanceIt("operationDelaySeconds", func() {
+			cls := tester.NewCollaSet("collaset-"+randStr, 3, appsv1alpha1.UpdateStrategy{})
+			cls.Spec.UpdateStrategy = appsv1alpha1.UpdateStrategy{
+				OperationDelaySeconds: int32Pointer(10),
+				RollingUpdate: &appsv1alpha1.RollingUpdateCollaSetStrategy{
+					ByLabel: &appsv1alpha1.ByLabel{},
+				},
+			}
+			Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
+
+			By("Wait for status replicas satisfied")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 3, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Update image to nginxNew but pods are not updated")
+			Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
+				cls.Spec.Template.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.NginxNew)
+			})).NotTo(HaveOccurred())
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 0, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Wait for CollaSet reconciled")
+			Eventually(func() bool {
+				if err := tester.GetCollaSet(cls); err != nil {
+					return false
+				}
+				return cls.Generation == cls.Status.ObservedGeneration
+			}, 10*time.Second, 3*time.Second).Should(Equal(true))
+
+			By("Label pod to trigger update")
+			pods, err := tester.ListPodsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			podToUpdate := pods[0]
+			Expect(tester.UpdatePod(podToUpdate, func(pod *v1.Pod) {
+				pod.Labels[appsv1alpha1.CollaSetUpdateIndicateLabelKey] = "true"
+			})).NotTo(HaveOccurred())
+
+			By("Check operationDelaySeconds")
+			var startTime time.Time
+			var duration time.Duration
+			Eventually(func() bool {
+				Expect(client.Get(context.Background(), types.NamespacedName{Namespace: podToUpdate.Namespace, Name: podToUpdate.Name}, podToUpdate)).Should(BeNil())
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+				if startedTimestampStr, started := podToUpdate.Labels[labelOperate]; started {
+					startedTimestamp, _ := strconv.ParseInt(startedTimestampStr, 10, 64)
+					startTime = time.Unix(0, startedTimestamp)
+					return true
+				}
+				return false
+			}, 5*time.Second, 3*time.Second).Should(BeTrue())
+			Eventually(func() bool {
+				Expect(client.Get(context.Background(), types.NamespacedName{Namespace: podToUpdate.Namespace, Name: podToUpdate.Name}, podToUpdate)).Should(BeNil())
+				if _, end := podToUpdate.Labels[appsv1alpha1.PodServiceAvailableLabel]; end {
+					duration = time.Since(startTime)
+					return true
+				}
+				return false
+			}, 12*time.Second, time.Second).Should(BeTrue())
+			Expect(duration > time.Duration(*cls.Spec.UpdateStrategy.OperationDelaySeconds)*time.Second).Should(BeTrue())
+
+			By("Wait for update finished")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 1, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+		})
+
 		framework.ConformanceIt("PVC template update", func() {
 			cls := tester.NewCollaSet("collaset-"+randStr, 2, appsv1alpha1.UpdateStrategy{})
 			cls.Spec.VolumeClaimTemplates = []v1.PersistentVolumeClaim{
