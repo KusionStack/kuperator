@@ -157,11 +157,11 @@ func (r *RealSyncControl) dealIncludeExcludePods(ctx context.Context, cls *appsv
 
 	toExcludePods, notAllowedExcludePods, exErr := r.allowIncludeExcludePods(ctx, cls, excludePodNames.List(), collasetutils.AllowResourceExclude)
 	toIncludePods, notAllowedIncludePods, inErr := r.allowIncludeExcludePods(ctx, cls, includePodNames.List(), collasetutils.AllowResourceInclude)
-	if len(notAllowedExcludePods) > 0 {
-		r.recorder.Eventf(cls, corev1.EventTypeWarning, "ExcludeNotAllowed", fmt.Sprintf("pods are not allowed to exclude [%v]", notAllowedExcludePods.List()))
+	if notAllowedExcludePods.Len() > 0 {
+		r.recorder.Eventf(cls, corev1.EventTypeWarning, "ExcludeNotAllowed", fmt.Sprintf("pods [%v] are not allowed to exclude, please find out the reason from pod's event", notAllowedExcludePods.List()))
 	}
-	if len(notAllowedIncludePods) > 0 {
-		r.recorder.Eventf(cls, corev1.EventTypeWarning, "IncludeNotAllowed", fmt.Sprintf("pods are not allowed to include [%v]", notAllowedIncludePods.List()))
+	if notAllowedIncludePods.Len() > 0 {
+		r.recorder.Eventf(cls, corev1.EventTypeWarning, "IncludeNotAllowed", fmt.Sprintf("pods [%v] are not allowed to include, please find out the reason from pod's event", notAllowedIncludePods.List()))
 	}
 	return toExcludePods, toIncludePods, controllerutils.AggregateErrors([]error{exErr, inErr})
 }
@@ -177,19 +177,22 @@ func (r *RealSyncControl) allowIncludeExcludePods(ctx context.Context, cls *apps
 		pod := &corev1.Pod{}
 		err = r.client.Get(ctx, types.NamespacedName{Namespace: cls.Namespace, Name: podNames[i]}, pod)
 		if errors.IsNotFound(err) {
-			notAllowPods.Insert(pod.Name)
+			notAllowPods.Insert(podNames[i])
 			continue
 		} else if err != nil {
-			r.recorder.Eventf(cls, corev1.EventTypeWarning, "ExcludeIncludeNotAllowed", fmt.Sprintf("failed to find pod %s: %s", podNames[i], err.Error()))
+			r.recorder.Eventf(cls, corev1.EventTypeWarning, "ExcludeIncludeFailed", fmt.Sprintf("failed to find pod %s: %s", podNames[i], err.Error()))
 			return
 		}
 
+		// check allowance for pod
 		if allowed, reason := fn(pod, cls.Name, cls.Kind); !allowed {
 			r.recorder.Eventf(pod, corev1.EventTypeWarning, "ExcludeIncludeNotAllowed", fmt.Sprintf("pod is not allowed to exlcude/include from/to collaset %s/%s: %s", cls.Namespace, cls.Name, reason))
 			notAllowPods.Insert(pod.Name)
 			continue
 		}
 
+		pvcsAllowed := true
+		// check allowance for pvcs
 		for _, volume := range pod.Spec.Volumes {
 			if volume.PersistentVolumeClaim == nil {
 				continue
@@ -201,15 +204,19 @@ func (r *RealSyncControl) allowIncludeExcludePods(ctx context.Context, cls *apps
 				continue
 			} else if err != nil {
 				r.recorder.Eventf(pod, corev1.EventTypeWarning, "ExcludeIncludeNotAllowed", fmt.Sprintf("failed to check allowed to exlcude/include from/to collaset %s/%s: %s", cls.Namespace, cls.Name, err.Error()))
-				return
+				pvcsAllowed = false
+				break
 			}
 			if allowed, reason := fn(pvc, cls.Name, cls.Kind); !allowed {
-				r.recorder.Eventf(pod, corev1.EventTypeWarning, "ExcludeIncludeNotAllowed", fmt.Sprintf("pod is not allowed to exlcude/include from/to collaset %s/%s: %s", cls.Namespace, cls.Name, reason))
+				r.recorder.Eventf(pod, corev1.EventTypeWarning, "ExcludeIncludeNotAllowed", fmt.Sprintf("pvc is not allowed to exlcude/include from/to collaset %s/%s: %s", cls.Namespace, cls.Name, reason))
 				notAllowPods.Insert(pod.Name)
-				continue
+				pvcsAllowed = false
+				break
 			}
 		}
-		allowPods.Insert(pod.Name)
+		if pvcsAllowed {
+			allowPods.Insert(pod.Name)
+		}
 	}
 	return allowPods, notAllowPods, nil
 }

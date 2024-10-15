@@ -209,7 +209,7 @@ func (r *RealSyncControl) SyncPods(
 			return false, nil, nil, getErr
 		}
 		if err = r.doIncludeExcludePods(ctx, instance, toExcludePodNames.List(), toIncludePodNames.List(), availableContexts); err != nil {
-			r.recorder.Eventf(instance, corev1.EventTypeWarning, "DoExcludeIncludePod", "collaset syncPods include exclude with error: %s", err.Error())
+			r.recorder.Eventf(instance, corev1.EventTypeWarning, "ExcludeIncludeFailed", "collaset syncPods include exclude with error: %s", err.Error())
 			return false, nil, nil, err
 		}
 		inExSucceed = true
