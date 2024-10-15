@@ -40,7 +40,6 @@ import (
 	"kusionstack.io/kuperator/pkg/controllers/collaset/pvccontrol"
 	"kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
-	podopslifecycleutil "kusionstack.io/kuperator/pkg/controllers/podopslifecycle"
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration"
@@ -365,13 +364,7 @@ func (u *GenericPodUpdater) BeginUpdatePod(_ context.Context, resources *collase
 		podInfo := <-podCh
 		u.Recorder.Eventf(podInfo.Pod, corev1.EventTypeNormal, "PodUpdateLifecycle", "try to begin PodOpsLifecycle for updating Pod of CollaSet")
 
-		if podInUpdateLifecycle, err := podopslifecycleutil.IsLifecycleOnPod(collasetutils.UpdateOpsLifecycleAdapter.GetID(), podInfo.Pod); err != nil {
-			return fmt.Errorf("fail to check %s PodOpsLifecycle on Pod %s/%s: %s", collasetutils.UpdateOpsLifecycleAdapter.GetID(), podInfo.Pod.Namespace, podInfo.Pod.Name, err)
-		} else if podInUpdateLifecycle {
-			return podopslifecycle.Undo(u.Client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod)
-		}
-
-		if updated, err := podopslifecycle.Begin(u.Client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod, func(obj client.Object) (bool, error) {
+		if updated, err := podopslifecycle.BeginWithCleaningOld(u.Client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod, func(obj client.Object) (bool, error) {
 			if !podInfo.OnlyMetadataChanged && !podInfo.InPlaceUpdateSupport {
 				return podopslifecycle.WhenBeginDelete(obj)
 			}

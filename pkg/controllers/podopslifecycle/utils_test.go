@@ -269,7 +269,7 @@ func TestIsLifecycleOnPod(t *testing.T) {
 				},
 			}
 
-			got, err := IsLifecycleOnPod(c.lifecycleId, pod)
+			got, err := IsLifecycleIDOnPod(c.lifecycleId, pod)
 			if c.err != nil {
 				if err == nil {
 					t.Errorf("%s, expect err %v, got nil", c.keyWords, c.err)
@@ -278,7 +278,7 @@ func TestIsLifecycleOnPod(t *testing.T) {
 				}
 			}
 			if got != c.want {
-				t.Errorf("IsLifecycleOnPod() got = %v, want %v", got, c.want)
+				t.Errorf("IsLifecycleIDOnPod() got = %v, want %v", got, c.want)
 			}
 		})
 	}
@@ -359,7 +359,7 @@ func TestNumOfLifecycleOnPod(t *testing.T) {
 				},
 			}
 
-			got, err := NumOfLifecycleOnPod(pod)
+			got, err := NumOfLifecycleIDOnPod(pod)
 			if c.err != nil {
 				if err == nil {
 					t.Errorf("%s, expect err %v, got nil", c.keyWords, c.err)
@@ -368,7 +368,7 @@ func TestNumOfLifecycleOnPod(t *testing.T) {
 				}
 			}
 			if got != c.want {
-				t.Errorf("NumOfLifecycleOnPod() got = %v, want %v", got, c.want)
+				t.Errorf("NumOfLifecycleIDOnPod() got = %v, want %v", got, c.want)
 			}
 		})
 	}

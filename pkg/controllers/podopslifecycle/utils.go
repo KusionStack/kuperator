@@ -22,6 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/kube-api/apps/v1alpha1"
 )
@@ -78,8 +79,9 @@ func IDToLabelsMap(pod *corev1.Pod) (map[string]map[string]string, map[string]in
 	return idToLabelsMap, typeToNumsMap, nil
 }
 
-// IsLifecycleOnPod returns true if the lifecycle with lifecycleId exist on pod, otherwise returns false
-func IsLifecycleOnPod(lifecycleId string, pod *corev1.Pod) (bool, error) {
+// IsLifecycleIDOnPod returns true if the lifecycle with lifecycleId exist on pod, otherwise returns false
+func IsLifecycleIDOnPod(lifecycleId string, obj client.Object) (bool, error) {
+	pod := obj.(*corev1.Pod)
 	if pod == nil {
 		return false, nil
 	}
@@ -88,8 +90,8 @@ func IsLifecycleOnPod(lifecycleId string, pod *corev1.Pod) (bool, error) {
 	return exist, err
 }
 
-// NumOfLifecycleOnPod returns the nums of lifecycles on pod
-func NumOfLifecycleOnPod(pod *corev1.Pod) (int, error) {
+// NumOfLifecycleIDOnPod returns the nums of lifecycles on pod
+func NumOfLifecycleIDOnPod(pod *corev1.Pod) (int, error) {
 	if pod == nil {
 		return 0, nil
 	}

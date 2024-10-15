@@ -33,7 +33,7 @@ func BeginOperateLifecycle(client client.Client, adapter podopslifecycle.Lifecyc
 	}
 
 	// not start to operate until other lifecycles finished
-	if num, err := podopslifecycleutil.NumOfLifecycleOnPod(pod); err != nil {
+	if num, err := podopslifecycleutil.NumOfLifecycleIDOnPod(pod); err != nil {
 		return false, err
 	} else if num > 0 {
 		return false, nil
@@ -70,7 +70,7 @@ func CancelOpsLifecycle(client client.Client, adapter podopslifecycle.LifecycleA
 	}
 
 	// only cancel when lifecycle exist on pod
-	if exist, err := podopslifecycleutil.IsLifecycleOnPod(adapter.GetID(), pod); err != nil {
+	if exist, err := podopslifecycleutil.IsLifecycleIDOnPod(adapter.GetID(), pod); err != nil {
 		return fmt.Errorf("fail to check %s PodOpsLifecycle on Pod %s/%s: %s", adapter.GetID(), pod.Namespace, pod.Name, err)
 	} else if !exist {
 		return nil

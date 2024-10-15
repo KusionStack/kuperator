@@ -27,6 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/kube-api/apps/v1alpha1"
+
+	podopslifecycleutil "kusionstack.io/kuperator/pkg/controllers/podopslifecycle"
 )
 
 // IsDuringOps decides whether the Pod is during ops or not
@@ -83,6 +85,16 @@ func Begin(c client.Client, adapter LifecycleAdapter, obj client.Object, updateF
 	}
 
 	return false, nil
+}
+
+// BeginWithCleaningOld is used for an CRD Operator to begin a lifecycle with cleaning the old lifecycle
+func BeginWithCleaningOld(c client.Client, adapter LifecycleAdapter, obj client.Object, updateFunc ...UpdateFunc) (updated bool, err error) {
+	if podInUpdateLifecycle, err := podopslifecycleutil.IsLifecycleIDOnPod(adapter.GetID(), obj); err != nil {
+		return false, fmt.Errorf("fail to check %s PodOpsLifecycle on Pod %s/%s: %s", adapter.GetID(), obj.GetNamespace(), obj.GetName(), err)
+	} else if podInUpdateLifecycle {
+		return false, Undo(c, adapter, obj)
+	}
+	return Begin(c, adapter, obj, updateFunc...)
 }
 
 // AllowOps is used to check whether the PodOpsLifecycle phase is in UPGRADE to do following operations.
