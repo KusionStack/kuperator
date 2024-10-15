@@ -22,6 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/kube-api/apps/v1alpha1"
 )
@@ -33,12 +34,15 @@ func IDToLabelsMap(pod *corev1.Pod) (map[string]map[string]string, map[string]in
 
 	ids := sets.String{}
 	for k := range pod.Labels {
-		if strings.HasPrefix(k, v1alpha1.PodOperatingLabelPrefix) || strings.HasPrefix(k, v1alpha1.PodOperateLabelPrefix) || strings.HasPrefix(k, v1alpha1.PodOperatedLabelPrefix) {
-			s := strings.Split(k, "/")
-			if len(s) < 2 {
-				return nil, nil, fmt.Errorf("invalid label %s", k)
+		for _, prefix := range v1alpha1.WellKnownLabelPrefixesWithID {
+			if strings.HasPrefix(k, prefix) {
+				s := strings.Split(k, "/")
+				if len(s) < 2 {
+					return nil, nil, fmt.Errorf("invalid label %s", k)
+				}
+				ids.Insert(s[1])
+				break
 			}
-			ids.Insert(s[1])
 		}
 	}
 
@@ -76,7 +80,8 @@ func IDToLabelsMap(pod *corev1.Pod) (map[string]map[string]string, map[string]in
 }
 
 // IsLifecycleOnPod returns true if the lifecycle with lifecycleId exist on pod, otherwise returns false
-func IsLifecycleOnPod(lifecycleId string, pod *corev1.Pod) (bool, error) {
+func IsLifecycleOnPod(lifecycleId string, obj client.Object) (bool, error) {
+	pod := obj.(*corev1.Pod)
 	if pod == nil {
 		return false, nil
 	}

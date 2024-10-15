@@ -17,11 +17,9 @@ limitations under the License.
 package utils
 
 import (
-	"context"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	podopslifecycleutil "kusionstack.io/kuperator/pkg/controllers/podopslifecycle"
@@ -66,22 +64,17 @@ func FinishOperateLifecycle(client client.Client, adapter podopslifecycle.Lifecy
 	return nil
 }
 
-func CancelOpsLifecycle(ctx context.Context, client client.Client, adapter podopslifecycle.LifecycleAdapter, pod *corev1.Pod) error {
+func CancelOpsLifecycle(client client.Client, adapter podopslifecycle.LifecycleAdapter, pod *corev1.Pod) error {
 	if pod == nil {
 		return nil
 	}
 
 	// only cancel when lifecycle exist on pod
 	if exist, err := podopslifecycleutil.IsLifecycleOnPod(adapter.GetID(), pod); err != nil {
-		return err
+		return fmt.Errorf("fail to check %s PodOpsLifecycle on Pod %s/%s: %s", adapter.GetID(), pod.Namespace, pod.Name, err)
 	} else if !exist {
 		return nil
 	}
 
-	labelUndo := fmt.Sprintf("%s/%s", appsv1alpha1.PodUndoOperationTypeLabelPrefix, adapter.GetID())
-	if pod.Labels == nil {
-		pod.Labels = make(map[string]string)
-	}
-	pod.Labels[labelUndo] = string(adapter.GetType())
-	return client.Update(ctx, pod)
+	return podopslifecycle.Undo(client, adapter, pod)
 }
