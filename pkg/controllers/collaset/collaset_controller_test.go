@@ -3258,9 +3258,20 @@ var _ = Describe("collaset controller", func() {
 			},
 		}
 
+		Expect(c.Create(context.TODO(), podDecoration)).Should(BeNil())
+
 		// allow Pod to do update
 		for i := range podList.Items {
 			pod := podList.Items[i]
+			Eventually(func() bool {
+				Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, &pod)).Should(BeNil())
+				for k := range pod.Labels {
+					if strings.HasPrefix(k, appsv1alpha1.PodOperatingLabelPrefix) {
+						return true
+					}
+				}
+				return false
+			}, time.Second*10, time.Second).Should(BeTrue())
 			Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
 				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
 				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
@@ -3268,7 +3279,6 @@ var _ = Describe("collaset controller", func() {
 			})).Should(BeNil())
 		}
 
-		Expect(c.Create(context.TODO(), podDecoration)).Should(BeNil())
 		Eventually(func() int32 {
 			err := c.Get(context.TODO(), types.NamespacedName{Namespace: podDecoration.Namespace, Name: podDecoration.Name}, podDecoration)
 			if !errors.IsNotFound(err) {
