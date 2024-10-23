@@ -238,8 +238,8 @@ func TestAllowResourceInclude(t *testing.T) {
 					},
 				},
 			},
-			allow:  false,
-			reason: "object's is controlled by CollaSet/test, but marked as orphaned",
+			allow:  true,
+			reason: "",
 		},
 		{
 			name: "allowed case1",
