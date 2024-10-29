@@ -216,7 +216,7 @@ func (r *RealSyncControl) SyncPods(
 		inExSucceed = true
 	}
 
-	// reclaim Pod ID which is (1) during ScalingIn, (3) ExcludePods; besides, Pod & PVC are all non-existing
+	// reclaim Pod ID which is (1) during ScalingIn, (2) ExcludePods
 	err = r.reclaimOwnedIDs(false, instance, idToReclaim, ownedIDs, resources.CurrentIDs)
 	if err != nil {
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReclaimOwnedIDs", "reclaim pod contexts with error: %s", err.Error())
