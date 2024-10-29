@@ -154,6 +154,7 @@ func (r *RealSyncControl) replaceOriginPods(
 			ownedIDs[newPodId].Remove(podcontext.JustCreateContextDataKey)
 		}
 		newPod.Labels[appsv1alpha1.PodReplacePairOriginName] = originPod.GetName()
+		newPod.Labels[appsv1alpha1.PodCreatingLabel] = strconv.FormatInt(time.Now().UnixNano(), 10)
 		newPodContext.Put(podcontext.RevisionContextDataKey, replaceRevision.Name)
 		// create pvcs for new pod
 		err = r.pvcControl.CreatePodPvcs(ctx, instance, newPod, resources.ExistingPvcs)

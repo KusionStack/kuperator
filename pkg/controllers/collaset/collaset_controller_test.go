@@ -130,6 +130,19 @@ var _ = Describe("collaset controller", func() {
 				return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)
 			}, 5*time.Second, 1*time.Second).Should(BeNil())
 
+			Eventually(func() bool {
+				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+				return len(podList.Items) == 2
+			}, 5*time.Second, 1*time.Second).Should(BeTrue())
+
+			for _, pod := range podList.Items {
+				if pod.Name == originPodName {
+					continue
+				}
+
+				Expect(pod.Labels[appsv1alpha1.PodCreatingLabel]).ShouldNot(BeEquivalentTo(""))
+			}
+
 			// update collaset with recreate update
 			observedGeneration := cs.Status.ObservedGeneration
 			Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
