@@ -274,6 +274,9 @@ var _ = Describe("collaset controller", func() {
 		}, 5*time.Second, 1*time.Second).Should(BeTrue())
 		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
+		for _, pod := range podList.Items {
+			Expect(pod.Labels[appsv1alpha1.PodCreatingLabel]).ShouldNot(BeEquivalentTo(""))
+		}
 
 		// pod replica will be kept, after deleted
 		podToDelete := &podList.Items[0]
@@ -989,6 +992,8 @@ var _ = Describe("collaset controller", func() {
 		// manual changes should have lower priority than PodTemplate changes
 		Expect(pod.Labels["test1"]).Should(BeEquivalentTo("v4"))
 		Expect(pod.Labels["test2"]).Should(BeEquivalentTo("v1"))
+		Expect(pod.Labels[appsv1alpha1.PodCompletingLabel]).ShouldNot(BeEquivalentTo(""))
+		Expect(pod.Labels[appsv1alpha1.PodCreatingLabel]).Should(BeEquivalentTo(""))
 
 		_, exist = pod.Labels["manual-added"]
 		Expect(exist).Should(BeFalse())
