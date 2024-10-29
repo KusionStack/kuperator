@@ -185,20 +185,19 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 		v1alpha1.PodPreparingLabelPrefix:  false, // Set readiness gate to false
 		v1alpha1.PodCompletingLabelPrefix: true,  // Set readiness gate to true
 	}
-	for _, k := range []string{v1alpha1.PodPreparingLabelPrefix, v1alpha1.PodCompletingLabelPrefix} {
-		v := expected[k]
+	for phaseLabel, expectedReadinessGateStatus := range expected {
 		keeped := false
 		for _, labels := range idToLabelsMap {
-			if _, ok := labels[k]; !ok {
+			if _, ok := labels[phaseLabel]; !ok {
 				continue
 			}
 
-			updated, err := r.updateServiceReadiness(ctx, pod, v)
+			updated, err := r.updateServiceReadiness(ctx, pod, expectedReadinessGateStatus)
 			if err != nil {
 				return reconcile.Result{}, err // Only need set once
 			}
 			if updated {
-				logger.Info("update readiness gate", "status", v)
+				logger.Info("update readiness gate", "status", expectedReadinessGateStatus)
 			}
 			keeped = true
 		}
@@ -221,7 +220,7 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 // addServiceAvailable try to add service available label to pod
 func (r *ReconcilePodOpsLifecycle) addServiceAvailable(pod *corev1.Pod) (bool, error) {
 	if pod.Labels == nil {
-		return false, nil
+		pod.Labels = map[string]string{}
 	}
 	if _, ok := pod.Labels[v1alpha1.PodServiceAvailableLabel]; ok {
 		return false, nil
@@ -248,10 +247,29 @@ func (r *ReconcilePodOpsLifecycle) addServiceAvailable(pod *corev1.Pod) (bool, e
 		return false, nil
 	}
 
-	podLabelsToAdd := map[string]string{
-		v1alpha1.PodServiceAvailableLabel: strconv.FormatInt(time.Now().UnixNano(), 10),
+	key := controllerKey(pod)
+	r.expectation.ExpectUpdate(key, pod.ResourceVersion)
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		newPod := &corev1.Pod{}
+		err := r.Client.Get(context.Background(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, newPod)
+		if err != nil {
+			return err
+		}
+		if newPod.Labels == nil {
+			newPod.Labels = map[string]string{}
+		}
+		newPod.Labels[v1alpha1.PodServiceAvailableLabel] = strconv.FormatInt(time.Now().UnixNano(), 10)
+		delete(newPod.Labels, v1alpha1.PodCreatingLabel)
+		delete(newPod.Labels, v1alpha1.PodCompletingLabel)
+
+		return r.Client.Update(context.Background(), newPod)
+	})
+	if err != nil {
+		r.Logger.Error(err, "failed to set Pod as service available", "pod", utils.ObjectKeyString(pod))
+		r.expectation.DeleteExpectations(key)
 	}
-	return true, r.addLabels(context.Background(), pod, podLabelsToAdd)
+
+	return true, err
 }
 
 func (r *ReconcilePodOpsLifecycle) removeDirtyExpectedFinalizer(pod *corev1.Pod, notSatisfiedFinalizers map[string]string) (bool, error) {
