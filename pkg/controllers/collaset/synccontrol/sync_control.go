@@ -343,6 +343,11 @@ func (r *RealSyncControl) Scale(
 					revision,
 					func(in *corev1.Pod) (localErr error) {
 						in.Labels[appsv1alpha1.PodInstanceIDLabelKey] = fmt.Sprintf("%d", availableIDContext.ID)
+						if availableIDContext.Data[podcontext.JustCreateContextDataKey] == "true" {
+							in.Labels[appsv1alpha1.PodCreatingLabel] = strconv.FormatInt(time.Now().UnixNano(), 10)
+						} else {
+							in.Labels[appsv1alpha1.PodCompletingLabel] = strconv.FormatInt(time.Now().UnixNano(), 10)
+						}
 						revisionsInfo, ok := availableIDContext.Get(podcontext.PodDecorationRevisionKey)
 						var pds map[string]*appsv1alpha1.PodDecoration
 						if !ok {
