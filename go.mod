@@ -22,6 +22,7 @@ require (
 	k8s.io/klog/v2 v2.100.1
 	k8s.io/kubernetes v0.0.0-00010101000000-000000000000
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
+	kusionstack.io/kube-api v0.6.5
 	kusionstack.io/resourceconsist v0.0.1
 	sigs.k8s.io/controller-runtime v0.15.1
 )
@@ -94,7 +95,6 @@ require (
 	k8s.io/apiserver v0.22.6 // indirect
 	k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9 // indirect
 	k8s.io/kubectl v0.29.0
-	kusionstack.io/kube-api v0.6.4-0.20241029071130-eb39b9372954
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
