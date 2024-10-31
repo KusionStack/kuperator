@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/apis/core"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -110,6 +111,12 @@ func (h *ValidatingHandler) validateScaleStrategy(cls, oldCls *appsv1alpha1.Coll
 
 	if oldCls != nil && oldCls.Spec.ScaleStrategy.Context != cls.Spec.ScaleStrategy.Context {
 		allErrs = append(allErrs, field.Forbidden(fSpec.Child("scaleStrategy", "context"), "scaleStrategy.context is not allowed to be changed"))
+	}
+
+	excludePodNames := sets.NewString(cls.Spec.ScaleStrategy.PodToExclude...)
+	includePodNames := sets.NewString(cls.Spec.ScaleStrategy.PodToInclude...)
+	if len(excludePodNames.Intersection(includePodNames)) > 0 {
+		allErrs = append(allErrs, field.Forbidden(fSpec.Child("scaleStrategy", "poToExclude[poToInclude]"), "scaleStrategy.poToExclude[poToInclude] should not have intersection"))
 	}
 
 	return allErrs
