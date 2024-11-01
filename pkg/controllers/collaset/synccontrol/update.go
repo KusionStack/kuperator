@@ -47,7 +47,7 @@ import (
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 )
 
-const UnknownRevision = "UnknownRevision"
+const UnknownRevision = "__unknownRevision__"
 
 type PodUpdateInfo struct {
 	*utils.PodWrapper

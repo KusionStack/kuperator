@@ -113,12 +113,29 @@ func (h *ValidatingHandler) validateScaleStrategy(cls, oldCls *appsv1alpha1.Coll
 		allErrs = append(allErrs, field.Forbidden(fSpec.Child("scaleStrategy", "context"), "scaleStrategy.context is not allowed to be changed"))
 	}
 
+	allErrs = append(allErrs, h.validateScaleStrategyPodList(cls, fSpec)...)
+
+	return allErrs
+}
+
+func (h *ValidatingHandler) validateScaleStrategyPodList(cls *appsv1alpha1.CollaSet, fSpec *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
 	excludePodNames := sets.NewString(cls.Spec.ScaleStrategy.PodToExclude...)
 	includePodNames := sets.NewString(cls.Spec.ScaleStrategy.PodToInclude...)
-	if len(excludePodNames.Intersection(includePodNames)) > 0 {
-		allErrs = append(allErrs, field.Forbidden(fSpec.Child("scaleStrategy", "poToExclude[poToInclude]"), "scaleStrategy.poToExclude[poToInclude] should not have intersection"))
+	deletePodNames := sets.NewString(cls.Spec.ScaleStrategy.PodToDelete...)
+	isBtExInclude := excludePodNames.Intersection(includePodNames)
+	isBtDeInclude := deletePodNames.Intersection(includePodNames)
+	isBtDeExclude := deletePodNames.Intersection(excludePodNames)
+	if len(isBtExInclude) > 0 {
+		allErrs = append(allErrs, field.Forbidden(fSpec.Child("scaleStrategy", "podToExclude[podToInclude]"), fmt.Sprintf("scaleStrategy.podToExclude[podToInclude] should not have intersection %v", isBtExInclude.List())))
 	}
-
+	if len(isBtDeInclude) > 0 {
+		allErrs = append(allErrs, field.Forbidden(fSpec.Child("scaleStrategy", "podToDelete[podToInclude]"), fmt.Sprintf("scaleStrategy.podToDelete[podToInclude] should not have intersection %v", isBtDeInclude.List())))
+	}
+	if len(isBtDeExclude) > 0 {
+		allErrs = append(allErrs, field.Forbidden(fSpec.Child("scaleStrategy", "podToDelete[podToExclude]"), fmt.Sprintf("scaleStrategy.podToDelete[podToExclude] should not have intersection %v", isBtDeExclude.List())))
+	}
 	return allErrs
 }
 
