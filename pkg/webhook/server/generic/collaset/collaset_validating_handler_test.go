@@ -412,6 +412,201 @@ func TestValidatingCollaSet(t *testing.T) {
 				},
 			},
 		},
+		"intersection-of-pod-in-exclude": {
+			messageKeyWords: "scaleStrategy.podToExclude[podToInclude] should not have intersection [pod-1]",
+			cls: &appsv1alpha1.CollaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: appsv1alpha1.CollaSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "foo",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "foo",
+									Image: "image:v1",
+								},
+							},
+						},
+					},
+					ScaleStrategy: appsv1alpha1.ScaleStrategy{
+						Context:      "context",
+						PodToInclude: []string{"pod-1", "pod-2"},
+						PodToExclude: []string{"pod-1", "pod-3"},
+					},
+				},
+			},
+			old: &appsv1alpha1.CollaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: appsv1alpha1.CollaSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "foo",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "foo",
+									Image: "image:v1",
+								},
+							},
+						},
+					},
+					ScaleStrategy: appsv1alpha1.ScaleStrategy{
+						Context: "context",
+					},
+				},
+			},
+		},
+		"intersection-of-pod-del-exclude": {
+			messageKeyWords: "scaleStrategy.podToDelete[podToExclude] should not have intersection [pod-1]",
+			cls: &appsv1alpha1.CollaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: appsv1alpha1.CollaSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "foo",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "foo",
+									Image: "image:v1",
+								},
+							},
+						},
+					},
+					ScaleStrategy: appsv1alpha1.ScaleStrategy{
+						Context:      "context",
+						PodToDelete:  []string{"pod-1", "pod-2"},
+						PodToExclude: []string{"pod-1", "pod-3"},
+					},
+				},
+			},
+			old: &appsv1alpha1.CollaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: appsv1alpha1.CollaSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "foo",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "foo",
+									Image: "image:v1",
+								},
+							},
+						},
+					},
+					ScaleStrategy: appsv1alpha1.ScaleStrategy{
+						Context: "context",
+					},
+				},
+			},
+		},
+		"intersection-of-pod-del-include": {
+			messageKeyWords: "scaleStrategy.podToDelete[podToInclude] should not have intersection [pod-1]",
+			cls: &appsv1alpha1.CollaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: appsv1alpha1.CollaSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "foo",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "foo",
+									Image: "image:v1",
+								},
+							},
+						},
+					},
+					ScaleStrategy: appsv1alpha1.ScaleStrategy{
+						Context:      "context",
+						PodToInclude: []string{"pod-1", "pod-2"},
+						PodToDelete:  []string{"pod-1", "pod-3"},
+					},
+				},
+			},
+			old: &appsv1alpha1.CollaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: appsv1alpha1.CollaSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "foo",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "foo",
+									Image: "image:v1",
+								},
+							},
+						},
+					},
+					ScaleStrategy: appsv1alpha1.ScaleStrategy{
+						Context: "context",
+					},
+				},
+			},
+		},
 	}
 
 	for key, tc := range failureCases {

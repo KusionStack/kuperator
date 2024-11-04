@@ -21,6 +21,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration"
 )
 
@@ -31,6 +32,9 @@ type RelatedResources struct {
 	ExistingPvcs    []*corev1.PersistentVolumeClaim
 
 	PDGetter utilspoddecoration.Getter
+
+	FilteredPods []*corev1.Pod
+	CurrentIDs   map[int]struct{}
 
 	NewStatus *appsv1alpha1.CollaSetStatus
 }

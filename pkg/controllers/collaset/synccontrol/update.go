@@ -47,6 +47,8 @@ import (
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 )
 
+const UnknownRevision = "__unknownRevision__"
+
 type PodUpdateInfo struct {
 	*utils.PodWrapper
 
@@ -88,7 +90,7 @@ type PodUpdateInfo struct {
 	replacePairOriginPodName string
 }
 
-func attachPodUpdateInfo(ctx context.Context, cls *appsv1alpha1.CollaSet, pods []*collasetutils.PodWrapper, resource *collasetutils.RelatedResources) ([]*PodUpdateInfo, error) {
+func (r *RealSyncControl) attachPodUpdateInfo(ctx context.Context, cls *appsv1alpha1.CollaSet, pods []*collasetutils.PodWrapper, resource *collasetutils.RelatedResources) ([]*PodUpdateInfo, error) {
 	activePods := FilterOutPlaceHolderPodWrappers(pods)
 	podUpdateInfoList := make([]*PodUpdateInfo, len(activePods))
 
@@ -140,6 +142,19 @@ func attachPodUpdateInfo(ctx context.Context, cls *appsv1alpha1.CollaSet, pods [
 					}
 				}
 			}
+		}
+
+		// default CurrentRevision is an empty revision
+		if updateInfo.CurrentRevision == nil {
+			updateInfo.CurrentRevision = &appsv1.ControllerRevision{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: UnknownRevision,
+				},
+			}
+			r.recorder.Eventf(pod.Pod,
+				corev1.EventTypeWarning,
+				"PodCurrentRevisionNotFound",
+				"pod is going to be updated by recreate because: (1) controller-revision-hash label not found, or (2) not found in history revisions")
 		}
 
 		// decide whether the PodOpsLifecycle is during ops or not
@@ -255,7 +270,7 @@ func decidePodToUpdateByPartition(
 	cls *appsv1alpha1.CollaSet,
 	podInfos []*PodUpdateInfo) (podToUpdate []*PodUpdateInfo) {
 
-	filteredPodInfos := filterReplacingNewCreatedPod(podInfos)
+	filteredPodInfos := getTargetsUpdatePods(podInfos)
 	if cls.Spec.UpdateStrategy.RollingUpdate == nil ||
 		cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition == nil {
 		return filteredPodInfos
@@ -281,8 +296,8 @@ func decidePodToUpdateByPartition(
 	return podToUpdate
 }
 
-// filter these pods in replacing and is new created pod
-func filterReplacingNewCreatedPod(podInfos []*PodUpdateInfo) (filteredPodInfos []*PodUpdateInfo) {
+// when sort pods to choose update, only sort (1) replace origin pods, (2) non-exclude pods
+func getTargetsUpdatePods(podInfos []*PodUpdateInfo) (filteredPodInfos []*PodUpdateInfo) {
 	for _, podInfo := range podInfos {
 		if podInfo.isInReplacing && podInfo.replacePairOriginPodName != "" {
 			continue
