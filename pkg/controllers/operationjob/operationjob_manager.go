@@ -271,7 +271,7 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, 
 	}
 
 	if operationJob.Spec.TTLSecondsAfterFinished != nil {
-		if ojutils.IsJobFinished(operationJob) {
+		if ojutils.IsJobFinished(operationJob) && operationJob.Status.EndTime != nil {
 			leftTime := time.Duration(*operationJob.Spec.TTLSecondsAfterFinished)*time.Second - time.Since(operationJob.Status.EndTime.Time)
 			if leftTime > 0 {
 				return false, &leftTime, nil
