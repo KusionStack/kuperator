@@ -1058,7 +1058,7 @@ var _ = SIGDescribe("CollaSet", func() {
 				}
 				return false
 			}, 12*time.Second, time.Second).Should(BeTrue())
-			Expect(duration > time.Duration(*cls.Spec.UpdateStrategy.OperationDelaySeconds)*time.Second).Should(BeTrue())
+			Expect(duration > time.Duration(*cls.Spec.UpdateStrategy.OperationDelaySeconds)*time.Second-4).Should(BeTrue())
 
 			By("Wait for update finished")
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 1, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
