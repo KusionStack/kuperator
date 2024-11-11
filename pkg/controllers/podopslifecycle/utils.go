@@ -34,15 +34,12 @@ func IDToLabelsMap(pod *corev1.Pod) (map[string]map[string]string, map[string]in
 
 	ids := sets.String{}
 	for k := range pod.Labels {
-		for _, prefix := range v1alpha1.WellKnownLabelPrefixesWithID {
-			if strings.HasPrefix(k, prefix) {
-				s := strings.Split(k, "/")
-				if len(s) < 2 {
-					return nil, nil, fmt.Errorf("invalid label %s", k)
-				}
-				ids.Insert(s[1])
-				break
+		if strings.HasPrefix(k, v1alpha1.PodOperatingLabelPrefix) || strings.HasPrefix(k, v1alpha1.PodOperateLabelPrefix) || strings.HasPrefix(k, v1alpha1.PodOperatedLabelPrefix) {
+			s := strings.Split(k, "/")
+			if len(s) < 2 {
+				return nil, nil, fmt.Errorf("invalid label %s", k)
 			}
+			ids.Insert(s[1])
 		}
 	}
 
