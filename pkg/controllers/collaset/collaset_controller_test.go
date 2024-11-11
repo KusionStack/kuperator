@@ -3731,7 +3731,7 @@ var _ = Describe("collaset controller", func() {
 			return true
 		})).Should(BeNil())
 
-		// included pod should not have ownerReference
+		// included pod should have ownerReference
 		Eventually(func() bool {
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 			podIncluded := false
@@ -3748,7 +3748,7 @@ var _ = Describe("collaset controller", func() {
 			return podIncluded
 		}, 10*time.Second, 1*time.Second).Should(BeTrue())
 
-		// included pvc should not have ownerReference
+		// included pvc should have ownerReference
 		Eventually(func() bool {
 			pvcIncluded := false
 			Expect(c.List(context.TODO(), pvcList, client.InNamespace(cs.Namespace))).Should(BeNil())
@@ -3782,6 +3782,16 @@ var _ = Describe("collaset controller", func() {
 			}
 			return true
 		})).Should(BeNil())
+
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for k := range podList.Items[0].Labels {
+				if strings.HasPrefix(k, appsv1alpha1.PodOperatingLabelPrefix) {
+					return true
+				}
+			}
+			return false
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
 
 		// allow pod to update
 		Expect(c.List(context.TODO(), pvcList, client.InNamespace(cs.Namespace))).Should(BeNil())
