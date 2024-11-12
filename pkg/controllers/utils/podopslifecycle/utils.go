@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -89,10 +90,12 @@ func Begin(c client.Client, adapter LifecycleAdapter, obj client.Object, updateF
 
 // BeginWithCleaningOld is used for an CRD Operator to begin a lifecycle with cleaning the old lifecycle
 func BeginWithCleaningOld(c client.Client, adapter LifecycleAdapter, obj client.Object, updateFunc ...UpdateFunc) (updated bool, err error) {
-	if podInUpdateLifecycle, err := podopslifecycleutil.IsLifecycleOnPod(adapter.GetID(), obj); err != nil {
+	if podInUpdateLifecycle, err := podopslifecycleutil.IsLifecycleOnPod(adapter.GetID(), obj.(*corev1.Pod)); err != nil {
 		return false, fmt.Errorf("fail to check %s PodOpsLifecycle on Pod %s/%s: %s", adapter.GetID(), obj.GetNamespace(), obj.GetName(), err)
 	} else if podInUpdateLifecycle {
-		return false, Undo(c, adapter, obj)
+		if err := Undo(c, adapter, obj); err != nil {
+			return false, err
+		}
 	}
 	return Begin(c, adapter, obj, updateFunc...)
 }
