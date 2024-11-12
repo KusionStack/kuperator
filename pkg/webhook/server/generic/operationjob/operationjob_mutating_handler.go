@@ -22,7 +22,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"k8s.io/utils/pointer"
+	admissionv1 "k8s.io/api/admission/v1"
+	"k8s.io/utils/ptr"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -49,9 +50,12 @@ func NewMutatingHandler() *MutatingHandler {
 }
 
 func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
+	if req.Operation != admissionv1.Update && req.Operation != admissionv1.Create {
+		return admission.Allowed("")
+	}
 	opj := &appsv1alpha1.OperationJob{}
-	if err := h.Decoder.DecodeRaw(req.OldObject, opj); err != nil {
-		return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to unmarshal object: %s", err))
+	if err := h.Decoder.Decode(req, opj); err != nil {
+		return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to decode OperationJob: %s", err))
 	}
 
 	SetDefaultSpec(opj)
@@ -64,9 +68,9 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 
 func SetDefaultSpec(opj *appsv1alpha1.OperationJob) {
 	if opj.Spec.ActiveDeadlineSeconds == nil {
-		opj.Spec.ActiveDeadlineSeconds = pointer.Int32(defaultActiveDeadline)
+		opj.Spec.ActiveDeadlineSeconds = ptr.To(defaultActiveDeadline)
 	}
 	if opj.Spec.TTLSecondsAfterFinished == nil {
-		opj.Spec.TTLSecondsAfterFinished = pointer.Int32(defaultTTL)
+		opj.Spec.TTLSecondsAfterFinished = ptr.To(defaultTTL)
 	}
 }
