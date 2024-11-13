@@ -361,6 +361,17 @@ func (r *RealSyncControl) adoptPvcsLeftByRetainPolicy(ctx context.Context, cls *
 	return claims, nil
 }
 
+// pauseExclude checks whether a pod's exclude should be paused
+func pauseExclude(pod *corev1.Pod, toDelete bool) bool {
+	duringReplace, isOriginPod := podDuringReplace(pod)
+	// if replace origin pod is terminating, we exclude it to let replace finished
+	if isOriginPod && pod.DeletionTimestamp != nil {
+		return false
+	}
+	// otherwise, replace and podToDelete prioritize over exclude
+	return duringReplace || toDelete
+}
+
 // reclaimScaleStrategy updates podToDelete, podToExclude, podToInclude in scaleStrategy
 func (r *RealSyncControl) reclaimScaleStrategy(ctx context.Context, deletedPods sets.String, excludedPods sets.String, includedPods sets.String, cls *appsv1alpha1.CollaSet) error {
 	// ReclaimPodScaleStrategy FeatureGate defaults to true

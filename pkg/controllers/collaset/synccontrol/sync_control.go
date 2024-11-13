@@ -159,7 +159,7 @@ func (r *RealSyncControl) SyncPods(
 			toDeletePodNames.Delete(pod.Name)
 		}
 		if toExclude {
-			if podDuringReplace(pod) || toDelete {
+			if pauseExclude(pod, toDelete) {
 				// skip exclude until replace and toDelete done
 				toExcludePodNames.Delete(pod.Name)
 			} else {

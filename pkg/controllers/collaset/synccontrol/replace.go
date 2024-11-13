@@ -414,12 +414,13 @@ func mapReplaceOriginToNewPodContext(ownedIDs map[int]*appsv1alpha1.ContextDetai
 	return mapOriginToNewPodContext
 }
 
-func podDuringReplace(pod *corev1.Pod) bool {
+// podDuringReplace checks whether pod is during replace and origin pod
+func podDuringReplace(pod *corev1.Pod) (duringReplace bool, isOriginPod bool) {
 	if pod.Labels == nil {
-		return false
+		return false, false
 	}
 	_, replaceIndicate := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
 	_, replaceOriginPod := pod.Labels[appsv1alpha1.PodReplacePairNewId]
 	_, replaceNewPod := pod.Labels[appsv1alpha1.PodReplacePairOriginName]
-	return replaceIndicate || replaceOriginPod || replaceNewPod
+	return replaceIndicate || replaceOriginPod || replaceNewPod, replaceOriginPod
 }
