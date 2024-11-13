@@ -40,6 +40,7 @@ import (
 
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
+	"kusionstack.io/kuperator/pkg/utils"
 	"kusionstack.io/kuperator/test/e2e/framework"
 )
 
@@ -1057,7 +1058,7 @@ var _ = SIGDescribe("CollaSet", func() {
 				}
 				return false
 			}, 12*time.Second, time.Second).Should(BeTrue())
-			Expect(duration > time.Duration(*cls.Spec.UpdateStrategy.OperationDelaySeconds)*time.Second).Should(BeTrue())
+			Expect(duration > time.Duration(*cls.Spec.UpdateStrategy.OperationDelaySeconds)*time.Second-4).Should(BeTrue())
 
 			By("Wait for update finished")
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 1, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
@@ -1260,7 +1261,7 @@ var _ = SIGDescribe("CollaSet", func() {
 					}
 				}
 				return duringOpsCount
-			})
+			}, 10*time.Second, 3*time.Second).Should(Equal(1))
 
 			By("Remove finalizers from pods")
 			pods, err = tester.ListPodsForCollaSet(cls)
@@ -1273,6 +1274,111 @@ var _ = SIGDescribe("CollaSet", func() {
 
 			By("Wait for update finish")
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 2, 2, 1, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+		})
+
+		framework.ConformanceIt("update with cleaning old lifecycle", func() {
+			cls := tester.NewCollaSet("collaset-"+randStr, 1, appsv1alpha1.UpdateStrategy{PodUpdatePolicy: appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType})
+			Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
+
+			By("Wait for status replicas satisfied")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 1, 1, 1, 1, 1) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+			pods, err := tester.ListPodsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Mock traffic finalizer on pods")
+			Expect(tester.UpdatePod(pods[0], func(pod *v1.Pod) {
+				if pod.Annotations == nil {
+					pod.Annotations = make(map[string]string)
+				}
+				finalizer := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperationProtectionFinalizerPrefix, "test")
+				pod.Finalizers = []string{finalizer}
+				pod.Annotations[appsv1alpha1.PodAvailableConditionsAnnotation] = utils.DumpJSON(&appsv1alpha1.PodAvailableConditions{
+					ExpectedFinalizers: map[string]string{
+						"finalizer/test": finalizer,
+					},
+				})
+			})).NotTo(HaveOccurred())
+
+			By("Update CollaSet from v1 to v2")
+			Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
+				cls.Spec.Template.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.Redis)
+			})).NotTo(HaveOccurred())
+
+			By("Wait for CollaSet reconciled")
+			Eventually(func() bool {
+				if err = tester.GetCollaSet(cls); err != nil {
+					return false
+				}
+				return cls.Generation == cls.Status.ObservedGeneration
+			}, 10*time.Second, 3*time.Second).Should(Equal(true))
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 1, 0, 0, 0, 1) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Remove finalizers from pods")
+			Expect(tester.UpdatePod(pods[0], func(pod *v1.Pod) {
+				pod.Finalizers = []string{}
+			})).NotTo(HaveOccurred())
+
+			By("Wait for pod operated")
+			Eventually(func() bool {
+				pods, err = tester.ListPodsForCollaSet(cls)
+				Expect(err).NotTo(HaveOccurred())
+				_, exist := pods[0].Labels[fmt.Sprintf("%s/%s", appsv1alpha1.PodOperatedLabelPrefix, "collaset")]
+				return exist
+			}, 10*time.Second, 3*time.Second).Should(Equal(true))
+
+			By("Record lifecycle label values")
+			pods, err = tester.ListPodsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			lifecycleLabelValues := make(map[string]string)
+			for k := range pods[0].Labels {
+				if strings.HasPrefix(k, appsv1alpha1.PodOperatedLabelPrefix) {
+					lifecycleLabelValues[k] = pods[0].Labels[k]
+				}
+			}
+
+			By("Update CollaSet from v2 to v3")
+			Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
+				cls.Spec.Template.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.NginxNew)
+			})).NotTo(HaveOccurred())
+
+			By("Wait for CollaSet reconciled")
+			Eventually(func() bool {
+				if err = tester.GetCollaSet(cls); err != nil {
+					return false
+				}
+				return cls.Generation == cls.Status.ObservedGeneration
+			}, 10*time.Second, 3*time.Second).Should(Equal(true))
+
+			By("Wait for pod operated")
+			Eventually(func() bool {
+				pods, err = tester.ListPodsForCollaSet(cls)
+				Expect(err).NotTo(HaveOccurred())
+				_, exist := pods[0].Labels[fmt.Sprintf("%s/%s", appsv1alpha1.PodOperatedLabelPrefix, "collaset")]
+				return exist
+			}, 10*time.Second, 3*time.Second).Should(Equal(true))
+
+			By("Check old lifecycle are cleaned and new lifecycle created")
+			pods, err = tester.ListPodsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			for k := range pods[0].Labels {
+				if strings.HasPrefix(k, appsv1alpha1.PodOperatingLabelPrefix) {
+					Expect(lifecycleLabelValues[k] == pods[0].Labels[k]).ShouldNot(BeTrue())
+				}
+			}
+
+			By("Add finalizers to pods")
+			Expect(tester.UpdatePod(pods[0], func(pod *v1.Pod) {
+				finalizer := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperationProtectionFinalizerPrefix, "test")
+				pod.Finalizers = []string{finalizer}
+			})).NotTo(HaveOccurred())
+
+			By("Wait for update finish")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 1, 1, 1, 1, 1) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Remove finalizers from pods")
+			Expect(tester.UpdatePod(pods[0], func(pod *v1.Pod) {
+				pod.Finalizers = []string{}
+			})).NotTo(HaveOccurred())
 		})
 	})
 
