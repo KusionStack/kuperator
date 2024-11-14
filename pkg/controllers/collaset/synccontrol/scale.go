@@ -117,9 +117,6 @@ func (s ActivePodsForDeletion) Less(i, j int) bool {
 
 // dealIncludeExcludePods returns pods which are allowed to exclude and include
 func (r *RealSyncControl) dealIncludeExcludePods(ctx context.Context, cls *appsv1alpha1.CollaSet, pods []*corev1.Pod) (sets.String, sets.String, error) {
-	if len(cls.Spec.ScaleStrategy.PodToExclude) == 0 && len(cls.Spec.ScaleStrategy.PodToInclude) == 0 {
-		return nil, nil, nil
-	}
 	ownedPods := sets.String{}
 	excludePodNames := sets.String{}
 	includePodNames := sets.String{}
