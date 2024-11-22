@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	processorrules "kusionstack.io/kuperator/pkg/controllers/podtransitionrule/processor/rules"
 	commonutils "kusionstack.io/kuperator/pkg/utils"
 )
@@ -145,7 +146,9 @@ func (p *PodTransitionRuleEventHandler) Create(e event.CreateEvent, q workqueue.
 func (p *PodTransitionRuleEventHandler) Update(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	oldPodTransitionRule := e.ObjectOld.(*appsv1alpha1.PodTransitionRule)
 	newPodTransitionRule := e.ObjectNew.(*appsv1alpha1.PodTransitionRule)
-	if equality.Semantic.DeepEqual(oldPodTransitionRule.Spec, newPodTransitionRule.Spec) && newPodTransitionRule.DeletionTimestamp == nil {
+	if equality.Semantic.DeepEqual(oldPodTransitionRule.Spec, newPodTransitionRule.Spec) &&
+		equality.Semantic.DeepEqual(oldPodTransitionRule.Status, newPodTransitionRule.Status) &&
+		newPodTransitionRule.DeletionTimestamp == nil {
 		return
 	}
 	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
