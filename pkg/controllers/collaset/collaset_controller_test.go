@@ -119,7 +119,7 @@ var _ = Describe("collaset controller", func() {
 				return len(podList.Items) == 1
 			}, 5*time.Second, 1*time.Second).Should(BeTrue())
 			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
-			Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 1, 1, 0, 0, 0)).Should(BeNil())
+			Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 1, 1, 0, 0, 0), 5*time.Second, 1*time.Second).Should(BeNil())
 
 			// label pod to trigger replace
 			originPod := podList.Items[0]
