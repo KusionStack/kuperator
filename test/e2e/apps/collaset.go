@@ -1057,7 +1057,7 @@ var _ = SIGDescribe("CollaSet", func() {
 					return true
 				}
 				return false
-			}, 12*time.Second, time.Second).Should(BeTrue())
+			}, 12*time.Second, time.Microsecond).Should(BeTrue())
 			Expect(duration > time.Duration(*cls.Spec.UpdateStrategy.OperationDelaySeconds)*time.Second-4).Should(BeTrue())
 
 			By("Wait for update finished")
