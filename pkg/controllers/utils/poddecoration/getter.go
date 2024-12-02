@@ -19,6 +19,7 @@ package poddecoration
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -28,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/strategy"
 	"kusionstack.io/kuperator/pkg/utils"
@@ -47,6 +49,8 @@ type namespacedPodDecorationManager struct {
 	latestPodDecorations     []*appsv1alpha1.PodDecoration
 	latestPodDecorationNames sets.String
 	revisions                map[string]*appsv1alpha1.PodDecoration
+
+	mu sync.RWMutex
 }
 
 func NewPodDecorationGetter(c client.Client, namespace string) (Getter, error) {
@@ -86,6 +90,8 @@ func (n *namespacedPodDecorationManager) GetOnPod(ctx context.Context, pod *core
 }
 
 func (n *namespacedPodDecorationManager) GetByRevisions(ctx context.Context, revisions ...string) (map[string]*appsv1alpha1.PodDecoration, error) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	res := map[string]*appsv1alpha1.PodDecoration{}
 	var err error
 	for _, rev := range revisions {
