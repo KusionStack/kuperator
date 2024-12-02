@@ -118,6 +118,8 @@ func (r *ReconcileOperationJob) filterAndOperateAllowOpsTargets(
 		}
 
 		if enablePodOpsLifecycle && candidate.Pod == nil {
+			MarkCandidateFailed(candidate)
+			ojutils.SetOpsStatusError(candidate, appsv1alpha1.ReasonPodNotFound, "failed to operate a non-exist pod")
 			return nil
 		}
 
