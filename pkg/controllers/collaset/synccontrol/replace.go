@@ -365,8 +365,11 @@ func classifyPodReplacingMapping(podWrappers []*collasetutils.PodWrapper) map[st
 		if replacePairNewIdStr, exist := podWrapper.Labels[appsv1alpha1.PodReplacePairNewId]; exist {
 			if pairNewPod, exist := podIdMap[replacePairNewIdStr]; exist {
 				replacePodMapping[name] = pairNewPod
-				// if one of pair pods is to Exclude, both pods should not scaleIn
+				// if one of pair pods is to Exclude, both pods should not scaleIn until
+				// exclude finished, this is because scale in should be exclusive to ex/include
 				podWrapper.ToExclude = podWrapper.ToExclude || pairNewPod.ToExclude
+				// if new pod is selective scaleIn, origin pod should be scaled first and then scaleIn newPod
+				podWrapper.ToDelete = podWrapper.ToDelete || pairNewPod.ToDelete
 				continue
 			}
 		} else if replaceOriginStr, exist := podWrapper.Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
