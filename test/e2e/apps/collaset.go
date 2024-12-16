@@ -1793,8 +1793,6 @@ var _ = SIGDescribe("CollaSet", func() {
 
 			By("Wait for replace new pod created")
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 0, 0, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
-
-			By("Selective scaleIn new pod")
 			pods, err = tester.ListPodsForCollaSet(cls)
 			Expect(err).NotTo(HaveOccurred())
 			var newPod *v1.Pod
@@ -1803,6 +1801,14 @@ var _ = SIGDescribe("CollaSet", func() {
 					newPod = pod
 				}
 			}
+
+			By("Mock finalizer on new pod")
+			Expect(tester.UpdatePod(newPod, func(pod *v1.Pod) {
+				finalizers := []string{fmt.Sprintf("%s/%s", appsv1alpha1.PodOperationProtectionFinalizerPrefix, "test")}
+				pod.Finalizers = finalizers
+			})).NotTo(HaveOccurred())
+
+			By("Selective scaleIn new pod")
 			Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
 				cls.Spec.Replicas = int32Pointer(0)
 				cls.Spec.ScaleStrategy = appsv1alpha1.ScaleStrategy{
@@ -1818,15 +1824,17 @@ var _ = SIGDescribe("CollaSet", func() {
 				return cls.Generation == cls.Status.ObservedGeneration
 			}, 10*time.Second, 3*time.Second).Should(Equal(true))
 
-			By("New pod will not be deleted")
-			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 0, 0, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+			By("New pod will not be deleted and origin pod is deleted")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 1, 0, 0, 1, 1) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+			pods, err = tester.ListPodsForCollaSet(cls)
+			Expect(pods[0].Name).To(BeEquivalentTo(newPod.Name))
 
-			By("Mock new pod service available")
+			By("Remove finalizer from new pod")
 			Expect(tester.UpdatePod(newPod, func(pod *v1.Pod) {
-				newPod.Labels[appsv1alpha1.PodServiceAvailableLabel] = "true"
+				pod.Finalizers = []string{}
 			})).NotTo(HaveOccurred())
 
-			By("Wait for pods are deleted")
+			By("Wait for new pod scaled in")
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 0, 0, 0, 0, 0) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
 			By("Check resourceContext")
