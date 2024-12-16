@@ -32,6 +32,10 @@ type OpsCandidate struct {
 	OpsStatus  *appsv1alpha1.OpsStatus
 }
 
+const (
+	ExtraInfoReleased = "Released"
+)
+
 func DecideCandidateByPartition(instance *appsv1alpha1.OperationJob, candidates []*OpsCandidate) []*OpsCandidate {
 	if instance.Spec.Partition == nil {
 		return candidates
@@ -81,6 +85,16 @@ func IsCandidateOpsFinished(candidate *OpsCandidate) bool {
 		candidate.OpsStatus.Progress == appsv1alpha1.OperationProgressSucceeded
 }
 
+func IsCandidateOpsReleased(candidate *OpsCandidate) bool {
+	if candidate.OpsStatus == nil || candidate.OpsStatus.ExtraInfo == nil {
+		return false
+	}
+	if val, exist := candidate.OpsStatus.ExtraInfo[ExtraInfoReleased]; exist && val == "true" {
+		return true
+	}
+	return false
+}
+
 func IsCandidateServiceAvailable(candidate *OpsCandidate) bool {
 	if candidate.Pod == nil || candidate.Pod.Labels == nil {
 		return false
@@ -93,4 +107,14 @@ func MarkCandidateFailed(candidate *OpsCandidate) {
 	if candidate.OpsStatus.Progress != appsv1alpha1.OperationProgressSucceeded {
 		candidate.OpsStatus.Progress = appsv1alpha1.OperationProgressFailed
 	}
+}
+
+func MarkCandidateReleased(candidate *OpsCandidate) {
+	if candidate.OpsStatus == nil {
+		candidate.OpsStatus = &appsv1alpha1.OpsStatus{}
+	}
+	if candidate.OpsStatus.ExtraInfo == nil {
+		candidate.OpsStatus.ExtraInfo = map[string]string{}
+	}
+	candidate.OpsStatus.ExtraInfo[ExtraInfoReleased] = "true"
 }

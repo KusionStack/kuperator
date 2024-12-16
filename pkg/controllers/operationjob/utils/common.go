@@ -89,3 +89,11 @@ func UpdatePodWithRetry(ctx context.Context, c client.Client, obj client.Object,
 		return c.Update(ctx, pod)
 	})
 }
+
+func ConvertErrMapToList(errMap map[string]error) []error {
+	var errList []error
+	for _, v := range errMap {
+		errList = append(errList, v)
+	}
+	return errList
+}

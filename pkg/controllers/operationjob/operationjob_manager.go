@@ -174,7 +174,8 @@ func (r *ReconcileOperationJob) operateTargets(
 	if len(candidates) == 0 {
 		return nil
 	}
-	return operator.OperateTargets(ctx, candidates, operationJob)
+	errMap := operator.OperateTargets(ctx, candidates, operationJob)
+	return ctrlutils.AggregateErrors(ojutils.ConvertErrMapToList(errMap))
 }
 
 func (r *ReconcileOperationJob) getTargetsOpsStatus(
@@ -247,8 +248,8 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, 
 		var allowReleaseCandidates []*OpsCandidate
 		for i := range candidates {
 			candidate := candidates[i]
-			// just skip if target operation already finished, or not started
-			if IsCandidateOpsFinished(candidate) || candidate.OpsStatus.StartTime == nil {
+			// just skip if target operation already released, or not started
+			if IsCandidateOpsReleased(candidate) || candidate.OpsStatus.StartTime == nil {
 				continue
 			}
 			leftTime := time.Duration(*operationJob.Spec.ActiveDeadlineSeconds)*time.Second - time.Since(candidate.OpsStatus.StartTime.Time)
@@ -292,13 +293,15 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob
 	if err != nil {
 		return err
 	}
-	releaseErr := actionHandler.ReleaseTargets(ctx, candidates, operationJob)
+
+	// start to release targets
+	releaseErrMap := actionHandler.ReleaseTargets(ctx, candidates, operationJob)
 	_, _ = controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
 		// cancel lifecycle if necessary
 		if enablePodOpsLifecycle {
 			err = r.cleanCandidateOpsLifecycle(ctx, true, candidate, operationJob)
-			releaseErr = controllerutils.AggregateErrors([]error{releaseErr, err})
+			releaseErrMap[candidate.PodName] = controllerutils.AggregateErrors([]error{releaseErrMap[candidate.PodName], err})
 		}
 		// mark candidate as failed if not finished
 		if !IsCandidateOpsFinished(candidate) {
@@ -306,6 +309,16 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob
 		}
 		return nil
 	})
+
+	// mark target as released if error not occurred
+	for _, candidate := range candidates {
+		if releaseErrMap[candidate.PodName] == nil {
+			MarkCandidateReleased(candidate)
+		}
+	}
+	releaseErr := ctrlutils.AggregateErrors(ojutils.ConvertErrMapToList(releaseErrMap))
+
+	// update candidates status to job status
 	if !needUpdateStatus {
 		return releaseErr
 	}

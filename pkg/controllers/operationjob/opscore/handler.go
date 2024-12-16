@@ -39,11 +39,11 @@ type ActionHandler interface {
 	Setup(controller.Controller, *mixin.ReconcilerMixin) error
 
 	// OperateTargets do real operation to targets
-	OperateTargets(context.Context, []*OpsCandidate, *appsv1alpha1.OperationJob) error
+	OperateTargets(context.Context, []*OpsCandidate, *appsv1alpha1.OperationJob) map[string]error
 
 	// GetOpsProgress returns target's current opsStatus, e.g., progress, reason, message
 	GetOpsProgress(context.Context, *OpsCandidate, *appsv1alpha1.OperationJob) (progress ActionProgress, err error)
 
 	// ReleaseTargets releases the target from operation when the operationJob is deleted
-	ReleaseTargets(context.Context, []*OpsCandidate, *appsv1alpha1.OperationJob) error
+	ReleaseTargets(context.Context, []*OpsCandidate, *appsv1alpha1.OperationJob) map[string]error
 }
