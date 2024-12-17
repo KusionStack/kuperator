@@ -38,12 +38,12 @@ type ActionHandler interface {
 	// Setup sets up action with manager in AddToMgr, i.e., watch, cache...
 	Setup(controller.Controller, *mixin.ReconcilerMixin) error
 
-	// OperateTargets do real operation to targets, and returns an error map to each target
+	// OperateTargets do real operation to targets, and returns an error map to each target name
 	OperateTargets(context.Context, []*OpsCandidate, *appsv1alpha1.OperationJob) map[string]error
 
 	// GetOpsProgress returns target's current opsStatus, e.g., progress, reason, message
 	GetOpsProgress(context.Context, *OpsCandidate, *appsv1alpha1.OperationJob) (progress ActionProgress, err error)
 
-	// ReleaseTargets releases the target from operation when failed, and returns an error map to each target
+	// ReleaseTargets releases the target from operation when failed, and returns an error map to each target name
 	ReleaseTargets(context.Context, []*OpsCandidate, *appsv1alpha1.OperationJob) map[string]error
 }
