@@ -245,11 +245,10 @@ func (r *ReconcileOperationJob) getTargetsOpsStatus(
 // ensureActiveDeadlineAndTTL calculate time to ActiveDeadlineSeconds and TTLSecondsAfterFinished and release targets
 func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, operationJob *appsv1alpha1.OperationJob, candidates []*OpsCandidate, logger logr.Logger) (bool, *time.Duration, error) {
 	if operationJob.Spec.ActiveDeadlineSeconds != nil {
-		var allowReleaseCandidates []*OpsCandidate
 		for i := range candidates {
 			candidate := candidates[i]
-			// just skip if target operation already released, or not started
-			if IsCandidateOpsReleased(candidate) || candidate.OpsStatus.StartTime == nil {
+			// just skip if target not started
+			if candidate.OpsStatus.StartTime == nil {
 				continue
 			}
 			leftTime := time.Duration(*operationJob.Spec.ActiveDeadlineSeconds)*time.Second - time.Since(candidate.OpsStatus.StartTime.Time)
@@ -258,16 +257,9 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, 
 			} else {
 				logger.Info("should end but still processing")
 				r.Recorder.Eventf(operationJob, corev1.EventTypeNormal, "Timeout", "Try to fail OperationJob for timeout...")
-				// mark operationjob and targets failed and release targets
+				// mark target failed if timeout
 				MarkCandidateFailed(candidate)
-				allowReleaseCandidates = append(allowReleaseCandidates, candidate)
 			}
-		}
-		if len(allowReleaseCandidates) > 0 {
-			releaseErr := r.releaseTargets(ctx, operationJob, allowReleaseCandidates, false)
-			operationJob.Status = r.calculateStatus(operationJob, candidates)
-			updateErr := r.updateStatus(ctx, operationJob)
-			return false, nil, controllerutils.AggregateErrors([]error{releaseErr, updateErr})
 		}
 	}
 
@@ -285,6 +277,23 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, 
 		}
 	}
 	return false, nil, nil
+}
+
+// ensureFailedTargetsReleased select failed but unreleased targets and call releaseTargets
+func (r *ReconcileOperationJob) ensureFailedTargetsReleased(ctx context.Context, operationJob *appsv1alpha1.OperationJob, candidates []*OpsCandidate) error {
+	var allowReleaseCandidates []*OpsCandidate
+	for i := range candidates {
+		if IsCandidateOpsFailed(candidates[i]) && !IsCandidateOpsReleased(candidates[i]) {
+			allowReleaseCandidates = append(allowReleaseCandidates, candidates[i])
+		}
+	}
+	if len(allowReleaseCandidates) > 0 {
+		releaseErr := r.releaseTargets(ctx, operationJob, allowReleaseCandidates, false)
+		operationJob.Status = r.calculateStatus(operationJob, candidates)
+		updateErr := r.updateStatus(ctx, operationJob)
+		return controllerutils.AggregateErrors([]error{releaseErr, updateErr})
+	}
+	return nil
 }
 
 // releaseTargets try to release the targets from operation when the operationJob is deleted

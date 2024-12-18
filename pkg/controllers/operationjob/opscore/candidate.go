@@ -95,6 +95,13 @@ func IsCandidateOpsReleased(candidate *OpsCandidate) bool {
 	return false
 }
 
+func IsCandidateOpsFailed(candidate *OpsCandidate) bool {
+	if candidate.OpsStatus == nil || candidate.OpsStatus.Progress == "" {
+		return false
+	}
+	return candidate.OpsStatus.Progress == appsv1alpha1.OperationProgressFailed
+}
+
 func IsCandidateServiceAvailable(candidate *OpsCandidate) bool {
 	if candidate.Pod == nil || candidate.Pod.Labels == nil {
 		return false
