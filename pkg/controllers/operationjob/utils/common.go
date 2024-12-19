@@ -18,6 +18,7 @@ package utils
 
 import (
 	"context"
+	"sync"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -96,4 +97,17 @@ func ConvertErrMapToList(errMap map[string]error) []error {
 		errList = append(errList, v)
 	}
 	return errList
+}
+
+func ConvertSyncErrMap(errMap *sync.Map) map[string]error {
+	ret := make(map[string]error)
+	errMap.Range(func(key, value any) bool {
+		if value == nil {
+			ret[key.(string)] = nil
+		} else {
+			ret[key.(string)] = value.(error)
+		}
+		return true
+	})
+	return ret
 }

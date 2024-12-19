@@ -19,6 +19,7 @@ package replace
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -63,11 +64,11 @@ func (p *PodReplaceHandler) Setup(controller controller.Controller, reconcileMix
 }
 
 func (p *PodReplaceHandler) OperateTargets(ctx context.Context, candidates []*OpsCandidate, operationJob *appsv1alpha1.OperationJob) map[string]error {
-	errMap := make(map[string]error)
+	errMap := &sync.Map{}
 	_, _ = controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) (err error) {
 		candidate := candidates[i]
 		defer func() {
-			errMap[candidate.PodName] = err
+			errMap.Store(candidate.PodName, err)
 		}()
 		if candidate.Pod == nil || candidate.Pod.Labels == nil {
 			return nil
@@ -103,7 +104,7 @@ func (p *PodReplaceHandler) OperateTargets(ctx context.Context, candidates []*Op
 		}
 		return nil
 	})
-	return errMap
+	return ojutils.ConvertSyncErrMap(errMap)
 }
 
 func (p *PodReplaceHandler) GetOpsProgress(ctx context.Context, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) (progress ActionProgress, err error) {
@@ -178,11 +179,11 @@ func (p *PodReplaceHandler) GetOpsProgress(ctx context.Context, candidate *OpsCa
 }
 
 func (p *PodReplaceHandler) ReleaseTargets(ctx context.Context, candidates []*OpsCandidate, operationJob *appsv1alpha1.OperationJob) map[string]error {
-	errMap := make(map[string]error)
+	errMap := &sync.Map{}
 	_, _ = controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) (err error) {
 		candidate := candidates[i]
 		defer func() {
-			errMap[candidate.PodName] = err
+			errMap.Store(candidate.PodName, err)
 		}()
 		if candidate.Pod == nil || candidate.Pod.DeletionTimestamp != nil {
 			return nil
@@ -207,5 +208,5 @@ func (p *PodReplaceHandler) ReleaseTargets(ctx context.Context, candidates []*Op
 		candidate.OpsStatus.ExtraInfo[ExtraInfoReleased] = "true"
 		return nil
 	})
-	return errMap
+	return ojutils.ConvertSyncErrMap(errMap)
 }
