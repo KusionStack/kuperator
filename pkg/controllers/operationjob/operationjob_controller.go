@@ -138,6 +138,10 @@ func (r *ReconcileOperationJob) Reconcile(ctx context.Context, req reconcile.Req
 		return reconcile.Result{}, err
 	}
 
+	if err := r.ensureFailedTargetsReleased(ctx, instance, candidates); err != nil {
+		return reconcile.Result{}, err
+	}
+
 	err = r.doReconcile(ctx, instance, candidates)
 	return requeueResult(requeueAfter), err
 }
