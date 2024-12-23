@@ -23,6 +23,7 @@ import (
 	"kusionstack.io/kuperator/pkg/webhook/server/generic/operationjob"
 	"kusionstack.io/kuperator/pkg/webhook/server/generic/persistentvolumeclaim"
 	"kusionstack.io/kuperator/pkg/webhook/server/generic/poddecoration"
+	"kusionstack.io/kuperator/pkg/webhook/server/generic/resourcecontext"
 
 	webhookdmission "kusionstack.io/kuperator/pkg/webhook/admission"
 	"kusionstack.io/kuperator/pkg/webhook/server/generic/pod"
@@ -60,4 +61,7 @@ func init() {
 
 	MutatingTypeHandlerMap["OperationJob"] = operationjob.NewMutatingHandler()
 	ValidatingTypeHandlerMap["OperationJob"] = operationjob.NewValidatingHandler()
+
+	MutatingTypeHandlerMap["ResourceContext"] = resourcecontext.NewMutatingHandler()
+	ValidatingTypeHandlerMap["ResourceContext"] = resourcecontext.NewValidatingHandler()
 }
