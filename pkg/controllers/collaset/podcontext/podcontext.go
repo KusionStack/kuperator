@@ -24,9 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 )
@@ -61,9 +61,11 @@ func AllocateID(c client.Client, instance *appsv1alpha1.CollaSet, defaultRevisio
 		detail := &podContext.Spec.Contexts[i]
 		if detail.Contains(OwnerContextKey, instance.Name) {
 			ownedIDs[detail.ID] = detail
+			existingIDs[detail.ID] = detail
+		} else if instance.Spec.ScaleStrategy.Context != "" {
+			// add other collaset podContexts only if context pool enabled
+			existingIDs[detail.ID] = detail
 		}
-
-		existingIDs[detail.ID] = detail
 	}
 
 	// if owner has enough ID, return
@@ -149,13 +151,16 @@ func doUpdatePodContext(c client.Client, instance client.Object, ownedIDs map[in
 	// store all IDs crossing all workload
 	existingIDs := map[int]*appsv1alpha1.ContextDetail{}
 
-	for i := range podContext.Spec.Contexts {
-		detail := podContext.Spec.Contexts[i]
-		if detail.Contains(OwnerContextKey, instance.GetName()) {
-			continue
+	// add other collaset podContexts only if context pool enabled
+	cls := instance.(*appsv1alpha1.CollaSet)
+	if cls.Spec.ScaleStrategy.Context != "" {
+		for i := range podContext.Spec.Contexts {
+			detail := podContext.Spec.Contexts[i]
+			if detail.Contains(OwnerContextKey, instance.GetName()) {
+				continue
+			}
+			existingIDs[detail.ID] = &detail
 		}
-
-		existingIDs[detail.ID] = &detail
 	}
 
 	for _, contextDetail := range ownedIDs {
