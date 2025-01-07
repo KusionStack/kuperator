@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	"kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 )
@@ -145,17 +146,19 @@ func doCreatePodContext(c client.Client, instance *appsv1alpha1.CollaSet, ownerI
 	return c.Create(context.TODO(), podContext)
 }
 
-func doUpdatePodContext(c client.Client, instance client.Object, ownedIDs map[int]*appsv1alpha1.ContextDetail, podContext *appsv1alpha1.ResourceContext) error {
+func doUpdatePodContext(c client.Client, instance *appsv1alpha1.CollaSet, ownedIDs map[int]*appsv1alpha1.ContextDetail, podContext *appsv1alpha1.ResourceContext) error {
 	// store all IDs crossing all workload
 	existingIDs := map[int]*appsv1alpha1.ContextDetail{}
 
-	for i := range podContext.Spec.Contexts {
-		detail := podContext.Spec.Contexts[i]
-		if detail.Contains(OwnerContextKey, instance.GetName()) {
-			continue
+	// add other collaset podContexts only when instance enables context pool
+	if instance.Spec.ScaleStrategy.Context != "" {
+		for i := range podContext.Spec.Contexts {
+			detail := podContext.Spec.Contexts[i]
+			if detail.Contains(OwnerContextKey, instance.GetName()) {
+				continue
+			}
+			existingIDs[detail.ID] = &detail
 		}
-
-		existingIDs[detail.ID] = &detail
 	}
 
 	for _, contextDetail := range ownedIDs {
@@ -166,7 +169,7 @@ func doUpdatePodContext(c client.Client, instance client.Object, ownedIDs map[in
 	if len(existingIDs) == 0 {
 		err := c.Delete(context.TODO(), podContext)
 		if err != nil {
-			if err := utils.ActiveExpectations.ExpectDelete(instance, expectations.ResourceContext, podContext.Name); err != nil {
+			if err := utils.ActiveExpectations.ExpectDelete(instance.GetObjectMeta(), expectations.ResourceContext, podContext.Name); err != nil {
 				return err
 			}
 		}
@@ -185,7 +188,7 @@ func doUpdatePodContext(c client.Client, instance client.Object, ownedIDs map[in
 	sort.Sort(ContextDetailsByOrder(podContext.Spec.Contexts))
 	err := c.Update(context.TODO(), podContext)
 	if err != nil {
-		if err := utils.ActiveExpectations.ExpectUpdate(instance, expectations.ResourceContext, podContext.Name, podContext.ResourceVersion); err != nil {
+		if err := utils.ActiveExpectations.ExpectUpdate(instance.GetObjectMeta(), expectations.ResourceContext, podContext.Name, podContext.ResourceVersion); err != nil {
 			return err
 		}
 	}
