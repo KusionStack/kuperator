@@ -38,6 +38,7 @@ import (
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontext"
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/kuperator/pkg/utils"
@@ -1380,6 +1381,62 @@ var _ = SIGDescribe("CollaSet", func() {
 				pod.Finalizers = []string{}
 			})).NotTo(HaveOccurred())
 		})
+
+		framework.ConformanceIt("update with hacking resourceContexts", func() {
+			cls := tester.NewCollaSet("collaset-"+randStr, 3, appsv1alpha1.UpdateStrategy{})
+			cls.Spec.UpdateStrategy = appsv1alpha1.UpdateStrategy{
+				RollingUpdate: &appsv1alpha1.RollingUpdateCollaSetStrategy{
+					ByLabel: &appsv1alpha1.ByLabel{},
+				},
+			}
+			Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
+
+			By("Wait for status replicas satisfied")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 3, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Hacking resourceContexts with different collaset")
+			currResourceContexts, err := tester.ListResourceContextsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(currResourceContexts[0].Spec.Contexts)).Should(BeEquivalentTo(3))
+			for i := range currResourceContexts[0].Spec.Contexts {
+				currResourceContexts[0].Spec.Contexts[i].Data[podcontext.OwnerContextKey] = "mock-collaset"
+			}
+			Expect(client.Update(context.Background(), currResourceContexts[0])).Should(BeNil())
+
+			By("Update image to nginxNew but pods are not updated")
+			Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
+				cls.Spec.Template.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.NginxNew)
+			})).NotTo(HaveOccurred())
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 0, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Wait for CollaSet reconciled")
+			Eventually(func() bool {
+				if err := tester.GetCollaSet(cls); err != nil {
+					return false
+				}
+				return cls.Generation == cls.Status.ObservedGeneration
+			}, 10*time.Second, 3*time.Second).Should(Equal(true))
+
+			By("Label pod to trigger update")
+			pods, err := tester.ListPodsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			podToUpdate := pods[0]
+			Expect(tester.UpdatePod(podToUpdate, func(pod *v1.Pod) {
+				pod.Labels[appsv1alpha1.CollaSetUpdateIndicateLabelKey] = "true"
+			})).NotTo(HaveOccurred())
+
+			By("Wait for update finished")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 1, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Check resourceContexts")
+			currResourceContexts, err = tester.ListResourceContextsForCollaSet(cls)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(currResourceContexts[0].Spec.Contexts)).Should(BeEquivalentTo(3))
+			for i := range currResourceContexts[0].Spec.Contexts {
+				Expect(currResourceContexts[0].Spec.Contexts[i].Data[podcontext.OwnerContextKey]).Should(BeEquivalentTo(cls.Name))
+			}
+		})
+
 	})
 
 	framework.KusionstackDescribe("CollaSet Replacing", func() {
