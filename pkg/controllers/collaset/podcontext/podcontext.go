@@ -62,9 +62,11 @@ func AllocateID(c client.Client, instance *appsv1alpha1.CollaSet, defaultRevisio
 		detail := &podContext.Spec.Contexts[i]
 		if detail.Contains(OwnerContextKey, instance.Name) {
 			ownedIDs[detail.ID] = detail
+			existingIDs[detail.ID] = detail
+		} else if instance.Spec.ScaleStrategy.Context != "" {
+			// add other collaset podContexts only if context pool enabled
+			existingIDs[detail.ID] = detail
 		}
-
-		existingIDs[detail.ID] = detail
 	}
 
 	// if owner has enough ID, return
@@ -150,7 +152,7 @@ func doUpdatePodContext(c client.Client, instance *appsv1alpha1.CollaSet, ownedI
 	// store all IDs crossing all workload
 	existingIDs := map[int]*appsv1alpha1.ContextDetail{}
 
-	// add other collaset podContexts only when instance enables context pool
+	// add other collaset podContexts only if context pool enabled
 	if instance.Spec.ScaleStrategy.Context != "" {
 		for i := range podContext.Spec.Contexts {
 			detail := podContext.Spec.Contexts[i]
