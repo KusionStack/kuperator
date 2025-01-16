@@ -220,14 +220,16 @@ func (r *RealSyncControl) allowIncludeExcludePods(ctx context.Context, cls *apps
 
 // doIncludeExcludePods do real include and exclude for pods which are allowed to in/exclude
 func (r *RealSyncControl) doIncludeExcludePods(ctx context.Context, cls *appsv1alpha1.CollaSet, excludePods []string, includePods []string, availableContexts []*appsv1alpha1.ContextDetail) error {
-	_, exErr := controllerutils.SlowStartBatch(len(excludePods), controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) error {
+	var excludeErrs, includeErrs []error
+	_, _ = controllerutils.SlowStartBatch(len(excludePods), controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) (err error) {
+		defer func() { excludeErrs = append(excludeErrs, err) }()
 		return r.excludePod(ctx, cls, excludePods[idx])
 	})
-
-	_, inErr := controllerutils.SlowStartBatch(len(includePods), controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) error {
+	_, _ = controllerutils.SlowStartBatch(len(includePods), controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) (err error) {
+		defer func() { includeErrs = append(includeErrs, err) }()
 		return r.includePod(ctx, cls, includePods[idx], strconv.Itoa(availableContexts[idx].ID))
 	})
-	return controllerutils.AggregateErrors([]error{exErr, inErr})
+	return controllerutils.AggregateErrors(append(includeErrs, excludeErrs...))
 }
 
 // excludePod try to exclude a pod from collaset
