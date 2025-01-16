@@ -258,7 +258,7 @@ func classifyPodPvcs(cls *appsv1alpha1.CollaSet, id string, existingPvcs []*core
 		}
 
 		// classify into updated and old pvcs
-		if newTmpHash[pvcTmpName] == hash {
+		if val, exist := newTmpHash[pvcTmpName]; exist && val == hash {
 			newPvcs[pvcTmpName] = pvc
 		} else {
 			oldPvcs[pvcTmpName] = pvc
