@@ -18,6 +18,7 @@ package utils
 
 import (
 	"context"
+	"sync"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -88,4 +89,25 @@ func UpdatePodWithRetry(ctx context.Context, c client.Client, obj client.Object,
 		updateFn(pod)
 		return c.Update(ctx, pod)
 	})
+}
+
+func ConvertErrMapToList(errMap map[string]error) []error {
+	var errList []error
+	for _, v := range errMap {
+		errList = append(errList, v)
+	}
+	return errList
+}
+
+func ConvertSyncErrMap(errMap *sync.Map) map[string]error {
+	ret := make(map[string]error)
+	errMap.Range(func(key, value any) bool {
+		if value == nil {
+			ret[key.(string)] = nil
+		} else {
+			ret[key.(string)] = value.(error)
+		}
+		return true
+	})
+	return ret
 }
