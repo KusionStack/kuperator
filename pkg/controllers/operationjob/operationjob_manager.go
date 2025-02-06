@@ -174,7 +174,8 @@ func (r *ReconcileOperationJob) operateTargets(
 	if len(candidates) == 0 {
 		return nil
 	}
-	return operator.OperateTargets(ctx, candidates, operationJob)
+	errMap := operator.OperateTargets(ctx, candidates, operationJob)
+	return ctrlutils.AggregateErrors(ojutils.ConvertErrMapToList(errMap))
 }
 
 func (r *ReconcileOperationJob) getTargetsOpsStatus(
@@ -244,11 +245,10 @@ func (r *ReconcileOperationJob) getTargetsOpsStatus(
 // ensureActiveDeadlineAndTTL calculate time to ActiveDeadlineSeconds and TTLSecondsAfterFinished and release targets
 func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, operationJob *appsv1alpha1.OperationJob, candidates []*OpsCandidate, logger logr.Logger) (bool, *time.Duration, error) {
 	if operationJob.Spec.ActiveDeadlineSeconds != nil {
-		var allowReleaseCandidates []*OpsCandidate
 		for i := range candidates {
 			candidate := candidates[i]
-			// just skip if target operation already finished, or not started
-			if IsCandidateOpsFinished(candidate) || candidate.OpsStatus.StartTime == nil {
+			// just skip if target not started
+			if candidate.OpsStatus.StartTime == nil {
 				continue
 			}
 			leftTime := time.Duration(*operationJob.Spec.ActiveDeadlineSeconds)*time.Second - time.Since(candidate.OpsStatus.StartTime.Time)
@@ -257,16 +257,9 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, 
 			} else {
 				logger.Info("should end but still processing")
 				r.Recorder.Eventf(operationJob, corev1.EventTypeNormal, "Timeout", "Try to fail OperationJob for timeout...")
-				// mark operationjob and targets failed and release targets
+				// mark target failed if timeout
 				MarkCandidateFailed(candidate)
-				allowReleaseCandidates = append(allowReleaseCandidates, candidate)
 			}
-		}
-		if len(allowReleaseCandidates) > 0 {
-			releaseErr := r.releaseTargets(ctx, operationJob, allowReleaseCandidates, false)
-			operationJob.Status = r.calculateStatus(operationJob, candidates)
-			updateErr := r.updateStatus(ctx, operationJob)
-			return false, nil, controllerutils.AggregateErrors([]error{releaseErr, updateErr})
 		}
 	}
 
@@ -286,19 +279,38 @@ func (r *ReconcileOperationJob) ensureActiveDeadlineAndTTL(ctx context.Context, 
 	return false, nil, nil
 }
 
+// ensureFailedTargetsReleased select failed but unreleased targets and call releaseTargets
+func (r *ReconcileOperationJob) ensureFailedTargetsReleased(ctx context.Context, operationJob *appsv1alpha1.OperationJob, candidates []*OpsCandidate) error {
+	var allowReleaseCandidates []*OpsCandidate
+	for i := range candidates {
+		if IsCandidateOpsFailed(candidates[i]) && !IsCandidateOpsReleased(candidates[i]) {
+			allowReleaseCandidates = append(allowReleaseCandidates, candidates[i])
+		}
+	}
+	if len(allowReleaseCandidates) > 0 {
+		releaseErr := r.releaseTargets(ctx, operationJob, allowReleaseCandidates, false)
+		operationJob.Status = r.calculateStatus(operationJob, candidates)
+		updateErr := r.updateStatus(ctx, operationJob)
+		return controllerutils.AggregateErrors([]error{releaseErr, updateErr})
+	}
+	return nil
+}
+
 // releaseTargets try to release the targets from operation when the operationJob is deleted
 func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob *appsv1alpha1.OperationJob, candidates []*OpsCandidate, needUpdateStatus bool) error {
 	actionHandler, enablePodOpsLifecycle, err := r.getActionHandler(operationJob)
 	if err != nil {
 		return err
 	}
-	releaseErr := actionHandler.ReleaseTargets(ctx, candidates, operationJob)
+
+	// start to release targets
+	releaseErrMap := actionHandler.ReleaseTargets(ctx, candidates, operationJob)
 	_, _ = controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
 		// cancel lifecycle if necessary
 		if enablePodOpsLifecycle {
 			err = r.cleanCandidateOpsLifecycle(ctx, true, candidate, operationJob)
-			releaseErr = controllerutils.AggregateErrors([]error{releaseErr, err})
+			releaseErrMap[candidate.PodName] = controllerutils.AggregateErrors([]error{releaseErrMap[candidate.PodName], err})
 		}
 		// mark candidate as failed if not finished
 		if !IsCandidateOpsFinished(candidate) {
@@ -306,6 +318,16 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob
 		}
 		return nil
 	})
+
+	// mark target as released if error not occurred
+	for _, candidate := range candidates {
+		if releaseErrMap[candidate.PodName] == nil {
+			MarkCandidateReleased(candidate)
+		}
+	}
+	releaseErr := ctrlutils.AggregateErrors(ojutils.ConvertErrMapToList(releaseErrMap))
+
+	// update candidates status to job status
 	if !needUpdateStatus {
 		return releaseErr
 	}
