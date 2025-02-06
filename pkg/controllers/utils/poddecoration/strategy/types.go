@@ -56,6 +56,7 @@ type podState struct {
 	IsDeleted                 bool
 	IsCollaSetUpdatedRevision bool
 	IsPodReady                bool
+	IsPodSA                   bool
 	NodeName                  string
 	Phase                     corev1.PodPhase
 	ReadyTime                 *metav1.Time
@@ -79,6 +80,11 @@ func Compare(l, r *podInfo) bool {
 		// Move the latest version to the front,
 		//  ensuring that the Pod selected by the partition is always ahead
 		return l.revision > r.revision
+	}
+
+	// Service UnAvailable < Available
+	if l.state.IsPodSA != r.state.IsPodSA {
+		return r.state.IsPodSA
 	}
 
 	// Unassigned < assigned
@@ -117,6 +123,7 @@ func setPodState(pod *corev1.Pod, info *podInfo) {
 	info.state.NodeName = pod.Spec.NodeName
 	info.state.Phase = pod.Status.Phase
 	info.state.IsPodReady = controllerutils.IsPodReady(pod)
+	info.state.IsPodSA = controllerutils.IsPodServiceAvailable(pod)
 	info.state.ReadyTime = podReadyTime(pod).DeepCopy()
 	info.state.MaxContainerRestarts = maxContainerRestarts(pod)
 	info.state.CreationTimestamp = pod.CreationTimestamp.DeepCopy()

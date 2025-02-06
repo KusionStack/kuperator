@@ -347,6 +347,10 @@ func (o orderByDefault) Less(i, j int) bool {
 		return l.PodDecorationChanged
 	}
 
+	if controllerutils.IsPodServiceAvailable(l.Pod) != controllerutils.IsPodServiceAvailable(r.Pod) {
+		return controllerutils.IsPodServiceAvailable(r.Pod)
+	}
+
 	return utils.ComparePod(l.Pod, r.Pod)
 }
 
