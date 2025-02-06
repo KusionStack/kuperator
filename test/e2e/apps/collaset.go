@@ -1887,7 +1887,7 @@ var _ = SIGDescribe("CollaSet", func() {
 			}, 30*time.Second, 3*time.Second).Should(BeTrue())
 		})
 
-		framework.ConformanceIt("scaleIn new pod", func() {
+		framework.ConformanceIt("scaleIn new pod only", func() {
 			cls := tester.NewCollaSet("collaset-"+randStr, 1, appsv1alpha1.UpdateStrategy{})
 			// use bad image to mock new replace pod unavailable
 			cls.Spec.Template.Spec.Containers[0].Image = "nginx:non-exist"
