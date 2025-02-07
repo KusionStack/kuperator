@@ -184,10 +184,11 @@ func (r *RealSyncControl) replaceOriginPods(
 			r.recorder.Eventf(originPod,
 				corev1.EventTypeNormal,
 				"ReplacePod",
-				"failed to create replace pair Pod %s/%s to from revision %s to revision %s by replace update",
+				"failed to create replace pair Pod %s/%s from revision %s by replace update: %s",
 				originPod.Namespace,
 				originPod.Name,
-				replaceRevision.Name)
+				replaceRevision.Name,
+				err.Error())
 			return err
 		}
 		return nil
