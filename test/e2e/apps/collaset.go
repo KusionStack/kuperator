@@ -1905,10 +1905,10 @@ var _ = SIGDescribe("CollaSet", func() {
 				pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] = "true"
 			})).NotTo(HaveOccurred())
 
-			By("Wait for replace new pod created")
+			By("Wait for new pod created by OperationJob")
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 0, 0, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
-			By("Selective scaleIn new pod")
+			By("scaleIn the specified new pod")
 			pods, err = tester.ListPodsForCollaSet(cls)
 			Expect(err).NotTo(HaveOccurred())
 			var newPod *v1.Pod
@@ -1940,7 +1940,7 @@ var _ = SIGDescribe("CollaSet", func() {
 				newPod.Labels[appsv1alpha1.PodServiceAvailableLabel] = "true"
 			})).NotTo(HaveOccurred())
 
-			By("Wait for pods are deleted")
+			By("Wait for pods deleted")
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 0, 0, 0, 0, 0) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 
 			By("Check resourceContext")
