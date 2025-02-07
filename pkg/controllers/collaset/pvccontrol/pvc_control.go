@@ -192,7 +192,7 @@ func (pc *RealPvcControl) DeletePodUnusedPvcs(ctx context.Context, cls *appsv1al
 
 	// delete old pvc if new pvc is provisioned and WhenScaled is "Delete"
 	if collasetutils.PvcPolicyWhenScaled(cls) == appsv1alpha1.DeletePersistentVolumeClaimRetentionPolicyType {
-		return deleteOldPvcs(pc.client, ctx, cls, newPvcs, oldPvcs, mountedPvcNames)
+		return deleteOldPvcs(pc.client, ctx, cls, newPvcs, oldPvcs)
 	}
 	return nil
 }
@@ -334,13 +334,8 @@ func deleteUnclaimedPvcs(c client.Client, ctx context.Context, cls *appsv1alpha1
 	return nil
 }
 
-func deleteOldPvcs(c client.Client, ctx context.Context, cls *appsv1alpha1.CollaSet, newPvcs, oldPvcs *map[string]*corev1.PersistentVolumeClaim, mountedPvcNames sets.String) error {
+func deleteOldPvcs(c client.Client, ctx context.Context, cls *appsv1alpha1.CollaSet, newPvcs, oldPvcs *map[string]*corev1.PersistentVolumeClaim) error {
 	for pvcTmpName, pvc := range *oldPvcs {
-		// if pvc is still mounted on pod, keep it
-		if mountedPvcNames.Has(pvcTmpName) {
-			continue
-		}
-		// if new pvc is not ready, keep this pvc
 		if _, newPvcExist := (*newPvcs)[pvcTmpName]; !newPvcExist {
 			continue
 		}
