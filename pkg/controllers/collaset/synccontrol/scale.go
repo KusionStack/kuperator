@@ -59,7 +59,7 @@ func getPodsToDelete(filteredPods []*collasetutils.PodWrapper, replaceMapping ma
 
 		if replacePairPod, exist := replaceMapping[pod.Name]; exist && replacePairPod != nil {
 			// don't selective scaleIn newPod (and its originPod) until replace finished
-			if replacePairPod.ToDelete {
+			if replacePairPod.ToDelete && !pod.ToDelete {
 				continue
 			}
 			// when scaleIn origin Pod, newPod should be deleted if not service available
