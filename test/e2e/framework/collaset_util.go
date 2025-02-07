@@ -174,6 +174,19 @@ func (t *CollaSetTester) UpdatePod(pod *v1.Pod, fn func(pod *v1.Pod)) error {
 	})
 }
 
+func (t *CollaSetTester) UpdatePvc(pvc *v1.PersistentVolumeClaim, fn func(pvc *v1.PersistentVolumeClaim)) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := t.client.Get(context.TODO(), types.NamespacedName{Namespace: pvc.Namespace, Name: pvc.Name}, pvc)
+		if err != nil {
+			return err
+		}
+
+		fn(pvc)
+		err = t.client.Update(context.TODO(), pvc)
+		return err
+	})
+}
+
 func (t *CollaSetTester) ExpectedStatusReplicas(cls *appsv1alpha1.CollaSet, replicas, readyReplicas, availableReplicas, updatedReplicas, totalReplicas int32) error {
 	if err := t.client.Get(context.TODO(), types.NamespacedName{Namespace: cls.Namespace, Name: cls.Name}, cls); err != nil {
 		return err
