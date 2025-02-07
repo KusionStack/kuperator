@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 
@@ -51,10 +50,14 @@ func BuildPvcWithHash(cls *appsv1alpha1.CollaSet, pvcTmp *corev1.PersistentVolum
 	}
 	claim.Labels[appsv1alpha1.PvcTemplateHashLabelKey] = hash
 	claim.Labels[appsv1alpha1.PodInstanceIDLabelKey] = id
+	claim.Labels[appsv1alpha1.PvcTemplateLabelKey] = pvcTmp.Name
 	return claim, nil
 }
 
 func ExtractPvcTmpName(cls *appsv1alpha1.CollaSet, pvc *corev1.PersistentVolumeClaim) (string, error) {
+	if pvcTmpName, exist := pvc.Labels[appsv1alpha1.PvcTemplateLabelKey]; exist {
+		return pvcTmpName, nil
+	}
 	lastDashIndex := strings.LastIndex(pvc.Name, "-")
 	if lastDashIndex == -1 {
 		return "", fmt.Errorf("pvc %s has no postfix", pvc.Name)
