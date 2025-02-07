@@ -799,6 +799,7 @@ var _ = SIGDescribe("CollaSet", func() {
 
 			By("exclude pod and scale in 1 replicas from CollaSet2")
 			pvcs, err := tester.ListPVCForCollaSet(cls2)
+			Expect(err).NotTo(HaveOccurred())
 			pods, err := tester.ListPodsForCollaSet(cls2)
 			Expect(err).NotTo(HaveOccurred())
 			PodToExclude := pods[0]
