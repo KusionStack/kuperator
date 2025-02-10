@@ -2037,6 +2037,7 @@ var _ = SIGDescribe("CollaSet", func() {
 			for _, pod := range pods {
 				if pod.Name != podToReplace.Name {
 					newPod = pod
+					break
 				}
 			}
 			Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
