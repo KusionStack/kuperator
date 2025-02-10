@@ -178,8 +178,15 @@ func (pc *RealPvcControl) DeletePodUnusedPvcs(ctx context.Context, cls *appsv1al
 		return err
 	}
 
+	mountedPvcNames := sets.String{}
+	for _, container := range pod.Spec.Containers {
+		for _, v := range container.VolumeMounts {
+			mountedPvcNames.Insert(v.Name)
+		}
+	}
+
 	//delete pvc which is not claimed in templates
-	if err := deleteUnclaimedPvcs(pc.client, ctx, cls, oldPvcs); err != nil {
+	if err := deleteUnclaimedPvcs(pc.client, ctx, cls, oldPvcs, mountedPvcNames); err != nil {
 		return err
 	}
 
@@ -304,16 +311,20 @@ func IsPodPvcTmpChanged(cls *appsv1alpha1.CollaSet, pod *corev1.Pod, existingPvc
 	return false, nil
 }
 
-func deleteUnclaimedPvcs(c client.Client, ctx context.Context, cls *appsv1alpha1.CollaSet, oldPvcs *map[string]*corev1.PersistentVolumeClaim) error {
+func deleteUnclaimedPvcs(c client.Client, ctx context.Context, cls *appsv1alpha1.CollaSet, oldPvcs *map[string]*corev1.PersistentVolumeClaim, mountedPvcNames sets.String) error {
 	expectedNames := sets.String{}
 	for _, pvcTmp := range cls.Spec.VolumeClaimTemplates {
 		expectedNames.Insert(pvcTmp.Name)
 	}
 	for pvcTmpName, pvc := range *oldPvcs {
+		// if pvc is still mounted on pod, keep it
+		if mountedPvcNames.Has(pvcTmpName) {
+			continue
+		}
+		// if pvc is claimed in pvc templates, keep it
 		if expectedNames.Has(pvcTmpName) {
 			continue
 		}
-		// if pvc is not claimed in pvc templates, delete it
 		if err := c.Delete(ctx, pvc); err != nil {
 			return err
 		} else if err := collasetutils.ActiveExpectations.ExpectDelete(cls, expectations.Pvc, pvc.Name); err != nil {
@@ -325,7 +336,6 @@ func deleteUnclaimedPvcs(c client.Client, ctx context.Context, cls *appsv1alpha1
 
 func deleteOldPvcs(c client.Client, ctx context.Context, cls *appsv1alpha1.CollaSet, newPvcs, oldPvcs *map[string]*corev1.PersistentVolumeClaim) error {
 	for pvcTmpName, pvc := range *oldPvcs {
-		// if new pvc is not ready, keep this pvc
 		if _, newPvcExist := (*newPvcs)[pvcTmpName]; !newPvcExist {
 			continue
 		}
