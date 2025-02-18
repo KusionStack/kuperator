@@ -164,6 +164,10 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			// reclaim pods ownerReferences before remove finalizers
 			return ctrl.Result{}, err
 		}
+		if err := r.ensureReclaimPodsDeletion(instance); err != nil {
+			// reclaim pods deletion before remove finalizers
+			return ctrl.Result{}, err
+		}
 		if controllerutil.ContainsFinalizer(instance, preReclaimFinalizer) {
 			// reclaim owner IDs in ResourceContext
 			if err := r.reclaimResourceContext(instance); err != nil {
@@ -400,4 +404,13 @@ func (r *CollaSetReconciler) ensureReclaimPodOwnerReferences(cls *appsv1alpha1.C
 		}
 	}
 	return nil
+}
+
+func (r *CollaSetReconciler) ensureReclaimPodsDeletion(cls *appsv1alpha1.CollaSet) error {
+	podControl := podcontrol.NewRealPodControl(r.Client, r.Scheme)
+	pods, err := podControl.GetFilteredPods(cls.Spec.Selector, cls)
+	if err != nil {
+		return fmt.Errorf("fail to get filtered Pods: %s", err)
+	}
+	return synccontrol.DeletePodsByLabel(podControl, pods)
 }
