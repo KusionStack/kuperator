@@ -425,6 +425,9 @@ func (r *RealSyncControl) Scale(
 			r.recorder.Eventf(cls, corev1.EventTypeNormal, "ScaleOut", "scale out %d Pod(s)", succCount)
 			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleOut", "")
 			return succCount > 0, recordedRequeueAfter, err
+		} else {
+			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleOut", "")
+			return false, nil, nil
 		}
 	} else if diff < 0 {
 		// chose the pods to scale in
