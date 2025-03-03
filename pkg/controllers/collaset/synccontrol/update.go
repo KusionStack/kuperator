@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
@@ -268,24 +269,28 @@ func decidePodToUpdateByLabel(_ *appsv1alpha1.CollaSet, podInfos []*PodUpdateInf
 
 func decidePodToUpdateByPartition(
 	cls *appsv1alpha1.CollaSet,
-	podInfos []*PodUpdateInfo) (podToUpdate []*PodUpdateInfo) {
+	podInfos []*PodUpdateInfo) []*PodUpdateInfo {
+
+	replicas := ptr.Deref(cls.Spec.Replicas, 0)
+	partition := int32(0)
+	if cls.Spec.UpdateStrategy.RollingUpdate != nil && cls.Spec.UpdateStrategy.RollingUpdate.ByPartition != nil {
+		partition = ptr.Deref(cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition, 0)
+	}
 
 	filteredPodInfos := getTargetsUpdatePods(podInfos)
-	if cls.Spec.UpdateStrategy.RollingUpdate == nil ||
-		cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition == nil {
+	// update all or not update any replicas
+	if partition == 0 {
 		return filteredPodInfos
 	}
-	podsNum := len(filteredPodInfos)
-	ordered := orderByDefault(filteredPodInfos)
-	sort.Sort(ordered)
-
-	partition := int(*cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition)
-	if partition >= podsNum {
-		partition = podsNum
+	if partition >= replicas {
+		return nil
 	}
 
-	podToUpdate = ordered[:podsNum-partition]
-	for i := podsNum - partition; i < podsNum; i++ {
+	// partial update replicas
+	ordered := orderByDefault(filteredPodInfos)
+	sort.Sort(ordered)
+	podToUpdate := ordered[:replicas-partition]
+	for i := replicas - partition; i < replicas; i++ {
 		if ordered[i].PodDecorationChanged {
 			// separate pd and collaset update progress
 			podInfos[i].IsUpdatedRevision = true
