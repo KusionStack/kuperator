@@ -221,7 +221,7 @@ func (r *CollaSetReconciler) DoReconcile(
 	resources *collasetutils.RelatedResources) (
 	*time.Duration, *appsv1alpha1.CollaSetStatus, error) {
 	podWrappers, requeueAfter, syncErr := r.doSync(ctx, instance, resources)
-	return requeueAfter, calculateStatus(instance, resources, podWrappers, syncErr), syncErr
+	return requeueAfter, calculateStatus(instance, resources, podWrappers), syncErr
 }
 
 // doSync is responsible for reconcile Pods with CollaSet spec.
@@ -257,8 +257,7 @@ func (r *CollaSetReconciler) doSync(
 func calculateStatus(
 	instance *appsv1alpha1.CollaSet,
 	resources *collasetutils.RelatedResources,
-	podWrappers []*collasetutils.PodWrapper,
-	syncErr error) *appsv1alpha1.CollaSetStatus {
+	podWrappers []*collasetutils.PodWrapper) *appsv1alpha1.CollaSetStatus {
 	newStatus := resources.NewStatus
 	newStatus.ObservedGeneration = instance.Generation
 
