@@ -260,9 +260,7 @@ func calculateStatus(
 	podWrappers []*collasetutils.PodWrapper,
 	syncErr error) *appsv1alpha1.CollaSetStatus {
 	newStatus := resources.NewStatus
-	if syncErr == nil {
-		newStatus.ObservedGeneration = instance.Generation
-	}
+	newStatus.ObservedGeneration = instance.Generation
 
 	var scheduledReplicas, readyReplicas, availableReplicas, replicas, updatedReplicas, operatingReplicas,
 		updatedReadyReplicas, updatedAvailableReplicas int32
