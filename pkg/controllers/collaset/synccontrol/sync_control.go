@@ -429,9 +429,11 @@ func (r *RealSyncControl) Scale(
 			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleOut", "")
 			return false, nil, nil
 		}
-	} else if diff < 0 {
+	}
+
+	if diff <= 0 {
 		// chose the pods to scale in
-		podsToScaleIn := getPodsToDelete(activePods, replacePodMap, diff*-1)
+		podsToScaleIn := getPodsToDelete(cls, activePods, replacePodMap, diff*-1)
 		// filter out Pods need to trigger PodOpsLifecycle
 		podCh := make(chan *collasetutils.PodWrapper, len(podsToScaleIn))
 		for i := range podsToScaleIn {

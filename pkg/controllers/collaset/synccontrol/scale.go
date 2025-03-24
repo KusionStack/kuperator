@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -40,18 +41,19 @@ import (
 	"kusionstack.io/kuperator/pkg/utils/feature"
 )
 
-// getPodsToDelete finds number of diff pods from filteredPods to do scaleIn
-func getPodsToDelete(filteredPods []*collasetutils.PodWrapper, replaceMapping map[string]*collasetutils.PodWrapper, diff int) []*collasetutils.PodWrapper {
+// getPodsToDelete 1. finds number of diff pods from filteredPods to do scaleIn
+// 2.finds pods allowed to scale in out of diff
+func getPodsToDelete(cls *appsv1alpha1.CollaSet, filteredPods []*collasetutils.PodWrapper, replaceMapping map[string]*collasetutils.PodWrapper, diff int) []*collasetutils.PodWrapper {
 	targetsPods := getTargetsDeletePods(filteredPods, replaceMapping)
-	// 1. select pods to delete in first round according to diff
+	// select pods to delete in first round according to diff
 	sort.Sort(ActivePodsForDeletion(targetsPods))
 	if diff > len(targetsPods) {
 		diff = len(targetsPods)
 	}
 
 	var needDeletePods []*collasetutils.PodWrapper
-	// 2. select pods to delete in second round according to replace, delete, exclude
-	for _, pod := range targetsPods[:diff] {
+	// select pods to delete in second round according to replace, delete, exclude
+	for i, pod := range targetsPods {
 		//  don't scaleIn exclude pod and its newPod (if exist)
 		if pod.ToExclude {
 			continue
@@ -67,7 +69,14 @@ func getPodsToDelete(filteredPods []*collasetutils.PodWrapper, replaceMapping ma
 				needDeletePods = append(needDeletePods, replacePairPod)
 			}
 		}
-		needDeletePods = append(needDeletePods, pod)
+		if i < diff {
+			needDeletePods = append(needDeletePods, pod)
+		} else {
+			// finds pods allowed to scale in out of diff
+			if _, allowed := podopslifecycle.AllowOps(collasetutils.ScaleInOpsLifecycleAdapter, ptr.Deref(cls.Spec.ScaleStrategy.OperationDelaySeconds, 0), pod); allowed {
+				needDeletePods = append(needDeletePods, pod)
+			}
+		}
 	}
 
 	return needDeletePods
