@@ -42,7 +42,7 @@ import (
 )
 
 // getPodsToDelete 1. finds number of diff pods from filteredPods to do scaleIn
-// 2.finds pods allowed to scale in out of diff
+// 2. finds pods allowed to scale in out of diff
 func getPodsToDelete(cls *appsv1alpha1.CollaSet, filteredPods []*collasetutils.PodWrapper, replaceMapping map[string]*collasetutils.PodWrapper, diff int) []*collasetutils.PodWrapper {
 	targetsPods := getTargetsDeletePods(filteredPods, replaceMapping)
 	// select pods to delete in first round according to diff
@@ -54,6 +54,7 @@ func getPodsToDelete(cls *appsv1alpha1.CollaSet, filteredPods []*collasetutils.P
 	var needDeletePods []*collasetutils.PodWrapper
 	// select pods to delete in second round according to replace, delete, exclude
 	for i, pod := range targetsPods {
+		// find pods to be scaled in out of diff, if allowed to ops
 		_, allowed := podopslifecycle.AllowOps(collasetutils.ScaleInOpsLifecycleAdapter, ptr.Deref(cls.Spec.ScaleStrategy.OperationDelaySeconds, 0), pod)
 		if i >= diff && !allowed {
 			continue
