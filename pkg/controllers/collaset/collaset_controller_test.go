@@ -131,7 +131,7 @@ var _ = Describe("collaset controller", func() {
 			})).Should(BeNil())
 			Eventually(func() error {
 				return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)
-			}, 500*time.Second, 1*time.Second).Should(BeNil())
+			}, 30*time.Second, 1*time.Second).Should(BeNil())
 
 			Eventually(func() bool {
 				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
@@ -479,7 +479,7 @@ var _ = Describe("collaset controller", func() {
 				}
 			}
 			return true
-		}, 300*time.Second, 1*time.Second).Should(BeEquivalentTo(true))
+		}, 30*time.Second, 1*time.Second).Should(BeEquivalentTo(true))
 
 		// wait for scale finished
 		Eventually(func() int {
