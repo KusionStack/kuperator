@@ -54,6 +54,11 @@ func getPodsToDelete(cls *appsv1alpha1.CollaSet, filteredPods []*collasetutils.P
 	var needDeletePods []*collasetutils.PodWrapper
 	// select pods to delete in second round according to replace, delete, exclude
 	for i, pod := range targetsPods {
+		_, allowed := podopslifecycle.AllowOps(collasetutils.ScaleInOpsLifecycleAdapter, ptr.Deref(cls.Spec.ScaleStrategy.OperationDelaySeconds, 0), pod)
+		if i >= diff && !allowed {
+			continue
+		}
+
 		//  don't scaleIn exclude pod and its newPod (if exist)
 		if pod.ToExclude {
 			continue
@@ -69,14 +74,7 @@ func getPodsToDelete(cls *appsv1alpha1.CollaSet, filteredPods []*collasetutils.P
 				needDeletePods = append(needDeletePods, replacePairPod)
 			}
 		}
-		if i < diff {
-			needDeletePods = append(needDeletePods, pod)
-		} else {
-			// finds pods allowed to scale in out of diff
-			if _, allowed := podopslifecycle.AllowOps(collasetutils.ScaleInOpsLifecycleAdapter, ptr.Deref(cls.Spec.ScaleStrategy.OperationDelaySeconds, 0), pod); allowed {
-				needDeletePods = append(needDeletePods, pod)
-			}
-		}
+		needDeletePods = append(needDeletePods, pod)
 	}
 
 	return needDeletePods
