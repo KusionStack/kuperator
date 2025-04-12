@@ -32,15 +32,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	"kusionstack.io/kube-utils/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
+	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/revision"
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/strategy"
-	"kusionstack.io/kuperator/pkg/controllers/utils/revision"
 )
 
 var (
@@ -48,7 +49,7 @@ var (
 	cancel      context.CancelFunc
 	ctx         context.Context
 	c           client.Client
-	revisionMgr *revision.RevisionManager
+	revisionMgr history.HistoryManager
 )
 
 const timeoutInterval = 5 * time.Second
@@ -101,7 +102,7 @@ var _ = Describe("Test PodDecoration getter", func() {
 		Eventually(func() error {
 			return c.Get(ctx, types.NamespacedName{Name: podDecoration.Name, Namespace: testcase}, podDecoration)
 		}, timeoutInterval, pollInterval).Should(BeNil())
-		_, updatedRevisionV1, _, _, _, err := revisionMgr.ConstructRevisions(podDecoration, false)
+		_, updatedRevisionV1, _, _, _, err := revisionMgr.ConstructRevisions(ctx, podDecoration)
 		Expect(updatedRevisionV1).ShouldNot(BeNil())
 		currentRevision := updatedRevisionV1.Name
 		Expect(err).ShouldNot(HaveOccurred())
@@ -130,7 +131,7 @@ var _ = Describe("Test PodDecoration getter", func() {
 			return false
 		}, timeoutInterval, pollInterval).Should(Equal(true))
 
-		_, updatedRevisionV2, _, _, _, err := revisionMgr.ConstructRevisions(podDecoration, false)
+		_, updatedRevisionV2, _, _, _, err := revisionMgr.ConstructRevisions(ctx, podDecoration)
 		Expect(err).Should(BeNil())
 		Expect(updatedRevisionV2).ShouldNot(BeNil())
 		updatedRevision := updatedRevisionV2.Name
@@ -215,7 +216,7 @@ var _ = BeforeSuite(func() {
 	c = cl
 	strategy.SharedStrategyController.InjectClient(c)
 	Expect(err).NotTo(HaveOccurred())
-	revisionMgr = revision.NewRevisionManager(c, sch, &revisionOwnerAdapter{})
+	revisionMgr = history.NewHistoryManager(history.NewRevisionControl(cl, cl), &revision.RevisionOwnerAdapter{})
 })
 
 var _ = AfterEach(func() {
@@ -258,38 +259,6 @@ func getPodDecorationPatch(pd *appsv1alpha1.PodDecoration) ([]byte, error) {
 	objCopy["spec"] = specCopy
 	patch, err := json.Marshal(objCopy)
 	return patch, err
-}
-
-type revisionOwnerAdapter struct {
-}
-
-func (roa *revisionOwnerAdapter) GetSelector(obj metav1.Object) *metav1.LabelSelector {
-	ips, _ := obj.(*appsv1alpha1.PodDecoration)
-	return ips.Spec.Selector
-}
-
-func (roa *revisionOwnerAdapter) GetCollisionCount(obj metav1.Object) *int32 {
-	ips, _ := obj.(*appsv1alpha1.PodDecoration)
-	return &ips.Status.CollisionCount
-}
-
-func (roa *revisionOwnerAdapter) GetHistoryLimit(obj metav1.Object) int32 {
-	ips, _ := obj.(*appsv1alpha1.PodDecoration)
-	return ips.Spec.HistoryLimit
-}
-
-func (roa *revisionOwnerAdapter) GetPatch(obj metav1.Object) ([]byte, error) {
-	cs, _ := obj.(*appsv1alpha1.PodDecoration)
-	return getPodDecorationPatch(cs)
-}
-
-func (roa *revisionOwnerAdapter) GetCurrentRevision(obj metav1.Object) string {
-	ips, _ := obj.(*appsv1alpha1.PodDecoration)
-	return ips.Status.CurrentRevision
-}
-
-func (roa *revisionOwnerAdapter) IsInUsed(_ metav1.Object, _ string) bool {
-	return false
 }
 
 func int32Pointer(val int32) *int32 {

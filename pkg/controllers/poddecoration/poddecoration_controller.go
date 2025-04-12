@@ -47,6 +47,8 @@ import (
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
+	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/revision"
+
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/strategy"
 	"kusionstack.io/kuperator/pkg/utils"
 	"kusionstack.io/kuperator/pkg/utils/mixin"
@@ -68,7 +70,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcilePodDecoration{
 		ReconcilerMixin: mixin,
 		Client:          mgr.GetClient(),
-		revisionManager: history.NewHistoryManager(history.NewRevisionControl(mixin.Client, mixin.Client), &revisionOwnerAdapter{}),
+		revisionManager: history.NewHistoryManager(history.NewRevisionControl(mixin.Client, mixin.Client), &revision.RevisionOwnerAdapter{}),
 	}
 }
 
