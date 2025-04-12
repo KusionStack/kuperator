@@ -41,12 +41,13 @@ import (
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
+	"kusionstack.io/kube-utils/controller/history"
+
 	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontrol"
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/strategy"
-	"kusionstack.io/kuperator/pkg/controllers/utils/revision"
 	"kusionstack.io/kuperator/pkg/utils"
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
@@ -63,10 +64,11 @@ func Add(mgr manager.Manager) error {
 
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
+	mixin := mixin.NewReconcilerMixin(controllerName, mgr)
 	return &ReconcilePodDecoration{
-		ReconcilerMixin: mixin.NewReconcilerMixin(controllerName, mgr),
+		ReconcilerMixin: mixin,
 		Client:          mgr.GetClient(),
-		revisionManager: revision.NewRevisionManager(mgr.GetClient(), mgr.GetScheme(), &revisionOwnerAdapter{}),
+		revisionManager: history.NewHistoryManager(history.NewRevisionControl(mixin.Client, mixin.Client), &revisionOwnerAdapter{}),
 	}
 }
 
@@ -112,7 +114,7 @@ var (
 type ReconcilePodDecoration struct {
 	client.Client
 	*mixin.ReconcilerMixin
-	revisionManager *revision.RevisionManager
+	revisionManager history.HistoryManager
 }
 
 // +kubebuilder:rbac:groups=apps.kusionstack.io,resources=poddecorations,verbs=get;list;watch;create;update;patch;delete
@@ -152,7 +154,7 @@ func (r *ReconcilePodDecoration) Reconcile(ctx context.Context, request reconcil
 		return reconcile.Result{}, err
 	}
 
-	_, updatedRevision, _, collisionCount, _, err := r.revisionManager.ConstructRevisions(instance, false)
+	_, updatedRevision, _, collisionCount, _, err := r.revisionManager.ConstructRevisions(ctx, instance)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -182,7 +184,7 @@ func (r *ReconcilePodDecoration) Reconcile(ctx context.Context, request reconcil
 		ObservedGeneration: instance.Generation,
 		CurrentRevision:    instance.Status.CurrentRevision,
 		UpdatedRevision:    updatedRevision.Name,
-		CollisionCount:     *collisionCount,
+		CollisionCount:     collisionCount,
 	}
 	err = r.calculateStatus(instance, newStatus, affectedPods, affectedCollaSets, instance.Spec.DisablePodDetail)
 	if err != nil {

@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
@@ -52,19 +54,27 @@ func getPodDecorationPatch(pd *appsv1alpha1.PodDecoration) ([]byte, error) {
 type revisionOwnerAdapter struct {
 }
 
-func (roa *revisionOwnerAdapter) GetSelector(obj metav1.Object) *metav1.LabelSelector {
-	ips, _ := obj.(*appsv1alpha1.PodDecoration)
-	return ips.Spec.Selector
+func (roa *revisionOwnerAdapter) GetGroupVersionKind() schema.GroupVersionKind {
+	return appsv1alpha1.SchemeGroupVersion.WithKind("PodDecoration")
+}
+
+func (roa *revisionOwnerAdapter) GetMatchLabels(obj metav1.Object) map[string]string {
+	pd, _ := obj.(*appsv1alpha1.PodDecoration)
+	selector := pd.Spec.Selector
+	if selector == nil {
+		return nil
+	}
+	return selector.MatchLabels
 }
 
 func (roa *revisionOwnerAdapter) GetCollisionCount(obj metav1.Object) *int32 {
-	ips, _ := obj.(*appsv1alpha1.PodDecoration)
-	return &ips.Status.CollisionCount
+	pd, _ := obj.(*appsv1alpha1.PodDecoration)
+	return &pd.Status.CollisionCount
 }
 
 func (roa *revisionOwnerAdapter) GetHistoryLimit(obj metav1.Object) int32 {
-	ips, _ := obj.(*appsv1alpha1.PodDecoration)
-	return ips.Spec.HistoryLimit
+	pd, _ := obj.(*appsv1alpha1.PodDecoration)
+	return pd.Spec.HistoryLimit
 }
 
 func (roa *revisionOwnerAdapter) GetPatch(obj metav1.Object) ([]byte, error) {
@@ -73,10 +83,10 @@ func (roa *revisionOwnerAdapter) GetPatch(obj metav1.Object) ([]byte, error) {
 }
 
 func (roa *revisionOwnerAdapter) GetCurrentRevision(obj metav1.Object) string {
-	ips, _ := obj.(*appsv1alpha1.PodDecoration)
-	return ips.Status.CurrentRevision
+	pd, _ := obj.(*appsv1alpha1.PodDecoration)
+	return pd.Status.CurrentRevision
 }
 
-func (roa *revisionOwnerAdapter) IsInUsed(_ metav1.Object, _ string) bool {
-	return false
+func (roa *revisionOwnerAdapter) GetInUsedRevisions(_ metav1.Object) (sets.String, error) {
+	return sets.NewString(), nil
 }
