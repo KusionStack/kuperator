@@ -25,6 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	"kusionstack.io/kube-utils/controller/history"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -32,10 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-
-	"kusionstack.io/kube-utils/controller/history"
 
 	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontext"
 	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontrol"
