@@ -35,6 +35,8 @@ import (
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
+	"kusionstack.io/kube-utils/controller/history"
+
 	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontext"
 	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontrol"
 	"kusionstack.io/kuperator/pkg/controllers/collaset/pvccontrol"
@@ -46,7 +48,6 @@ import (
 	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration"
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/strategy"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
-	"kusionstack.io/kuperator/pkg/controllers/utils/revision"
 	commonutils "kusionstack.io/kuperator/pkg/utils"
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
@@ -61,7 +62,7 @@ const (
 type CollaSetReconciler struct {
 	*mixin.ReconcilerMixin
 
-	revisionManager *revision.RevisionManager
+	revisionManager history.HistoryManager
 	syncControl     synccontrol.Interface
 }
 
@@ -76,7 +77,7 @@ func NewReconciler(mgr ctrl.Manager) reconcile.Reconciler {
 
 	return &CollaSetReconciler{
 		ReconcilerMixin: mixin,
-		revisionManager: revision.NewRevisionManager(mixin.Client, mixin.Scheme, NewRevisionOwnerAdapter(podcontrol.NewRealPodControl(mixin.Client, mixin.Scheme))),
+		revisionManager: history.NewHistoryManager(history.NewRevisionControl(mixin.Client, mixin.Client), &revisionOwnerAdapter{podControl: podcontrol.NewRealPodControl(mixin.Client, mixin.Scheme)}),
 		syncControl:     synccontrol.NewRealSyncControl(mixin.Client, mixin.Logger, podcontrol.NewRealPodControl(mixin.Client, mixin.Scheme), pvccontrol.NewRealPvcControl(mixin.Client, mixin.Scheme), mixin.Recorder),
 	}
 }
@@ -182,14 +183,14 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, controllerutils.AddFinalizer(context.TODO(), r.Client, instance, preReclaimFinalizer)
 	}
 	key := commonutils.ObjectKeyString(instance)
-	currentRevision, updatedRevision, revisions, collisionCount, _, err := r.revisionManager.ConstructRevisions(instance, false)
+	currentRevision, updatedRevision, revisions, collisionCount, _, err := r.revisionManager.ConstructRevisions(ctx, instance)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("fail to construct revision for CollaSet %s: %s", key, err)
 	}
 
 	newStatus := &appsv1alpha1.CollaSetStatus{
 		// record collisionCount
-		CollisionCount:  collisionCount,
+		CollisionCount:  &collisionCount,
 		CurrentRevision: currentRevision.Name,
 		UpdatedRevision: updatedRevision.Name,
 		Conditions:      instance.Status.Conditions,
