@@ -21,10 +21,12 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontrol"
-	"kusionstack.io/kuperator/pkg/controllers/utils/revision"
 )
 
 func getCollaSetPatch(cls *appsv1alpha1.CollaSet) ([]byte, error) {
@@ -55,29 +57,31 @@ func getCollaSetPatch(cls *appsv1alpha1.CollaSet) ([]byte, error) {
 	return patch, err
 }
 
-func NewRevisionOwnerAdapter(podControl podcontrol.Interface) revision.OwnerAdapter {
-	return &revisionOwnerAdapter{
-		podControl: podControl,
-	}
-}
-
 type revisionOwnerAdapter struct {
 	podControl podcontrol.Interface
 }
 
-func (roa *revisionOwnerAdapter) GetSelector(obj metav1.Object) *metav1.LabelSelector {
-	ips, _ := obj.(*appsv1alpha1.CollaSet)
-	return ips.Spec.Selector
+func (roa *revisionOwnerAdapter) GetGroupVersionKind() schema.GroupVersionKind {
+	return appsv1alpha1.SchemeGroupVersion.WithKind("CollaSet")
+}
+
+func (roa *revisionOwnerAdapter) GetMatchLabels(obj metav1.Object) map[string]string {
+	cls, _ := obj.(*appsv1alpha1.CollaSet)
+	selector := cls.Spec.Selector
+	if selector == nil {
+		return nil
+	}
+	return selector.MatchLabels
 }
 
 func (roa *revisionOwnerAdapter) GetCollisionCount(obj metav1.Object) *int32 {
-	ips, _ := obj.(*appsv1alpha1.CollaSet)
-	return ips.Status.CollisionCount
+	cls, _ := obj.(*appsv1alpha1.CollaSet)
+	return cls.Status.CollisionCount
 }
 
 func (roa *revisionOwnerAdapter) GetHistoryLimit(obj metav1.Object) int32 {
-	ips, _ := obj.(*appsv1alpha1.CollaSet)
-	return ips.Spec.HistoryLimit
+	cls, _ := obj.(*appsv1alpha1.CollaSet)
+	return cls.Spec.HistoryLimit
 }
 
 func (roa *revisionOwnerAdapter) GetPatch(obj metav1.Object) ([]byte, error) {
@@ -86,26 +90,26 @@ func (roa *revisionOwnerAdapter) GetPatch(obj metav1.Object) ([]byte, error) {
 }
 
 func (roa *revisionOwnerAdapter) GetCurrentRevision(obj metav1.Object) string {
-	ips, _ := obj.(*appsv1alpha1.CollaSet)
-	return ips.Status.CurrentRevision
+	cls, _ := obj.(*appsv1alpha1.CollaSet)
+	return cls.Status.CurrentRevision
 }
 
-func (roa *revisionOwnerAdapter) IsInUsed(obj metav1.Object, revision string) bool {
-	ips, _ := obj.(*appsv1alpha1.CollaSet)
-
-	if ips.Status.UpdatedRevision == revision || ips.Status.CurrentRevision == revision {
-		return true
+func (roa *revisionOwnerAdapter) GetInUsedRevisions(obj metav1.Object) (sets.String, error) {
+	inUsed := sets.NewString()
+	cls, _ := obj.(*appsv1alpha1.CollaSet)
+	if cls.Status.UpdatedRevision != "" {
+		inUsed.Insert(cls.Status.UpdatedRevision)
 	}
-
-	pods, _ := roa.podControl.GetFilteredPods(ips.Spec.Selector, ips)
+	if cls.Status.CurrentRevision != "" {
+		inUsed.Insert(cls.Status.CurrentRevision)
+	}
+	pods, _ := roa.podControl.GetFilteredPods(cls.Spec.Selector, cls)
 	for _, pod := range pods {
 		if pod.Labels != nil {
-			currentRevisionName, exist := pod.Labels[appsv1.ControllerRevisionHashLabelKey]
-			if exist && currentRevisionName == revision {
-				return true
+			if currentRevisionName, exist := pod.Labels[appsv1.ControllerRevisionHashLabelKey]; exist {
+				inUsed.Insert(currentRevisionName)
 			}
 		}
 	}
-
-	return false
+	return inUsed, nil
 }

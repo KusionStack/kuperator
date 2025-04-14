@@ -14,12 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package poddecoration
+package revision
 
 import (
 	"encoding/json"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
@@ -49,34 +51,42 @@ func getPodDecorationPatch(pd *appsv1alpha1.PodDecoration) ([]byte, error) {
 	return patch, err
 }
 
-type revisionOwnerAdapter struct {
+type RevisionOwnerAdapter struct {
 }
 
-func (roa *revisionOwnerAdapter) GetSelector(obj metav1.Object) *metav1.LabelSelector {
-	ips, _ := obj.(*appsv1alpha1.PodDecoration)
-	return ips.Spec.Selector
+func (roa *RevisionOwnerAdapter) GetGroupVersionKind() schema.GroupVersionKind {
+	return appsv1alpha1.SchemeGroupVersion.WithKind("PodDecoration")
 }
 
-func (roa *revisionOwnerAdapter) GetCollisionCount(obj metav1.Object) *int32 {
-	ips, _ := obj.(*appsv1alpha1.PodDecoration)
-	return &ips.Status.CollisionCount
+func (roa *RevisionOwnerAdapter) GetMatchLabels(obj metav1.Object) map[string]string {
+	pd, _ := obj.(*appsv1alpha1.PodDecoration)
+	selector := pd.Spec.Selector
+	if selector == nil {
+		return nil
+	}
+	return selector.MatchLabels
 }
 
-func (roa *revisionOwnerAdapter) GetHistoryLimit(obj metav1.Object) int32 {
-	ips, _ := obj.(*appsv1alpha1.PodDecoration)
-	return ips.Spec.HistoryLimit
+func (roa *RevisionOwnerAdapter) GetCollisionCount(obj metav1.Object) *int32 {
+	pd, _ := obj.(*appsv1alpha1.PodDecoration)
+	return &pd.Status.CollisionCount
 }
 
-func (roa *revisionOwnerAdapter) GetPatch(obj metav1.Object) ([]byte, error) {
+func (roa *RevisionOwnerAdapter) GetHistoryLimit(obj metav1.Object) int32 {
+	pd, _ := obj.(*appsv1alpha1.PodDecoration)
+	return pd.Spec.HistoryLimit
+}
+
+func (roa *RevisionOwnerAdapter) GetPatch(obj metav1.Object) ([]byte, error) {
 	cs, _ := obj.(*appsv1alpha1.PodDecoration)
 	return getPodDecorationPatch(cs)
 }
 
-func (roa *revisionOwnerAdapter) GetCurrentRevision(obj metav1.Object) string {
-	ips, _ := obj.(*appsv1alpha1.PodDecoration)
-	return ips.Status.CurrentRevision
+func (roa *RevisionOwnerAdapter) GetCurrentRevision(obj metav1.Object) string {
+	pd, _ := obj.(*appsv1alpha1.PodDecoration)
+	return pd.Status.CurrentRevision
 }
 
-func (roa *revisionOwnerAdapter) IsInUsed(_ metav1.Object, _ string) bool {
-	return false
+func (roa *RevisionOwnerAdapter) GetInUsedRevisions(_ metav1.Object) (sets.String, error) {
+	return sets.NewString(), nil
 }

@@ -28,12 +28,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/client-go/kubernetes/scheme"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
-	revisionutils "kusionstack.io/kuperator/pkg/controllers/utils/revision"
 	"kusionstack.io/kuperator/pkg/utils"
 )
+
+var PodCodec = scheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion)
 
 type PodWrapper struct {
 	*corev1.Pod
@@ -113,7 +115,7 @@ func ApplyPatchFromRevision(pod *corev1.Pod, revision *appsv1.ControllerRevision
 	}
 
 	clone := pod.DeepCopy()
-	patched, err := strategicpatch.StrategicMergePatch([]byte(runtime.EncodeOrDie(revisionutils.PodCodec, clone)), patch, clone)
+	patched, err := strategicpatch.StrategicMergePatch([]byte(runtime.EncodeOrDie(PodCodec, clone)), patch, clone)
 	if err != nil {
 		return nil, err
 	}
