@@ -41,7 +41,8 @@ import (
 	"kusionstack.io/kuperator/pkg/utils/feature"
 )
 
-// getPodsToDelete 1. finds number of diff pods from filteredPods to do scaleIn
+// getPodsToDelete
+// 1. finds number of diff pods from filteredPods to do scaleIn
 // 2. finds pods allowed to scale in out of diff
 func getPodsToDelete(cls *appsv1alpha1.CollaSet, filteredPods []*collasetutils.PodWrapper, replaceMapping map[string]*collasetutils.PodWrapper, diff int) []*collasetutils.PodWrapper {
 	targetsPods := getTargetsDeletePods(filteredPods, replaceMapping)
