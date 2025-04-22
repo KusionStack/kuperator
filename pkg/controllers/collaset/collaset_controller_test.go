@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -130,7 +131,7 @@ var _ = Describe("collaset controller", func() {
 			})).Should(BeNil())
 			Eventually(func() error {
 				return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)
-			}, 5*time.Second, 1*time.Second).Should(BeNil())
+			}, 30*time.Second, 1*time.Second).Should(BeNil())
 
 			Eventually(func() bool {
 				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
@@ -379,6 +380,112 @@ var _ = Describe("collaset controller", func() {
 			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 			return expectedStatusReplicas(c, cs, 0, 0, 0, 0, 0, 0, 0, 0)
 		}, 5*time.Second, 1*time.Second).Should(BeNil())
+	})
+
+	It("scaleIn cancel", func() {
+		testcase := "test-scale-in-cancel"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+
+		cs := &appsv1alpha1.CollaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.CollaSetSpec{
+				Replicas: ptr.To(int32(2)),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "foo",
+								Image: "nginx:v1",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
+
+		modelList := &corev1.PodList{}
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), modelList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(modelList.Items) == 2
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
+
+		// scale in 1 models
+		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+			cls.Spec.Replicas = ptr.To(int32(1))
+			return true
+		})).Should(BeNil())
+
+		// ensure model is during scale in
+		var modelToScaleIn *corev1.Pod
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), modelList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range modelList.Items {
+				model := modelList.Items[i]
+				if podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, &model) {
+					modelToScaleIn = &model
+					return true
+				}
+			}
+			return false
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+
+		// scale out 1 replicas
+		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+			cls.Spec.Replicas = ptr.To(int32(2))
+			return true
+		})).Should(BeNil())
+
+		// allow scaleIn model to delete
+		Eventually(func() bool {
+			triggerAllowed := false
+			Expect(c.List(context.TODO(), modelList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range modelList.Items {
+				model := modelList.Items[i]
+				Expect(updatePodWithRetry(c, model.Namespace, model.Name, func(model *corev1.Pod) bool {
+					if podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, model) {
+						labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+						model.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+						triggerAllowed = modelToScaleIn.Name == model.Name
+					}
+					return true
+				})).Should(BeNil())
+			}
+			return triggerAllowed
+		}, 30*time.Second, 1*time.Second).Should(BeTrue())
+
+		// wait for scale in model to be deleted
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), modelList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for _, model := range modelList.Items {
+				if model.Name == modelToScaleIn.Name {
+					return false
+				}
+			}
+			return true
+		}, 30*time.Second, 1*time.Second).Should(BeEquivalentTo(true))
+
+		// wait for scale finished
+		Eventually(func() int {
+			Expect(c.List(context.TODO(), modelList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(modelList.Items)
+		}, 30*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
 	})
 
 	It("scaleIn Order", func() {

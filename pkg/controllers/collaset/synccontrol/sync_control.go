@@ -334,10 +334,15 @@ func (r *RealSyncControl) Scale(
 			// collect instance ID in used from owned Pods
 			podInstanceIDSet := collasetutils.CollectPodInstanceID(activePods)
 			// find IDs and their contexts which have not been used by owned Pods
-			availableContext := extractAvailableContexts(diff, ownedIDs, podInstanceIDSet)
+			var availableContexts []*appsv1alpha1.ContextDetail
+			var getErr error
+			availableContexts, ownedIDs, getErr = r.getAvailablePodIDs(diff, cls, resources, ownedIDs, podInstanceIDSet)
+			if getErr != nil {
+				return false, recordedRequeueAfter, getErr
+			}
 			needUpdateContext := atomic.Bool{}
 			succCount, err := controllerutils.SlowStartBatch(diff, controllerutils.SlowStartInitialBatchSize, false, func(idx int, _ error) (err error) {
-				availableIDContext := availableContext[idx]
+				availableIDContext := availableContexts[idx]
 				defer func() {
 					if decideContextRevision(availableIDContext, resources.UpdatedRevision, err == nil) {
 						needUpdateContext.Store(true)
@@ -427,11 +432,12 @@ func (r *RealSyncControl) Scale(
 			return succCount > 0, recordedRequeueAfter, err
 		} else {
 			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleOut", "")
-			return false, nil, nil
 		}
-	} else if diff < 0 {
+	}
+
+	if diff <= 0 {
 		// chose the pods to scale in
-		podsToScaleIn := getPodsToDelete(activePods, replacePodMap, diff*-1)
+		podsToScaleIn := getPodsToDelete(cls, activePods, replacePodMap, diff*-1)
 		// filter out Pods need to trigger PodOpsLifecycle
 		podCh := make(chan *collasetutils.PodWrapper, len(podsToScaleIn))
 		for i := range podsToScaleIn {
@@ -545,8 +551,6 @@ func (r *RealSyncControl) Scale(
 		} else {
 			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleIn", "")
 		}
-
-		return scaling, recordedRequeueAfter, err
 	}
 
 	// reset ContextDetail.ScalingIn, if there are Pods had its PodOpsLifecycle reverted
