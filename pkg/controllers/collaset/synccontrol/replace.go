@@ -236,11 +236,12 @@ func dealReplacePods(pods []*corev1.Pod) (needReplacePods []*corev1.Pod, needCle
 		needReplacePods = append(needReplacePods, pod)
 	}
 
+	// deal need clean labels and need delete pods
 	for _, pod := range pods {
 		_, replaceByUpdate := pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
 		var needCleanLabels []string
 
-		// pod is replace new created pod, skip replace
+		// pod is replace new created pod
 		if originPodName, exist := pod.Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
 			// replace pair origin pod is not exist, clean label.
 			if originPod, exist := podNameMap[originPodName]; !exist {
@@ -250,6 +251,7 @@ func dealReplacePods(pods []*corev1.Pod) (needReplacePods []*corev1.Pod, needCle
 				if _, exist := pod.Labels[appsv1alpha1.PodServiceAvailableLabel]; !exist {
 					needDeletePods = append(needDeletePods, pod)
 				}
+				needCleanLabels = append(needCleanLabels, appsv1alpha1.PodReplacePairOriginName)
 			} else if !replaceByUpdate {
 				// not replace update, delete origin pod when new created pod is service available
 				if _, serviceAvailable := pod.Labels[appsv1alpha1.PodServiceAvailableLabel]; serviceAvailable {
@@ -258,8 +260,13 @@ func dealReplacePods(pods []*corev1.Pod) (needReplacePods []*corev1.Pod, needCle
 			}
 		}
 
+		// pod is replace origin pod
 		if newPairPodId, exist := pod.Labels[appsv1alpha1.PodReplacePairNewId]; exist {
-			if _, exist := podInstanceIdMap[newPairPodId]; !exist {
+			// replace new pod is deleted, clean label on origin pod
+			_, newPodExist := podInstanceIdMap[newPairPodId]
+			// replace is cancelled, clean label on origin pod
+			_, replaceIndicate := pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
+			if !newPodExist || !replaceIndicate {
 				needCleanLabels = append(needCleanLabels, appsv1alpha1.PodReplacePairNewId)
 			}
 		}
