@@ -62,6 +62,19 @@ var _ = SIGDescribe("CollaSet", func() {
 		randStr = rand.String(10)
 	})
 
+	framework.KusionstackDescribe("CollaSet Basics", func() {
+		framework.ConformanceIt("create privileged container", func() {
+			cls := tester.NewCollaSet("collaset-"+randStr, 3, appsv1alpha1.UpdateStrategy{})
+			// create container with privileged
+			privileged := true
+			cls.Spec.Template.Spec.Containers[0].SecurityContext.Privileged = &privileged
+			Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
+
+			By("Wait for status replicas satisfied")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 3, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+		})
+	})
+
 	framework.KusionstackDescribe("CollaSet Scaling", func() {
 
 		framework.ConformanceIt("scales in normal cases", func() {
