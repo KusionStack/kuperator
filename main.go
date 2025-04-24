@@ -59,12 +59,9 @@ func main() {
 		probeAddr            string
 		certDir              string
 		dnsName              string
-		allowPrivileged      bool
 	)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&allowPrivileged, "allow-privileged", true, "If true, allow privileged containers. It will only work if api-server is also"+
-		"started with --allow-privileged=true.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -74,11 +71,10 @@ func main() {
 	klog.InitFlags(nil)
 	defer klog.Flush()
 
-	if allowPrivileged {
-		capabilities.Initialize(capabilities.Capabilities{
-			AllowPrivileged: allowPrivileged,
-		})
-	}
+	// allow privileged containers. It will only work if api-server is also started with --allow-privileged=true.
+	capabilities.Initialize(capabilities.Capabilities{
+		AllowPrivileged: true,
+	})
 
 	feature.DefaultMutableFeatureGate.AddFlag(pflag.CommandLine)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
