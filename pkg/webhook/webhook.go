@@ -34,7 +34,6 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/capabilities"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"kusionstack.io/kuperator/pkg/utils"
@@ -67,12 +66,6 @@ func Initialize(ctx context.Context, config *rest.Config, dnsName, certDir strin
 	if err != nil {
 		return err
 	}
-
-	// Validating webhook allows to create privileged containers, this will only work if api-server is started with --allow-privileged=true.
-	capabilities.Initialize(capabilities.Capabilities{
-		AllowPrivileged: true,
-	})
-
 	return ensureWebhookCABundleAndCert(ctx, clientset, dnsName, certDir)
 }
 

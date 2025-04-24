@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/capabilities"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,6 +49,11 @@ type ValidatingHandler struct {
 }
 
 func NewValidatingHandler() *ValidatingHandler {
+	// Validating webhook allows to create privileged containers, this will only work if api-server is started with --allow-privileged=true.
+	capabilities.Initialize(capabilities.Capabilities{
+		AllowPrivileged: true,
+	})
+
 	return &ValidatingHandler{
 		WebhookHandlerMixin: mixin.NewWebhookHandlerMixin(),
 	}
