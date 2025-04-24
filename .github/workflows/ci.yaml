@@ -18,7 +18,7 @@ jobs:
 
   Test:
     name: Unit Test
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v3
       with:
@@ -143,7 +143,7 @@ jobs:
 
   TyposCheck:
     name: Spell Check with Typos
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout Actions Repository
         uses: actions/checkout@v3
