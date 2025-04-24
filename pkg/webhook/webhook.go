@@ -68,7 +68,7 @@ func Initialize(ctx context.Context, config *rest.Config, dnsName, certDir strin
 		return err
 	}
 
-	// Allow to create privileged containers, this will only work if api-server is started with --allow-privileged=true.
+	// Validating webhook allows to create privileged containers, this will only work if api-server is started with --allow-privileged=true.
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
