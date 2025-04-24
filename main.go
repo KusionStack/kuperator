@@ -28,7 +28,6 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
-	"k8s.io/kubernetes/pkg/capabilities"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -70,11 +69,6 @@ func main() {
 
 	klog.InitFlags(nil)
 	defer klog.Flush()
-
-	// allow privileged containers. It will only work if api-server is also started with --allow-privileged=true.
-	capabilities.Initialize(capabilities.Capabilities{
-		AllowPrivileged: true,
-	})
 
 	feature.DefaultMutableFeatureGate.AddFlag(pflag.CommandLine)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
