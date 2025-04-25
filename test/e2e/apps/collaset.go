@@ -79,7 +79,8 @@ var _ = SIGDescribe("CollaSet", func() {
 			pods, err := tester.ListPodsForCollaSet(cls)
 			Expect(err).NotTo(HaveOccurred())
 			for i := range pods {
-				Expect(pods[i].Spec.Containers[0].SecurityContext.Privileged).Should(BeTrue())
+				privileged := pods[i].Spec.Containers[0].SecurityContext.Privileged
+				Expect(*privileged).Should(BeTrue())
 			}
 		})
 	})
