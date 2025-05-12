@@ -430,8 +430,6 @@ func (r *RealSyncControl) Scale(
 			r.recorder.Eventf(cls, corev1.EventTypeNormal, "ScaleOut", "scale out %d Pod(s)", succCount)
 			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleOut", "")
 			return succCount > 0, recordedRequeueAfter, err
-		} else {
-			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleOut", "")
 		}
 	}
 
@@ -570,6 +568,10 @@ func (r *RealSyncControl) Scale(
 		}); err != nil {
 			return scaling, recordedRequeueAfter, fmt.Errorf("fail to reset ResourceContext: %s", err)
 		}
+	}
+
+	if !scaling {
+		collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "Scaled", "")
 	}
 
 	return scaling, recordedRequeueAfter, nil

@@ -17,6 +17,8 @@ limitations under the License.
 package utils
 
 import (
+	"sort"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -91,4 +93,19 @@ func filterOutCondition(conditions []appsv1alpha1.CollaSetCondition, condType ap
 		newConditions = append(newConditions, c)
 	}
 	return newConditions
+}
+
+func SortCollaSetConditions(conditions []appsv1alpha1.CollaSetCondition) []appsv1alpha1.CollaSetCondition {
+	sort.Sort(ByCollaSetType(conditions))
+	return conditions
+}
+
+type CollaSetConditionType string
+
+type ByCollaSetType []appsv1alpha1.CollaSetCondition
+
+func (a ByCollaSetType) Len() int      { return len(a) }
+func (a ByCollaSetType) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a ByCollaSetType) Less(i, j int) bool {
+	return strings.Compare(string(a[i].Type), string(a[j].Type)) < 0
 }

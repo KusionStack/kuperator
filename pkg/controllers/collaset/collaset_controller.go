@@ -206,6 +206,8 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		PDGetter:        getter,
 	}
 	requeueAfter, newStatus, err := r.DoReconcile(ctx, instance, resources)
+	// sort conditions
+	collasetutils.SortCollaSetConditions(newStatus.Conditions)
 	// update status anyway
 	if err := r.updateStatus(ctx, instance, newStatus); err != nil {
 		return requeueResult(requeueAfter), fmt.Errorf("fail to update status of CollaSet %s: %s", req, err)
