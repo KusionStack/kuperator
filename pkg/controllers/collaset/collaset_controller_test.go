@@ -418,10 +418,10 @@ var _ = Describe("collaset controller", func() {
 
 		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
 
-		csList := &corev1.PodList{}
+		podList := &corev1.PodList{}
 		Eventually(func() bool {
-			Expect(c.List(context.TODO(), csList, client.InNamespace(cs.Namespace))).Should(BeNil())
-			return len(csList.Items) == 2
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 2
 		}, 5*time.Second, 1*time.Second).Should(BeTrue())
 		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
@@ -435,9 +435,9 @@ var _ = Describe("collaset controller", func() {
 		// ensure pod is during scale in
 		var podToScaleIn *corev1.Pod
 		Eventually(func() bool {
-			Expect(c.List(context.TODO(), csList, client.InNamespace(cs.Namespace))).Should(BeNil())
-			for i := range csList.Items {
-				pod := csList.Items[i]
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range podList.Items {
+				pod := podList.Items[i]
 				if podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, &pod) {
 					podToScaleIn = &pod
 					return true
@@ -455,9 +455,9 @@ var _ = Describe("collaset controller", func() {
 		// allow scaleIn pod to delete
 		Eventually(func() bool {
 			triggerAllowed := false
-			Expect(c.List(context.TODO(), csList, client.InNamespace(cs.Namespace))).Should(BeNil())
-			for i := range csList.Items {
-				pod := csList.Items[i]
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range podList.Items {
+				pod := podList.Items[i]
 				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
 					if podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, pod) {
 						labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
@@ -472,8 +472,8 @@ var _ = Describe("collaset controller", func() {
 
 		// wait for scale in pod to be deleted
 		Eventually(func() bool {
-			Expect(c.List(context.TODO(), csList, client.InNamespace(cs.Namespace))).Should(BeNil())
-			for _, pod := range csList.Items {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for _, pod := range podList.Items {
 				if pod.Name == podToScaleIn.Name {
 					return false
 				}
@@ -483,8 +483,8 @@ var _ = Describe("collaset controller", func() {
 
 		// wait for scale finished
 		Eventually(func() int {
-			Expect(c.List(context.TODO(), csList, client.InNamespace(cs.Namespace))).Should(BeNil())
-			return len(csList.Items)
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items)
 		}, 30*time.Second, 1*time.Second).Should(BeEquivalentTo(2))
 	})
 
