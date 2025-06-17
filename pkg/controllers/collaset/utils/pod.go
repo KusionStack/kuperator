@@ -112,8 +112,8 @@ func AddRandomTritonEnvPort(pod *corev1.Pod) {
 		newEnv = append(newEnv, env)
 	}
 	rand.Seed(time.Now().UnixNano())
-	minPort := 8100
-	maxPort := 8990
+	minPort := 16100
+	maxPort := 16990
 	randomNum := rand.Intn(maxPort-minPort+1) + minPort
 	randPort := randomNum - randomNum%3
 	newEnv = append(newEnv, corev1.EnvVar{Name: grpcPort, Value: strconv.Itoa(randPort)})
