@@ -20,7 +20,9 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"strconv"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -94,6 +96,30 @@ func NewPodFrom(owner metav1.Object, ownerRef *metav1.OwnerReference, revision *
 		}
 	}
 	return pod, nil
+}
+
+func AddRandomTritonEnvPort(pod *corev1.Pod) {
+	grpcPort := "TRITON_GRPC_PORT"
+	httpPort := "TRITON_HTTP_PORT"
+	metricPort := "TRITON_METRIC_PORT"
+	antVipCustomizedPortLabel := "paascore.antgroup.com/antvip-customized-port"
+	var newEnv []corev1.EnvVar
+	for _, env := range pod.Spec.Containers[0].Env {
+		if env.Name == grpcPort || env.Name == httpPort || env.Name == metricPort {
+			continue
+		}
+		newEnv = append(newEnv, env)
+	}
+	rand.Seed(time.Now().UnixNano())
+	minPort := 8100
+	maxPort := 8990
+	randomNum := rand.Intn(maxPort-minPort+1) + minPort
+	randPort := randomNum - randomNum%3
+	newEnv = append(newEnv, corev1.EnvVar{Name: grpcPort, Value: strconv.Itoa(randPort)})
+	newEnv = append(newEnv, corev1.EnvVar{Name: httpPort, Value: strconv.Itoa(randPort + 1)})
+	newEnv = append(newEnv, corev1.EnvVar{Name: metricPort, Value: strconv.Itoa(randPort + 2)})
+	pod.Spec.Containers[0].Env = newEnv
+	pod.Labels[antVipCustomizedPortLabel] = strconv.Itoa(randPort + 1)
 }
 
 func GetPodRevisionPatch(revision *appsv1.ControllerRevision) ([]byte, error) {

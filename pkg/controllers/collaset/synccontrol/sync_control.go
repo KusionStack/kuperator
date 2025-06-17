@@ -395,6 +395,9 @@ func (r *RealSyncControl) Scale(
 						return utilspoddecoration.PatchListOfDecorations(in, pds)
 					},
 				)
+				if _, exist := cls.Labels["paascore.antgroup.com/enable-antvip-customized-port"]; exist {
+					collasetutils.AddRandomTritonEnvPort(pod)
+				}
 				if err != nil {
 					return fmt.Errorf("fail to new Pod from revision %s: %s", revision.Name, err)
 				}
