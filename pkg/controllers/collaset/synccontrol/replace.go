@@ -304,8 +304,8 @@ func updateReplaceOriginPod(
 
 	// 2. replace the origin pod with updated pod
 	_, replaceIndicate := originPod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
-	_, replaceByUpdate := originPod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
-	if !replaceIndicate || !replaceByUpdate {
+	replaceRevision, replaceByUpdate := originPod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
+	if !replaceIndicate || !replaceByUpdate || replaceRevision != originPodUpdateInfo.UpdateRevision.Name {
 		now := time.Now().UnixNano()
 		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v", "%s": "%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, now, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey, originPodUpdateInfo.UpdateRevision.Name)))
 		if err := c.Patch(ctx, originPod, patch); err != nil {

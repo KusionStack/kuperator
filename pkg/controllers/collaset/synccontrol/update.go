@@ -846,8 +846,8 @@ func (u *replaceUpdatePodUpdater) FulfillPodUpdatedInfo(_ context.Context, _ *ap
 func (u *replaceUpdatePodUpdater) UpgradePod(ctx context.Context, podInfo *PodUpdateInfo) error {
 	// add replace labels and wait to replace when syncPods
 	_, replaceIndicate := podInfo.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
-	_, replaceByUpdate := podInfo.Pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
-	if !replaceIndicate || !replaceByUpdate {
+	replaceRevision, replaceByUpdate := podInfo.Pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
+	if !replaceIndicate || !replaceByUpdate || replaceRevision != podInfo.UpdateRevision.Name {
 		// need replace update pod, label pod with replace-indicate and replace-update
 		now := time.Now().UnixNano()
 		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v", "%s": "%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, now, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey, podInfo.UpdateRevision.Name)))
