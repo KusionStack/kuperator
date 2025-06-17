@@ -430,8 +430,6 @@ func (r *RealSyncControl) Scale(
 			r.recorder.Eventf(cls, corev1.EventTypeNormal, "ScaleOut", "scale out %d Pod(s)", succCount)
 			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleOut", "")
 			return succCount > 0, recordedRequeueAfter, err
-		} else {
-			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleOut", "")
 		}
 	}
 
@@ -465,12 +463,12 @@ func (r *RealSyncControl) Scale(
 
 			return nil
 		})
-		scaling = succCount != 0
+		scaling = succCount > 0
 
 		if err != nil {
 			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, err, "ScaleInFailed", err.Error())
 			return scaling, recordedRequeueAfter, err
-		} else {
+		} else if scaling {
 			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleIn", "")
 		}
 
@@ -548,7 +546,7 @@ func (r *RealSyncControl) Scale(
 		if err != nil {
 			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, err, "ScaleInFailed", fmt.Sprintf("fail to delete Pod for scaling in: %s", err))
 			return scaling, recordedRequeueAfter, err
-		} else {
+		} else if succCount > 0 {
 			collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "ScaleIn", "")
 		}
 	}
@@ -570,6 +568,10 @@ func (r *RealSyncControl) Scale(
 		}); err != nil {
 			return scaling, recordedRequeueAfter, fmt.Errorf("fail to reset ResourceContext: %s", err)
 		}
+	}
+
+	if !scaling {
+		collasetutils.AddOrUpdateCondition(resources.NewStatus, appsv1alpha1.CollaSetScale, nil, "Scaled", "")
 	}
 
 	return scaling, recordedRequeueAfter, nil
