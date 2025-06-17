@@ -1603,7 +1603,6 @@ var _ = SIGDescribe("CollaSet", func() {
 			for i := range currResourceContexts[0].Spec.Contexts {
 				currResourceContexts[0].Spec.Contexts[i].Data[podcontext.OwnerContextKey] = "mock-collaset"
 			}
-			Expect(client.Update(context.Background(), currResourceContexts[0])).Should(BeNil())
 
 			By("Update image to nginxNew but pods are not updated")
 			Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
