@@ -119,8 +119,12 @@ func AddRandomTritonEnvPort(pod *corev1.Pod) {
 	newEnv = append(newEnv, corev1.EnvVar{Name: grpcPort, Value: strconv.Itoa(randPort)})
 	newEnv = append(newEnv, corev1.EnvVar{Name: httpPort, Value: strconv.Itoa(randPort + 1)})
 	newEnv = append(newEnv, corev1.EnvVar{Name: metricPort, Value: strconv.Itoa(randPort + 2)})
-	pod.Spec.Containers[0].ReadinessProbe.TCPSocket = &corev1.TCPSocketAction{Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(randPort)}}
-	pod.Spec.Containers[0].LivenessProbe.TCPSocket = &corev1.TCPSocketAction{Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(randPort)}}
+	if pod.Spec.Containers[0].ReadinessProbe != nil {
+		pod.Spec.Containers[0].ReadinessProbe.TCPSocket = &corev1.TCPSocketAction{Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(randPort)}}
+	}
+	if pod.Spec.Containers[0].LivenessProbe != nil {
+		pod.Spec.Containers[0].LivenessProbe.TCPSocket = &corev1.TCPSocketAction{Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(randPort)}}
+	}
 	pod.Spec.Containers[0].Env = newEnv
 	pod.Labels[antVipCustomizedPortLabel] = strconv.Itoa(randPort + 1)
 }
