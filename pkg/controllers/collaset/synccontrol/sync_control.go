@@ -766,7 +766,10 @@ func (r *RealSyncControl) Update(
 		var updateFinished bool
 		var msg string
 		var err error
-		if podInfo.isAllowOps {
+		if !podInfo.isAllowOps && !podToUpdateSet.Has(podInfo.Name) {
+			// check Pod is out of update scope (by partition or label), will do FinishUpdatePod
+			updateOutScope = true
+		} else if podInfo.isAllowOps {
 			// check Pod is during updating, and it is finished or not
 			if updateFinished, msg, err = updater.GetPodUpdateFinishStatus(ctx, podInfo); err != nil {
 				return fmt.Errorf("failed to get pod %s/%s update finished: %s", podInfo.Namespace, podInfo.Name, err)
@@ -777,8 +780,6 @@ func (r *RealSyncControl) Update(
 					"waiting for pod %s/%s to update finished: %s",
 					podInfo.Namespace, podInfo.Name, msg)
 			}
-		} else if !podToUpdateSet.Has(podInfo.Name) {
-			updateOutScope = true
 		}
 
 		if updateFinished || updateOutScope {
