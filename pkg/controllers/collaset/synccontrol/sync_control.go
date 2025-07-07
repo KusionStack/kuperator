@@ -762,15 +762,15 @@ func (r *RealSyncControl) Update(
 			return nil
 		}
 
-		var updateOutScope bool
+		var finishByCancelUpdate bool
 		var updateFinished bool
 		var msg string
 		var err error
-		if !podInfo.isAllowOps && !podToUpdateSet.Has(podInfo.Name) {
-			// check Pod is out of update scope (by partition or label), will do FinishUpdatePod
-			updateOutScope = true
+		if !podToUpdateSet.Has(podInfo.Name) {
+			// Pod is out of scope (partition or by label) and not allow ops, should finish update by cancel
+			finishByCancelUpdate = !podInfo.isAllowOps
 		} else if podInfo.isAllowOps {
-			// check Pod is during updating, and it is finished or not
+			// Pod is in update scope, should finish update gracefully
 			if updateFinished, msg, err = updater.GetPodUpdateFinishStatus(ctx, podInfo); err != nil {
 				return fmt.Errorf("failed to get pod %s/%s update finished: %s", podInfo.Namespace, podInfo.Name, err)
 			} else if !updateFinished {
@@ -782,8 +782,8 @@ func (r *RealSyncControl) Update(
 			}
 		}
 
-		if updateFinished || updateOutScope {
-			if err := updater.FinishUpdatePod(ctx, podInfo); err != nil {
+		if updateFinished || finishByCancelUpdate {
+			if err := updater.FinishUpdatePod(ctx, podInfo, finishByCancelUpdate); err != nil {
 				return err
 			}
 			r.recorder.Eventf(podInfo.Pod,

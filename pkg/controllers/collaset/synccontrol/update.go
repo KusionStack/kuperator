@@ -41,6 +41,7 @@ import (
 	"kusionstack.io/kuperator/pkg/controllers/collaset/pvccontrol"
 	"kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
+	ojutils "kusionstack.io/kuperator/pkg/controllers/operationjob/utils"
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration"
@@ -366,7 +367,7 @@ type PodUpdater interface {
 	FilterAllowOpsPods(ctx context.Context, podToUpdate []*PodUpdateInfo, ownedIDs map[int]*appsv1alpha1.ContextDetail, resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (*time.Duration, error)
 	UpgradePod(ctx context.Context, podInfo *PodUpdateInfo) error
 	GetPodUpdateFinishStatus(ctx context.Context, podUpdateInfo *PodUpdateInfo) (bool, string, error)
-	FinishUpdatePod(ctx context.Context, podInfo *PodUpdateInfo) error
+	FinishUpdatePod(ctx context.Context, podInfo *PodUpdateInfo, finishByCancelUpdate bool) error
 }
 
 type GenericPodUpdater struct {
@@ -482,7 +483,12 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(_ context.Context, candidates []*
 	return recordedRequeueAfter, nil
 }
 
-func (u *GenericPodUpdater) FinishUpdatePod(_ context.Context, podInfo *PodUpdateInfo) error {
+func (u *GenericPodUpdater) FinishUpdatePod(_ context.Context, podInfo *PodUpdateInfo, finishByCancelUpdate bool) error {
+	if finishByCancelUpdate {
+		// pod is out of scope, just cancel the lifecycle
+		return ojutils.CancelOpsLifecycle(u.Client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod)
+	}
+	// pod is ops finished, finish the lifecycle gracefully
 	if updated, err := podopslifecycle.Finish(u.Client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod); err != nil {
 		return fmt.Errorf("failed to finish PodOpsLifecycle for updating Pod %s/%s: %s", podInfo.Namespace, podInfo.Name, err)
 	} else if updated {
@@ -874,7 +880,17 @@ func (u *replaceUpdatePodUpdater) GetPodUpdateFinishStatus(_ context.Context, po
 	return isPodUpdatedServiceAvailable(replaceNewPodInfo)
 }
 
-func (u *replaceUpdatePodUpdater) FinishUpdatePod(_ context.Context, podInfo *PodUpdateInfo) error {
+func (u *replaceUpdatePodUpdater) FinishUpdatePod(_ context.Context, podInfo *PodUpdateInfo, finishByCancelUpdate bool) error {
+	if finishByCancelUpdate {
+		// cancel replace update by removing to-replace and replace-by-update label from origin pod
+		if _, exist := podInfo.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
+			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":null, "%s":null}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey)))
+			if err := u.podControl.PatchPod(podInfo.Pod, patch); err != nil {
+				return fmt.Errorf("failed to delete replace pair origin pod %s/%s %s", podInfo.Namespace, podInfo.Name, err)
+			}
+		}
+	}
+
 	replacePairNewPodInfo := podInfo.replacePairNewPodInfo
 	if replacePairNewPodInfo != nil {
 		if _, exist := podInfo.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; !exist {
