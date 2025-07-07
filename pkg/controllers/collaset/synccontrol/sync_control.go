@@ -762,13 +762,26 @@ func (r *RealSyncControl) Update(
 			return nil
 		}
 
-		// check Pod is during updating, and it is finished or not
-		finished, msg, err := updater.GetPodUpdateFinishStatus(ctx, podInfo)
-		if err != nil {
-			return fmt.Errorf("failed to get pod %s/%s update finished: %s", podInfo.Namespace, podInfo.Name, err)
+		var updateOutScope bool
+		var updateFinished bool
+		var msg string
+		var err error
+		if podInfo.isAllowOps {
+			// check Pod is during updating, and it is finished or not
+			if updateFinished, msg, err = updater.GetPodUpdateFinishStatus(ctx, podInfo); err != nil {
+				return fmt.Errorf("failed to get pod %s/%s update finished: %s", podInfo.Namespace, podInfo.Name, err)
+			} else if !updateFinished {
+				r.recorder.Eventf(podInfo.Pod,
+					corev1.EventTypeNormal,
+					"WaitingUpdateReady",
+					"waiting for pod %s/%s to update finished: %s",
+					podInfo.Namespace, podInfo.Name, msg)
+			}
+		} else if !podToUpdateSet.Has(podInfo.Name) {
+			updateOutScope = true
 		}
 
-		if finished || !podToUpdateSet.Has(podInfo.Name) {
+		if updateFinished || updateOutScope {
 			if err := updater.FinishUpdatePod(ctx, podInfo); err != nil {
 				return err
 			}
@@ -777,14 +790,7 @@ func (r *RealSyncControl) Update(
 				"UpdatePodFinished",
 				"pod %s/%s is finished for upgrade to revision %s",
 				podInfo.Namespace, podInfo.Name, podInfo.UpdateRevision.Name)
-		} else {
-			r.recorder.Eventf(podInfo.Pod,
-				corev1.EventTypeNormal,
-				"WaitingUpdateReady",
-				"waiting for pod %s/%s to update finished: %s",
-				podInfo.Namespace, podInfo.Name, msg)
 		}
-
 		return nil
 	})
 
