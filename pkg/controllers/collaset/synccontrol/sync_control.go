@@ -39,7 +39,6 @@ import (
 	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontrol"
 	"kusionstack.io/kuperator/pkg/controllers/collaset/pvccontrol"
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
-	ojutils "kusionstack.io/kuperator/pkg/controllers/operationjob/utils"
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration"
@@ -763,27 +762,13 @@ func (r *RealSyncControl) Update(
 			return nil
 		}
 
-		if !podInfo.isAllowOps {
-			// pod is not included by podToUpdate, not allowOps, but isDuringOps, just cancel
-			if !podToUpdateSet.Has(podInfo.Name) {
-				r.recorder.Eventf(podInfo.Pod,
-					corev1.EventTypeNormal,
-					"UpdatePodCanceled",
-					"pod %s/%s with revision %s update is canceled due to not started and not included by partition",
-					podInfo.Namespace, podInfo.Name, podInfo.CurrentRevision.Name)
-				return ojutils.CancelOpsLifecycle(r.client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod)
-			}
-			// not allowedOps, skip GetPodUpdateFinishStatus
-			return nil
-		}
-
 		// check Pod is during updating, and it is finished or not
 		finished, msg, err := updater.GetPodUpdateFinishStatus(ctx, podInfo)
 		if err != nil {
 			return fmt.Errorf("failed to get pod %s/%s update finished: %s", podInfo.Namespace, podInfo.Name, err)
 		}
 
-		if finished {
+		if finished || !podToUpdateSet.Has(podInfo.Name) {
 			if err := updater.FinishUpdatePod(ctx, podInfo); err != nil {
 				return err
 			}
