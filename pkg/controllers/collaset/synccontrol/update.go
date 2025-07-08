@@ -82,7 +82,7 @@ type PodUpdateInfo struct {
 	requeueForOperationDelay *time.Duration
 
 	// for replace update
-	// judge pod in replace updating
+	// judge pod in replace and replace updating
 	isInReplacing     bool
 	isUpdateByReplace bool
 
