@@ -728,8 +728,7 @@ func (r *RealSyncControl) Update(
 		)
 
 		// when a pod during replace, it turns to ReplaceUpdate
-		_, isDuringReplace := podInfo.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
-		if isDuringReplace && cls.Spec.UpdateStrategy.PodUpdatePolicy != appsv1alpha1.CollaSetReplacePodUpdateStrategyType {
+		if podInfo.isInReplacing && cls.Spec.UpdateStrategy.PodUpdatePolicy != appsv1alpha1.CollaSetReplacePodUpdateStrategyType {
 			return updateReplaceOriginPod(ctx, r.client, r.recorder, podInfo, podInfo.replacePairNewPodInfo)
 		}
 
