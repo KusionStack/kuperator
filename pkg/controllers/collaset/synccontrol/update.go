@@ -842,24 +842,6 @@ func (u *replaceUpdatePodUpdater) FulfillPodUpdatedInfo(_ context.Context, _ *ap
 }
 
 func (u *replaceUpdatePodUpdater) UpgradePod(ctx context.Context, podInfo *PodUpdateInfo) error {
-	// add replace labels and wait to replace when syncPods
-	//_, replaceIndicate := podInfo.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
-	//replaceRevision, replaceByUpdate := podInfo.Pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
-	//if !replaceIndicate || !replaceByUpdate || replaceRevision != podInfo.UpdateRevision.Name {
-	//	// need replace update pod, label pod with replace-indicate and replace-update
-	//	now := time.Now().UnixNano()
-	//	patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v", "%s": "%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, now, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey, podInfo.UpdateRevision.Name)))
-	//	if err := u.Patch(ctx, podInfo.Pod, patch); err != nil {
-	//		return fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %s", podInfo.Namespace, podInfo.Name, err)
-	//	}
-	//	u.recorder.Eventf(podInfo.Pod,
-	//		corev1.EventTypeNormal,
-	//		"UpdatePod",
-	//		"succeed to update Pod %s/%s by label to-replace",
-	//		podInfo.Namespace,
-	//		podInfo.Name,
-	//	)
-	//}
 	return updateReplaceOriginPod(ctx, u.Client, u.recorder, podInfo, podInfo.replacePairNewPodInfo)
 }
 
