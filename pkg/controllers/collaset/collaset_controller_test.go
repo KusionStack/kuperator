@@ -2382,7 +2382,7 @@ var _ = Describe("collaset controller", func() {
 		Eventually(func() error {
 			// check updated pod replicas by CollaSet status
 			return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)
-		}, 300*time.Second, 1*time.Second).Should(BeNil())
+		}, 30*time.Second, 1*time.Second).Should(BeNil())
 	})
 
 	It("replace update change to inplaceUpdate", func() {
