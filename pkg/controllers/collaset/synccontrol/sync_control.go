@@ -760,24 +760,21 @@ func (r *RealSyncControl) Update(
 		var msg string
 		var err error
 		if !podToUpdateSet.Has(podInfo.Name) {
-			// Pod is out of scope (partition or by label) and not allow ops, finish update by cancel
+			// Pod is out of scope (partition or by label) and not start update yet, finish update by cancel
 			finishByCancelUpdate = !podInfo.isAllowOps
+		} else if !podInfo.isAllowOps {
+			// Pod is in update scope, but is not start update yet, if pod is updatedRevision, just finish update by cancel
+			finishByCancelUpdate = podInfo.IsUpdatedRevision
 		} else {
-			// Pod is in update scope
-			if !podInfo.isAllowOps {
-				// Pod is updatedRevision, maybe rolled back, finish update by cancel
-				finishByCancelUpdate = podInfo.IsUpdatedRevision
-			} else {
-				// Pod is in update scope and allowed to update, check and finish update gracefully
-				if updateFinished, msg, err = updater.GetPodUpdateFinishStatus(ctx, podInfo); err != nil {
-					return fmt.Errorf("failed to get pod %s/%s update finished: %s", podInfo.Namespace, podInfo.Name, err)
-				} else if !updateFinished {
-					r.recorder.Eventf(podInfo.Pod,
-						corev1.EventTypeNormal,
-						"WaitingUpdateReady",
-						"waiting for pod %s/%s to update finished: %s",
-						podInfo.Namespace, podInfo.Name, msg)
-				}
+			// Pod is in update scope and allowed to update, check and finish update gracefully
+			if updateFinished, msg, err = updater.GetPodUpdateFinishStatus(ctx, podInfo); err != nil {
+				return fmt.Errorf("failed to get pod %s/%s update finished: %s", podInfo.Namespace, podInfo.Name, err)
+			} else if !updateFinished {
+				r.recorder.Eventf(podInfo.Pod,
+					corev1.EventTypeNormal,
+					"WaitingUpdateReady",
+					"waiting for pod %s/%s to update finished: %s",
+					podInfo.Namespace, podInfo.Name, msg)
 			}
 		}
 

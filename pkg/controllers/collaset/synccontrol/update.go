@@ -890,7 +890,7 @@ func isPodUpdatedServiceAvailable(podInfo *PodUpdateInfo) (finished bool, msg st
 	if podInfo.Labels == nil {
 		return false, "no labels on pod", nil
 	}
-	if podInfo.isUpdateByReplace && podInfo.replacePairNewPodInfo != nil {
+	if podInfo.isInReplacing && podInfo.replacePairNewPodInfo != nil {
 		return false, "replace origin pod", nil
 	}
 
