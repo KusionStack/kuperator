@@ -83,6 +83,7 @@ type PodUpdateInfo struct {
 
 	// for replace update
 	// judge pod in replace updating
+	isInReplacing     bool
 	isUpdateByReplace bool
 
 	// replace new created pod
@@ -184,6 +185,7 @@ func (r *RealSyncControl) attachPodUpdateInfo(ctx context.Context, cls *appsv1al
 		_, replaceByReplaceUpdate := originPodInfo.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
 		isReplaceUpdating := replaceIndicated && replaceByReplaceUpdate
 
+		originPodInfo.isInReplacing = replaceIndicated
 		originPodInfo.isUpdateByReplace = isReplaceUpdating
 		originPodInfo.isDuringOps = originPodInfo.isDuringOps || isReplaceUpdating
 		if replacePairNewPod != nil {
@@ -192,7 +194,9 @@ func (r *RealSyncControl) attachPodUpdateInfo(ctx context.Context, cls *appsv1al
 			originPodInfo.isAllowOps = originPodInfo.isAllowOps || newPodSa
 			// attach replace new pod updateInfo
 			replacePairNewPodInfo := podUpdateInfoMap[replacePairNewPod.Name]
-			replacePairNewPodInfo.isUpdateByReplace = isReplaceUpdating
+			replacePairNewPodInfo.isInReplacing = true
+			// in case of to-replace label is removed from origin pod, new pod is still in replaceUpdate
+			replacePairNewPodInfo.isUpdateByReplace = replaceByReplaceUpdate
 			replacePairNewPodInfo.replacePairOriginPodName = originPodName
 			originPodInfo.replacePairNewPodInfo = replacePairNewPodInfo
 		}
@@ -248,7 +252,7 @@ func decidePodToUpdateByLabel(_ *appsv1alpha1.CollaSet, podInfos []*PodUpdateInf
 		}
 
 		if podInfos[i].PodDecorationChanged {
-			if _, exist := podInfos[i].Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
+			if podInfos[i].isInReplacing {
 				continue
 			}
 			// separate pd and collaset update progress
@@ -857,7 +861,7 @@ func (u *replaceUpdatePodUpdater) GetPodUpdateFinishStatus(_ context.Context, po
 func (u *replaceUpdatePodUpdater) FinishUpdatePod(_ context.Context, podInfo *PodUpdateInfo, finishByCancelUpdate bool) error {
 	if finishByCancelUpdate {
 		// cancel replace update by removing to-replace and replace-by-update label from origin pod
-		if _, exist := podInfo.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
+		if podInfo.isInReplacing {
 			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":null, "%s":null}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey)))
 			if err := u.podControl.PatchPod(podInfo.Pod, patch); err != nil {
 				return fmt.Errorf("failed to delete replace pair origin pod %s/%s %s", podInfo.Namespace, podInfo.Name, err)
