@@ -74,16 +74,16 @@ type PodUpdateInfo struct {
 	CurrentPodDecorations map[string]*appsv1alpha1.PodDecoration
 	UpdatedPodDecorations map[string]*appsv1alpha1.PodDecoration
 
-	// indicates the PodOpsLifecycle is started.
+	// indicates the Pod is during Update PodOpsLifecycle.
 	isDuringOps bool
-	// indicates operate is allowed for PodOpsLifecycle.
+	// indicates operate is allowed for Update.
 	isAllowOps bool
 	// requeue after for operationDelaySeconds
 	requeueForOperationDelay *time.Duration
 
 	// for replace update
 	// judge pod in replace updating
-	isInReplacing bool
+	isUpdateByReplace bool
 
 	// replace new created pod
 	replacePairNewPodInfo *PodUpdateInfo
@@ -175,25 +175,26 @@ func (r *RealSyncControl) attachPodUpdateInfo(ctx context.Context, cls *appsv1al
 		podUpdateInfoMap[podUpdateInfo.Name] = podUpdateInfo
 	}
 	replacePodMap := classifyPodReplacingMapping(activePods)
+	// originPod's isDuringOps and isAllowOps depend on these 2 cases:
+	// (1) pod is during replacing but not during replaceUpdate, keep their legacy values
+	// (2) pod is during replaceUpdate, re-assign them by replace progress
 	for originPodName, replacePairNewPod := range replacePodMap {
 		originPodInfo := podUpdateInfoMap[originPodName]
+		_, replaceIndicated := originPodInfo.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
+		_, replaceByReplaceUpdate := originPodInfo.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
+		isReplaceUpdating := replaceIndicated && replaceByReplaceUpdate
+
+		originPodInfo.isUpdateByReplace = isReplaceUpdating
+		originPodInfo.isDuringOps = originPodInfo.isDuringOps || isReplaceUpdating
 		if replacePairNewPod != nil {
-			originPodInfo.isInReplacing = true
-			// replace origin pod not go through lifecycle, mark  during ops manual
-			originPodInfo.isDuringOps = true
-			originPodInfo.isAllowOps = true
+			// origin pod is allowed to ops if new pod is serviceAvailable
+			_, newPodSa := replacePairNewPod.Labels[appsv1alpha1.PodServiceAvailableLabel]
+			originPodInfo.isAllowOps = originPodInfo.isAllowOps || newPodSa
+			// attach replace new pod updateInfo
 			replacePairNewPodInfo := podUpdateInfoMap[replacePairNewPod.Name]
-			replacePairNewPodInfo.isInReplacing = true
+			replacePairNewPodInfo.isUpdateByReplace = isReplaceUpdating
 			replacePairNewPodInfo.replacePairOriginPodName = originPodName
 			originPodInfo.replacePairNewPodInfo = replacePairNewPodInfo
-		} else {
-			_, replaceIndicated := originPodInfo.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
-			_, replaceByReplaceUpdate := originPodInfo.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
-			if replaceIndicated && replaceByReplaceUpdate {
-				originPodInfo.isInReplacing = true
-				originPodInfo.isDuringOps = true
-				originPodInfo.isAllowOps = true
-			}
 		}
 	}
 
@@ -230,33 +231,24 @@ func filterOutPlaceHolderUpdateInfos(pods []*PodUpdateInfo) []*PodUpdateInfo {
 func decidePodToUpdate(
 	cls *appsv1alpha1.CollaSet,
 	podInfos []*PodUpdateInfo) []*PodUpdateInfo {
+	filteredPodInfos := getTargetsUpdatePods(podInfos)
 
 	if cls.Spec.UpdateStrategy.RollingUpdate != nil && cls.Spec.UpdateStrategy.RollingUpdate.ByLabel != nil {
-		activePodInfos := filterOutPlaceHolderUpdateInfos(podInfos)
+		activePodInfos := filterOutPlaceHolderUpdateInfos(filteredPodInfos)
 		return decidePodToUpdateByLabel(cls, activePodInfos)
 	}
-
-	return decidePodToUpdateByPartition(cls, podInfos)
+	return decidePodToUpdateByPartition(cls, filteredPodInfos)
 }
 
 func decidePodToUpdateByLabel(_ *appsv1alpha1.CollaSet, podInfos []*PodUpdateInfo) (podToUpdate []*PodUpdateInfo) {
 	for i := range podInfos {
 		if _, exist := podInfos[i].Labels[appsv1alpha1.CollaSetUpdateIndicateLabelKey]; exist {
-			// filter pod which is in replace update and is the new created pod
-			if podInfos[i].isInReplacing && podInfos[i].replacePairOriginPodName != "" {
-				continue
-			}
 			podToUpdate = append(podToUpdate, podInfos[i])
 			continue
 		}
 
-		// already in replace update.
-		if podInfos[i].isInReplacing && podInfos[i].replacePairNewPodInfo != nil {
-			podToUpdate = append(podToUpdate, podInfos[i])
-			continue
-		}
 		if podInfos[i].PodDecorationChanged {
-			if podInfos[i].isInReplacing && podInfos[i].replacePairOriginPodName != "" {
+			if _, exist := podInfos[i].Labels[appsv1alpha1.PodReplaceIndicationLabelKey]; exist {
 				continue
 			}
 			// separate pd and collaset update progress
@@ -270,7 +262,7 @@ func decidePodToUpdateByLabel(_ *appsv1alpha1.CollaSet, podInfos []*PodUpdateInf
 
 func decidePodToUpdateByPartition(
 	cls *appsv1alpha1.CollaSet,
-	podInfos []*PodUpdateInfo) []*PodUpdateInfo {
+	filteredPodInfos []*PodUpdateInfo) []*PodUpdateInfo {
 
 	replicas := ptr.Deref(cls.Spec.Replicas, 0)
 	partition := int32(0)
@@ -278,7 +270,7 @@ func decidePodToUpdateByPartition(
 		partition = ptr.Deref(cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition, 0)
 	}
 
-	filteredPodInfos := getTargetsUpdatePods(podInfos)
+	//filteredPodInfos := getTargetsUpdatePods(podInfos)
 	// update all or not update any replicas
 	if partition == 0 {
 		return filteredPodInfos
@@ -294,7 +286,7 @@ func decidePodToUpdateByPartition(
 	for i := replicas - partition; i < replicas; i++ {
 		if ordered[i].PodDecorationChanged {
 			// separate pd and collaset update progress
-			podInfos[i].IsUpdatedRevision = true
+			filteredPodInfos[i].IsUpdatedRevision = true
 			ordered[i].UpdateRevision = ordered[i].CurrentRevision
 			podToUpdate = append(podToUpdate, ordered[i])
 		}
@@ -305,14 +297,13 @@ func decidePodToUpdateByPartition(
 // when sort pods to choose update, only sort (1) replace origin pods, (2) non-exclude pods
 func getTargetsUpdatePods(podInfos []*PodUpdateInfo) (filteredPodInfos []*PodUpdateInfo) {
 	for _, podInfo := range podInfos {
-		if podInfo.isInReplacing && podInfo.replacePairOriginPodName != "" {
+		if podInfo.replacePairOriginPodName != "" {
 			continue
 		}
 
 		if podInfo.PlaceHolder {
 			_, isReplaceNewPod := podInfo.ContextDetail.Data[ReplaceOriginPodIDContextDataKey]
-			_, isReplaceOriginPod := podInfo.ContextDetail.Data[ReplaceNewPodIDContextDataKey]
-			if isReplaceNewPod || isReplaceOriginPod {
+			if isReplaceNewPod {
 				continue
 			}
 		}
@@ -485,9 +476,10 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(_ context.Context, candidates []*
 
 func (u *GenericPodUpdater) FinishUpdatePod(_ context.Context, podInfo *PodUpdateInfo, finishByCancelUpdate bool) error {
 	if finishByCancelUpdate {
-		// pod is out of scope, just cancel the lifecycle
+		// cancel update lifecycle
 		return ojutils.CancelOpsLifecycle(u.Client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod)
 	}
+
 	// pod is ops finished, finish the lifecycle gracefully
 	if updated, err := podopslifecycle.Finish(u.Client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod); err != nil {
 		return fmt.Errorf("failed to finish PodOpsLifecycle for updating Pod %s/%s: %s", podInfo.Namespace, podInfo.Name, err)
@@ -851,24 +843,24 @@ func (u *replaceUpdatePodUpdater) FulfillPodUpdatedInfo(_ context.Context, _ *ap
 
 func (u *replaceUpdatePodUpdater) UpgradePod(ctx context.Context, podInfo *PodUpdateInfo) error {
 	// add replace labels and wait to replace when syncPods
-	_, replaceIndicate := podInfo.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
-	replaceRevision, replaceByUpdate := podInfo.Pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
-	if !replaceIndicate || !replaceByUpdate || replaceRevision != podInfo.UpdateRevision.Name {
-		// need replace update pod, label pod with replace-indicate and replace-update
-		now := time.Now().UnixNano()
-		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v", "%s": "%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, now, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey, podInfo.UpdateRevision.Name)))
-		if err := u.Patch(ctx, podInfo.Pod, patch); err != nil {
-			return fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %s", podInfo.Namespace, podInfo.Name, err)
-		}
-		u.recorder.Eventf(podInfo.Pod,
-			corev1.EventTypeNormal,
-			"UpdatePod",
-			"succeed to update Pod %s/%s by label to-replace",
-			podInfo.Namespace,
-			podInfo.Name,
-		)
-	}
-	return nil
+	//_, replaceIndicate := podInfo.Pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
+	//replaceRevision, replaceByUpdate := podInfo.Pod.Labels[appsv1alpha1.PodReplaceByReplaceUpdateLabelKey]
+	//if !replaceIndicate || !replaceByUpdate || replaceRevision != podInfo.UpdateRevision.Name {
+	//	// need replace update pod, label pod with replace-indicate and replace-update
+	//	now := time.Now().UnixNano()
+	//	patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v", "%s": "%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, now, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey, podInfo.UpdateRevision.Name)))
+	//	if err := u.Patch(ctx, podInfo.Pod, patch); err != nil {
+	//		return fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %s", podInfo.Namespace, podInfo.Name, err)
+	//	}
+	//	u.recorder.Eventf(podInfo.Pod,
+	//		corev1.EventTypeNormal,
+	//		"UpdatePod",
+	//		"succeed to update Pod %s/%s by label to-replace",
+	//		podInfo.Namespace,
+	//		podInfo.Name,
+	//	)
+	//}
+	return updateReplaceOriginPod(ctx, u.Client, u.recorder, podInfo, podInfo.replacePairNewPodInfo)
 }
 
 func (u *replaceUpdatePodUpdater) GetPodUpdateFinishStatus(_ context.Context, podUpdateInfo *PodUpdateInfo) (finished bool, msg string, err error) {
@@ -889,6 +881,7 @@ func (u *replaceUpdatePodUpdater) FinishUpdatePod(_ context.Context, podInfo *Po
 				return fmt.Errorf("failed to delete replace pair origin pod %s/%s %s", podInfo.Namespace, podInfo.Name, err)
 			}
 		}
+		return nil
 	}
 
 	replacePairNewPodInfo := podInfo.replacePairNewPodInfo
@@ -911,7 +904,7 @@ func isPodUpdatedServiceAvailable(podInfo *PodUpdateInfo) (finished bool, msg st
 	if podInfo.Labels == nil {
 		return false, "no labels on pod", nil
 	}
-	if podInfo.isInReplacing && podInfo.replacePairNewPodInfo != nil {
+	if podInfo.isUpdateByReplace && podInfo.replacePairNewPodInfo != nil {
 		return false, "replace origin pod", nil
 	}
 

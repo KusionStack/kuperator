@@ -727,19 +727,13 @@ func (r *RealSyncControl) Update(
 			"onlyMetadataChanged", podInfo.OnlyMetadataChanged,
 		)
 
-		isReplaceUpdate := cls.Spec.UpdateStrategy.PodUpdatePolicy == appsv1alpha1.CollaSetReplacePodUpdateStrategyType
-		if podInfo.isInReplacing && !isReplaceUpdate {
-			// a replacing pod should be replaced by an updated revision pod when encountering upgrade
-			if err = updateReplaceOriginPod(ctx, r.client, r.recorder, podInfo, podInfo.replacePairNewPodInfo); err != nil {
-				return err
-			}
-		} else {
-			if err = updater.UpgradePod(ctx, podInfo); err != nil {
-				return err
-			}
+		// when a pod during replace, it turns to ReplaceUpdate
+		_, isDuringReplace := podInfo.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
+		if isDuringReplace && cls.Spec.UpdateStrategy.PodUpdatePolicy != appsv1alpha1.CollaSetReplacePodUpdateStrategyType {
+			return updateReplaceOriginPod(ctx, r.client, r.recorder, podInfo, podInfo.replacePairNewPodInfo)
 		}
 
-		return nil
+		return updater.UpgradePod(ctx, podInfo)
 	})
 
 	updating = updating || succCount > 0
@@ -754,7 +748,7 @@ func (r *RealSyncControl) Update(
 	for i := range podToUpdate {
 		podToUpdateSet.Insert(podToUpdate[i].Name)
 	}
-	// 7. try to finish all Pods'PodOpsLifecycle if its update is finished.
+	// 7. try to finish all Pods' PodOpsLifecycle if its update is finished.
 	succCount, err = controllerutils.SlowStartBatch(len(podUpdateInfos), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		podInfo := podUpdateInfos[i]
 
@@ -767,18 +761,24 @@ func (r *RealSyncControl) Update(
 		var msg string
 		var err error
 		if !podToUpdateSet.Has(podInfo.Name) {
-			// Pod is out of scope (partition or by label) and not allow ops, should finish update by cancel
+			// Pod is out of scope (partition or by label) and not allow ops, finish update by cancel
 			finishByCancelUpdate = !podInfo.isAllowOps
-		} else if podInfo.isAllowOps {
-			// Pod is in update scope, should finish update gracefully
-			if updateFinished, msg, err = updater.GetPodUpdateFinishStatus(ctx, podInfo); err != nil {
-				return fmt.Errorf("failed to get pod %s/%s update finished: %s", podInfo.Namespace, podInfo.Name, err)
-			} else if !updateFinished {
-				r.recorder.Eventf(podInfo.Pod,
-					corev1.EventTypeNormal,
-					"WaitingUpdateReady",
-					"waiting for pod %s/%s to update finished: %s",
-					podInfo.Namespace, podInfo.Name, msg)
+		} else {
+			// Pod is in update scope
+			if !podInfo.isAllowOps {
+				// Pod is updatedRevision, maybe rolled back, finish update by cancel
+				finishByCancelUpdate = podInfo.IsUpdatedRevision
+			} else {
+				// Pod is in update scope and allowed to update, check and finish update gracefully
+				if updateFinished, msg, err = updater.GetPodUpdateFinishStatus(ctx, podInfo); err != nil {
+					return fmt.Errorf("failed to get pod %s/%s update finished: %s", podInfo.Namespace, podInfo.Name, err)
+				} else if !updateFinished {
+					r.recorder.Eventf(podInfo.Pod,
+						corev1.EventTypeNormal,
+						"WaitingUpdateReady",
+						"waiting for pod %s/%s to update finished: %s",
+						podInfo.Namespace, podInfo.Name, msg)
+				}
 			}
 		}
 
