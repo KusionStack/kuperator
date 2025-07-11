@@ -691,7 +691,7 @@ func (r *RealSyncControl) Update(
 			continue
 		}
 
-		if podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, podInfo) {
+		if podInfo.isDuringUpdateOps {
 			continue
 		}
 
@@ -728,7 +728,7 @@ func (r *RealSyncControl) Update(
 		)
 
 		// when a pod during replace, it turns to ReplaceUpdate
-		if podInfo.isInReplacing && cls.Spec.UpdateStrategy.PodUpdatePolicy != appsv1alpha1.CollaSetReplacePodUpdateStrategyType {
+		if podInfo.isInReplace && cls.Spec.UpdateStrategy.PodUpdatePolicy != appsv1alpha1.CollaSetReplacePodUpdateStrategyType {
 			return updateReplaceOriginPod(ctx, r.client, r.recorder, podInfo, podInfo.replacePairNewPodInfo)
 		}
 
@@ -751,7 +751,7 @@ func (r *RealSyncControl) Update(
 	succCount, err = controllerutils.SlowStartBatch(len(podUpdateInfos), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		podInfo := podUpdateInfos[i]
 
-		if !podInfo.isDuringOps || podInfo.PlaceHolder || podInfo.DeletionTimestamp != nil {
+		if !(podInfo.isDuringUpdateOps || podInfo.isInReplaceUpdate) || podInfo.PlaceHolder || podInfo.DeletionTimestamp != nil {
 			return nil
 		}
 
@@ -761,8 +761,8 @@ func (r *RealSyncControl) Update(
 		var err error
 		if !podToUpdateSet.Has(podInfo.Name) {
 			// Pod is out of scope (partition or by label) and not start update yet, finish update by cancel
-			finishByCancelUpdate = !podInfo.isAllowOps
-		} else if !podInfo.isAllowOps {
+			finishByCancelUpdate = !podInfo.isAllowUpdateOps
+		} else if !podInfo.isAllowUpdateOps {
 			// Pod is in update scope, but is not start update yet, if pod is updatedRevision, just finish update by cancel
 			finishByCancelUpdate = podInfo.IsUpdatedRevision
 		} else {
