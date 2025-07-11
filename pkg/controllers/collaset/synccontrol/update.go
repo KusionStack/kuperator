@@ -190,7 +190,6 @@ func (r *RealSyncControl) attachPodUpdateInfo(ctx context.Context, cls *appsv1al
 
 		originPodInfo.isInReplace = replaceIndicated
 		originPodInfo.isInReplaceUpdate = isReplaceUpdating
-		//originPodInfo.isDuringUpdateOps = originPodInfo.isDuringUpdateOps || isReplaceUpdating
 		if replacePairNewPod != nil {
 			// origin pod is allowed to ops if new pod is serviceAvailable
 			_, newPodSa := replacePairNewPod.Labels[appsv1alpha1.PodServiceAvailableLabel]

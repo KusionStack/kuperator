@@ -691,7 +691,7 @@ func (r *RealSyncControl) Update(
 			continue
 		}
 
-		if podInfo.isDuringUpdateOps {
+		if podInfo.isDuringUpdateOps || podInfo.isDuringScaleInOps {
 			continue
 		}
 
