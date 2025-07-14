@@ -762,6 +762,7 @@ func (r *RealSyncControl) Update(
 		if !podToUpdateSet.Has(podInfo.Name) {
 			// Pod is out of scope (partition or by label) and not start update yet, finish update by cancel
 			finishByCancelUpdate = !podInfo.isAllowUpdateOps
+			logger.V(1).Info("out of update scope", "pod", commonutils.ObjectKeyString(podInfo.Pod), "finishByCancelUpdate", finishByCancelUpdate)
 		} else if !podInfo.isAllowUpdateOps {
 			// Pod is in update scope, but is not start update yet, if pod is updatedRevision, just finish update by cancel
 			finishByCancelUpdate = podInfo.IsUpdatedRevision
@@ -785,8 +786,8 @@ func (r *RealSyncControl) Update(
 			r.recorder.Eventf(podInfo.Pod,
 				corev1.EventTypeNormal,
 				"UpdatePodFinished",
-				"pod %s/%s is finished for upgrade to revision %s",
-				podInfo.Namespace, podInfo.Name, podInfo.UpdateRevision.Name)
+				"pod %s/%s with current revision %s is finished for upgrade to revision %s [finishByCancelUpdate=%v]",
+				podInfo.Namespace, podInfo.Name, podInfo.CurrentRevision.Name, podInfo.UpdateRevision.Name, finishByCancelUpdate)
 		}
 		return nil
 	})
