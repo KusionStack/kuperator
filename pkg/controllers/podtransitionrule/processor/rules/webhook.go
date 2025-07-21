@@ -27,6 +27,7 @@ import (
 	"k8s.io/klog"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/podtransitionrule/utils"
 	"kusionstack.io/kuperator/pkg/utils"
 	utilshttp "kusionstack.io/kuperator/pkg/utils/http"
@@ -176,7 +177,7 @@ func (w *Webhook) Do(targets map[string]*corev1.Pod, subjects sets.String) *Filt
 		var errMsg string
 		if pollingResult.LastError != nil {
 			errMsg = fmt.Sprintf("polling task %s error, %v", taskId, pollingResult.LastError)
-			klog.Warningf(errMsg)
+			klog.Warningf("polling task %s error, %v", taskId, pollingResult.LastError)
 		}
 		var rejectMsg string
 		if pollingResult.Stopped {
