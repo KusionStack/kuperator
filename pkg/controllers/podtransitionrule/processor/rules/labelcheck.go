@@ -38,7 +38,7 @@ func (l *LabelCheckRuler) Filter(podTransitionRule *appsv1alpha1.PodTransitionRu
 	rejected := map[string]string{}
 	sel, err := metav1.LabelSelectorAsSelector(l.Selector)
 	if err != nil {
-		return rejectAllWithErr(subjects, passed, rejected, fmt.Sprintf("labelCheck error: %v", err))
+		return rejectAllWithErr(subjects, passed, rejected, "labelCheck error: %v", err)
 	}
 
 	for podName := range subjects {
