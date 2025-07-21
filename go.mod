@@ -1,6 +1,6 @@
 module kusionstack.io/kuperator
 
-go 1.19
+go 1.24.2
 
 require (
 	github.com/evanphx/json-patch v5.7.0+incompatible
@@ -23,7 +23,7 @@ require (
 	k8s.io/kubernetes v0.0.0-00010101000000-000000000000
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
 	kusionstack.io/kube-api v0.6.6
-	kusionstack.io/kube-utils v0.1.19-0.20250206032419-01aec11b2bfa
+	kusionstack.io/kube-utils v0.2.1-0.20250721060418-3d21299a4b25
 	kusionstack.io/resourceconsist v0.0.1
 	sigs.k8s.io/controller-runtime v0.17.3
 )

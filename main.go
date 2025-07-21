@@ -32,6 +32,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
+	"kusionstack.io/kube-utils/controller/runnable"
+
 	"kusionstack.io/kuperator/pkg/controllers"
 	"kusionstack.io/kuperator/pkg/controllers/operationjob"
 	_ "kusionstack.io/kuperator/pkg/features"
@@ -77,7 +79,7 @@ func main() {
 	ctrl.SetLogger(klogr.New())
 
 	config := ctrl.GetConfigOrDie()
-	mgr, err := ctrl.NewManager(config, ctrl.Options{
+	opts := ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,
@@ -99,7 +101,9 @@ func main() {
 		// if you are doing or is intended to do any operation such as perform cleanups
 		// after the manager stops then its usage might be unsafe.
 		// LeaderElectionReleaseOnCancel: true,
-	})
+	}
+
+	mgr, err := ctrl.NewManager(config, opts)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
@@ -119,6 +123,11 @@ func main() {
 
 	if err = webhook.AddToManager(mgr); err != nil {
 		setupLog.Error(err, "unable to add webhook")
+		os.Exit(1)
+	}
+
+	if err = runnable.InitializeRunnable(mgr, opts); err != nil {
+		setupLog.Error(err, "unable to add runnable")
 		os.Exit(1)
 	}
 
