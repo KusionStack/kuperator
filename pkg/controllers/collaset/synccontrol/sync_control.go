@@ -244,8 +244,9 @@ func (r *RealSyncControl) Replace(
 	var err error
 	var needUpdateContext bool
 	var idToReclaim sets.Int
+	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(instance))
 
-	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(resources.FilteredPods)
+	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(resources.FilteredPods, logger)
 
 	// delete origin pods for replace
 	err = DeletePodsByLabel(r.podControl, needDeletePods)
@@ -255,7 +256,7 @@ func (r *RealSyncControl) Replace(
 	}
 
 	// clean labels for replace pods
-	needUpdateContext, idToReclaim, err = r.cleanReplacePodLabels(needCleanLabelPods, podsNeedCleanLabels, ownedIDs, resources.CurrentIDs)
+	needUpdateContext, idToReclaim, err = r.cleanReplacePodLabels(needCleanLabelPods, podsNeedCleanLabels, ownedIDs, resources.CurrentIDs, logger)
 	if err != nil {
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", fmt.Sprintf("clean pods replace pair origin name label with error: %s", err.Error()))
 		return podWrappers, ownedIDs, err
@@ -269,7 +270,7 @@ func (r *RealSyncControl) Replace(
 		if getErr != nil {
 			return podWrappers, ownedIDs, getErr
 		}
-		successCount, err := r.replaceOriginPods(ctx, instance, resources, needReplaceOriginPods, ownedIDs, availableContexts)
+		successCount, err := r.replaceOriginPods(ctx, instance, resources, needReplaceOriginPods, ownedIDs, availableContexts, logger)
 		needUpdateContext = needUpdateContext || successCount > 0
 		if err != nil {
 			r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "deal replace pods with error: %s", err.Error())
@@ -407,7 +408,7 @@ func (r *RealSyncControl) Scale(
 					return fmt.Errorf("fail to create PVCs for pod %s: %s", pod.Name, err)
 				}
 				newPod := pod.DeepCopy()
-				logger.V(1).Info("try to create Pod with revision of collaSet", "revision", revision.Name)
+				logger.Info("try to create Pod with revision of collaSet", "revision", revision.Name)
 				if pod, err = r.podControl.CreatePod(newPod); err != nil {
 					return err
 				}
@@ -415,7 +416,7 @@ func (r *RealSyncControl) Scale(
 				return collasetutils.ActiveExpectations.ExpectCreate(cls, expectations.Pod, pod.Name)
 			})
 			if needUpdateContext.Load() {
-				logger.V(1).Info("try to update ResourceContext for CollaSet after scaling out")
+				logger.Info("try to update ResourceContext for CollaSet after scaling out", "Context", ownedIDs)
 				if updateContextErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 					return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
 				}); updateContextErr != nil {
@@ -449,7 +450,7 @@ func (r *RealSyncControl) Scale(
 			pod := <-podCh
 
 			// trigger PodOpsLifecycle with scaleIn OperationType
-			logger.V(1).Info("try to begin PodOpsLifecycle for scaling in Pod in CollaSet", "pod", commonutils.ObjectKeyString(pod))
+			logger.Info("try to begin PodOpsLifecycle for scaling in Pod in CollaSet", "pod", commonutils.ObjectKeyString(pod))
 			if updated, err := podopslifecycle.Begin(r.client, collasetutils.ScaleInOpsLifecycleAdapter, pod.Pod); err != nil {
 				return fmt.Errorf("fail to begin PodOpsLifecycle for Scaling in Pod %s/%s: %s", pod.Namespace, pod.Name, err)
 			} else if updated {
@@ -503,7 +504,7 @@ func (r *RealSyncControl) Scale(
 
 		// mark these Pods to scalingIn
 		if needUpdateContext {
-			logger.V(1).Info("try to update ResourceContext for CollaSet when scaling in Pod")
+			logger.Info("try to update ResourceContext for CollaSet when scaling in Pod", "Context", ownedIDs)
 			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 				return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
 			})
@@ -519,7 +520,7 @@ func (r *RealSyncControl) Scale(
 		// do delete Pod resource
 		succCount, err = controllerutils.SlowStartBatch(len(podCh), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 			pod := <-podCh
-			logger.V(1).Info("try to scale in Pod", "pod", commonutils.ObjectKeyString(pod))
+			logger.Info("try to scale in Pod", "pod", commonutils.ObjectKeyString(pod))
 			if err := r.podControl.DeletePod(pod.Pod); err != nil {
 				return fmt.Errorf("fail to delete Pod %s/%s when scaling in: %s", pod.Namespace, pod.Name, err)
 			}
@@ -561,7 +562,7 @@ func (r *RealSyncControl) Scale(
 	}
 
 	if needUpdatePodContext {
-		logger.V(1).Info("try to update ResourceContext for CollaSet after scaling")
+		logger.Info("try to update ResourceContext for CollaSet after scaling", "Context", ownedIDs)
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
 		}); err != nil {
@@ -719,7 +720,7 @@ func (r *RealSyncControl) Update(
 	// 6. update Pod
 	succCount, err := controllerutils.SlowStartBatch(len(podCh), controllerutils.SlowStartInitialBatchSize, false, func(_ int, _ error) error {
 		podInfo := <-podCh
-		logger.V(1).Info("before pod update operation",
+		logger.Info("before pod update operation",
 			"pod", commonutils.ObjectKeyString(podInfo.Pod),
 			"revision.from", podInfo.CurrentRevision.Name,
 			"revision.to", resources.UpdatedRevision.Name,
@@ -762,7 +763,7 @@ func (r *RealSyncControl) Update(
 		if !podToUpdateSet.Has(podInfo.Name) {
 			// Pod is out of scope (partition or by label) and not start update yet, finish update by cancel
 			finishByCancelUpdate = !podInfo.isAllowUpdateOps
-			logger.V(1).Info("out of update scope", "pod", commonutils.ObjectKeyString(podInfo.Pod), "finishByCancelUpdate", finishByCancelUpdate)
+			logger.Info("out of update scope", "pod", commonutils.ObjectKeyString(podInfo.Pod), "finishByCancelUpdate", finishByCancelUpdate)
 		} else if !podInfo.isAllowUpdateOps {
 			// Pod is in update scope, but is not start update yet, if pod is updatedRevision, just finish update by cancel
 			finishByCancelUpdate = podInfo.IsUpdatedRevision
@@ -852,7 +853,7 @@ func (r *RealSyncControl) reclaimOwnedIDs(
 
 	if needUpdateContext {
 		logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
-		logger.V(1).Info("try to update ResourceContext for CollaSet when sync")
+		logger.Info("try to update ResourceContext for CollaSet when sync", "Context", ownedIDs)
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
 		}); err != nil {

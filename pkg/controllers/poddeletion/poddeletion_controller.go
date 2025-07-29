@@ -31,6 +31,7 @@ import (
 
 	"kusionstack.io/kube-api/apps/v1alpha1"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	"kusionstack.io/kuperator/pkg/controllers/collaset/pvccontrol"
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
@@ -97,7 +98,7 @@ func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			return reconcile.Result{}, err
 		}
 
-		logger.V(2).Info("pod is deleted")
+		logger.Info("pod is deleted")
 		return ctrl.Result{}, activeExpectations.Delete(req.Namespace, req.Name)
 	}
 
