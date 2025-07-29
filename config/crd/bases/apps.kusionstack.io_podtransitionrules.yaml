@@ -50,20 +50,56 @@ spec:
                       description: AvailablePolicy is the rule to check if the max
                         unavailable number is reached by current resource updated.
                       properties:
+                        maxUnavailablePolicy:
+                          description: MaxUnavailablePolicy is an option to apply
+                            max unavailable by adaptive policy.
+                          properties:
+                            expFunc:
+                              description: |-
+                                ExpFunc is an exponentiation expression to calculate the expected value.
+                                func: f(x) = coeff * x ^ pow.
+                              properties:
+                                coeff:
+                                  description: Coeff stands for coefficient in this
+                                    exponentiation.
+                                  type: string
+                                pow:
+                                  description: Pow stands for power in this exponentiation.
+                                  type: string
+                              type: object
+                          type: object
                         maxUnavailableValue:
                           anyOf:
                           - type: integer
                           - type: string
                           description: |-
-                            MaxUnavailableValue is the expected max unavailable replicas which is allowed to be a integer or a percentage of the whole
+                            MaxUnavailableValue is the expected max unavailable replicas which is allowed to be an integer or a percentage of the whole
                             number of the target resources.
                           x-kubernetes-int-or-string: true
+                        minAvailablePolicy:
+                          description: MaxUnavailablePolicy is an option to apply
+                            min available by adaptive policy.
+                          properties:
+                            expFunc:
+                              description: |-
+                                ExpFunc is an exponentiation expression to calculate the expected value.
+                                func: f(x) = coeff * x ^ pow.
+                              properties:
+                                coeff:
+                                  description: Coeff stands for coefficient in this
+                                    exponentiation.
+                                  type: string
+                                pow:
+                                  description: Pow stands for power in this exponentiation.
+                                  type: string
+                              type: object
+                          type: object
                         minAvailableValue:
                           anyOf:
                           - type: integer
                           - type: string
                           description: |-
-                            MinAvailableValue is the expected min available replicas which is allowed to be a integer or a percentage of the whole
+                            MinAvailableValue is the expected min available replicas which is allowed to be an integer or a percentage of the whole
                             number of the target resources.
                           x-kubernetes-int-or-string: true
                       type: object
