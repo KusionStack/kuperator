@@ -244,8 +244,9 @@ func (r *RealSyncControl) Replace(
 	var err error
 	var needUpdateContext bool
 	var idToReclaim sets.Int
+	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(instance))
 
-	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(resources.FilteredPods)
+	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(resources.FilteredPods, logger)
 
 	// delete origin pods for replace
 	err = DeletePodsByLabel(r.podControl, needDeletePods)
@@ -255,7 +256,7 @@ func (r *RealSyncControl) Replace(
 	}
 
 	// clean labels for replace pods
-	needUpdateContext, idToReclaim, err = r.cleanReplacePodLabels(needCleanLabelPods, podsNeedCleanLabels, ownedIDs, resources.CurrentIDs)
+	needUpdateContext, idToReclaim, err = r.cleanReplacePodLabels(needCleanLabelPods, podsNeedCleanLabels, ownedIDs, resources.CurrentIDs, logger)
 	if err != nil {
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", fmt.Sprintf("clean pods replace pair origin name label with error: %s", err.Error()))
 		return podWrappers, ownedIDs, err
@@ -269,7 +270,7 @@ func (r *RealSyncControl) Replace(
 		if getErr != nil {
 			return podWrappers, ownedIDs, getErr
 		}
-		successCount, err := r.replaceOriginPods(ctx, instance, resources, needReplaceOriginPods, ownedIDs, availableContexts)
+		successCount, err := r.replaceOriginPods(ctx, instance, resources, needReplaceOriginPods, ownedIDs, availableContexts, logger)
 		needUpdateContext = needUpdateContext || successCount > 0
 		if err != nil {
 			r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReplacePod", "deal replace pods with error: %s", err.Error())

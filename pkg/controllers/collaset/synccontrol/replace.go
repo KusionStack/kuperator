@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,13 +51,20 @@ func (r *RealSyncControl) cleanReplacePodLabels(
 	needCleanLabelPods []*corev1.Pod,
 	podsNeedCleanLabels [][]string,
 	ownedIDs map[int]*appsv1alpha1.ContextDetail,
-	currentIDs map[int]struct{}) (bool, sets.Int, error) {
+	currentIDs map[int]struct{},
+	logger logr.Logger) (bool, sets.Int, error) {
 
 	needUpdateContext := false
 	needDeletePodsIDs := sets.Int{}
 	mapOriginToNewPodContext := mapReplaceOriginToNewPodContext(ownedIDs)
 	mapNewToOriginPodContext := mapReplaceNewToOriginPodContext(ownedIDs)
-	_, err := controllerutils.SlowStartBatch(len(needCleanLabelPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
+	_, err := controllerutils.SlowStartBatch(len(needCleanLabelPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, err error) error {
+		defer func() {
+			if err == nil {
+				logger.Info("cleanReplacePodLabels clean replace labels success", "pod", needCleanLabelPods[i].Name, "labels", podsNeedCleanLabels[i])
+			}
+		}()
+
 		pod := needCleanLabelPods[i]
 		needCleanLabels := podsNeedCleanLabels[i]
 		var deletePatch []map[string]string
@@ -116,7 +124,8 @@ func (r *RealSyncControl) replaceOriginPods(
 	resources *collasetutils.RelatedResources,
 	needReplaceOriginPods []*corev1.Pod,
 	ownedIDs map[int]*appsv1alpha1.ContextDetail,
-	availableContexts []*appsv1alpha1.ContextDetail) (int, error) {
+	availableContexts []*appsv1alpha1.ContextDetail,
+	logger logr.Logger) (int, error) {
 
 	mapNewToOriginPodContext := mapReplaceNewToOriginPodContext(ownedIDs)
 	successCount, err := controllerutils.SlowStartBatch(len(needReplaceOriginPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
@@ -143,6 +152,7 @@ func (r *RealSyncControl) replaceOriginPods(
 			// reuse podContext ID if pair-relation exists
 			instanceId = fmt.Sprintf("%d", newPodContext.ID)
 			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
+			logger.Info("replaceOriginPods", "try to reuse new pod resourceContext id", instanceId)
 		} else {
 			if availableContexts[i] == nil {
 				return fmt.Errorf("cannot found available context for replace new pod when replacing origin pod %s/%s", originPod.Namespace, originPod.Name)
@@ -180,6 +190,7 @@ func (r *RealSyncControl) replaceOriginPods(
 			if err = r.podControl.PatchPod(originPod, patch); err != nil {
 				return fmt.Errorf("fail to update origin pod %s/%s pair label %s when updating by replaceUpdate: %s", originPod.Namespace, originPod.Name, newCreatedPod.Name, err)
 			}
+			logger.Info("replaceOriginPods", "replacing originPod", originPod.Name, "originPodId", originPodId, "newPodContextID", instanceId)
 		} else {
 			r.recorder.Eventf(originPod,
 				corev1.EventTypeNormal,
@@ -197,7 +208,8 @@ func (r *RealSyncControl) replaceOriginPods(
 	return successCount, err
 }
 
-func dealReplacePods(pods []*corev1.Pod) (needReplacePods []*corev1.Pod, needCleanLabelPods []*corev1.Pod, podNeedCleanLabels [][]string, needDeletePods []*corev1.Pod) {
+func dealReplacePods(pods []*corev1.Pod, logger logr.Logger) (
+	needReplacePods []*corev1.Pod, needCleanLabelPods []*corev1.Pod, podNeedCleanLabels [][]string, needDeletePods []*corev1.Pod) {
 	var podInstanceIdMap = make(map[string]*corev1.Pod)
 	var podNameMap = make(map[string]*corev1.Pod)
 	for _, pod := range pods {
@@ -216,6 +228,7 @@ func dealReplacePods(pods []*corev1.Pod) (needReplacePods []*corev1.Pod, needCle
 
 		// origin pod is about to scaleIn, skip replace
 		if podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, pod) {
+			logger.Info("dealReplacePods", "pod is during scaleInOps, skip replacing", pod.Name)
 			continue
 		}
 
