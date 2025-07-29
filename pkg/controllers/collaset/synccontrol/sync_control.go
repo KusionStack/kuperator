@@ -415,7 +415,7 @@ func (r *RealSyncControl) Scale(
 				return collasetutils.ActiveExpectations.ExpectCreate(cls, expectations.Pod, pod.Name)
 			})
 			if needUpdateContext.Load() {
-				logger.Info("try to update ResourceContext for CollaSet after scaling out")
+				logger.Info("try to update ResourceContext for CollaSet after scaling out", "Context", ownedIDs)
 				if updateContextErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 					return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
 				}); updateContextErr != nil {
@@ -503,7 +503,7 @@ func (r *RealSyncControl) Scale(
 
 		// mark these Pods to scalingIn
 		if needUpdateContext {
-			logger.Info("try to update ResourceContext for CollaSet when scaling in Pod")
+			logger.Info("try to update ResourceContext for CollaSet when scaling in Pod", "Context", ownedIDs)
 			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 				return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
 			})
@@ -561,7 +561,7 @@ func (r *RealSyncControl) Scale(
 	}
 
 	if needUpdatePodContext {
-		logger.Info("try to update ResourceContext for CollaSet after scaling")
+		logger.Info("try to update ResourceContext for CollaSet after scaling", "Context", ownedIDs)
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
 		}); err != nil {
@@ -852,7 +852,7 @@ func (r *RealSyncControl) reclaimOwnedIDs(
 
 	if needUpdateContext {
 		logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
-		logger.Info("try to update ResourceContext for CollaSet when sync")
+		logger.Info("try to update ResourceContext for CollaSet when sync", "Context", ownedIDs)
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
 		}); err != nil {
