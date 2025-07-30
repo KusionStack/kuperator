@@ -131,6 +131,11 @@ func (r *RealSyncControl) replaceOriginPods(
 	successCount, err := controllerutils.SlowStartBatch(len(needReplaceOriginPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		originPod := needReplaceOriginPods[i]
 		originPodId, _ := collasetutils.GetPodInstanceID(originPod)
+		if ownedIDs[originPodId] == nil {
+			r.recorder.Eventf(originPod, corev1.EventTypeWarning, "OriginPodContext", "cannot found resource context id %d of origin pod %s/%s", originPodId, originPod.Namespace, originPod.Name)
+			return fmt.Errorf("cannot found context for replace origin pod %s/%s", originPod.Namespace, originPod.Name)
+		}
+
 		ownerRef := metav1.NewControllerRef(instance, instance.GroupVersionKind())
 		updatedPDs, err := resources.PDGetter.GetEffective(ctx, originPod)
 		replaceRevision := getReplaceRevision(originPod, resources)
@@ -154,10 +159,11 @@ func (r *RealSyncControl) replaceOriginPods(
 			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
 			logger.Info("replaceOriginPods", "try to reuse new pod resourceContext id", instanceId)
 		} else {
-			if availableContexts[i] == nil {
-				return fmt.Errorf("cannot found available context for replace new pod when replacing origin pod %s/%s", originPod.Namespace, originPod.Name)
-			}
 			newPodContext = availableContexts[i]
+			if availableContexts[i] == nil {
+				r.recorder.Eventf(originPod, corev1.EventTypeWarning, "AvailableContext", "cannot found available context for replace new pod when replacing origin pod %s/%s", originPod.Namespace, originPod.Name)
+				return fmt.Errorf("cannot find available context for replace new pod when replacing origin pod %s/%s", originPod.Namespace, originPod.Name)
+			}
 			// add replace pair-relation to podContexts for originPod and newPod
 			instanceId = fmt.Sprintf("%d", newPodContext.ID)
 			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
