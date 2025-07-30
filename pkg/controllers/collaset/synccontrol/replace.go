@@ -159,11 +159,11 @@ func (r *RealSyncControl) replaceOriginPods(
 			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
 			logger.Info("replaceOriginPods", "try to reuse new pod resourceContext id", instanceId)
 		} else {
-			newPodContext = availableContexts[i]
 			if availableContexts[i] == nil {
 				r.recorder.Eventf(originPod, corev1.EventTypeWarning, "AvailableContext", "cannot found available context for replace new pod when replacing origin pod %s/%s", originPod.Namespace, originPod.Name)
 				return fmt.Errorf("cannot find available context for replace new pod when replacing origin pod %s/%s", originPod.Namespace, originPod.Name)
 			}
+			newPodContext = availableContexts[i]
 			// add replace pair-relation to podContexts for originPod and newPod
 			instanceId = fmt.Sprintf("%d", newPodContext.ID)
 			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
