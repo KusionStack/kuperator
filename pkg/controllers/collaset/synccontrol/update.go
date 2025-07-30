@@ -272,12 +272,12 @@ func decidePodToUpdateByPartition(
 	filteredPodInfos []*PodUpdateInfo) []*PodUpdateInfo {
 
 	replicas := ptr.Deref(cls.Spec.Replicas, 0)
+	currentPodCount := int32(len(filteredPodInfos))
 	partition := int32(0)
 	if cls.Spec.UpdateStrategy.RollingUpdate != nil && cls.Spec.UpdateStrategy.RollingUpdate.ByPartition != nil {
 		partition = ptr.Deref(cls.Spec.UpdateStrategy.RollingUpdate.ByPartition.Partition, 0)
 	}
 
-	//filteredPodInfos := getTargetsUpdatePods(podInfos)
 	// update all or not update any replicas
 	if partition == 0 {
 		return filteredPodInfos
@@ -290,7 +290,7 @@ func decidePodToUpdateByPartition(
 	ordered := orderByDefault(filteredPodInfos)
 	sort.Sort(ordered)
 	podToUpdate := ordered[:replicas-partition]
-	for i := replicas - partition; i < replicas; i++ {
+	for i := replicas - partition; i < controllerutils.Int32Min(replicas, currentPodCount); i++ {
 		if ordered[i].PodDecorationChanged {
 			// separate pd and collaset update progress
 			filteredPodInfos[i].IsUpdatedRevision = true
