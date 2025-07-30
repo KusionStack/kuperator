@@ -23,15 +23,7 @@ const (
 	SlowStartInitialBatchSize = 1
 )
 
-func IntMin(l, r int) int {
-	if l < r {
-		return l
-	}
-
-	return r
-}
-
-func Int32Min(l, r int32) int32 {
+func intMin(l, r int) int {
 	if l < r {
 		return l
 	}
@@ -55,7 +47,7 @@ func SlowStartBatch(count int, initialBatchSize int, shortCircuit bool, fn func(
 	successes := 0
 	index := 0
 	var gotErr error
-	for batchSize := IntMin(remaining, initialBatchSize); batchSize > 0; batchSize = IntMin(2*batchSize, remaining) {
+	for batchSize := intMin(remaining, initialBatchSize); batchSize > 0; batchSize = intMin(2*batchSize, remaining) {
 		errCh := make(chan error, batchSize)
 		var wg sync.WaitGroup
 		wg.Add(batchSize)

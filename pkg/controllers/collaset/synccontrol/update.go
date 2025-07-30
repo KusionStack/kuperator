@@ -290,7 +290,7 @@ func decidePodToUpdateByPartition(
 	ordered := orderByDefault(filteredPodInfos)
 	sort.Sort(ordered)
 	podToUpdate := ordered[:replicas-partition]
-	for i := replicas - partition; i < controllerutils.Int32Min(replicas, currentPodCount); i++ {
+	for i := replicas - partition; i < int32Min(replicas, currentPodCount); i++ {
 		if ordered[i].PodDecorationChanged {
 			// separate pd and collaset update progress
 			filteredPodInfos[i].IsUpdatedRevision = true
@@ -906,4 +906,12 @@ func isPodUpdatedServiceAvailable(podInfo *PodUpdateInfo) (finished bool, msg st
 	}
 
 	return false, "pod not service available", nil
+}
+
+func int32Min(l, r int32) int32 {
+	if l < r {
+		return l
+	}
+
+	return r
 }
