@@ -66,7 +66,7 @@ func IsJobFinished(instance *appsv1alpha1.OperationJob) bool {
 		instance.Status.Progress == appsv1alpha1.OperationProgressFailed
 }
 
-func SetOpsStatusError(candidate *opscore.OpsCandidate, reason string, message string) {
+func SetOpsStatusError(candidate *opscore.OpsCandidate, reason, message string) {
 	if candidate == nil || candidate.OpsStatus == nil {
 		return
 	}

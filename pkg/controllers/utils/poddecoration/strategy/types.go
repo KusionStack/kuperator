@@ -69,7 +69,6 @@ func (p *podInfo) InstanceKey() string {
 }
 
 func Compare(l, r *podInfo) bool {
-
 	// CollaSetUpdatedRevision < CollaSetOldRevision
 	if l.state.IsCollaSetUpdatedRevision != r.state.IsCollaSetUpdatedRevision {
 		return l.state.IsCollaSetUpdatedRevision

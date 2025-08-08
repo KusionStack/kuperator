@@ -27,6 +27,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,7 +56,6 @@ var (
 )
 
 var _ = Describe("Pod Deletion controller", func() {
-
 	It("deletion reconcile", func() {
 		testcase := "delete-pod"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
@@ -122,21 +122,6 @@ func updatePodWithRetry(c client.Client, namespace, name string, updateFn func(p
 		}
 
 		return c.Update(context.TODO(), pod)
-	})
-}
-
-func updatePodStatusWithRetry(c client.Client, namespace, name string, updateFn func(pod *corev1.Pod) bool) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		pod := &corev1.Pod{}
-		if err := c.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: name}, pod); err != nil {
-			return err
-		}
-
-		if !updateFn(pod) {
-			return nil
-		}
-
-		return c.Status().Update(context.TODO(), pod)
 	})
 }
 

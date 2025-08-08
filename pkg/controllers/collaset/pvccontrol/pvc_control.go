@@ -58,8 +58,7 @@ func (pc *RealPvcControl) GetFilteredPvcs(ctx context.Context, cls *appsv1alpha1
 	// list pvcs using ownerReference
 	var filteredPVCs []*corev1.PersistentVolumeClaim
 	ownedPvcList := &corev1.PersistentVolumeClaimList{}
-	if err := pc.client.List(ctx, ownedPvcList, &client.ListOptions{Namespace: cls.Namespace,
-		FieldSelector: fields.OneTermEqualSelector(inject.FieldIndexOwnerRefUID, string(cls.GetUID()))}); err != nil {
+	if err := pc.client.List(ctx, ownedPvcList, &client.ListOptions{Namespace: cls.Namespace, FieldSelector: fields.OneTermEqualSelector(inject.FieldIndexOwnerRefUID, string(cls.GetUID()))}); err != nil {
 		return nil, err
 	}
 
@@ -129,7 +128,7 @@ func provisionUpdatedPvc(c client.Client, ctx context.Context, cls *appsv1alpha1
 		}
 
 		if err := c.Create(ctx, claim); err != nil {
-			return nil, fmt.Errorf("fail to create pvc for id %s: %s", id, err)
+			return nil, fmt.Errorf("fail to create pvc for id %s: %w", id, err)
 		} else {
 			if err = collasetutils.ActiveExpectations.ExpectCreate(cls, expectations.Pvc, claim.Name); err != nil {
 				return nil, err
@@ -185,7 +184,7 @@ func (pc *RealPvcControl) DeletePodUnusedPvcs(ctx context.Context, cls *appsv1al
 		}
 	}
 
-	//delete pvc which is not claimed in templates
+	// delete pvc which is not claimed in templates
 	if err := deleteUnclaimedPvcs(pc.client, ctx, cls, oldPvcs, mountedPvcNames); err != nil {
 		return err
 	}
@@ -203,7 +202,7 @@ func (pc *RealPvcControl) OrphanPvc(cls *appsv1alpha1.CollaSet, pvc *corev1.Pers
 	}
 	cm, err := refmanagerutil.NewRefManager(pc.client, cls.Spec.Selector, cls, pc.scheme)
 	if err != nil {
-		return fmt.Errorf("fail to create ref manager: %s", err)
+		return fmt.Errorf("fail to create ref manager: %w", err)
 	}
 
 	if pvc.Labels == nil {
@@ -221,7 +220,7 @@ func (pc *RealPvcControl) AdoptPvc(cls *appsv1alpha1.CollaSet, pvc *corev1.Persi
 	}
 	cm, err := refmanagerutil.NewRefManager(pc.client, cls.Spec.Selector, cls, pc.scheme)
 	if err != nil {
-		return fmt.Errorf("fail to create ref manager: %s", err)
+		return fmt.Errorf("fail to create ref manager: %w", err)
 	}
 
 	_, err = cm.ClaimOwned([]client.Object{pvc})

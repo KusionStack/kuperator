@@ -102,7 +102,7 @@ func (p *Plugin) Validate(ctx context.Context, req admission.Request, obj runtim
 
 	if err != nil {
 		validateErrors.WithLabelValues(p.name).Inc()
-		err = fmt.Errorf("plugin %s validate for %s/%s failed: %v",
+		err = fmt.Errorf("plugin %s validate for %s/%s failed: %w",
 			p.name, req.AdmissionRequest.Namespace, req.AdmissionRequest.Name, err)
 		klog.Warningf("%v, object: %v", err, obj)
 	}
@@ -110,7 +110,7 @@ func (p *Plugin) Validate(ctx context.Context, req admission.Request, obj runtim
 	// if object changed during validating, return error
 	if !reflect.DeepEqual(obj, newObj) {
 		validateErrors.WithLabelValues(p.name).Inc()
-		err = fmt.Errorf("plugin %s validate for %s/%s failed: %v",
+		err = fmt.Errorf("plugin %s validate for %s/%s failed: %w",
 			p.name, req.AdmissionRequest.Namespace, req.AdmissionRequest.Name, err)
 		klog.Warningf("%v, object: %v", err, obj)
 	}
@@ -132,7 +132,7 @@ func (p *Plugin) Admit(ctx context.Context, req admission.Request, obj runtime.O
 
 	if err != nil {
 		admitErrors.WithLabelValues(p.name).Inc()
-		err = fmt.Errorf("plugin %s admit for %s/%s failed: %v",
+		err = fmt.Errorf("plugin %s admit for %s/%s failed: %w",
 			p.name, req.AdmissionRequest.Namespace, req.AdmissionRequest.Name, err)
 		klog.Warningf("%v, object: %v", err, obj)
 	}

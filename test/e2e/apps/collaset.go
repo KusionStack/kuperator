@@ -25,6 +25,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -46,7 +47,6 @@ import (
 )
 
 var _ = SIGDescribe("CollaSet", func() {
-
 	f := framework.NewDefaultFramework("collaset")
 	var client client.Client
 	var ns string
@@ -86,7 +86,6 @@ var _ = SIGDescribe("CollaSet", func() {
 	})
 
 	framework.KusionstackDescribe("CollaSet Scaling", func() {
-
 		framework.ConformanceIt("scales in normal cases", func() {
 			cls := tester.NewCollaSet("collaset-"+randStr, 3, appsv1alpha1.UpdateStrategy{})
 			Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
@@ -1050,7 +1049,6 @@ var _ = SIGDescribe("CollaSet", func() {
 	})
 
 	framework.KusionstackDescribe("CollaSet Updating", func() {
-
 		framework.ConformanceIt("in-place update images with same imageID", func() {
 			cls := tester.NewCollaSet("collaset-"+randStr, 1, appsv1alpha1.UpdateStrategy{PodUpdatePolicy: appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType})
 			Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
@@ -1202,7 +1200,6 @@ var _ = SIGDescribe("CollaSet", func() {
 
 			By("Wait for update finished")
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 3, 3, 3, 1, 3) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
-
 		})
 
 		framework.ConformanceIt("operationDelaySeconds", func() {
@@ -1455,7 +1452,7 @@ var _ = SIGDescribe("CollaSet", func() {
 			By("Check update is finished due to out of partition")
 			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 1, 1, 0, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
 			Eventually(func() int {
-				pods, err := tester.ListPodsForCollaSet(cls)
+				pods, err = tester.ListPodsForCollaSet(cls)
 				Expect(err).NotTo(HaveOccurred())
 				duringOpsCount := 0
 				for i := range pods {
@@ -1637,11 +1634,9 @@ var _ = SIGDescribe("CollaSet", func() {
 				Expect(currResourceContexts[0].Spec.Contexts[i].Data[podcontext.OwnerContextKey]).Should(BeEquivalentTo(cls.Name))
 			}
 		})
-
 	})
 
 	framework.KusionstackDescribe("CollaSet Replacing", func() {
-
 		framework.ConformanceIt("replace pod by label", func() {
 			cls := tester.NewCollaSet("collaset-"+randStr, 1, appsv1alpha1.UpdateStrategy{})
 			cls.Spec.ScaleStrategy.PersistentVolumeClaimRetentionPolicy = &appsv1alpha1.PersistentVolumeClaimRetentionPolicy{

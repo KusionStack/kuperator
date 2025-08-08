@@ -25,9 +25,12 @@ import (
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 
+var (
+	ownerName = "test"
+	ownerKind = "CollaSet"
+)
+
 func TestAllowResourceExclude(t *testing.T) {
-	var ownerName = "test"
-	var ownerKind = "CollaSet"
 	tests := []struct {
 		name   string
 		obj    *corev1.Pod
@@ -141,8 +144,6 @@ func TestAllowResourceExclude(t *testing.T) {
 }
 
 func TestAllowResourceInclude(t *testing.T) {
-	var ownerName = "test"
-	var ownerKind = "CollaSet"
 	tests := []struct {
 		name   string
 		obj    *corev1.Pod

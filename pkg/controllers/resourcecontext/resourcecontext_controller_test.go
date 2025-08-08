@@ -27,6 +27,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,7 +61,6 @@ var (
 )
 
 var _ = Describe("ResourceContext controller", func() {
-
 	It("resource context reconcile", func() {
 		testcase := "test-rc-reconcile"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
@@ -230,8 +230,7 @@ var _ = Describe("ResourceContext controller", func() {
 	})
 })
 
-func expectedStatusReplicas(c client.Client, cls *appsv1alpha1.CollaSet, scheduledReplicas, readyReplicas, availableReplicas, replicas, updatedReplicas, operatingReplicas,
-	updatedReadyReplicas, updatedAvailableReplicas int32) error {
+func expectedStatusReplicas(c client.Client, cls *appsv1alpha1.CollaSet, scheduledReplicas, readyReplicas, availableReplicas, replicas, updatedReplicas, operatingReplicas, updatedReadyReplicas, updatedAvailableReplicas int32) error {
 	if err := c.Get(context.TODO(), types.NamespacedName{Namespace: cls.Namespace, Name: cls.Name}, cls); err != nil {
 		return err
 	}

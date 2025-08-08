@@ -30,8 +30,10 @@ import (
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
-var _ inject.Client = &ValidatingHandler{}
-var _ admission.DecoderInjector = &ValidatingHandler{}
+var (
+	_ inject.Client             = &ValidatingHandler{}
+	_ admission.DecoderInjector = &ValidatingHandler{}
+)
 
 type ValidatingHandler struct {
 	*mixin.WebhookHandlerMixin
@@ -47,7 +49,7 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 	if req.Operation == admissionv1.Delete {
 		pvc := &corev1.PersistentVolumeClaim{}
 		if err := h.Decoder.DecodeRaw(req.OldObject, pvc); err != nil {
-			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to unmarshal old object: %s", err))
+			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to unmarshal old object: %w", err))
 		}
 
 		if pvc.Status.Phase == corev1.ClaimPending {

@@ -25,8 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/podtransitionrule/utils"
 	"kusionstack.io/kuperator/pkg/utils"
 	utilshttp "kusionstack.io/kuperator/pkg/utils/http"
@@ -176,7 +176,7 @@ func (w *Webhook) Do(targets map[string]*corev1.Pod, subjects sets.String) *Filt
 		var errMsg string
 		if pollingResult.LastError != nil {
 			errMsg = fmt.Sprintf("polling task %s error, %v", taskId, pollingResult.LastError)
-			klog.Warningf(errMsg)
+			klog.Warningf("polling task %s error, %v", taskId, pollingResult.LastError)
 		}
 		var rejectMsg string
 		if pollingResult.Stopped {
@@ -341,14 +341,6 @@ func (w *Webhook) Do(targets map[string]*corev1.Pod, subjects sets.String) *Filt
 	}
 }
 
-func (w *Webhook) oldTraceMap() map[string]*appsv1alpha1.TaskInfo {
-	res := map[string]*appsv1alpha1.TaskInfo{}
-	for i, state := range w.State.WebhookStatus.TaskStates {
-		res[state.TaskId] = &w.State.WebhookStatus.TaskStates[i]
-	}
-	return res
-}
-
 func (w *Webhook) convTaskInfo(infoMap map[string]*appsv1alpha1.TaskInfo) []appsv1alpha1.TaskInfo {
 	states := make([]appsv1alpha1.TaskInfo, 0, len(infoMap))
 	for _, v := range infoMap {
@@ -357,7 +349,7 @@ func (w *Webhook) convTaskInfo(infoMap map[string]*appsv1alpha1.TaskInfo) []apps
 	return states
 }
 
-func (w *Webhook) newTaskInfo(taskId string, msg string, processing, approved []string) {
+func (w *Webhook) newTaskInfo(taskId, msg string, processing, approved []string) {
 	w.taskInfo[taskId] = &appsv1alpha1.TaskInfo{
 		BeginTime:  &metav1.Time{Time: time.Now()},
 		Message:    msg,
@@ -419,6 +411,9 @@ func (w *Webhook) query(podSet sets.String, targets map[string]*corev1.Pod) (str
 
 func (w *Webhook) doHttp(req *appsv1alpha1.WebhookRequest) (*appsv1alpha1.WebhookResponse, error) {
 	httpResp, err := utilshttp.DoHttpAndHttpsRequestWithCa(http.MethodPost, w.Webhook.ClientConfig.URL, *req, nil, w.Webhook.ClientConfig.CABundle)
+	defer func() {
+		_ = httpResp.Body.Close()
+	}()
 	if err != nil {
 		return nil, err
 	}

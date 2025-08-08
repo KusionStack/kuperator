@@ -19,6 +19,6 @@ package framework
 import "github.com/onsi/gomega"
 
 // ExpectEqual expects the specified two are the same, otherwise an exception raises
-func ExpectEqual(actual interface{}, extra interface{}, explain ...interface{}) {
+func ExpectEqual(actual, extra interface{}, explain ...interface{}) {
 	gomega.ExpectWithOffset(1, actual).To(gomega.Equal(extra), explain...)
 }

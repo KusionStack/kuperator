@@ -17,9 +17,8 @@ limitations under the License.
 package alibaba_cloud_slb
 
 import (
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-
 	"kusionstack.io/resourceconsist/pkg/adapters"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 func Add(mgr manager.Manager) error {

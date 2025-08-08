@@ -65,7 +65,7 @@ func Read(filePath string) ([]byte, error) {
 	for _, filesource := range filesources {
 		data, err := filesource.ReadTestFile(filePath)
 		if err != nil {
-			return nil, fmt.Errorf("fatal error retrieving test file %s: %s", filePath, err)
+			return nil, fmt.Errorf("fatal error retrieving test file %s: %w", filePath, err)
 		}
 		if data != nil {
 			return data, nil
@@ -175,7 +175,7 @@ func (e EmbeddedFileSource) DescribeFiles() string {
 }
 
 func (e *EmbeddedFileSource) populateFileList() {
-	fs.WalkDir(e.EmbeddedFS, ".", func(path string, d fs.DirEntry, err error) error {
+	_ = fs.WalkDir(e.EmbeddedFS, ".", func(path string, d fs.DirEntry, err error) error {
 		if !d.IsDir() {
 			e.fileList = append(e.fileList, filepath.Join(e.Root, path))
 		}

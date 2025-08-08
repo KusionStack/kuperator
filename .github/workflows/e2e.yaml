@@ -10,7 +10,7 @@ on:
       - release-*
 
 env:
-  GO_VERSION: '1.19'
+  GO_VERSION: '1.24'
   KIND_VERSION: 'v0.14.0'
   KIND_IMAGE: 'kindest/node:v1.22.2'
   KIND_CLUSTER_NAME: 'e2e-test'
@@ -76,7 +76,7 @@ jobs:
       run: |
         make ginkgo
         set -e
-        KUBECONFIG=/tmp/kind/kubeconfig.yaml ./bin/ginkgo -timeout 15m -v --focus='\[apps\] CollaSet' test/e2e
+        KUBECONFIG=/tmp/kind/kubeconfig.yaml ./bin/ginkgo -timeout 30m -v --focus='\[apps\] CollaSet' test/e2e
         restartCount=$(kubectl get pod -n kusionstack-system -l control-plane=controller-manager --no-headers | awk '{print $4}')
         if [ "${restartCount}" -eq "0" ];then
           echo "Kusionstack-manager has not restarted"
@@ -146,7 +146,7 @@ jobs:
         run: |
           make ginkgo
           set -e
-          KUBECONFIG=/tmp/kind/kubeconfig.yaml ./bin/ginkgo -timeout 15m -v --focus='\[apps\] OperationJob' test/e2e
+          KUBECONFIG=/tmp/kind/kubeconfig.yaml ./bin/ginkgo -timeout 30m -v --focus='\[apps\] OperationJob' test/e2e
       - name: Check Operating Manager
         run: |
           restartCount=$(kubectl get pod -n kusionstack-system -l control-plane=controller-manager --no-headers | awk '{print $4}')

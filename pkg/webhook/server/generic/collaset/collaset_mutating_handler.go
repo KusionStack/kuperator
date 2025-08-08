@@ -59,13 +59,13 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 	}
 	kuperatorv1alpha1.SetDefaultCollaSetUpdateStrategy(cls)
 
-	marshalled, err := json.Marshal(cls)
+	marshaled, err := json.Marshal(cls)
 	if err != nil {
 		logger.Error(err, "failed to marshal collaset to json")
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
-	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
+	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
 }
 
 var _ inject.Client = &MutatingHandler{}

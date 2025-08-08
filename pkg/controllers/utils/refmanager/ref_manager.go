@@ -94,7 +94,7 @@ func (mgr *RefManager) canAdopt() error {
 
 func (mgr *RefManager) adopt(obj client.Object) error {
 	if err := mgr.canAdoptOnce(); err != nil {
-		return fmt.Errorf("can't adopt Object %v/%v (%v): %v", obj.GetNamespace(), obj.GetName(), obj.GetUID(), err)
+		return fmt.Errorf("can't adopt Object %v/%v (%v): %w", obj.GetNamespace(), obj.GetName(), obj.GetUID(), err)
 	}
 
 	if mgr.schema == nil {
@@ -102,7 +102,7 @@ func (mgr *RefManager) adopt(obj client.Object) error {
 	}
 
 	if err := controllerutil.SetControllerReference(mgr.owner, obj, mgr.schema); err != nil {
-		return fmt.Errorf("can't set Object %v/%v (%v) owner reference: %v", obj.GetNamespace(), obj.GetName(), obj.GetUID(), err)
+		return fmt.Errorf("can't set Object %v/%v (%v) owner reference: %w", obj.GetNamespace(), obj.GetName(), obj.GetUID(), err)
 	}
 
 	return mgr.client.Update(context.TODO(), obj)

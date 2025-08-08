@@ -27,9 +27,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type CollaSetTester struct {

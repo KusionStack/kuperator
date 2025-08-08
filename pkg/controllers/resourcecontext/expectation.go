@@ -25,17 +25,14 @@ import (
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 )
 
-var (
-	// activeExpectations is used to check the cache in informer is updated, before reconciling.
-	activeExpectations *expectations.ActiveExpectations
-)
+// activeExpectations is used to check the cache in informer is updated, before reconciling.
+var activeExpectations *expectations.ActiveExpectations
 
 func InitExpectations(c client.Client) {
 	activeExpectations = expectations.NewActiveExpectations(c)
 }
 
-type ExpectationEventHandler struct {
-}
+type ExpectationEventHandler struct{}
 
 // Create is called in response to an create event - e.g. Pod Creation.
 func (h *ExpectationEventHandler) Create(event.CreateEvent, workqueue.RateLimitingInterface) {}

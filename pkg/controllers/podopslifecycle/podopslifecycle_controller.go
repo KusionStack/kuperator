@@ -29,14 +29,13 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	"kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	"kusionstack.io/kube-api/apps/v1alpha1"
 
 	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule"
 	controllersutils "kusionstack.io/kuperator/pkg/controllers/utils"
@@ -49,9 +48,7 @@ const (
 	controllerName = "podopslifecycle-controller"
 )
 
-var (
-	IsPodReadyFunc = controllersutils.IsPodReady
-)
+var IsPodReadyFunc = controllersutils.IsPodReady
 
 func Add(mgr manager.Manager) error {
 	return AddToMgr(mgr, NewReconciler(mgr))
@@ -167,9 +164,9 @@ func (r *ReconcilePodOpsLifecycle) Reconcile(ctx context.Context, request reconc
 	if state.InStageAndPassed() {
 		switch state.Stage {
 		case v1alpha1.PodOpsLifecyclePreCheckStage:
-			labels, err = r.preCheckStage(pod, idToLabelsMap)
+			labels = r.preCheckStage(pod, idToLabelsMap)
 		case v1alpha1.PodOpsLifecyclePostCheckStage:
-			labels, err = r.postCheckStage(pod, idToLabelsMap)
+			labels = r.postCheckStage(pod, idToLabelsMap)
 		}
 	}
 	if err != nil {
@@ -251,7 +248,7 @@ func (r *ReconcilePodOpsLifecycle) addServiceAvailable(pod *corev1.Pod) (bool, e
 	}
 
 	key := controllerKey(pod)
-	r.expectation.ExpectUpdate(key, pod.ResourceVersion)
+	_ = r.expectation.ExpectUpdate(key, pod.ResourceVersion)
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		newPod := &corev1.Pod{}
 		err := r.Client.Get(context.Background(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, newPod)
@@ -348,7 +345,7 @@ func (r *ReconcilePodOpsLifecycle) updateAvailableConditions(pod *corev1.Pod, co
 }
 
 func (r *ReconcilePodOpsLifecycle) updateServiceReadiness(ctx context.Context, pod *corev1.Pod, isReady bool) (bool, error) {
-	needUpdate, _ := r.setServiceReadiness(pod, isReady)
+	needUpdate, msg := r.setServiceReadiness(pod, isReady)
 	if !needUpdate {
 		return false, nil
 	}
@@ -356,14 +353,14 @@ func (r *ReconcilePodOpsLifecycle) updateServiceReadiness(ctx context.Context, p
 	key := controllerKey(pod)
 	logger := r.Logger.WithValues("pod", key)
 
-	r.expectation.ExpectUpdate(key, pod.ResourceVersion)
+	_ = r.expectation.ExpectUpdate(key, pod.ResourceVersion)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		newPod := &corev1.Pod{}
 		err := r.Client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, newPod)
 		if err != nil {
 			return err
 		}
-		needUpdate, _ := r.setServiceReadiness(newPod, isReady)
+		needUpdate, msg = r.setServiceReadiness(newPod, isReady)
 		if !needUpdate {
 			return nil
 		}
@@ -376,7 +373,7 @@ func (r *ReconcilePodOpsLifecycle) updateServiceReadiness(ctx context.Context, p
 		return false, err
 	}
 
-	r.Recorder.Eventf(pod, corev1.EventTypeNormal, v1alpha1.ServiceReadyEvent, "Set ReadinessGate service-ready to %v", isReady)
+	r.Recorder.Eventf(pod, corev1.EventTypeNormal, v1alpha1.ServiceReadyEvent, msg)
 
 	return true, nil
 }
@@ -429,7 +426,7 @@ func (r *ReconcilePodOpsLifecycle) setServiceReadiness(pod *corev1.Pod, isReady 
 	return true, fmt.Sprintf("update service readiness gate to: %s", string(status))
 }
 
-func (r *ReconcilePodOpsLifecycle) preCheckStage(pod *corev1.Pod, idToLabelsMap map[string]map[string]string) (labels map[string]string, err error) {
+func (r *ReconcilePodOpsLifecycle) preCheckStage(pod *corev1.Pod, idToLabelsMap map[string]map[string]string) (labels map[string]string) {
 	labels = map[string]string{}
 	currentTime := strconv.FormatInt(time.Now().UnixNano(), 10)
 	for k, v := range idToLabelsMap {
@@ -452,7 +449,7 @@ func (r *ReconcilePodOpsLifecycle) preCheckStage(pod *corev1.Pod, idToLabelsMap 
 	return
 }
 
-func (r *ReconcilePodOpsLifecycle) postCheckStage(pod *corev1.Pod, idToLabelsMap map[string]map[string]string) (labels map[string]string, err error) {
+func (r *ReconcilePodOpsLifecycle) postCheckStage(pod *corev1.Pod, idToLabelsMap map[string]map[string]string) (labels map[string]string) {
 	labels = map[string]string{}
 	currentTime := strconv.FormatInt(time.Now().UnixNano(), 10)
 	for k := range idToLabelsMap {
@@ -471,7 +468,7 @@ func (r *ReconcilePodOpsLifecycle) addLabels(ctx context.Context, pod *corev1.Po
 	}
 
 	key := controllerKey(pod)
-	r.expectation.ExpectUpdate(key, pod.ResourceVersion)
+	_ = r.expectation.ExpectUpdate(key, pod.ResourceVersion)
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		newPod := &corev1.Pod{}
 		err := r.Client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, newPod)
@@ -500,7 +497,7 @@ func (r *ReconcilePodOpsLifecycle) removeLabels(ctx context.Context, pod *corev1
 	}
 
 	key := controllerKey(pod)
-	r.expectation.ExpectUpdate(key, pod.ResourceVersion)
+	_ = r.expectation.ExpectUpdate(key, pod.ResourceVersion)
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		newPod := &corev1.Pod{}
 		err := r.Client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, newPod)

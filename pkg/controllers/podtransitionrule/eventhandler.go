@@ -25,19 +25,20 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-
 	processorrules "kusionstack.io/kuperator/pkg/controllers/podtransitionrule/processor/rules"
 	commonutils "kusionstack.io/kuperator/pkg/utils"
 )
 
-var _ inject.Client = &EventHandler{}
-var _ inject.Logger = &EventHandler{}
+var (
+	_ inject.Client = &EventHandler{}
+	_ inject.Logger = &EventHandler{}
+)
 
 func NewWebhookGenericEventChannel() <-chan event.GenericEvent {
 	webhookTriggerChannel := make(chan event.GenericEvent, 1<<10)
@@ -133,8 +134,7 @@ func involvedPodTransitionRules(c client.Client, obj client.Object) ([]*appsv1al
 	return podTransitionRules, nil
 }
 
-type PodTransitionRuleEventHandler struct {
-}
+type PodTransitionRuleEventHandler struct{}
 
 func (p *PodTransitionRuleEventHandler) Create(e event.CreateEvent, q workqueue.RateLimitingInterface) {
 	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{

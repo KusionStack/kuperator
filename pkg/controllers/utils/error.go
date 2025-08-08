@@ -34,7 +34,7 @@ func AggregateErrors(errs []error) error {
 			aggErr = currErr
 			continue
 		}
-		aggErr = fmt.Errorf("%v; %v", aggErr, currErr)
+		aggErr = fmt.Errorf("%w; %w", aggErr, currErr)
 	}
 	return aggErr
 }

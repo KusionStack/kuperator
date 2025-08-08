@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 
@@ -136,9 +135,7 @@ func handleHttpAlwaysSomeSucc(resp http.ResponseWriter, req *http.Request) {
 	resp.Write(byt)
 }
 
-var (
-	traceCache = map[string]*setsTimer{}
-)
+var traceCache = map[string]*setsTimer{}
 
 type setsTimer struct {
 	pods     sets.String
@@ -196,7 +193,7 @@ func handleHttpWithTaskIdSucc(resp http.ResponseWriter, req *http.Request) {
 		panic(fmt.Sprintf("taskId %s not found", taskId))
 	}
 	passed, ok := col.getNow()
-	webhookResp := &appsv1alpha1.PollResponse{}
+	var webhookResp *appsv1alpha1.PollResponse
 	if ok {
 		webhookResp = &appsv1alpha1.PollResponse{
 			Success:  true,
@@ -224,7 +221,7 @@ func handleHttpWithTaskIdFail(resp http.ResponseWriter, req *http.Request) {
 		panic(fmt.Sprintf("taskId %s not found", taskId))
 	}
 	passed, ok := col.getNow()
-	webhookResp := &appsv1alpha1.PollResponse{}
+	var webhookResp *appsv1alpha1.PollResponse
 	if ok {
 		webhookResp = &appsv1alpha1.PollResponse{
 			Success: false,

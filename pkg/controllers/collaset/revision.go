@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
 	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontrol"

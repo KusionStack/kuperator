@@ -195,7 +195,6 @@ func (r *ReconcileOperationJob) calculateStatus(instance *appsv1alpha1.Operation
 		if podDetail.Progress == appsv1alpha1.OperationProgressPending {
 			pendingPodCount++
 		}
-
 	}
 
 	if !ojutils.IsJobFinished(&appsv1alpha1.OperationJob{Status: jobStatus}) {

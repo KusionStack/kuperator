@@ -24,9 +24,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
 )
 
@@ -68,7 +68,6 @@ func getUpdatedPodDecorationRevision(context *appsv1alpha1.ResourceContext, pdNa
 		if val, ok := detail.Get("PodDecorationRevisions"); ok {
 			pdInfos, err := utilspoddecoration.UnmarshallFromString(val)
 			if err == nil {
-
 				for _, pdInfo := range pdInfos {
 					if pdInfo.Name == pdName {
 						res[strconv.Itoa(detail.ID)] = pdInfo.Revision

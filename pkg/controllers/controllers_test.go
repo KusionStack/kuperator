@@ -34,8 +34,6 @@ var _ = Describe("test controllers", func() {
 		It("test case a", func() {
 			fmt.Println("case a tests")
 		})
-		AfterEach(func() {
-
-		})
+		AfterEach(func() {})
 	})
 })

@@ -42,7 +42,7 @@ func intMin(l, r int) int {
 // after waiting for the current batch to complete.
 //
 // It returns the number of successful calls to the function.
-func SlowStartBatch(count int, initialBatchSize int, shortCircuit bool, fn func(int, error) error) (int, error) {
+func SlowStartBatch(count, initialBatchSize int, shortCircuit bool, fn func(int, error) error) (int, error) {
 	remaining := count
 	successes := 0
 	index := 0

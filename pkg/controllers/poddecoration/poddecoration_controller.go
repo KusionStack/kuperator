@@ -104,9 +104,9 @@ func AddToMgr(mgr manager.Manager, r reconcile.Reconciler) error {
 	return err
 }
 
-var _ reconcile.Reconciler = &ReconcilePodDecoration{}
 var (
-	statusUpToDateExpectation = expectations.NewResourceVersionExpectation()
+	_                         reconcile.Reconciler = &ReconcilePodDecoration{}
+	statusUpToDateExpectation                      = expectations.NewResourceVersionExpectation()
 )
 
 // ReconcilePodDecoration reconciles a PodDecoration object
@@ -175,17 +175,14 @@ func (r *ReconcilePodDecoration) Reconcile(ctx context.Context, request reconcil
 		}
 		selectedPods = append(selectedPods, &podList.Items[i])
 	}
-	affectedPods, affectedCollaSets, err := r.filterOutPodAndCollaSet(selectedPods)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
+	affectedPods, affectedCollaSets := r.filterOutPodAndCollaSet(selectedPods)
 	newStatus := &appsv1alpha1.PodDecorationStatus{
 		ObservedGeneration: instance.Generation,
 		CurrentRevision:    instance.Status.CurrentRevision,
 		UpdatedRevision:    updatedRevision.Name,
 		CollisionCount:     collisionCount,
 	}
-	err = r.calculateStatus(instance, newStatus, affectedPods, affectedCollaSets, instance.Spec.DisablePodDetail)
+	r.calculateStatus(instance, newStatus, affectedPods, affectedCollaSets, instance.Spec.DisablePodDetail)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -202,8 +199,8 @@ func (r *ReconcilePodDecoration) calculateStatus(
 	status *appsv1alpha1.PodDecorationStatus,
 	affectedPods map[string][]*corev1.Pod,
 	affectedCollaSets sets.String,
-	disablePodDetail bool) error {
-
+	disablePodDetail bool,
+) {
 	status.MatchedPods = 0
 	status.UpdatedPods = 0
 	status.UpdatedReadyPods = 0
@@ -250,7 +247,6 @@ func (r *ReconcilePodDecoration) calculateStatus(
 		status.CurrentRevision = status.UpdatedRevision
 	}
 	status.Details = details
-	return nil
 }
 
 func (r *ReconcilePodDecoration) allCollaSetsSatisfyReplicas(collaSets sets.String, ns string) bool {
@@ -285,11 +281,12 @@ func (r *ReconcilePodDecoration) shouldEscape(ctx context.Context, instance *app
 func (r *ReconcilePodDecoration) updateStatus(
 	ctx context.Context,
 	instance *appsv1alpha1.PodDecoration,
-	status *appsv1alpha1.PodDecorationStatus) (err error) {
+	status *appsv1alpha1.PodDecorationStatus,
+) (err error) {
 	if equality.Semantic.DeepEqual(instance.Status, *status) {
 		return nil
 	}
-	statusUpToDateExpectation.ExpectUpdate(utils.ObjectKeyString(instance), instance.ResourceVersion)
+	_ = statusUpToDateExpectation.ExpectUpdate(utils.ObjectKeyString(instance), instance.ResourceVersion)
 	defer func() {
 		if err != nil {
 			statusUpToDateExpectation.DeleteExpectations(utils.ObjectKeyString(instance))
@@ -302,14 +299,15 @@ func (r *ReconcilePodDecoration) updateStatus(
 			return nil
 		}
 		if err := r.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: instance.Name}, instance); err != nil {
-			return fmt.Errorf("error getting PodDecoration %s: %v", utils.ObjectKeyString(instance), err)
+			return fmt.Errorf("error getting PodDecoration %s: %w", utils.ObjectKeyString(instance), err)
 		}
 		return updateErr
 	})
 }
 
 func (r *ReconcilePodDecoration) filterOutPodAndCollaSet(pods []*corev1.Pod) (
-	affectedPods map[string][]*corev1.Pod, affectedCollaSets sets.String, err error) {
+	affectedPods map[string][]*corev1.Pod, affectedCollaSets sets.String,
+) {
 	affectedPods = map[string][]*corev1.Pod{}
 	affectedCollaSets = sets.NewString()
 	for i := range pods {

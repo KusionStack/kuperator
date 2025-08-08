@@ -31,13 +31,11 @@ import (
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
-const (
-	mutatingName = "pod-mutating-webhook"
+var (
+	_ inject.Client             = &MutatingHandler{}
+	_ inject.Logger             = &MutatingHandler{}
+	_ admission.DecoderInjector = &MutatingHandler{}
 )
-
-var _ inject.Client = &MutatingHandler{}
-var _ inject.Logger = &MutatingHandler{}
-var _ admission.DecoderInjector = &MutatingHandler{}
 
 type MutatingHandler struct {
 	*mixin.WebhookHandlerMixin
@@ -73,7 +71,7 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 	if req.Operation == admissionv1.Update || req.Operation == admissionv1.Delete {
 		oldPod = &corev1.Pod{}
 		if err = h.Decoder.DecodeRaw(req.OldObject, oldPod); err != nil {
-			return admission.Errored(http.StatusBadRequest, fmt.Errorf("fail to unmarshal old object: %s", err))
+			return admission.Errored(http.StatusBadRequest, fmt.Errorf("fail to unmarshal old object: %w", err))
 		}
 	}
 
@@ -85,11 +83,11 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 		}
 	}
 
-	marshalled, err := json.Marshal(pod)
+	marshaled, err := json.Marshal(pod)
 	if err != nil {
 		logger.Error(err, "failed to marshal pod json")
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
-	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
+	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
 }

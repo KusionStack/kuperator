@@ -19,27 +19,26 @@ package generic
 import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	webhookdmission "kusionstack.io/kuperator/pkg/webhook/admission"
 	"kusionstack.io/kuperator/pkg/webhook/server/generic/collaset"
 	"kusionstack.io/kuperator/pkg/webhook/server/generic/operationjob"
 	"kusionstack.io/kuperator/pkg/webhook/server/generic/persistentvolumeclaim"
-	"kusionstack.io/kuperator/pkg/webhook/server/generic/poddecoration"
-	"kusionstack.io/kuperator/pkg/webhook/server/generic/resourcecontext"
-
-	webhookdmission "kusionstack.io/kuperator/pkg/webhook/admission"
 	"kusionstack.io/kuperator/pkg/webhook/server/generic/pod"
+	"kusionstack.io/kuperator/pkg/webhook/server/generic/poddecoration"
 	"kusionstack.io/kuperator/pkg/webhook/server/generic/podtransitionrule"
+	"kusionstack.io/kuperator/pkg/webhook/server/generic/resourcecontext"
 )
+
+// HandlerMap contains admission webhook handlers
+var HandlerMap = map[string]admission.Handler{
+	"mutating-generic":   NewGenericMutatingHandler(),
+	"validating-generic": NewGenericValidatingHandler(),
+}
 
 var (
-	// HandlerMap contains admission webhook handlers
-	HandlerMap = map[string]admission.Handler{
-		"mutating-generic":   NewGenericMutatingHandler(),
-		"validating-generic": NewGenericValidatingHandler(),
-	}
+	MutatingTypeHandlerMap   = map[string]webhookdmission.DispatchHandler{}
+	ValidatingTypeHandlerMap = map[string]webhookdmission.DispatchHandler{}
 )
-
-var MutatingTypeHandlerMap = map[string]webhookdmission.DispatchHandler{}
-var ValidatingTypeHandlerMap = map[string]webhookdmission.DispatchHandler{}
 
 func init() {
 	podMutatingHandler := pod.NewMutatingHandler()

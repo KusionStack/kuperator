@@ -21,9 +21,9 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/fields"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/register"
 	"kusionstack.io/kuperator/pkg/utils/inject"
 )
@@ -43,7 +43,6 @@ type checker struct {
 
 // GetState get item current check state from all related podTransitionRules
 func (c *checker) GetState(ctx context.Context, cl client.Client, item client.Object) (CheckState, error) {
-
 	result := CheckState{
 		Stage: c.policy.Stage(item),
 	}

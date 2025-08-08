@@ -27,9 +27,7 @@ import (
 	"kusionstack.io/kuperator/pkg/webhook/server/generic/pod/opslifecycle"
 )
 
-var (
-	webhooks []AdmissionWebhook
-)
+var webhooks []AdmissionWebhook
 
 type AdmissionWebhook interface {
 	Name() string

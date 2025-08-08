@@ -27,7 +27,6 @@ import (
 
 // ManagerInterface is podtransitionrule manager interface to init and setup one podtransitionrule controller
 type ManagerInterface interface {
-
 	// Register used to register podTransitionRule stages and conditions before starting controller
 	register.Register
 

@@ -29,7 +29,6 @@ func (e Rules) Less(i, j int) bool {
 }
 
 func weight(rule *appsv1alpha1.TransitionRule) int {
-
 	if rule.AvailablePolicy != nil {
 		return 1
 	}

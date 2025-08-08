@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 
@@ -141,7 +140,7 @@ func copyMetadataFromRevOwnerRef(pd *appsv1alpha1.PodDecoration, rev *appsv1.Con
 func GetPodDecorationFromRevision(revision *appsv1.ControllerRevision) (*appsv1alpha1.PodDecoration, error) {
 	podDecoration, err := ApplyPatch(revision)
 	if err != nil {
-		return nil, fmt.Errorf("fail to get ResourceDecoration from revision %s/%s: %s", revision.Namespace, revision.Name, err)
+		return nil, fmt.Errorf("fail to get ResourceDecoration from revision %s/%s: %w", revision.Namespace, revision.Name, err)
 	}
 
 	podDecoration.Namespace = revision.Namespace

@@ -25,8 +25,10 @@ import (
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
-var _ inject.Client = &MutatingHandler{}
-var _ admission.DecoderInjector = &MutatingHandler{}
+var (
+	_ inject.Client             = &MutatingHandler{}
+	_ admission.DecoderInjector = &MutatingHandler{}
+)
 
 type MutatingHandler struct {
 	*mixin.WebhookHandlerMixin

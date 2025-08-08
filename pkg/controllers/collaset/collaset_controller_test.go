@@ -27,6 +27,9 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -37,17 +40,13 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
 	"kusionstack.io/kuperator/pkg/controllers/collaset/synccontrol"
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
@@ -71,7 +70,6 @@ var (
 )
 
 var _ = Describe("collaset controller", func() {
-
 	It("replace pod with update", func() {
 		for _, updateStrategy := range []appsv1alpha1.PodUpdateStrategyType{appsv1alpha1.CollaSetRecreatePodUpdateStrategyType, appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType, appsv1alpha1.CollaSetReplacePodUpdateStrategyType} {
 			testcase := fmt.Sprintf("test-replace-pod-with-%s-update", strings.ToLower(string(updateStrategy)))
@@ -645,7 +643,7 @@ var _ = Describe("collaset controller", func() {
 				return cs.Status.ObservedGeneration != observedGeneration
 			}, 5*time.Second, 1*time.Second).Should(BeTrue())
 
-			podList := &corev1.PodList{}
+			podList = &corev1.PodList{}
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 			for i := range podList.Items {
 				pod := &podList.Items[i]
@@ -880,7 +878,6 @@ var _ = Describe("collaset controller", func() {
 		Eventually(func() error {
 			return expectedStatusReplicas(c, cs, 0, 0, 0, 3, 2, 0, 0, 0)
 		}, 10*time.Second, 1*time.Second).Should(BeNil())
-
 	})
 
 	It("scale failed and update parallel", func() {
@@ -2368,7 +2365,7 @@ var _ = Describe("collaset controller", func() {
 			})).Should(BeNil())
 		}
 
-		// replace is cancelled
+		// replace is canceled
 		Eventually(func() bool {
 			pod := &corev1.Pod{}
 			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: originPod1.Namespace, Name: originPod1.Name}, pod)).Should(BeNil())
@@ -2882,7 +2879,7 @@ var _ = Describe("collaset controller", func() {
 			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
 			Eventually(func() int {
 				allPvcs := &corev1.PersistentVolumeClaimList{}
-				activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
+				activePvcs = make([]*corev1.PersistentVolumeClaim, 0)
 				Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
 				for i := range allPvcs.Items {
 					if allPvcs.Items[i].DeletionTimestamp != nil {
@@ -2922,7 +2919,6 @@ var _ = Describe("collaset controller", func() {
 				}
 			}
 		}
-
 	})
 
 	It("[pvc template] replace update", func() {
@@ -3033,7 +3029,7 @@ var _ = Describe("collaset controller", func() {
 					Expect(pod.Spec.Containers[0].Image).Should(BeEquivalentTo("nginx:v2"))
 					Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
 						pod.Labels[appsv1alpha1.PodServiceAvailableLabel] = "true"
-						//replaceNewPod++
+						// replaceNewPod++
 						return true
 					})).Should(BeNil())
 				}
@@ -3642,7 +3638,7 @@ var _ = Describe("collaset controller", func() {
 		Eventually(func() bool {
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 			podIncluded := false
-			//var podId string
+			// var podId string
 			for i := range podList.Items {
 				pod := podList.Items[i]
 				if pod.Name == toExcludeName {
@@ -4087,7 +4083,7 @@ var _ = Describe("collaset controller", func() {
 		Eventually(func() bool {
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 			podIncluded := false
-			//var podId string
+			// var podId string
 			for i := range podList.Items {
 				pod := podList.Items[i]
 				if pod.Name == toExcludeName {
@@ -4497,7 +4493,8 @@ var _ = Describe("collaset controller", func() {
 })
 
 func expectedStatusReplicas(c client.Client, cls *appsv1alpha1.CollaSet, scheduledReplicas, readyReplicas, availableReplicas, replicas, updatedReplicas, operatingReplicas,
-	updatedReadyReplicas, updatedAvailableReplicas int32) error {
+	updatedReadyReplicas, updatedAvailableReplicas int32,
+) error {
 	if err := c.Get(context.TODO(), types.NamespacedName{Namespace: cls.Namespace, Name: cls.Name}, cls); err != nil {
 		return err
 	}
@@ -4666,6 +4663,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	r, request = testReconcile(poddeletion.NewReconciler(mgr))
 	err = poddeletion.AddToMgr(mgr, r)
+	Expect(err).NotTo(HaveOccurred())
 	r, request = testReconcile(poddecoration.NewReconciler(mgr))
 	err = poddecoration.AddToMgr(mgr, r)
 	Expect(err).NotTo(HaveOccurred())

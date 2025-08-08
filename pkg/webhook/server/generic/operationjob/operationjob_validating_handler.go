@@ -26,15 +26,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
-var _ inject.Client = &ValidatingHandler{}
-var _ admission.DecoderInjector = &ValidatingHandler{}
+var (
+	_ inject.Client             = &ValidatingHandler{}
+	_ admission.DecoderInjector = &ValidatingHandler{}
+)
 
 type ValidatingHandler struct {
 	*mixin.WebhookHandlerMixin

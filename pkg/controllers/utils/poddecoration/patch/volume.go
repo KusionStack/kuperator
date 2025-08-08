@@ -18,10 +18,9 @@ package patch
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-func MergeWithOverwriteVolumes(original []corev1.Volume, additional []corev1.Volume) []corev1.Volume {
+func MergeWithOverwriteVolumes(original, additional []corev1.Volume) []corev1.Volume {
 	volumeMap := map[string]*corev1.Volume{}
 	for i, volume := range additional {
 		volumeMap[volume.Name] = &additional[i]
@@ -37,22 +36,5 @@ func MergeWithOverwriteVolumes(original []corev1.Volume, additional []corev1.Vol
 			original = append(original, *added)
 		}
 	}
-	return original
-}
-
-func MergeVolumes(original []corev1.Volume, additional []corev1.Volume) []corev1.Volume {
-	exists := sets.NewString()
-	for _, volume := range original {
-		exists.Insert(volume.Name)
-	}
-
-	for _, volume := range additional {
-		if exists.Has(volume.Name) {
-			continue
-		}
-		original = append(original, volume)
-		exists.Insert(volume.Name)
-	}
-
 	return original
 }

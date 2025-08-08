@@ -17,15 +17,14 @@ limitations under the License.
 package poddeletion
 
 import (
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"kusionstack.io/kuperator/pkg/utils"
 )
 
-type PredicateDeletionIndicatedPod struct {
-}
+type PredicateDeletionIndicatedPod struct{}
 
 // Create returns true if the Create event should be processed
 func (p *PredicateDeletionIndicatedPod) Create(e event.CreateEvent) bool {

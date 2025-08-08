@@ -25,6 +25,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -217,7 +218,7 @@ var _ = Describe("PodOpsLifecycle controller", func() {
 				Name:      name,
 				Namespace: namespace,
 			}, pod); err != nil {
-				return fmt.Errorf("fail to get pod: %s", err)
+				return fmt.Errorf("fail to get pod: %w", err)
 			}
 
 			// Need set readiness gate to false
@@ -258,7 +259,7 @@ var _ = Describe("PodOpsLifecycle controller", func() {
 				Name:      name,
 				Namespace: namespace,
 			}, pod); err != nil {
-				return fmt.Errorf("fail to get pod: %s", err)
+				return fmt.Errorf("fail to get pod: %w", err)
 			}
 
 			// Need set readiness gate to true
@@ -297,7 +298,7 @@ var _ = Describe("PodOpsLifecycle controller", func() {
 				Namespace: namespace,
 			}, pod)
 			if err != nil {
-				return fmt.Errorf("fail to get pod: %v", err)
+				return fmt.Errorf("fail to get pod: %w", err)
 			}
 
 			pod.ObjectMeta.Labels = map[string]string{
@@ -314,7 +315,7 @@ var _ = Describe("PodOpsLifecycle controller", func() {
 				Name:      name,
 				Namespace: namespace,
 			}, pod); err != nil {
-				return fmt.Errorf("fail to get pod: %v", err)
+				return fmt.Errorf("fail to get pod: %w", err)
 			}
 
 			// Need set readiness gate to true
@@ -352,7 +353,7 @@ var _ = Describe("PodOpsLifecycle controller", func() {
 				Namespace: namespace,
 			}, pod)
 			if err != nil {
-				return fmt.Errorf("fail to get pod: %v", err)
+				return fmt.Errorf("fail to get pod: %w", err)
 			}
 
 			pod.ObjectMeta.Labels = map[string]string{
@@ -375,7 +376,7 @@ var _ = Describe("PodOpsLifecycle controller", func() {
 				Name:      name,
 				Namespace: namespace,
 			}, pod); err != nil {
-				return fmt.Errorf("fail to get pod: %v", err)
+				return fmt.Errorf("fail to get pod: %w", err)
 			}
 
 			// Need set readiness gate to false
@@ -433,8 +434,7 @@ var _ = Describe("Stage processing", func() {
 		Expect(len(idToLabelsMap)).To(Equal(2))
 		fmt.Println(idToLabelsMap)
 
-		labels, err := podOpsLifecycle.preCheckStage(pod, idToLabelsMap)
-		Expect(err).NotTo(HaveOccurred())
+		labels := podOpsLifecycle.preCheckStage(pod, idToLabelsMap)
 		Expect(len(labels)).To(Equal(4))
 
 		for k, v := range idToLabelsMap {
@@ -469,8 +469,7 @@ var _ = Describe("Stage processing", func() {
 		Expect(len(idToLabelsMap)).To(Equal(2))
 		fmt.Println(idToLabelsMap)
 
-		labels, err := podOpsLifecycle.postCheckStage(pod, idToLabelsMap)
-		Expect(err).NotTo(HaveOccurred())
+		labels := podOpsLifecycle.postCheckStage(pod, idToLabelsMap)
 		Expect(len(labels)).To(Equal(2))
 
 		for k := range idToLabelsMap {

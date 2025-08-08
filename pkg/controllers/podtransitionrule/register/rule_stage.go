@@ -22,9 +22,7 @@ import (
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 
-var (
-	ruleStage = map[string]string{}
-)
+var ruleStage = map[string]string{}
 
 func InitDefaultRuleStage(ruleDef *appsv1alpha1.TransitionRuleDefinition, stage string) {
 	ruleStage[GetRuleType(ruleDef)] = stage

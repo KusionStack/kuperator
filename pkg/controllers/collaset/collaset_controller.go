@@ -183,7 +183,7 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	key := commonutils.ObjectKeyString(instance)
 	currentRevision, updatedRevision, revisions, collisionCount, _, err := r.revisionManager.ConstructRevisions(ctx, instance)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("fail to construct revision for CollaSet %s: %s", key, err)
+		return ctrl.Result{}, fmt.Errorf("fail to construct revision for CollaSet %s: %w", key, err)
 	}
 
 	newStatus := &appsv1alpha1.CollaSetStatus{
@@ -210,7 +210,7 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	collasetutils.SortCollaSetConditions(newStatus.Conditions)
 	// update status anyway
 	if err := r.updateStatus(ctx, instance, newStatus); err != nil {
-		return requeueResult(requeueAfter), fmt.Errorf("fail to update status of CollaSet %s: %s", req, err)
+		return requeueResult(requeueAfter), fmt.Errorf("fail to update status of CollaSet %s: %w", req, err)
 	}
 
 	return requeueResult(requeueAfter), err
@@ -219,8 +219,8 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 func (r *CollaSetReconciler) DoReconcile(
 	ctx context.Context,
 	instance *appsv1alpha1.CollaSet,
-	resources *collasetutils.RelatedResources) (
-	*time.Duration, *appsv1alpha1.CollaSetStatus, error) {
+	resources *collasetutils.RelatedResources,
+) (*time.Duration, *appsv1alpha1.CollaSetStatus, error) {
 	podWrappers, requeueAfter, syncErr := r.doSync(ctx, instance, resources)
 	return requeueAfter, calculateStatus(instance, resources, podWrappers), syncErr
 }
@@ -233,8 +233,8 @@ func (r *CollaSetReconciler) doSync(
 	ctx context.Context,
 	instance *appsv1alpha1.CollaSet,
 	resources *collasetutils.RelatedResources) (
-	[]*collasetutils.PodWrapper, *time.Duration, error) {
-
+	[]*collasetutils.PodWrapper, *time.Duration, error,
+) {
 	synced, podWrappers, ownedIDs, err := r.syncControl.SyncPods(ctx, instance, resources)
 	if err != nil || synced {
 		return podWrappers, nil, err
@@ -258,7 +258,8 @@ func (r *CollaSetReconciler) doSync(
 func calculateStatus(
 	instance *appsv1alpha1.CollaSet,
 	resources *collasetutils.RelatedResources,
-	podWrappers []*collasetutils.PodWrapper) *appsv1alpha1.CollaSetStatus {
+	podWrappers []*collasetutils.PodWrapper,
+) *appsv1alpha1.CollaSetStatus {
 	newStatus := resources.NewStatus
 	newStatus.ObservedGeneration = instance.Generation
 
@@ -321,7 +322,8 @@ func calculateStatus(
 func (r *CollaSetReconciler) updateStatus(
 	ctx context.Context,
 	instance *appsv1alpha1.CollaSet,
-	newStatus *appsv1alpha1.CollaSetStatus) error {
+	newStatus *appsv1alpha1.CollaSetStatus,
+) error {
 	if equality.Semantic.DeepEqual(instance.Status, newStatus) {
 		return nil
 	}
@@ -380,7 +382,7 @@ func (r *CollaSetReconciler) ensureReclaimPodOwnerReferences(cls *appsv1alpha1.C
 	podControl := podcontrol.NewRealPodControl(r.Client, r.Scheme)
 	pods, err := podControl.GetFilteredPods(cls.Spec.Selector, cls)
 	if err != nil {
-		return fmt.Errorf("fail to get filtered Pods: %s", err)
+		return fmt.Errorf("fail to get filtered Pods: %w", err)
 	}
 	// reclaim podDecoration ownerReferences on pods
 	for i := range pods {
@@ -408,7 +410,7 @@ func (r *CollaSetReconciler) ensureReclaimPodsDeletion(cls *appsv1alpha1.CollaSe
 	podControl := podcontrol.NewRealPodControl(r.Client, r.Scheme)
 	pods, err := podControl.GetFilteredPods(cls.Spec.Selector, cls)
 	if err != nil {
-		return fmt.Errorf("fail to get filtered Pods: %s", err)
+		return fmt.Errorf("fail to get filtered Pods: %w", err)
 	}
 	return synccontrol.DeletePodsByLabel(podControl, pods)
 }

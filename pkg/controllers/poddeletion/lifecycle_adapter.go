@@ -22,13 +22,10 @@ import (
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 )
 
-var (
-	OpsLifecycleAdapter = &PodDeleteOpsLifecycleAdapter{}
-)
+var OpsLifecycleAdapter = &PodDeleteOpsLifecycleAdapter{}
 
 // PodDeleteOpsLifecycleAdapter tells PodOpsLifecycle the Pod deletion ops info
-type PodDeleteOpsLifecycleAdapter struct {
-}
+type PodDeleteOpsLifecycleAdapter struct{}
 
 // GetID indicates ID of one PodOpsLifecycle
 func (a *PodDeleteOpsLifecycleAdapter) GetID() string {

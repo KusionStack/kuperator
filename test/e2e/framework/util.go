@@ -20,16 +20,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
-	"net"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -58,35 +57,9 @@ import (
 )
 
 const (
-	// PodListTimeout indicates how long to wait for the pod to be listable
-	PodListTimeout = time.Minute
 	// PodStartTimeout indicates that initial pod start can be delayed O(minutes) by slow docker pulls
 	// TODO: Make this 30 seconds once #4566 is resolved.
 	PodStartTimeout = 5 * time.Minute
-
-	// PodStartShortTimeout is same as `PodStartTimeout` to wait for the pod to be started, but shorter.
-	// Use it case by case when we are sure pod start will not be delayed
-	// minutes by slow docker pulls or something else.
-	PodStartShortTimeout = 2 * time.Minute
-
-	// PodDeleteTimeout indicates how long to wait for a pod to be deleted
-	PodDeleteTimeout = 5 * time.Minute
-
-	// PodEventTimeout is how much we wait for a pod event to occur.
-	PodEventTimeout = 2 * time.Minute
-
-	// NamespaceCleanupTimeout indicates:
-	// If there are any orphaned namespaces to clean up, this test is running
-	// on a long lived cluster. A long wait here is preferably to spurious test
-	// failures caused by leaked resources from a previous test run.
-	NamespaceCleanupTimeout = 15 * time.Minute
-
-	// Some pods can take much longer to get ready due to volume attach/detach latency.
-	slowPodStartTimeout = 15 * time.Minute
-
-	// ServiceStartTimeout indicates how long to wait for a service endpoint to be resolvable.
-	ServiceStartTimeout = 3 * time.Minute
-
 	// Poll indicates how often to Poll pods, nodes and claims.
 	Poll = 2 * time.Second
 
@@ -99,34 +72,6 @@ const (
 	// transient failures from failing tests.
 	// TODO: client should not apply this timeout to Watch calls. Increased from 30s until that is fixed.
 	SingleCallTimeout = 5 * time.Minute
-
-	// NodeReadyInitialTimeout indicates how long nodes have to be "ready" when a test begins. They should already
-	// be "ready" before the test starts, so this is small.
-	NodeReadyInitialTimeout = 20 * time.Second
-
-	// PodReadyBeforeTimeout indicates how long pods have to be "ready" when a test begins.
-	PodReadyBeforeTimeout = 5 * time.Minute
-
-	// ClaimProvisionTimeout indicates how long claims have to become dynamically provisioned
-	ClaimProvisionTimeout = 5 * time.Minute
-
-	// ClaimProvisionShortTimeout is same as `ClaimProvisionTimeout` to wait for claim to be dynamically provisioned, but shorter.
-	// Use it case by case when we are sure this timeout is enough.
-	ClaimProvisionShortTimeout = 1 * time.Minute
-
-	// ClaimBindingTimeout indicates how long claims have to become bound
-	ClaimBindingTimeout = 3 * time.Minute
-
-	// PVDeletingTimeout indicates how long PVs have to become deleted
-	PVDeletingTimeout = 3 * time.Minute
-
-	// RestartNodeReadyAgainTimeout indicates how long a node is allowed to become "Ready" after it is restarted before
-	// the test is considered failed.
-	RestartNodeReadyAgainTimeout = 5 * time.Minute
-
-	// RestartPodReadyAgainTimeout indicates how long a pod is allowed to become "running" and "ready" after a node
-	// restart before test is considered failed.
-	RestartPodReadyAgainTimeout = 5 * time.Minute
 )
 
 var (
@@ -287,16 +232,16 @@ func deleteNS(c clientset.Interface, dynamicClient dynamic.Interface, namespace 
 			if remainingPods > 0 {
 				if missingTimestamp != 0 {
 					// pods remained, but were not undergoing deletion (namespace controller is probably culprit)
-					return fmt.Errorf("namespace %v was not deleted with limit: %v, pods remaining: %v, pods missing deletion timestamp: %v", namespace, err, remainingPods, missingTimestamp)
+					return fmt.Errorf("namespace %v was not deleted with limit: %w, pods remaining: %v, pods missing deletion timestamp: %v", namespace, err, remainingPods, missingTimestamp)
 				}
 				// but they were all undergoing deletion (kubelet is probably culprit, check NodeLost)
-				return fmt.Errorf("namespace %v was not deleted with limit: %v, pods remaining: %v", namespace, err, remainingPods)
+				return fmt.Errorf("namespace %v was not deleted with limit: %w, pods remaining: %v", namespace, err, remainingPods)
 			}
 			// other content remains (namespace controller is probably screwed up)
-			return fmt.Errorf("namespace %v was not deleted with limit: %v, namespaced content other than pods remain", namespace, err)
+			return fmt.Errorf("namespace %v was not deleted with limit: %w, namespaced content other than pods remain", namespace, err)
 		}
 		// no remaining content, but namespace was not deleted (namespace controller is probably wedged)
-		return fmt.Errorf("namespace %v was not deleted with limit: %v, namespace is empty but is not yet removed", namespace, err)
+		return fmt.Errorf("namespace %v was not deleted with limit: %w, namespace is empty but is not yet removed", namespace, err)
 	}
 	Logf("namespace %v deletion completed in %s", namespace, time.Since(startTime))
 	return nil
@@ -452,21 +397,6 @@ func isDynamicDiscoveryError(err error) bool {
 	if !discovery.IsGroupDiscoveryFailedError(err) {
 		return false
 	}
-	discoveryErr := err.(*discovery.ErrGroupDiscoveryFailed)
-	for gv := range discoveryErr.Groups {
-		switch gv.Group {
-		case "mygroup.example.com":
-			// custom_resource_definition
-			// garbage_collector
-		case "wardle.k8s.io":
-			// aggregator
-		case "metrics.k8s.io":
-			// aggregated metrics server add-on, no persisted resources
-		default:
-			Logf("discovery error for unexpected group: %#v", gv)
-			return false
-		}
-	}
 	return true
 }
 
@@ -512,7 +442,7 @@ func dumpAllNodeInfo(c clientset.Interface) {
 	for ix := range nodes.Items {
 		names[ix] = nodes.Items[ix].Name
 	}
-	//DumpNodeDebugInfo(c, names, Logf)
+	// DumpNodeDebugInfo(c, names, Logf)
 }
 
 // EventsLister defines a event listener
@@ -582,8 +512,7 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 		// won't install correctly), so we can't expect them to be ready at any point.
 		return len(notReady) <= TestContext.AllowedNotReadyNodes, nil
 	})
-
-	if err != nil && err != wait.ErrWaitTimeout {
+	if err != nil && errors.Is(err, wait.ErrWaitTimeout) {
 		return err
 	}
 
@@ -643,7 +572,7 @@ func nowStamp() string {
 	return time.Now().Format(time.StampMilli)
 }
 
-func log(level string, format string, args ...interface{}) {
+func log(level, format string, args ...interface{}) {
 	fmt.Fprintf(ginkgo.GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
 }
 
@@ -745,9 +674,9 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 			return out, nil
 		}
 		if elapsed := time.Since(start); elapsed > timeout {
-			return out, fmt.Errorf("RunHostCmd still failed after %v: %v", elapsed, err)
+			return out, fmt.Errorf("RunHostCmd still failed after %v: %w", elapsed, err)
 		}
-		Logf("Waiting %v to retry failed RunHostCmd: %v", interval, err)
+		Logf("Waiting %v to retry failed RunHostCmd: %w", interval, err)
 		time.Sleep(interval)
 	}
 }
@@ -777,13 +706,6 @@ func WaitForPodRunningInNamespace(c clientset.Interface, pod *corev1.Pod) error 
 // Returns an error if timeout occurs first, or pod goes in to failed state.
 func WaitForPodNameRunningInNamespace(c clientset.Interface, podName, namespace string) error {
 	return WaitTimeoutForPodRunningInNamespace(c, podName, namespace, PodStartTimeout)
-}
-
-// Waits an extended amount of time (slowPodStartTimeout) for the specified pod to become running.
-// The resourceVersion is used when Watching object changes, it tells since when we care
-// about changes to the pod. Returns an error if timeout occurs first, or pod goes in to failed state.
-func waitForPodRunningInNamespaceSlow(c clientset.Interface, podName, namespace string) error {
-	return WaitTimeoutForPodRunningInNamespace(c, podName, namespace, slowPodStartTimeout)
 }
 
 // WaitTimeoutForPodRunningInNamespace waits default amount of time
@@ -874,11 +796,8 @@ func (b KubectlBuilder) ExecOrDie() string {
 }
 
 func isTimeout(err error) bool {
-	switch err := err.(type) {
-	case net.Error:
-		if err.Timeout() {
-			return true
-		}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
 	}
 	return false
 }
@@ -891,7 +810,7 @@ func (b KubectlBuilder) Exec() (string, error) {
 
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
 	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("error starting %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err)
+		return "", fmt.Errorf("error starting %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%w", cmd, cmd.Stdout, cmd.Stderr, err)
 	}
 	errCh := make(chan error, 1)
 	go func() {
@@ -900,18 +819,13 @@ func (b KubectlBuilder) Exec() (string, error) {
 	select {
 	case err := <-errCh:
 		if err != nil {
-			var rc = 127
-			if ee, ok := err.(*exec.ExitError); ok {
-				rc = int(ee.Sys().(syscall.WaitStatus).ExitStatus())
-				Logf("rc: %d", rc)
-			}
 			return "", CodeExitError{
-				Err:  fmt.Errorf("error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err),
-				Code: rc,
+				Err:  fmt.Errorf("error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%w", cmd, cmd.Stdout, cmd.Stderr, err),
+				Code: 127,
 			}
 		}
 	case <-b.timeout:
-		b.cmd.Process.Kill()
+		b.cmd.Process.Kill() // nolint: errcheck
 		return "", fmt.Errorf("timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v", cmd, cmd.Stdout, cmd.Stderr)
 	}
 	Logf("stderr: %q", stderr.String())
@@ -934,7 +848,6 @@ func KubectlCmd(args ...string) *exec.Cmd {
 		if TestContext.KubeContext != "" {
 			defaultArgs = append(defaultArgs, "--"+clientcmd.FlagContext+"="+TestContext.KubeContext)
 		}
-
 	} else {
 		if TestContext.CertDir != "" {
 			defaultArgs = append(defaultArgs,
@@ -945,11 +858,11 @@ func KubectlCmd(args ...string) *exec.Cmd {
 	}
 	kubectlArgs := append(defaultArgs, args...)
 
-	//We allow users to specify path to kubectl, so you can test either "kubectl" or "cluster/kubectl.sh"
-	//and so on.
+	// We allow users to specify path to kubectl, so you can test either "kubectl" or "cluster/kubectl.sh"
+	// and so on.
 	cmd := exec.Command(TestContext.KubectlPath, kubectlArgs...)
 
-	//caller will invoke this and wait on it.
+	// caller will invoke this and wait on it.
 	return cmd
 }
 
@@ -973,8 +886,7 @@ func FilterNodes(nodeList *corev1.NodeList, fn func(node corev1.Node) bool) {
 // 3) doesn't have NetworkUnavailable condition set to true
 func isNodeSchedulable(node *corev1.Node) bool {
 	nodeReady := IsNodeConditionSetAsExpected(node, corev1.NodeReady, true)
-	networkReady := IsNodeConditionUnset(node, corev1.NodeNetworkUnavailable) ||
-		IsNodeConditionSetAsExpectedSilent(node, corev1.NodeNetworkUnavailable, false)
+	networkReady := IsNodeConditionUnset(node, corev1.NodeNetworkUnavailable) || IsNodeConditionSetAsExpectedSilent(node, corev1.NodeNetworkUnavailable, false)
 	return !node.Spec.Unschedulable && nodeReady && networkReady
 }
 
@@ -1040,7 +952,6 @@ func isNodeConditionSetAsExpected(node *corev1.Node, conditionType corev1.NodeCo
 			}
 			return false
 		}
-
 	}
 	if !silent {
 		Logf("Couldn't find condition %v on node %v", conditionType, node.Name)

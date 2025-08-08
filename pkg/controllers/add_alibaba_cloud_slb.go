@@ -17,11 +17,11 @@ limitations under the License.
 package controllers
 
 import (
+	"kusionstack.io/resourceconsist/pkg/adapters"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"kusionstack.io/kuperator/pkg/features"
 	"kusionstack.io/kuperator/pkg/utils/feature"
-	"kusionstack.io/resourceconsist/pkg/adapters"
 )
 
 func init() {

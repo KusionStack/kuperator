@@ -23,13 +23,11 @@ import (
 	"sync"
 )
 
-var (
-	hashPool = sync.Pool{
-		New: func() any {
-			return fnv.New32a()
-		},
-	}
-)
+var hashPool = sync.Pool{
+	New: func() any {
+		return fnv.New32a()
+	},
+}
 
 func GenerateLifecycleID(v string) string {
 	if len(v) > 63 {

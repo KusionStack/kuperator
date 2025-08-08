@@ -20,7 +20,6 @@ import (
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 

@@ -18,6 +18,4 @@ package utils
 
 import "kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 
-var (
-	StatusUpToDateExpectation = expectations.NewResourceVersionExpectation()
-)
+var StatusUpToDateExpectation = expectations.NewResourceVersionExpectation()

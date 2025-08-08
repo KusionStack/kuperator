@@ -17,19 +17,15 @@ limitations under the License.
 package rules
 
 import (
-	"context"
 	"fmt"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/register"
 	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/utils"
 )
@@ -133,21 +129,6 @@ func (r *AvailableRuler) Filter(podTransitionRule *appsv1alpha1.PodTransitionRul
 	}
 
 	return &FilterResult{Passed: pass, Rejected: rejects}
-}
-
-func (r *AvailableRuler) getPodReplicaSetReplication(controllerRef *metav1.OwnerReference, namespace string) (int, bool, error) {
-	rs := &appsv1.ReplicaSet{}
-	if err := r.Client.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: controllerRef.Name}, rs); err != nil {
-		return 0, false, fmt.Errorf("fail to find controller ReplicaSet %s/%s: %s", namespace, controllerRef.Name, err)
-	}
-	if rs.UID != controllerRef.UID {
-		return 0, false, nil
-	}
-
-	if rs.Spec.Replicas == nil {
-		return 0, true, nil
-	}
-	return int(*rs.Spec.Replicas), true, nil
 }
 
 func processUnavailableFunc(pod *corev1.Pod) (bool, *int64) {

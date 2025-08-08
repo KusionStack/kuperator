@@ -69,7 +69,7 @@ func GetPodInstanceID(pod *corev1.Pod) (int, error) {
 	id, err := strconv.ParseInt(val, 10, 32)
 	if err != nil {
 		// ignore invalid pod instance ID
-		return -1, fmt.Errorf("failed to parse instance ID with value %s: %s", val, err)
+		return -1, fmt.Errorf("failed to parse instance ID with value %s: %w", val, err)
 	}
 
 	return int(id), nil
@@ -133,7 +133,6 @@ func PatchToPod(currentRevisionPod, updateRevisionPod, currentPod *corev1.Pod) (
 		return nil, err
 	}
 	updateRevisionPodBytes, err := json.Marshal(updateRevisionPod)
-
 	if err != nil {
 		return nil, err
 	}

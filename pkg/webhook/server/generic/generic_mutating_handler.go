@@ -28,10 +28,12 @@ import (
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
-var _ inject.Injector = &MutatingHandler{}
-var _ inject.Client = &MutatingHandler{}
-var _ inject.Logger = &MutatingHandler{}
-var _ admission.DecoderInjector = &MutatingHandler{}
+var (
+	_ inject.Injector           = &MutatingHandler{}
+	_ inject.Client             = &MutatingHandler{}
+	_ inject.Logger             = &MutatingHandler{}
+	_ admission.DecoderInjector = &MutatingHandler{}
+)
 
 // MutatingHandler handles all resources mutating operation
 type MutatingHandler struct {
@@ -83,7 +85,7 @@ func (h *MutatingHandler) InjectFunc(f inject.Func) error {
 }
 
 func (h *MutatingHandler) InjectLogger(l logr.Logger) error {
-	h.WebhookHandlerMixin.InjectLogger(l)
+	_ = h.WebhookHandlerMixin.InjectLogger(l)
 
 	// inject logger into subHandlers
 	for kind, handler := range MutatingTypeHandlerMap {

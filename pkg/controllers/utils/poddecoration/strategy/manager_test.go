@@ -28,17 +28,17 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 
 var (
@@ -48,8 +48,10 @@ var (
 	c      client.Client
 )
 
-const timeoutInterval = 5 * time.Second
-const pollInterval = 500 * time.Millisecond
+const (
+	timeoutInterval = 5 * time.Second
+	pollInterval    = 500 * time.Millisecond
+)
 
 var _ = Describe("Test PodDecoration strategy manager", func() {
 	It("RollingUpdate by Selector", func() {
@@ -195,7 +197,6 @@ var _ = Describe("Test PodDecoration strategy manager", func() {
 		Expect(sortedInfos.infos[0].instanceId).Should(Equal("3"))
 		Expect(sortedInfos.infos[1].instanceId).Should(Equal("2"))
 		Expect(sortedInfos.infos[2].instanceId).Should(Equal("1"))
-
 	})
 
 	It("RollingUpdate by Partition", func() {

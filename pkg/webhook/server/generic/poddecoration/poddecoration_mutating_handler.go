@@ -23,15 +23,17 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/klog/v2"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
-var _ inject.Client = &MutatingHandler{}
-var _ admission.DecoderInjector = &MutatingHandler{}
+var (
+	_ inject.Client             = &MutatingHandler{}
+	_ admission.DecoderInjector = &MutatingHandler{}
+)
 
 type MutatingHandler struct {
 	*mixin.WebhookHandlerMixin
@@ -53,11 +55,11 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	SetDefaultPodDecoration(pd)
-	marshalled, err := json.Marshal(pd)
+	marshaled, err := json.Marshal(pd)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
-	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
+	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
 }
 
 func SetDefaultPodDecoration(pd *appsv1alpha1.PodDecoration) {

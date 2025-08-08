@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
 	kuperatorv1alpha1 "kusionstack.io/kuperator/apis/apps/v1alpha1"

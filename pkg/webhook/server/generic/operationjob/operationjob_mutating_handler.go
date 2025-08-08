@@ -31,8 +31,10 @@ import (
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
-var _ inject.Client = &MutatingHandler{}
-var _ admission.DecoderInjector = &MutatingHandler{}
+var (
+	_ inject.Client             = &MutatingHandler{}
+	_ admission.DecoderInjector = &MutatingHandler{}
+)
 
 var (
 	defaultTTL            int32 = 30 * 60
@@ -55,15 +57,15 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 	}
 	opj := &appsv1alpha1.OperationJob{}
 	if err := h.Decoder.Decode(req, opj); err != nil {
-		return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to decode OperationJob: %s", err))
+		return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to decode OperationJob: %w", err))
 	}
 
 	SetDefaultSpec(opj)
-	marshalled, err := json.Marshal(opj)
+	marshaled, err := json.Marshal(opj)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
-	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
+	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
 }
 
 func SetDefaultSpec(opj *appsv1alpha1.OperationJob) {

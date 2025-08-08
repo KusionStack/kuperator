@@ -19,7 +19,6 @@ package patch
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 
@@ -90,7 +89,7 @@ func patchContainer(origin *corev1.Container, patch *appsv1alpha1.PodDecorationP
 	}
 }
 
-func MergeEnvByOverwrite(original []corev1.EnvVar, additional []corev1.EnvVar) (res []corev1.EnvVar) {
+func MergeEnvByOverwrite(original, additional []corev1.EnvVar) []corev1.EnvVar {
 	existsIdx := map[string]int{}
 	for i, env := range original {
 		existsIdx[env.Name] = i
@@ -105,7 +104,7 @@ func MergeEnvByOverwrite(original []corev1.EnvVar, additional []corev1.EnvVar) (
 	return original
 }
 
-func MergeVolumeMountByOverwrite(original []corev1.VolumeMount, additional []corev1.VolumeMount) (res []corev1.VolumeMount) {
+func MergeVolumeMountByOverwrite(original, additional []corev1.VolumeMount) (res []corev1.VolumeMount) {
 	existsIdx := map[string]int{}
 	for i, env := range original {
 		existsIdx[env.Name] = i

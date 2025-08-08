@@ -351,7 +351,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 		if clusterConfig, err := restclient.InClusterConfig(); err == nil {
 			if tempFile, err := os.CreateTemp(os.TempDir(), "kubeconfig-"); err == nil {
 				kubeConfig := createKubeConfig(clusterConfig)
-				clientcmd.WriteToFile(*kubeConfig, tempFile.Name())
+				clientcmd.WriteToFile(*kubeConfig, tempFile.Name()) // nolint: errcheck
 				t.KubeConfig = tempFile.Name()
 				klog.Infof("Using a temporary kubeconfig file from in-cluster config : %s", tempFile.Name())
 			}

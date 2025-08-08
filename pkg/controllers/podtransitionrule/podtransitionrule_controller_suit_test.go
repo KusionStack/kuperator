@@ -25,22 +25,20 @@ import (
 	"time"
 
 	"k8s.io/client-go/kubernetes/scheme"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"kusionstack.io/kuperator/pkg/utils/inject"
 )
 
 var (
-	env     *envtest.Environment
-	mgr     manager.Manager
-	c       client.Client
-	request chan reconcile.Request
+	env *envtest.Environment
+	mgr manager.Manager
+	c   client.Client
 
 	ctx    context.Context
 	cancel context.CancelFunc
