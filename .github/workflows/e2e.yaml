@@ -10,7 +10,7 @@ on:
       - release-*
 
 env:
-  GO_VERSION: '1.19'
+  GO_VERSION: '1.23'
   KIND_VERSION: 'v0.14.0'
   KIND_IMAGE: 'kindest/node:v1.22.2'
   KIND_CLUSTER_NAME: 'e2e-test'
