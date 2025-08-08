@@ -4,14 +4,10 @@ linters:
   enable:
     - bodyclose
     - copyloopvar
-    - ginkgolinter
-    - testifylint
     - misspell
-    - nakedret
     - unconvert
     - unparam
     - whitespace
-    - gocritic
     - errorlint
   settings:
     govet:

@@ -114,23 +114,23 @@ func (r *RealSyncControl) SyncPods(
 	var err error
 	resources.FilteredPods, err = r.podControl.GetFilteredPods(instance.Spec.Selector, instance)
 	if err != nil {
-		return false, nil, nil, fmt.Errorf("fail to get filtered Pods: %s", err)
+		return false, nil, nil, fmt.Errorf("fail to get filtered Pods: %w", err)
 	}
 
 	// list pvcs using ownerReference
 	if resources.ExistingPvcs, err = r.pvcControl.GetFilteredPvcs(ctx, instance); err != nil {
-		return false, nil, nil, fmt.Errorf("fail to get filtered PVCs: %s", err)
+		return false, nil, nil, fmt.Errorf("fail to get filtered PVCs: %w", err)
 	}
 	// adopt and retain orphaned pvcs according to PVC retention policy
 	if adoptedPvcs, err := r.adoptPvcsLeftByRetainPolicy(ctx, instance); err != nil {
-		return false, nil, nil, fmt.Errorf("fail to adopt orphaned left by whenDelete retention policy PVCs: %s", err)
+		return false, nil, nil, fmt.Errorf("fail to adopt orphaned left by whenDelete retention policy PVCs: %w", err)
 	} else {
 		resources.ExistingPvcs = append(resources.ExistingPvcs, adoptedPvcs...)
 	}
 
 	toExcludePodNames, toIncludePodNames, err := r.dealIncludeExcludePods(ctx, instance, resources.FilteredPods)
 	if err != nil {
-		return false, nil, nil, fmt.Errorf("fail to deal with include exclude pods: %s", err.Error())
+		return false, nil, nil, fmt.Errorf("fail to deal with include exclude pods: %w", err)
 	}
 
 	// get owned IDs
@@ -139,7 +139,7 @@ func (r *RealSyncControl) SyncPods(
 		ownedIDs, err = podcontext.AllocateID(r.client, instance, resources.UpdatedRevision.Name, int(realValue(instance.Spec.Replicas)))
 		return err
 	}); err != nil {
-		return false, nil, ownedIDs, fmt.Errorf("fail to allocate %d IDs using context when sync Pods: %s", instance.Spec.Replicas, err)
+		return false, nil, ownedIDs, fmt.Errorf("fail to allocate %d IDs using context when sync Pods: %w", instance.Spec.Replicas, err)
 	}
 
 	// stateless case
@@ -240,7 +240,6 @@ func (r *RealSyncControl) Replace(
 	ownedIDs map[int]*appsv1alpha1.ContextDetail,
 	resources *collasetutils.RelatedResources,
 ) ([]*collasetutils.PodWrapper, map[int]*appsv1alpha1.ContextDetail, error) {
-
 	var err error
 	var needUpdateContext bool
 	var idToReclaim sets.Int
@@ -309,7 +308,6 @@ func (r *RealSyncControl) Scale(
 	podWrappers []*collasetutils.PodWrapper,
 	ownedIDs map[int]*appsv1alpha1.ContextDetail,
 ) (bool, *time.Duration, error) {
-
 	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
 	var recordedRequeueAfter *time.Duration
 	activePods := FilterOutPlaceHolderPodWrappers(podWrappers)
@@ -538,7 +536,7 @@ func (r *RealSyncControl) Scale(
 			}
 			return nil
 		})
-		scaling := scaling || succCount > 0
+		scaling = scaling || succCount > 0
 
 		if succCount > 0 {
 			r.recorder.Eventf(cls, corev1.EventTypeNormal, "ScaleIn", "scale in %d Pod(s)", succCount)
@@ -658,7 +656,6 @@ func (r *RealSyncControl) Update(
 	podWrappers []*collasetutils.PodWrapper,
 	ownedIDs map[int]*appsv1alpha1.ContextDetail,
 ) (bool, *time.Duration, error) {
-
 	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
 	var recordedRequeueAfter *time.Duration
 	// 1. scan and analysis pods update info for active pods and PlaceHolder pods
@@ -683,7 +680,7 @@ func (r *RealSyncControl) Update(
 		// 3.1 fulfillPodUpdateInfo to all not updatedRevision pod
 		if podInfo.CurrentRevision.Name != UnknownRevision {
 			if err = updater.FulfillPodUpdatedInfo(ctx, resources.UpdatedRevision, podInfo); err != nil {
-				logger.Error(err, fmt.Sprintf("fail to analyse pod %s/%s in-place update support", podInfo.Namespace, podInfo.Name))
+				logger.Error(err, fmt.Sprintf("fail to analyze pod %s/%s in-place update support", podInfo.Namespace, podInfo.Name))
 				continue
 			}
 		}

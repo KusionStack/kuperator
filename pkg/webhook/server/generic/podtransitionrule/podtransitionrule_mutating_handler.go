@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	commonutils "kusionstack.io/kuperator/pkg/utils"
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
@@ -59,13 +60,13 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	SetDefaultPodTransitionRule(rs)
-	marshalled, err := json.Marshal(rs)
+	marshaled, err := json.Marshal(rs)
 	if err != nil {
 		logger.Error(err, "failed to marshal podtransitionrule json")
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
-	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
+	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
 }
 
 func SetDefaultPodTransitionRule(rs *appsv1alpha1.PodTransitionRule) {

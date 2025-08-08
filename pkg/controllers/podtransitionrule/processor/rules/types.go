@@ -22,9 +22,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Ruler interface {
@@ -41,7 +40,6 @@ type FilterResult struct {
 }
 
 func GetRuler(rule *appsv1alpha1.TransitionRule, client client.Client) Ruler {
-
 	if rule.AvailablePolicy != nil {
 		return &AvailableRuler{
 			Client:              client,
@@ -92,7 +90,6 @@ type HttpJob struct {
 }
 
 func (w *Webhook) buildRequest(pods sets.String, targets map[string]*corev1.Pod) (*appsv1alpha1.WebhookRequest, error) {
-
 	req := &appsv1alpha1.WebhookRequest{
 		RuleName: w.RuleName,
 		Stage:    w.Stage,
@@ -109,7 +106,7 @@ func (w *Webhook) buildRequest(pods sets.String, targets map[string]*corev1.Pod)
 		for _, parameter := range w.Webhook.Parameters {
 			value, err := w.parseParameter(&parameter, targets[podName])
 			if err != nil {
-				return nil, fmt.Errorf("%s failed to parse parameter, %v", w.Key, err)
+				return nil, fmt.Errorf("%s failed to parse parameter, %w", w.Key, err)
 			}
 			parameters[parameter.Key] = value
 		}
@@ -121,7 +118,6 @@ func (w *Webhook) buildRequest(pods sets.String, targets map[string]*corev1.Pod)
 }
 
 func (w *Webhook) parseParameter(parameter *appsv1alpha1.Parameter, pod *corev1.Pod) (value string, err error) {
-
 	defer func() {
 		if value == "null" {
 			value = ""

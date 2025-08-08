@@ -91,7 +91,7 @@ func Begin(c client.Client, adapter LifecycleAdapter, obj client.Object, updateF
 // BeginWithCleaningOld is used for an CRD Operator to begin a lifecycle with cleaning the old lifecycle
 func BeginWithCleaningOld(c client.Client, adapter LifecycleAdapter, obj client.Object, updateFunc ...UpdateFunc) (updated bool, err error) {
 	if podInUpdateLifecycle, err := podopslifecycleutil.IsLifecycleOnPod(adapter.GetID(), obj.(*corev1.Pod)); err != nil {
-		return false, fmt.Errorf("fail to check %s PodOpsLifecycle on Pod %s/%s: %s", adapter.GetID(), obj.GetNamespace(), obj.GetName(), err)
+		return false, fmt.Errorf("fail to check %s PodOpsLifecycle on Pod %s/%s: %w", adapter.GetID(), obj.GetNamespace(), obj.GetName(), err)
 	} else if podInUpdateLifecycle {
 		if err := Undo(c, adapter, obj); err != nil {
 			return false, err
@@ -179,16 +179,14 @@ func checkOperate(adapter LifecycleAdapter, obj client.Object) (val string, ok b
 	return
 }
 
-func setOperatingID(adapter LifecycleAdapter, obj client.Object) (val string, ok bool) {
+func setOperatingID(adapter LifecycleAdapter, obj client.Object) {
 	labelID := fmt.Sprintf("%s/%s", v1alpha1.PodOperatingLabelPrefix, adapter.GetID())
 	obj.GetLabels()[labelID] = fmt.Sprintf("%d", time.Now().UnixNano())
-	return
 }
 
-func setOperationType(adapter LifecycleAdapter, obj client.Object) (val string, ok bool) {
+func setOperationType(adapter LifecycleAdapter, obj client.Object) {
 	labelType := fmt.Sprintf("%s/%s", v1alpha1.PodOperationTypeLabelPrefix, adapter.GetID())
 	obj.GetLabels()[labelType] = string(adapter.GetType())
-	return
 }
 
 // setOperate only for test

@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/onsi/gomega"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 

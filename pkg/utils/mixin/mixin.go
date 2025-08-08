@@ -70,10 +70,10 @@ func NewReconcilerMixin(controllerName string, mgr manager.Manager) *ReconcilerM
 	// - Mapper
 	// - StopChannel
 	// - Logger
-	mgr.SetFields(m)
+	_ = mgr.SetFields(m)
 
 	// additional inject fields
-	m.InjectRecorder(mgr)
+	_ = m.InjectRecorder(mgr)
 	return m
 }
 

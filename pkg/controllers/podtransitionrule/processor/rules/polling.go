@@ -27,9 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	utilshttp "kusionstack.io/kuperator/pkg/utils/http"
 )
 
@@ -242,6 +242,11 @@ func (t *task) do() bool {
 
 func (t *task) query() (*appsv1alpha1.PollResponse, error) {
 	httpResp, err := utilshttp.DoHttpAndHttpsRequestWithCa(http.MethodGet, t.url, nil, nil, t.caBundle)
+	defer func() {
+		if httpResp != nil {
+			_ = httpResp.Body.Close()
+		}
+	}()
 	if err != nil {
 		return nil, err
 	}

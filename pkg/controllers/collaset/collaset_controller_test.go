@@ -645,7 +645,7 @@ var _ = Describe("collaset controller", func() {
 				return cs.Status.ObservedGeneration != observedGeneration
 			}, 5*time.Second, 1*time.Second).Should(BeTrue())
 
-			podList := &corev1.PodList{}
+			podList = &corev1.PodList{}
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 			for i := range podList.Items {
 				pod := &podList.Items[i]
@@ -2368,7 +2368,7 @@ var _ = Describe("collaset controller", func() {
 			})).Should(BeNil())
 		}
 
-		// replace is cancelled
+		// replace is canceled
 		Eventually(func() bool {
 			pod := &corev1.Pod{}
 			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: originPod1.Namespace, Name: originPod1.Name}, pod)).Should(BeNil())
@@ -2882,7 +2882,7 @@ var _ = Describe("collaset controller", func() {
 			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
 			Eventually(func() int {
 				allPvcs := &corev1.PersistentVolumeClaimList{}
-				activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
+				activePvcs = make([]*corev1.PersistentVolumeClaim, 0)
 				Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
 				for i := range allPvcs.Items {
 					if allPvcs.Items[i].DeletionTimestamp != nil {
@@ -4666,6 +4666,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	r, request = testReconcile(poddeletion.NewReconciler(mgr))
 	err = poddeletion.AddToMgr(mgr, r)
+	Expect(err).NotTo(HaveOccurred())
 	r, request = testReconcile(poddecoration.NewReconciler(mgr))
 	err = poddecoration.AddToMgr(mgr, r)
 	Expect(err).NotTo(HaveOccurred())

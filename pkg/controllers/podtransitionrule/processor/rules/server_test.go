@@ -196,7 +196,7 @@ func handleHttpWithTaskIdSucc(resp http.ResponseWriter, req *http.Request) {
 		panic(fmt.Sprintf("taskId %s not found", taskId))
 	}
 	passed, ok := col.getNow()
-	webhookResp := &appsv1alpha1.PollResponse{}
+	var webhookResp *appsv1alpha1.PollResponse
 	if ok {
 		webhookResp = &appsv1alpha1.PollResponse{
 			Success:  true,
@@ -224,7 +224,7 @@ func handleHttpWithTaskIdFail(resp http.ResponseWriter, req *http.Request) {
 		panic(fmt.Sprintf("taskId %s not found", taskId))
 	}
 	passed, ok := col.getNow()
-	webhookResp := &appsv1alpha1.PollResponse{}
+	var webhookResp *appsv1alpha1.PollResponse
 	if ok {
 		webhookResp = &appsv1alpha1.PollResponse{
 			Success: false,

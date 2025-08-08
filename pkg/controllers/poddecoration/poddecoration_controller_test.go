@@ -18,7 +18,6 @@ package poddecoration
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -42,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	"kusionstack.io/kuperator/pkg/controllers/collaset"
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
@@ -994,9 +994,4 @@ func updatePodWithRetry(ctx context.Context, c client.Client, namespace, name st
 
 		return c.Update(ctx, pod)
 	})
-}
-
-func printJson(obj any) {
-	byt, _ := json.MarshalIndent(obj, "", "  ")
-	fmt.Printf("%s\n", string(byt))
 }

@@ -40,14 +40,14 @@ func TestError(t *testing.T) {
 
 	errs = append(errs, err2)
 	actual = AggregateErrors(errs)
-	expected := fmt.Errorf("%v; %v", errs[0], errs[1])
+	expected := fmt.Errorf("%w; %w", errs[0], errs[1])
 	if actual.Error() != expected.Error() {
 		t.Fatalf("expect %v equal to %v", actual, expected)
 	}
 
 	errs = append(errs, err3)
 	actual = AggregateErrors(errs)
-	expected = fmt.Errorf("%v; %v", errs[0], errs[1])
+	expected = fmt.Errorf("%w; %w", errs[0], errs[1])
 	if actual.Error() != expected.Error() {
 		t.Fatalf("expect %v equal to %v", actual, expected)
 	}

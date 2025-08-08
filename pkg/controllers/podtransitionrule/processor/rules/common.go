@@ -36,13 +36,13 @@ func ExtractValueFromPod(pod *corev1.Pod, key, fieldPath string) (value string, 
 	} else {
 		interfaceValue, err := GetFieldRef(pod, fieldPath)
 		if err != nil {
-			return "", fmt.Errorf("fail to parse parameter %s by field ref: %s", key, err)
+			return "", fmt.Errorf("fail to parse parameter %s by field ref: %w", key, err)
 		}
 		if s, ok := interfaceValue.(string); !ok {
 			var newValue []byte
 			newValue, err = json.Marshal(interfaceValue)
 			if err != nil {
-				return "", fmt.Errorf("fail to marshal parameter %s when parse it: %s", key, err)
+				return "", fmt.Errorf("fail to marshal parameter %s when parse it: %w", key, err)
 			}
 			return string(newValue), nil
 		} else {

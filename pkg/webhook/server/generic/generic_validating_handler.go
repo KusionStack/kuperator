@@ -80,7 +80,7 @@ func (h *ValidatingHandler) InjectFunc(f inject.Func) error {
 }
 
 func (h *ValidatingHandler) InjectLogger(l logr.Logger) error {
-	h.WebhookHandlerMixin.InjectLogger(l)
+	_ = h.WebhookHandlerMixin.InjectLogger(l)
 
 	// inject logger into subHandlers
 	for kind, handler := range ValidatingTypeHandlerMap {

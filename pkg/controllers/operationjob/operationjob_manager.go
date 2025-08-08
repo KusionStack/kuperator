@@ -64,7 +64,7 @@ func (r *ReconcileOperationJob) listTargets(ctx context.Context, operationJob *a
 		var pod corev1.Pod
 
 		candidate.Idx = idx
-		// fulfil target pod
+		// fulfill target pod
 		candidate.PodName = target.Name
 		err := r.Client.Get(ctx, types.NamespacedName{Namespace: operationJob.Namespace, Name: target.Name}, &pod)
 		if err == nil {
@@ -75,7 +75,7 @@ func (r *ReconcileOperationJob) listTargets(ctx context.Context, operationJob *a
 			return candidates, err
 		}
 
-		// fulfil target containers
+		// fulfill target containers
 		candidate.Containers = target.Containers
 		if len(target.Containers) == 0 && candidate.Pod != nil {
 			var containers []string
@@ -85,7 +85,7 @@ func (r *ReconcileOperationJob) listTargets(ctx context.Context, operationJob *a
 			candidate.Containers = containers
 		}
 
-		// fulfil or initialize opsStatus
+		// fulfill or initialize opsStatus
 		if opsStatus, exist := podOpsStatusMap[target.Name]; exist {
 			candidate.OpsStatus = opsStatus
 		} else {
@@ -339,7 +339,7 @@ func (r *ReconcileOperationJob) releaseTargets(ctx context.Context, operationJob
 }
 
 // cleanCandidateOpsLifecycle finishes lifecycle resources from target pod if forced==true gracefully, otherwise remove with force
-func (r *ReconcileOperationJob) cleanCandidateOpsLifecycle(ctx context.Context, forced bool, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
+func (r *ReconcileOperationJob) cleanCandidateOpsLifecycle(_ context.Context, forced bool, candidate *OpsCandidate, operationJob *appsv1alpha1.OperationJob) error {
 	if candidate.Pod == nil {
 		return nil
 	}

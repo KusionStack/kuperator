@@ -17,15 +17,12 @@ limitations under the License.
 package poddecoration
 
 import (
-	"context"
 	"testing"
-
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
@@ -418,42 +415,6 @@ var _ = Describe("PodDecoration controller", func() {
 		Expect(len(pod.OwnerReferences)).Should(BeEquivalentTo(2))
 	})
 })
-
-type mockClient struct {
-	client.Client
-}
-
-func (*mockClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object) error {
-	return nil
-}
-
-func (*mockClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
-	i0Int32 := int32(0)
-	i1Int32 := int32(1)
-	Tm1 := metav1.Now()
-	Tm2 := metav1.NewTime(Tm1.Time.Add(100))
-	list.(*appsv1alpha1.PodDecorationList).Items = []appsv1alpha1.PodDecoration{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:              "pd-a",
-				CreationTimestamp: Tm1,
-			},
-			Spec: appsv1alpha1.PodDecorationSpec{
-				Weight: &i0Int32,
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:              "pd-b",
-				CreationTimestamp: Tm2,
-			},
-			Spec: appsv1alpha1.PodDecorationSpec{
-				Weight: &i1Int32,
-			},
-		},
-	}
-	return nil
-}
 
 func TestPodDecorationController(t *testing.T) {
 	RegisterFailHandler(Fail)

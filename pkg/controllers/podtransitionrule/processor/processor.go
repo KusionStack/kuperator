@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/processor/rules"
 	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/register"
 	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/utils"
@@ -195,13 +196,9 @@ type RejectInfo struct {
 	Reason   string
 }
 
-const (
-	EnvSkipTransitionRules = "SKIP_POD_TRANSITION_RULES"
-)
+const EnvSkipTransitionRules = "SKIP_POD_TRANSITION_RULES"
 
-var (
-	SkipTransitionRules = sets.NewString()
-)
+var SkipTransitionRules = sets.NewString()
 
 func needSkip(rule *appsv1alpha1.TransitionRule) bool {
 	typRule := reflect.TypeOf(rule.TransitionRuleDefinition)

@@ -192,7 +192,7 @@ func (r *RealSyncControl) allowIncludeExcludePods(ctx context.Context, cls *apps
 
 		// check allowance for pod
 		if allowed, reason := fn(pod, cls.Name, cls.Kind); !allowed {
-			r.recorder.Eventf(pod, corev1.EventTypeWarning, "ExcludeIncludeNotAllowed", fmt.Sprintf("pod is not allowed to exlcude/include from/to collaset %s/%s: %s", cls.Namespace, cls.Name, reason))
+			r.recorder.Eventf(pod, corev1.EventTypeWarning, "ExcludeIncludeNotAllowed", fmt.Sprintf("pod is not allowed to exclude/include from/to collaset %s/%s: %s", cls.Namespace, cls.Name, reason))
 			notAllowPods.Insert(pod.Name)
 			continue
 		}
@@ -209,12 +209,12 @@ func (r *RealSyncControl) allowIncludeExcludePods(ctx context.Context, cls *apps
 			if errors.IsNotFound(err) {
 				continue
 			} else if err != nil {
-				r.recorder.Eventf(pod, corev1.EventTypeWarning, "ExcludeIncludeNotAllowed", fmt.Sprintf("failed to check allowed to exlcude/include from/to collaset %s/%s: %s", cls.Namespace, cls.Name, err.Error()))
+				r.recorder.Eventf(pod, corev1.EventTypeWarning, "ExcludeIncludeNotAllowed", fmt.Sprintf("failed to check allowed to exclude/include from/to collaset %s/%s: %s", cls.Namespace, cls.Name, err.Error()))
 				pvcsAllowed = false
 				break
 			}
 			if allowed, reason := fn(pvc, cls.Name, cls.Kind); !allowed {
-				r.recorder.Eventf(pod, corev1.EventTypeWarning, "ExcludeIncludeNotAllowed", fmt.Sprintf("pvc is not allowed to exlcude/include from/to collaset %s/%s: %s", cls.Namespace, cls.Name, reason))
+				r.recorder.Eventf(pod, corev1.EventTypeWarning, "ExcludeIncludeNotAllowed", fmt.Sprintf("pvc is not allowed to exclude/include from/to collaset %s/%s: %s", cls.Namespace, cls.Name, reason))
 				notAllowPods.Insert(pod.Name)
 				pvcsAllowed = false
 				break

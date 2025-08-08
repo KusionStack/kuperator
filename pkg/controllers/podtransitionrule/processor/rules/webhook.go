@@ -27,6 +27,7 @@ import (
 	"k8s.io/klog"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/podtransitionrule/utils"
 	"kusionstack.io/kuperator/pkg/utils"
 	utilshttp "kusionstack.io/kuperator/pkg/utils/http"
@@ -341,14 +342,6 @@ func (w *Webhook) Do(targets map[string]*corev1.Pod, subjects sets.String) *Filt
 	}
 }
 
-func (w *Webhook) oldTraceMap() map[string]*appsv1alpha1.TaskInfo {
-	res := map[string]*appsv1alpha1.TaskInfo{}
-	for i, state := range w.State.WebhookStatus.TaskStates {
-		res[state.TaskId] = &w.State.WebhookStatus.TaskStates[i]
-	}
-	return res
-}
-
 func (w *Webhook) convTaskInfo(infoMap map[string]*appsv1alpha1.TaskInfo) []appsv1alpha1.TaskInfo {
 	states := make([]appsv1alpha1.TaskInfo, 0, len(infoMap))
 	for _, v := range infoMap {
@@ -419,6 +412,9 @@ func (w *Webhook) query(podSet sets.String, targets map[string]*corev1.Pod) (str
 
 func (w *Webhook) doHttp(req *appsv1alpha1.WebhookRequest) (*appsv1alpha1.WebhookResponse, error) {
 	httpResp, err := utilshttp.DoHttpAndHttpsRequestWithCa(http.MethodPost, w.Webhook.ClientConfig.URL, *req, nil, w.Webhook.ClientConfig.CABundle)
+	defer func() {
+		_ = httpResp.Body.Close()
+	}()
 	if err != nil {
 		return nil, err
 	}

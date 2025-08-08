@@ -19,12 +19,13 @@ package podopslifecycle
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"testing"
+
 	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/runtime"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -107,7 +108,7 @@ func TestLifecycle(t *testing.T) {
 			setOperationType(b, pod)
 		}
 
-		started, err := Begin(c, a, pod)
+		_, err := Begin(c, a, pod)
 		g.Expect(reflect.DeepEqual(err, input.err)).Should(gomega.BeTrue())
 		if err != nil {
 			continue
@@ -115,7 +116,7 @@ func TestLifecycle(t *testing.T) {
 		g.Expect(pod.Labels[mockLabelKey]).Should(gomega.BeEquivalentTo(mockLabelValue))
 
 		setOperate(a, pod)
-		started, err = Begin(c, a, pod)
+		started, err := Begin(c, a, pod)
 		g.Expect(err).Should(gomega.BeNil())
 		g.Expect(started).Should(gomega.BeTrue())
 		g.Expect(IsDuringOps(a, pod)).Should(gomega.BeTrue())

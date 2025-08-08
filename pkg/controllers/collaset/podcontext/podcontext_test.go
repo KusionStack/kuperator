@@ -86,6 +86,7 @@ var _ = Describe("ResourceContext allocation", func() {
 		}
 
 		ownedIDs, err = AllocateID(c, instance1, "", 10)
+		Expect(err).NotTo(HaveOccurred())
 		delete(ownedIDs, 4)
 		delete(ownedIDs, 6)
 		Expect(UpdateToPodContext(c, instance1, ownedIDs)).Should(BeNil())

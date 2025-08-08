@@ -289,7 +289,7 @@ func (r *ReconcilePodDecoration) updateStatus(
 	if equality.Semantic.DeepEqual(instance.Status, *status) {
 		return nil
 	}
-	statusUpToDateExpectation.ExpectUpdate(utils.ObjectKeyString(instance), instance.ResourceVersion)
+	_ = statusUpToDateExpectation.ExpectUpdate(utils.ObjectKeyString(instance), instance.ResourceVersion)
 	defer func() {
 		if err != nil {
 			statusUpToDateExpectation.DeleteExpectations(utils.ObjectKeyString(instance))

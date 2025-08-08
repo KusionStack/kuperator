@@ -125,21 +125,6 @@ func updatePodWithRetry(c client.Client, namespace, name string, updateFn func(p
 	})
 }
 
-func updatePodStatusWithRetry(c client.Client, namespace, name string, updateFn func(pod *corev1.Pod) bool) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		pod := &corev1.Pod{}
-		if err := c.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: name}, pod); err != nil {
-			return err
-		}
-
-		if !updateFn(pod) {
-			return nil
-		}
-
-		return c.Status().Update(context.TODO(), pod)
-	})
-}
-
 func testReconcile(inner reconcile.Reconciler) (reconcile.Reconciler, chan reconcile.Request) {
 	requests := make(chan reconcile.Request, 5)
 	fn := reconcile.Func(func(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {

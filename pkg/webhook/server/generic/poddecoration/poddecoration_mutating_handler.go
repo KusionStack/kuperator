@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
@@ -53,11 +54,11 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	SetDefaultPodDecoration(pd)
-	marshalled, err := json.Marshal(pd)
+	marshaled, err := json.Marshal(pd)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
-	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
+	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
 }
 
 func SetDefaultPodDecoration(pd *appsv1alpha1.PodDecoration) {

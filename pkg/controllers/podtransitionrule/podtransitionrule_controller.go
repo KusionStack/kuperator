@@ -136,7 +136,7 @@ func (r *PodTransitionRuleReconciler) Reconcile(ctx context.Context, request rec
 		return reconcile.Result{}, controllerutils.RemoveFinalizer(ctx, r.Client, instance, appsv1alpha1.ProtectFinalizer)
 	} else if !controllerutil.ContainsFinalizer(instance, appsv1alpha1.ProtectFinalizer) {
 		if err := controllerutils.AddFinalizer(ctx, r.Client, instance, appsv1alpha1.ProtectFinalizer); err != nil {
-			return result, fmt.Errorf("fail to add finalizer on PodTransitionRule %s: %s", request, err)
+			return result, fmt.Errorf("fail to add finalizer on PodTransitionRule %s: %w", request, err)
 		}
 	}
 
@@ -169,7 +169,7 @@ func (r *PodTransitionRuleReconciler) Reconcile(ctx context.Context, request rec
 			continue
 		}
 
-		if _, err := r.updatePodTransitionRuleOnPod(ctx, instance.Name, name, instance.Namespace, podtransitionruleutils.MoveAllPodTransitionRuleInfo); err != nil {
+		if err := r.updatePodTransitionRuleOnPod(ctx, instance.Name, name, instance.Namespace, podtransitionruleutils.MoveAllPodTransitionRuleInfo); err != nil {
 			logger.Error(err, "failed to remote podtransitionrule on pod", "pod", name)
 			return result, err
 		}
@@ -208,7 +208,7 @@ func (r *PodTransitionRuleReconciler) Reconcile(ctx context.Context, request rec
 	}
 
 	if !equalStatus(newStatus, &instance.Status) {
-		podtransitionruleutils.PodTransitionRuleVersionExpectation.ExpectUpdate(commonutils.ObjectKeyString(instance), instance.ResourceVersion)
+		_ = podtransitionruleutils.PodTransitionRuleVersionExpectation.ExpectUpdate(commonutils.ObjectKeyString(instance), instance.ResourceVersion)
 		instance.Status = *newStatus
 		if err := r.Client.Status().Update(ctx, instance); err != nil {
 			podtransitionruleutils.PodTransitionRuleVersionExpectation.DeleteExpectations(commonutils.ObjectKeyString(instance))
@@ -288,16 +288,16 @@ func (r *PodTransitionRuleReconciler) process(
 
 func (r *PodTransitionRuleReconciler) cleanUpPodTransitionRulePods(ctx context.Context, podTransitionRule *appsv1alpha1.PodTransitionRule) error {
 	for _, name := range podTransitionRule.Status.Targets {
-		if _, err := r.updatePodTransitionRuleOnPod(ctx, podTransitionRule.Name, name, podTransitionRule.Namespace, podtransitionruleutils.MoveAllPodTransitionRuleInfo); err != nil && !errors.IsNotFound(err) {
-			return fmt.Errorf("fail to remove PodTransitionRule %s on pod %s: %v", commonutils.ObjectKeyString(podTransitionRule), name, err)
+		if err := r.updatePodTransitionRuleOnPod(ctx, podTransitionRule.Name, name, podTransitionRule.Namespace, podtransitionruleutils.MoveAllPodTransitionRuleInfo); err != nil && !errors.IsNotFound(err) {
+			return fmt.Errorf("fail to remove PodTransitionRule %s on pod %s: %w", commonutils.ObjectKeyString(podTransitionRule), name, err)
 		}
 	}
 	return nil
 }
 
-func (r *PodTransitionRuleReconciler) updatePodTransitionRuleOnPod(ctx context.Context, podTransitionRule, name, namespace string, fn func(*corev1.Pod, string) bool) (*corev1.Pod, error) {
+func (r *PodTransitionRuleReconciler) updatePodTransitionRuleOnPod(ctx context.Context, podTransitionRule, name, namespace string, fn func(*corev1.Pod, string) bool) error {
 	pod := &corev1.Pod{}
-	return pod, retry.RetryOnConflict(retry.DefaultRetry, func() error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if err := r.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, pod); err != nil {
 			if errors.IsNotFound(err) {
 				return nil

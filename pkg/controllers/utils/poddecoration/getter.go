@@ -159,7 +159,7 @@ func (n *namespacedPodDecorationManager) getByRevision(ctx context.Context, rev 
 		if errors.IsNotFound(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("fail to get PodDecoration ControllerRevision %s/%s: %v", n.namespace, rev, err)
+		return nil, fmt.Errorf("fail to get PodDecoration ControllerRevision %s/%s: %w", n.namespace, rev, err)
 	}
 	pd, err := anno.GetPodDecorationFromRevision(revision)
 

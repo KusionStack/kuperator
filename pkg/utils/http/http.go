@@ -46,7 +46,7 @@ func ParseResponse(resp *http.Response, data interface{}) error {
 		if data != nil {
 			err := json.Unmarshal(b, data)
 			if err != nil {
-				return fmt.Errorf("err: %s, response: %s", err, httpContentString)
+				return fmt.Errorf("err: %w, response: %s", err, httpContentString)
 			}
 		}
 		return nil

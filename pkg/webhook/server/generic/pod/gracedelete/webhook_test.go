@@ -37,7 +37,6 @@ import (
 )
 
 func TestGraceDelete(t *testing.T) {
-
 	inputs := []struct {
 		keyWords string // used to check the error message
 		fakePod  corev1.Pod
@@ -160,9 +159,9 @@ func TestGraceDelete(t *testing.T) {
 		client := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(&v.fakePod).Build()
 		err := gd.Validating(context.Background(), client, &v.oldPod, nil, v.reqOperation)
 		if v.keyWords == "" {
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 		} else {
-			assert.NotNil(t, err)
+			assert.Error(t, err)
 			assert.Contains(t, err.Error(), v.keyWords)
 		}
 		if len(v.expectedLabels) != 0 {

@@ -110,7 +110,7 @@ func (r *RealSyncControl) cleanReplacePodLabels(
 			return err
 		}
 		if err = r.podControl.PatchPod(pod, client.RawPatch(types.JSONPatchType, patchBytes)); err != nil {
-			return fmt.Errorf("failed to remove replace pair label %s/%s: %s", pod.Namespace, pod.Name, err)
+			return fmt.Errorf("failed to remove replace pair label %s/%s: %w", pod.Namespace, pod.Name, err)
 		}
 		return nil
 	})
@@ -178,7 +178,7 @@ func (r *RealSyncControl) replaceOriginPods(
 		// create pvcs for new pod
 		err = r.pvcControl.CreatePodPvcs(ctx, instance, newPod, resources.ExistingPvcs)
 		if err != nil {
-			return fmt.Errorf("fail to migrate PVCs from origin pod %s to replace pod %s: %s", originPod.Name, newPod.Name, err)
+			return fmt.Errorf("fail to migrate PVCs from origin pod %s to replace pod %s: %w", originPod.Name, newPod.Name, err)
 		}
 		if newCreatedPod, err := r.podControl.CreatePod(newPod); err == nil {
 			r.recorder.Eventf(originPod,
@@ -194,7 +194,7 @@ func (r *RealSyncControl) replaceOriginPods(
 
 			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, appsv1alpha1.PodReplacePairNewId, instanceId)))
 			if err = r.podControl.PatchPod(originPod, patch); err != nil {
-				return fmt.Errorf("fail to update origin pod %s/%s pair label %s when updating by replaceUpdate: %s", originPod.Namespace, originPod.Name, newCreatedPod.Name, err)
+				return fmt.Errorf("fail to update origin pod %s/%s pair label %s when updating by replaceUpdate: %w", originPod.Namespace, originPod.Name, newCreatedPod.Name, err)
 			}
 			logger.Info("replaceOriginPods", "replacing originPod", originPod.Name, "originPodId", originPodId, "newPodContextID", instanceId)
 		} else {
@@ -307,7 +307,7 @@ func updateReplaceOriginPod(
 		if exist && currentRevision != originPodUpdateInfo.UpdateRevision.Name && !deletionIndicate {
 			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%d"}}}`, appsv1alpha1.PodDeletionIndicationLabelKey, time.Now().UnixNano())))
 			if patchErr := c.Patch(ctx, newPod, patch); patchErr != nil {
-				err := fmt.Errorf("failed to delete replace pair new pod %s/%s %s",
+				err := fmt.Errorf("failed to delete replace pair new pod %s/%s %w",
 					newPod.Namespace, newPod.Name, patchErr)
 				return err
 			}
@@ -328,7 +328,7 @@ func updateReplaceOriginPod(
 		now := time.Now().UnixNano()
 		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v", "%s": "%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, now, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey, originPodUpdateInfo.UpdateRevision.Name)))
 		if err := c.Patch(ctx, originPod, patch); err != nil {
-			return fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %s", originPod.Namespace, originPod.Name, err)
+			return fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %w", originPod.Namespace, originPod.Name, err)
 		}
 		recorder.Eventf(originPod,
 			corev1.EventTypeNormal,

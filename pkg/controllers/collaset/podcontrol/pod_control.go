@@ -73,7 +73,7 @@ func (pc *RealPodControl) GetFilteredPods(selector *metav1.LabelSelector, owner 
 
 func (pc *RealPodControl) CreatePod(pod *corev1.Pod) (*corev1.Pod, error) {
 	if err := pc.client.Create(context.TODO(), pod); err != nil {
-		return nil, fmt.Errorf("fail to create Pod: %s", err)
+		return nil, fmt.Errorf("fail to create Pod: %w", err)
 	}
 
 	return pod, nil
@@ -97,7 +97,7 @@ func (pc *RealPodControl) OrphanPod(cls *appsv1alpha1.CollaSet, pod *corev1.Pod)
 	}
 	cm, err := refmanagerutil.NewRefManager(pc.client, cls.Spec.Selector, cls, pc.scheme)
 	if err != nil {
-		return fmt.Errorf("fail to create ref manager: %s", err)
+		return fmt.Errorf("fail to create ref manager: %w", err)
 	}
 
 	if pod.Labels == nil {
@@ -115,7 +115,7 @@ func (pc *RealPodControl) AdoptPod(cls *appsv1alpha1.CollaSet, pod *corev1.Pod) 
 	}
 	cm, err := refmanagerutil.NewRefManager(pc.client, cls.Spec.Selector, cls, pc.scheme)
 	if err != nil {
-		return fmt.Errorf("fail to create ref manager: %s", err)
+		return fmt.Errorf("fail to create ref manager: %w", err)
 	}
 
 	_, err = cm.ClaimOwned([]client.Object{pod})
@@ -129,7 +129,7 @@ func (pc *RealPodControl) getPodSetPods(pods []*corev1.Pod, selector *metav1.Lab
 	// Use ControllerRefManager to adopt/orphan as needed.
 	cm, err := refmanagerutil.NewRefManager(pc.client, selector, owner, pc.scheme)
 	if err != nil {
-		return nil, fmt.Errorf("fail to create ref manager: %s", err)
+		return nil, fmt.Errorf("fail to create ref manager: %w", err)
 	}
 
 	var candidates = make([]client.Object, len(pods))

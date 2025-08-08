@@ -45,7 +45,7 @@ func AllocateID(c client.Client, instance *appsv1alpha1.CollaSet, defaultRevisio
 	notFound := false
 	if err := c.Get(context.TODO(), types.NamespacedName{Namespace: instance.Namespace, Name: contextName}, podContext); err != nil {
 		if !errors.IsNotFound(err) {
-			return nil, fmt.Errorf("fail to find ResourceContext %s/%s for owner %s: %s", instance.Namespace, contextName, instance.Name, err)
+			return nil, fmt.Errorf("fail to find ResourceContext %s/%s for owner %s: %w", instance.Namespace, contextName, instance.Name, err)
 		}
 
 		notFound = true
@@ -111,7 +111,7 @@ func UpdateToPodContext(c client.Client, instance *appsv1alpha1.CollaSet, ownedI
 	podContext := &appsv1alpha1.ResourceContext{}
 	if err := c.Get(context.TODO(), types.NamespacedName{Namespace: instance.Namespace, Name: contextName}, podContext); err != nil {
 		if !errors.IsNotFound(err) {
-			return fmt.Errorf("fail to find ResourceContext %s/%s: %s", instance.Namespace, contextName, err)
+			return fmt.Errorf("fail to find ResourceContext %s/%s: %w", instance.Namespace, contextName, err)
 		}
 
 		if len(ownedIDs) == 0 {
@@ -119,7 +119,7 @@ func UpdateToPodContext(c client.Client, instance *appsv1alpha1.CollaSet, ownedI
 		}
 
 		if err := doCreatePodContext(c, instance, ownedIDs); err != nil {
-			return fmt.Errorf("fail to create ResourceContext %s/%s after not found: %s", instance.Namespace, contextName, err)
+			return fmt.Errorf("fail to create ResourceContext %s/%s after not found: %w", instance.Namespace, contextName, err)
 		}
 	}
 
