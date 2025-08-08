@@ -8,7 +8,7 @@ on:
 permissions:
   contents: write
 env:
-  GO_VERSION: '1.23'
+  GO_VERSION: '1.24'
 
 jobs:
   Test:
@@ -99,7 +99,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.23
+        go-version: 1.24
 
     - name: Release with GoReleaser
       uses: goreleaser/goreleaser-action@v2

@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.23-alpine3.22 as builder
+FROM golang:1.24.2-bookworm as builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -23,7 +23,7 @@ COPY apis/ apis/
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -a -o manager main.go
 
-FROM alpine:3.22
+FROM gcr.io/distroless/static-debian12:debug
 WORKDIR /
 COPY --from=builder /workspace/manager .
 

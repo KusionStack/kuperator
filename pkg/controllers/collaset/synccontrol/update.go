@@ -730,7 +730,7 @@ func (u *inPlaceIfPossibleUpdater) GetPodUpdateFinishStatus(_ context.Context, p
 		return false, "no pod last state annotation", nil
 	} else if err := json.Unmarshal([]byte(lastStateJson), podLastState); err != nil {
 		msg := fmt.Sprintf("malformat pod last state annotation [%s]: %s", lastStateJson, err)
-		return false, msg, fmt.Errorf(msg)
+		return false, msg, fmt.Errorf("malformat pod last state annotation [%s]: %w", lastStateJson, err)
 	}
 
 	if podLastState.ContainerStates == nil {

@@ -176,7 +176,7 @@ func (w *Webhook) Do(targets map[string]*corev1.Pod, subjects sets.String) *Filt
 		var errMsg string
 		if pollingResult.LastError != nil {
 			errMsg = fmt.Sprintf("polling task %s error, %v", taskId, pollingResult.LastError)
-			klog.Warningf(errMsg)
+			klog.Warningf("polling task %s error, %v", taskId, pollingResult.LastError)
 		}
 		var rejectMsg string
 		if pollingResult.Stopped {

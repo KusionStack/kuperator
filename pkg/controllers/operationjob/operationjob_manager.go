@@ -48,7 +48,7 @@ func (r *ReconcileOperationJob) getActionHandler(operationJob *appsv1alpha1.Oper
 	if handler == nil {
 		errMsg := fmt.Sprintf("unsupported operation type! please register handler for action: %s", action)
 		r.Recorder.Eventf(operationJob, corev1.EventTypeWarning, "OpsAction", errMsg)
-		return nil, false, fmt.Errorf(errMsg)
+		return nil, false, fmt.Errorf("unsupported operation type! please register handler for action: %s", action)
 	}
 
 	return handler, enablePodOpsLifecycle, nil
