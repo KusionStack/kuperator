@@ -31,9 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontext"
 	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontrol"
@@ -108,9 +107,7 @@ func (r *RealSyncControl) SyncPods(
 	ctx context.Context,
 	instance *appsv1alpha1.CollaSet,
 	resources *collasetutils.RelatedResources,
-) (
-	bool, []*collasetutils.PodWrapper, map[int]*appsv1alpha1.ContextDetail, error) {
-
+) (bool, []*collasetutils.PodWrapper, map[int]*appsv1alpha1.ContextDetail, error) {
 	var err error
 	resources.FilteredPods, err = r.podControl.GetFilteredPods(instance.Spec.Selector, instance)
 	if err != nil {
@@ -182,7 +179,7 @@ func (r *RealSyncControl) SyncPods(
 
 		// delete unused pvcs
 		if err := r.pvcControl.DeletePodUnusedPvcs(ctx, instance, pod, resources.ExistingPvcs); err != nil {
-			return false, nil, nil, fmt.Errorf("fail to delete unused pvcs %s", err)
+			return false, nil, nil, fmt.Errorf("fail to delete unused pvcs %w", err)
 		}
 
 		podWrappers = append(podWrappers, &collasetutils.PodWrapper{
@@ -399,11 +396,11 @@ func (r *RealSyncControl) Scale(
 					},
 				)
 				if err != nil {
-					return fmt.Errorf("fail to new Pod from revision %s: %s", revision.Name, err)
+					return fmt.Errorf("fail to new Pod from revision %s: %w", revision.Name, err)
 				}
 				err = r.pvcControl.CreatePodPvcs(ctx, cls, pod, resources.ExistingPvcs)
 				if err != nil {
-					return fmt.Errorf("fail to create PVCs for pod %s: %s", pod.Name, err)
+					return fmt.Errorf("fail to create PVCs for pod %s: %w", pod.Name, err)
 				}
 				newPod := pod.DeepCopy()
 				logger.Info("try to create Pod with revision of collaSet", "revision", revision.Name)
@@ -450,7 +447,7 @@ func (r *RealSyncControl) Scale(
 			// trigger PodOpsLifecycle with scaleIn OperationType
 			logger.Info("try to begin PodOpsLifecycle for scaling in Pod in CollaSet", "pod", commonutils.ObjectKeyString(pod))
 			if updated, err := podopslifecycle.Begin(r.client, collasetutils.ScaleInOpsLifecycleAdapter, pod.Pod); err != nil {
-				return fmt.Errorf("fail to begin PodOpsLifecycle for Scaling in Pod %s/%s: %s", pod.Namespace, pod.Name, err)
+				return fmt.Errorf("fail to begin PodOpsLifecycle for Scaling in Pod %s/%s: %w", pod.Namespace, pod.Name, err)
 			} else if updated {
 				r.recorder.Eventf(pod.Pod, corev1.EventTypeNormal, "BeginScaleInLifecycle", "succeed to begin PodOpsLifecycle for scaling in")
 				// add an expectation for this pod creation, before next reconciling
@@ -520,7 +517,7 @@ func (r *RealSyncControl) Scale(
 			pod := <-podCh
 			logger.Info("try to scale in Pod", "pod", commonutils.ObjectKeyString(pod))
 			if err := r.podControl.DeletePod(pod.Pod); err != nil {
-				return fmt.Errorf("fail to delete Pod %s/%s when scaling in: %s", pod.Namespace, pod.Name, err)
+				return fmt.Errorf("fail to delete Pod %s/%s when scaling in: %w", pod.Namespace, pod.Name, err)
 			}
 
 			r.recorder.Eventf(cls, corev1.EventTypeNormal, "PodDeleted", "succeed to scale in Pod %s/%s", pod.Namespace, pod.Name)
@@ -564,7 +561,7 @@ func (r *RealSyncControl) Scale(
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
 		}); err != nil {
-			return scaling, recordedRequeueAfter, fmt.Errorf("fail to reset ResourceContext: %s", err)
+			return scaling, recordedRequeueAfter, fmt.Errorf("fail to reset ResourceContext: %w", err)
 		}
 	}
 
@@ -616,7 +613,7 @@ func DeletePodsByLabel(podControl podcontrol.Interface, needDeletePods []*corev1
 		if _, exist := pod.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; !exist {
 			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%d"}}}`, appsv1alpha1.PodDeletionIndicationLabelKey, time.Now().UnixNano())))
 			if err := podControl.PatchPod(pod, patch); err != nil {
-				return fmt.Errorf("failed to delete pod when syncPods %s/%s %s", pod.Namespace, pod.Name, err)
+				return fmt.Errorf("failed to delete pod when syncPods %s/%s %w", pod.Namespace, pod.Name, err)
 			}
 		}
 		return nil
@@ -661,7 +658,7 @@ func (r *RealSyncControl) Update(
 	// 1. scan and analysis pods update info for active pods and PlaceHolder pods
 	podUpdateInfos, err := r.attachPodUpdateInfo(ctx, cls, podWrappers, resources)
 	if err != nil {
-		return false, nil, fmt.Errorf("fail to attach pod update info, %v", err)
+		return false, nil, fmt.Errorf("fail to attach pod update info, %w", err)
 	}
 
 	// 2. decide Pod update candidates
@@ -767,7 +764,7 @@ func (r *RealSyncControl) Update(
 		} else {
 			// Pod is in update scope and allowed to update, check and finish update gracefully
 			if updateFinished, msg, err = updater.GetPodUpdateFinishStatus(ctx, podInfo); err != nil {
-				return fmt.Errorf("failed to get pod %s/%s update finished: %s", podInfo.Namespace, podInfo.Name, err)
+				return fmt.Errorf("failed to get pod %s/%s update finished: %w", podInfo.Namespace, podInfo.Name, err)
 			} else if !updateFinished {
 				r.recorder.Eventf(podInfo.Pod,
 					corev1.EventTypeNormal,
@@ -799,8 +796,8 @@ func (r *RealSyncControl) getAvailablePodIDs(
 	instance *appsv1alpha1.CollaSet,
 	resources *collasetutils.RelatedResources,
 	ownedIDs map[int]*appsv1alpha1.ContextDetail,
-	currentIDs map[int]struct{}) ([]*appsv1alpha1.ContextDetail, map[int]*appsv1alpha1.ContextDetail, error) {
-
+	currentIDs map[int]struct{},
+) ([]*appsv1alpha1.ContextDetail, map[int]*appsv1alpha1.ContextDetail, error) {
 	availableContexts := extractAvailableContexts(want, ownedIDs, currentIDs)
 	if len(availableContexts) >= want {
 		return availableContexts, ownedIDs, nil
@@ -814,7 +811,7 @@ func (r *RealSyncControl) getAvailablePodIDs(
 		newOwnedIDs, err = podcontext.AllocateID(r.client, instance, resources.UpdatedRevision.Name, len(ownedIDs)+diff)
 		return err
 	}); err != nil {
-		return nil, ownedIDs, fmt.Errorf("fail to allocate IDs using context when include Pods: %s", err)
+		return nil, ownedIDs, fmt.Errorf("fail to allocate IDs using context when include Pods: %w", err)
 	}
 
 	return extractAvailableContexts(want, newOwnedIDs, currentIDs), newOwnedIDs, nil
@@ -826,7 +823,8 @@ func (r *RealSyncControl) reclaimOwnedIDs(
 	cls *appsv1alpha1.CollaSet,
 	idToReclaim sets.Int,
 	ownedIDs map[int]*appsv1alpha1.ContextDetail,
-	currentIDs map[int]struct{}) error {
+	currentIDs map[int]struct{},
+) error {
 	// TODO stateful case
 	// 1) only reclaim non-existing Pods' ID. Do not reclaim terminating Pods' ID until these Pods and PVC have been deleted from ETCD
 	// 2) do not filter out these terminating Pods
@@ -854,7 +852,7 @@ func (r *RealSyncControl) reclaimOwnedIDs(
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
 		}); err != nil {
-			return fmt.Errorf("fail to update ResourceContext when reclaiming IDs: %s", err)
+			return fmt.Errorf("fail to update ResourceContext when reclaiming IDs: %w", err)
 		}
 	}
 	return nil

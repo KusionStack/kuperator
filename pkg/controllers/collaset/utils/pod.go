@@ -133,7 +133,6 @@ func PatchToPod(currentRevisionPod, updateRevisionPod, currentPod *corev1.Pod) (
 		return nil, err
 	}
 	updateRevisionPodBytes, err := json.Marshal(updateRevisionPod)
-
 	if err != nil {
 		return nil, err
 	}

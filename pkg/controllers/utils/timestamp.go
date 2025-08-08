@@ -22,9 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var (
-	truncatedBy = 1 * time.Second
-)
+var truncatedBy = 1 * time.Second
 
 func FormatTime(originTime metav1.Time) metav1.Time {
 	newTime := metav1.NewTime(originTime.Truncate(truncatedBy))

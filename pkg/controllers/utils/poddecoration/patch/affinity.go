@@ -18,7 +18,6 @@ package patch
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 
@@ -41,23 +40,7 @@ func PatchAffinity(pod *corev1.Pod, affinity *appsv1alpha1.PodDecorationAffinity
 	}
 }
 
-func MergeTolerations(original []corev1.Toleration, additional []corev1.Toleration) []corev1.Toleration {
-	exists := sets.NewString()
-	for _, toleration := range original {
-		exists.Insert(toleration.Key)
-	}
-
-	for _, toleration := range additional {
-		if exists.Has(toleration.Key) {
-			continue
-		}
-		original = append(original, toleration)
-		exists.Insert(toleration.Key)
-	}
-	return original
-}
-
-func MergeWithOverwriteTolerations(original []corev1.Toleration, additional []corev1.Toleration) []corev1.Toleration {
+func MergeWithOverwriteTolerations(original, additional []corev1.Toleration) []corev1.Toleration {
 	additionalMap := map[string]*corev1.Toleration{}
 	for i, toleration := range additional {
 		additionalMap[toleration.Key] = &additional[i]

@@ -58,8 +58,7 @@ func (pc *RealPvcControl) GetFilteredPvcs(ctx context.Context, cls *appsv1alpha1
 	// list pvcs using ownerReference
 	var filteredPVCs []*corev1.PersistentVolumeClaim
 	ownedPvcList := &corev1.PersistentVolumeClaimList{}
-	if err := pc.client.List(ctx, ownedPvcList, &client.ListOptions{Namespace: cls.Namespace,
-		FieldSelector: fields.OneTermEqualSelector(inject.FieldIndexOwnerRefUID, string(cls.GetUID()))}); err != nil {
+	if err := pc.client.List(ctx, ownedPvcList, &client.ListOptions{Namespace: cls.Namespace, FieldSelector: fields.OneTermEqualSelector(inject.FieldIndexOwnerRefUID, string(cls.GetUID()))}); err != nil {
 		return nil, err
 	}
 
@@ -185,7 +184,7 @@ func (pc *RealPvcControl) DeletePodUnusedPvcs(ctx context.Context, cls *appsv1al
 		}
 	}
 
-	//delete pvc which is not claimed in templates
+	// delete pvc which is not claimed in templates
 	if err := deleteUnclaimedPvcs(pc.client, ctx, cls, oldPvcs, mountedPvcNames); err != nil {
 		return err
 	}

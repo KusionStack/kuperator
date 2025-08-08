@@ -27,17 +27,10 @@ import (
 	"k8s.io/klog/v2"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
-	"kusionstack.io/kuperator/test/e2e/framework"
-	"kusionstack.io/kuperator/test/e2e/framework/testfiles"
-
-	// Never, ever remove the line with "/ginkgo". Without it,
-	// the ginkgo test runner will not detect that this
-	// directory contains a Ginkgo test suite.
-	// See https://github.com/kubernetes/kubernetes/issues/74827
-	// "github.com/onsi/ginkgo"
-
 	// test sources
 	_ "kusionstack.io/kuperator/test/e2e/apps"
+	"kusionstack.io/kuperator/test/e2e/framework"
+	"kusionstack.io/kuperator/test/e2e/framework/testfiles"
 )
 
 // handleFlags sets up all flags and parses the command line.
@@ -67,7 +60,6 @@ func TestMain(m *testing.M) {
 }
 
 func TestE2E(t *testing.T) {
-
 	err := appsv1alpha1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		t.Fatal(err)

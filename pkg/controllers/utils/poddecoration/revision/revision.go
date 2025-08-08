@@ -50,8 +50,7 @@ func getPodDecorationPatch(pd *appsv1alpha1.PodDecoration) ([]byte, error) {
 	return patch, err
 }
 
-type RevisionOwnerAdapter struct {
-}
+type RevisionOwnerAdapter struct{}
 
 func (roa *RevisionOwnerAdapter) GetGroupVersionKind() schema.GroupVersionKind {
 	return appsv1alpha1.SchemeGroupVersion.WithKind("PodDecoration")

@@ -107,8 +107,8 @@ func (r *ReconcileOperationJob) filterAndOperateAllowOpsTargets(
 	operator ActionHandler,
 	candidates []*OpsCandidate,
 	enablePodOpsLifecycle bool,
-	operationJob *appsv1alpha1.OperationJob) (opsErr error) {
-
+	operationJob *appsv1alpha1.OperationJob,
+) (opsErr error) {
 	allowOpsCandidatesCh := make(chan *OpsCandidate, len(candidates))
 	_, _ = controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]
@@ -172,7 +172,8 @@ func (r *ReconcileOperationJob) operateTargets(
 	ctx context.Context,
 	operator ActionHandler,
 	candidates []*OpsCandidate,
-	operationJob *appsv1alpha1.OperationJob) error {
+	operationJob *appsv1alpha1.OperationJob,
+) error {
 	if len(candidates) == 0 {
 		return nil
 	}
@@ -185,7 +186,8 @@ func (r *ReconcileOperationJob) getTargetsOpsStatus(
 	operator ActionHandler,
 	candidates []*OpsCandidate,
 	enablePodOpsLifecycle bool,
-	operationJob *appsv1alpha1.OperationJob) error {
+	operationJob *appsv1alpha1.OperationJob,
+) error {
 	var updateErr error
 	_, _ = controllerutils.SlowStartBatch(len(candidates), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		candidate := candidates[i]

@@ -29,20 +29,18 @@ import (
 	"k8s.io/client-go/util/retry"
 	"kusionstack.io/kube-api/apps/v1alpha1"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"kusionstack.io/kuperator/pkg/controllers/poddeletion"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/kuperator/pkg/features"
 	"kusionstack.io/kuperator/pkg/utils"
 	"kusionstack.io/kuperator/pkg/utils/feature"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var (
-	updateGraceDeleteTimestampAnnoInterval = 5 * time.Second
-)
+var updateGraceDeleteTimestampAnnoInterval = 5 * time.Second
 
-type GraceDelete struct {
-}
+type GraceDelete struct{}
 
 func New() *GraceDelete {
 	return &GraceDelete{}
@@ -108,7 +106,6 @@ func (gd *GraceDelete) Validating(ctx context.Context, c client.Client, oldPod, 
 
 		return c.Update(ctx, newPod)
 	})
-
 	if err != nil {
 		return err
 	}

@@ -151,11 +151,14 @@ func (h *ValidatingHandler) validateUpdateStrategy(cls *appsv1alpha1.CollaSet, f
 		appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType,
 		appsv1alpha1.CollaSetReplacePodUpdateStrategyType:
 	default:
-		allErrs = append(allErrs, field.NotSupported(fSpec.Child("updateStrategy", "podUpdatePolicy"),
-			cls.Spec.UpdateStrategy.PodUpdatePolicy, []string{string(appsv1alpha1.CollaSetRecreatePodUpdateStrategyType),
+		allErrs = append(allErrs, field.NotSupported(fSpec.Child("updateStrategy", "podUpdatePolicy"), cls.Spec.UpdateStrategy.PodUpdatePolicy,
+			[]string{
+				string(appsv1alpha1.CollaSetRecreatePodUpdateStrategyType),
 				string(appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType),
 				string(appsv1alpha1.CollaSetInPlaceOnlyPodUpdateStrategyType),
-				string(appsv1alpha1.CollaSetReplacePodUpdateStrategyType)}))
+				string(appsv1alpha1.CollaSetReplacePodUpdateStrategyType),
+			},
+		))
 	}
 
 	if cls.Spec.UpdateStrategy.RollingUpdate != nil && cls.Spec.UpdateStrategy.RollingUpdate.ByPartition != nil &&

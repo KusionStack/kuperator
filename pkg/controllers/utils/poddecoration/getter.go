@@ -26,9 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/strategy"
@@ -162,7 +161,6 @@ func (n *namespacedPodDecorationManager) getByRevision(ctx context.Context, rev 
 		return nil, fmt.Errorf("fail to get PodDecoration ControllerRevision %s/%s: %w", n.namespace, rev, err)
 	}
 	pd, err := anno.GetPodDecorationFromRevision(revision)
-
 	if err != nil {
 		return nil, err
 	}

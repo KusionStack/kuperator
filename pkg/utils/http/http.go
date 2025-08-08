@@ -141,7 +141,7 @@ func (s *clientSet) GetClientWithKey(key string) (c *http.Client, err error) {
  *  Case 2: Nil ca use default client which ClientCAs is systemPool
  *  Case 3: Different token use different client and ClientCAs is systemPool
  */
-func (s *clientSet) newClient(ca *string, key *string) (c *http.Client, err error) {
+func (s *clientSet) newClient(ca, key *string) (*http.Client, error) {
 	var pool *x509.CertPool
 	if ca != nil && *ca != "" && *ca != "Cg==" {
 		pool = x509.NewCertPool()
@@ -156,7 +156,7 @@ func (s *clientSet) newClient(ca *string, key *string) (c *http.Client, err erro
 			ClientCAs: pool,
 		},
 	}
-	c = &http.Client{Transport: t, Timeout: timeout}
+	c := &http.Client{Transport: t, Timeout: timeout}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if ca != nil {
@@ -164,5 +164,5 @@ func (s *clientSet) newClient(ca *string, key *string) (c *http.Client, err erro
 	} else if key != nil {
 		s.tkClientSet[*key] = c
 	}
-	return c, err
+	return c, nil
 }

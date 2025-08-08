@@ -30,17 +30,18 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	k8scorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
 	operatingv1alpha1 "kusionstack.io/kuperator/apis/apps/v1alpha1"
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
-var _ inject.Client = &ValidatingHandler{}
-var _ admission.DecoderInjector = &ValidatingHandler{}
+var (
+	_ inject.Client             = &ValidatingHandler{}
+	_ admission.DecoderInjector = &ValidatingHandler{}
+)
 
 type ValidatingHandler struct {
 	*mixin.WebhookHandlerMixin
@@ -67,15 +68,13 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 	return admission.Allowed("")
 }
 
-var (
-	defaultValidationOptions = corevalidation.PodValidationOptions{
-		AllowDownwardAPIHugePages:       true,
-		AllowInvalidPodDeletionCost:     true,
-		AllowIndivisibleHugePagesValues: true,
-		AllowWindowsHostProcessField:    true,
-		AllowExpandedDNSConfig:          true,
-	}
-)
+var defaultValidationOptions = corevalidation.PodValidationOptions{
+	AllowDownwardAPIHugePages:       true,
+	AllowInvalidPodDeletionCost:     true,
+	AllowIndivisibleHugePagesValues: true,
+	AllowWindowsHostProcessField:    true,
+	AllowExpandedDNSConfig:          true,
+}
 
 func ValidatePodDecoration(pd *appsv1alpha1.PodDecoration) error {
 	allErrs := field.ErrorList{}
@@ -177,7 +176,7 @@ func ValidatePrimaryContainer(container *appsv1alpha1.PrimaryContainerPatch, fld
 			allErrs = append(allErrs, validateLocalDescendingPath(vm.SubPathExpr, idxPath.Child("subPathExpr"))...)
 		}
 	}
-	//type []"k8s.io/api/core/v1".EnvVar) as the type []"k8s.io/kubernetes/pkg/apis/core
+
 	if len(container.Env) > 0 {
 		var coreEnvs []core.EnvVar
 		for i, env := range container.Env {

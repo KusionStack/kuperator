@@ -48,7 +48,7 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 	numOfIDs := len(newIDToLabelsMap)
 
 	var operatingCount, operateCount, operatedCount, completeCount int
-	var undoTypeToNumsMap = map[string]int{}
+	undoTypeToNumsMap := map[string]int{}
 	for id, labels := range newIDToLabelsMap {
 		if undoOperationType, ok := labels[v1alpha1.PodUndoOperationTypeLabelPrefix]; ok { // Operation is canceled
 			if _, ok := undoTypeToNumsMap[undoOperationType]; !ok {
@@ -130,14 +130,16 @@ func (lc *OpsLifecycle) Mutating(ctx context.Context, c client.Client, oldPod, n
 			return err
 		}
 
+		lifecycleLabels := []string{
+			v1alpha1.PodOperateLabelPrefix,
+			v1alpha1.PodOperatedLabelPrefix,
+			v1alpha1.PodDoneOperationTypeLabelPrefix,
+			v1alpha1.PodPostCheckLabelPrefix,
+			v1alpha1.PodPostCheckedLabelPrefix,
+			v1alpha1.PodCompletingLabelPrefix,
+		}
 		for id := range newIDToLabelsMap {
-			for _, v := range []string{v1alpha1.PodOperateLabelPrefix,
-				v1alpha1.PodOperatedLabelPrefix,
-				v1alpha1.PodDoneOperationTypeLabelPrefix,
-				v1alpha1.PodPostCheckLabelPrefix,
-				v1alpha1.PodPostCheckedLabelPrefix,
-				v1alpha1.PodCompletingLabelPrefix} {
-
+			for _, v := range lifecycleLabels {
 				delete(newPod.Labels, fmt.Sprintf("%s/%s", v, id))
 			}
 		}

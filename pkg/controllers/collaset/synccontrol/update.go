@@ -32,9 +32,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontext"
 	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontrol"
@@ -168,13 +167,13 @@ func (r *RealSyncControl) attachPodUpdateInfo(ctx context.Context, cls *appsv1al
 		updateInfo.requeueForOperationDelay, updateInfo.isAllowUpdateOps = podopslifecycle.AllowOps(collasetutils.UpdateOpsLifecycleAdapter, realValue(cls.Spec.UpdateStrategy.OperationDelaySeconds), pod)
 		updateInfo.PvcTmpHashChanged, err = pvccontrol.IsPodPvcTmpChanged(cls, pod.Pod, resource.ExistingPvcs)
 		if err != nil {
-			return nil, fmt.Errorf("fail to check pvc template changed, %v", err)
+			return nil, fmt.Errorf("fail to check pvc template changed, %w", err)
 		}
 		podUpdateInfoList[i] = updateInfo
 	}
 
 	// attach replace info
-	var podUpdateInfoMap = make(map[string]*PodUpdateInfo)
+	podUpdateInfoMap := make(map[string]*PodUpdateInfo)
 	for _, podUpdateInfo := range podUpdateInfoList {
 		podUpdateInfoMap[podUpdateInfo.Name] = podUpdateInfo
 	}
@@ -237,7 +236,8 @@ func filterOutPlaceHolderUpdateInfos(pods []*PodUpdateInfo) []*PodUpdateInfo {
 
 func decidePodToUpdate(
 	cls *appsv1alpha1.CollaSet,
-	podInfos []*PodUpdateInfo) []*PodUpdateInfo {
+	podInfos []*PodUpdateInfo,
+) []*PodUpdateInfo {
 	filteredPodInfos := getTargetsUpdatePods(podInfos)
 
 	if cls.Spec.UpdateStrategy.RollingUpdate != nil && cls.Spec.UpdateStrategy.RollingUpdate.ByLabel != nil {
@@ -269,8 +269,8 @@ func decidePodToUpdateByLabel(_ *appsv1alpha1.CollaSet, podInfos []*PodUpdateInf
 
 func decidePodToUpdateByPartition(
 	cls *appsv1alpha1.CollaSet,
-	filteredPodInfos []*PodUpdateInfo) []*PodUpdateInfo {
-
+	filteredPodInfos []*PodUpdateInfo,
+) []*PodUpdateInfo {
 	replicas := ptr.Deref(cls.Spec.Replicas, 0)
 	currentPodCount := int32(len(filteredPodInfos))
 	partition := int32(0)
@@ -397,7 +397,7 @@ func (u *GenericPodUpdater) BeginUpdatePod(_ context.Context, resources *collase
 			}
 			return false, nil
 		}); err != nil {
-			return fmt.Errorf("fail to begin PodOpsLifecycle for updating Pod %s/%s: %s", podInfo.Namespace, podInfo.Name, err)
+			return fmt.Errorf("fail to begin PodOpsLifecycle for updating Pod %s/%s: %w", podInfo.Namespace, podInfo.Name, err)
 		} else if updated {
 			// add an expectation for this pod update, before next reconciling
 			if err := collasetutils.ActiveExpectations.ExpectUpdate(u.CollaSet, expectations.Pod, podInfo.Name, podInfo.ResourceVersion); err != nil {
@@ -493,7 +493,7 @@ func (u *GenericPodUpdater) FinishUpdatePod(_ context.Context, podInfo *PodUpdat
 
 	// pod is ops finished, finish the lifecycle gracefully
 	if updated, err := podopslifecycle.Finish(u.Client, collasetutils.UpdateOpsLifecycleAdapter, podInfo.Pod); err != nil {
-		return fmt.Errorf("failed to finish PodOpsLifecycle for updating Pod %s/%s: %s", podInfo.Namespace, podInfo.Name, err)
+		return fmt.Errorf("failed to finish PodOpsLifecycle for updating Pod %s/%s: %w", podInfo.Namespace, podInfo.Name, err)
 	} else if updated {
 		// add an expectation for this pod update, before next reconciling
 		if err := collasetutils.ActiveExpectations.ExpectUpdate(u.CollaSet, expectations.Pod, podInfo.Name, podInfo.ResourceVersion); err != nil {
@@ -556,7 +556,7 @@ func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(_ context.Context, _ *a
 		return utilspoddecoration.PatchListOfDecorations(in, podUpdateInfo.CurrentPodDecorations)
 	})
 	if err != nil {
-		return fmt.Errorf("fail to build Pod from current revision %s: %v", podUpdateInfo.CurrentRevision.Name, err)
+		return fmt.Errorf("fail to build Pod from current revision %s: %w", podUpdateInfo.CurrentRevision.Name, err)
 	}
 
 	// TODO: use cache
@@ -564,7 +564,7 @@ func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(_ context.Context, _ *a
 		return utilspoddecoration.PatchListOfDecorations(in, podUpdateInfo.UpdatedPodDecorations)
 	})
 	if err != nil {
-		return fmt.Errorf("fail to build Pod from updated revision %s: %v", podUpdateInfo.UpdateRevision.Name, err)
+		return fmt.Errorf("fail to build Pod from updated revision %s: %w", podUpdateInfo.UpdateRevision.Name, err)
 	}
 
 	if podUpdateInfo.PvcTmpHashChanged {
@@ -633,7 +633,7 @@ func (u *inPlaceIfPossibleUpdater) UpgradePod(_ context.Context, podInfo *PodUpd
 	if podInfo.OnlyMetadataChanged || podInfo.InPlaceUpdateSupport {
 		// if pod template changes only include metadata or support in-place update, just apply these changes to pod directly
 		if err := u.PodControl.UpdatePod(podInfo.UpdatedPod); err != nil {
-			return fmt.Errorf("fail to update Pod %s/%s when updating by in-place: %s", podInfo.Namespace, podInfo.Name, err)
+			return fmt.Errorf("fail to update Pod %s/%s when updating by in-place: %w", podInfo.Namespace, podInfo.Name, err)
 		} else {
 			podInfo.Pod = podInfo.UpdatedPod
 			u.Recorder.Eventf(podInfo.Pod,
@@ -656,7 +656,7 @@ func (u *inPlaceIfPossibleUpdater) UpgradePod(_ context.Context, podInfo *PodUpd
 
 func RecreatePod(collaSet *appsv1alpha1.CollaSet, podInfo *PodUpdateInfo, podControl podcontrol.Interface, recorder record.EventRecorder) error {
 	if err := podControl.DeletePod(podInfo.Pod); err != nil {
-		return fmt.Errorf("fail to delete Pod %s/%s when updating by recreate: %s", podInfo.Namespace, podInfo.Name, err)
+		return fmt.Errorf("fail to delete Pod %s/%s when updating by recreate: %w", podInfo.Namespace, podInfo.Name, err)
 	}
 	recorder.Eventf(podInfo.Pod,
 		corev1.EventTypeNormal,
@@ -673,7 +673,7 @@ func RecreatePod(collaSet *appsv1alpha1.CollaSet, podInfo *PodUpdateInfo, podCon
 	return nil
 }
 
-func (u *inPlaceIfPossibleUpdater) diffPod(currentPod, updatedPod *corev1.Pod) (inPlaceSetUpdateSupport bool, onlyMetadataChanged bool, imageChangedContainers sets.String) {
+func (u *inPlaceIfPossibleUpdater) diffPod(currentPod, updatedPod *corev1.Pod) (inPlaceSetUpdateSupport, onlyMetadataChanged bool, imageChangedContainers sets.String) {
 	if len(currentPod.Spec.Containers) != len(updatedPod.Spec.Containers) {
 		return false, false, nil
 	}
@@ -825,7 +825,7 @@ func (u *replaceUpdatePodUpdater) BeginUpdatePod(ctx context.Context, resources 
 				resources.UpdatedRevision.Name)
 			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%d"}}}`, appsv1alpha1.PodDeletionIndicationLabelKey, time.Now().UnixNano())))
 			if patchErr := u.Patch(ctx, podInfo.replacePairNewPodInfo.Pod, patch); patchErr != nil {
-				err := fmt.Errorf("failed to delete replace pair new pod %s/%s %s",
+				err := fmt.Errorf("failed to delete replace pair new pod %s/%s %w",
 					podInfo.replacePairNewPodInfo.Namespace, podInfo.replacePairNewPodInfo.Name, patchErr)
 				return err
 			}
@@ -871,7 +871,7 @@ func (u *replaceUpdatePodUpdater) FinishUpdatePod(_ context.Context, podInfo *Po
 		if podInfo.isInReplace {
 			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":null, "%s":null}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey)))
 			if err := u.podControl.PatchPod(podInfo.Pod, patch); err != nil {
-				return fmt.Errorf("failed to delete replace pair origin pod %s/%s %s", podInfo.Namespace, podInfo.Name, err)
+				return fmt.Errorf("failed to delete replace pair origin pod %s/%s %w", podInfo.Namespace, podInfo.Name, err)
 			}
 		}
 		return nil
@@ -882,7 +882,7 @@ func (u *replaceUpdatePodUpdater) FinishUpdatePod(_ context.Context, podInfo *Po
 		if _, exist := podInfo.Labels[appsv1alpha1.PodDeletionIndicationLabelKey]; !exist {
 			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%d"}}}`, appsv1alpha1.PodDeletionIndicationLabelKey, time.Now().UnixNano())))
 			if err := u.podControl.PatchPod(podInfo.Pod, patch); err != nil {
-				return fmt.Errorf("failed to delete replace pair origin pod %s/%s %s", podInfo.Namespace, podInfo.replacePairNewPodInfo.Name, err)
+				return fmt.Errorf("failed to delete replace pair origin pod %s/%s %w", podInfo.Namespace, podInfo.replacePairNewPodInfo.Name, err)
 			}
 		}
 	}

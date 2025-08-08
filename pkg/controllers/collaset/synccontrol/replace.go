@@ -52,8 +52,9 @@ func (r *RealSyncControl) cleanReplacePodLabels(
 	podsNeedCleanLabels [][]string,
 	ownedIDs map[int]*appsv1alpha1.ContextDetail,
 	currentIDs map[int]struct{},
-	logger logr.Logger) (bool, sets.Int, error) {
-
+	logger logr.Logger) (
+	bool, sets.Int, error,
+) {
 	needUpdateContext := false
 	needDeletePodsIDs := sets.Int{}
 	mapOriginToNewPodContext := mapReplaceOriginToNewPodContext(ownedIDs)
@@ -125,8 +126,8 @@ func (r *RealSyncControl) replaceOriginPods(
 	needReplaceOriginPods []*corev1.Pod,
 	ownedIDs map[int]*appsv1alpha1.ContextDetail,
 	availableContexts []*appsv1alpha1.ContextDetail,
-	logger logr.Logger) (int, error) {
-
+	logger logr.Logger,
+) (int, error) {
 	mapNewToOriginPodContext := mapReplaceNewToOriginPodContext(ownedIDs)
 	successCount, err := controllerutils.SlowStartBatch(len(needReplaceOriginPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		originPod := needReplaceOriginPods[i]
@@ -215,9 +216,10 @@ func (r *RealSyncControl) replaceOriginPods(
 }
 
 func dealReplacePods(pods []*corev1.Pod, logger logr.Logger) (
-	needReplacePods []*corev1.Pod, needCleanLabelPods []*corev1.Pod, podNeedCleanLabels [][]string, needDeletePods []*corev1.Pod) {
-	var podInstanceIdMap = make(map[string]*corev1.Pod)
-	var podNameMap = make(map[string]*corev1.Pod)
+	needReplacePods, needCleanLabelPods []*corev1.Pod, podNeedCleanLabels [][]string, needDeletePods []*corev1.Pod,
+) {
+	podInstanceIdMap := make(map[string]*corev1.Pod)
+	podNameMap := make(map[string]*corev1.Pod)
 	for _, pod := range pods {
 		if instanceId, exist := pod.Labels[appsv1alpha1.PodInstanceIDLabelKey]; exist {
 			podInstanceIdMap[instanceId] = pod
@@ -296,8 +298,8 @@ func updateReplaceOriginPod(
 	ctx context.Context,
 	c client.Client,
 	recorder record.EventRecorder,
-	originPodUpdateInfo, newPodUpdateInfo *PodUpdateInfo) error {
-
+	originPodUpdateInfo, newPodUpdateInfo *PodUpdateInfo,
+) error {
 	originPod := originPodUpdateInfo.Pod
 	// 1. delete the new pod if not updated
 	if newPodUpdateInfo != nil {
@@ -371,15 +373,15 @@ func getReplaceRevision(originPod *corev1.Pod, resources *collasetutils.RelatedR
 
 // classify the pair relationship for Pod replacement.
 func classifyPodReplacingMapping(podWrappers []*collasetutils.PodWrapper) map[string]*collasetutils.PodWrapper {
-	var podNameMap = make(map[string]*collasetutils.PodWrapper)
-	var podIdMap = make(map[string]*collasetutils.PodWrapper)
+	podNameMap := make(map[string]*collasetutils.PodWrapper)
+	podIdMap := make(map[string]*collasetutils.PodWrapper)
 	for _, podWrapper := range podWrappers {
 		podNameMap[podWrapper.Name] = podWrapper
 		instanceId := podWrapper.Labels[appsv1alpha1.PodInstanceIDLabelKey]
 		podIdMap[instanceId] = podWrapper
 	}
 
-	var replacePodMapping = make(map[string]*collasetutils.PodWrapper)
+	replacePodMapping := make(map[string]*collasetutils.PodWrapper)
 	for _, podWrapper := range podWrappers {
 		name := podWrapper.Name
 		if replacePairNewIdStr, exist := podWrapper.Labels[appsv1alpha1.PodReplacePairNewId]; exist {

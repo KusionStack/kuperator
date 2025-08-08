@@ -21,8 +21,8 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-
 	"kusionstack.io/kube-api/apps/v1alpha1"
+
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
 )
 
@@ -41,6 +41,7 @@ var (
 )
 
 type ReadyToOperate func(pod *corev1.Pod) bool
+
 type TimeLabelValue func() string
 
 type OpsLifecycle struct {

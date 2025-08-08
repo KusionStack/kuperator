@@ -56,8 +56,7 @@ type RealPodControl struct {
 func (pc *RealPodControl) GetFilteredPods(selector *metav1.LabelSelector, owner client.Object) ([]*corev1.Pod, error) {
 	// get the pods with ownerReference points to this CollaSet
 	podList := &corev1.PodList{}
-	err := pc.client.List(context.TODO(), podList, &client.ListOptions{Namespace: owner.GetNamespace(),
-		FieldSelector: fields.OneTermEqualSelector(inject.FieldIndexOwnerRefUID, string(owner.GetUID()))})
+	err := pc.client.List(context.TODO(), podList, &client.ListOptions{Namespace: owner.GetNamespace(), FieldSelector: fields.OneTermEqualSelector(inject.FieldIndexOwnerRefUID, string(owner.GetUID()))})
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +131,7 @@ func (pc *RealPodControl) getPodSetPods(pods []*corev1.Pod, selector *metav1.Lab
 		return nil, fmt.Errorf("fail to create ref manager: %w", err)
 	}
 
-	var candidates = make([]client.Object, len(pods))
+	candidates := make([]client.Object, len(pods))
 	for i, pod := range pods {
 		candidates[i] = pod
 	}

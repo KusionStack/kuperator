@@ -28,10 +28,12 @@ import (
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
-var _ inject.Injector = &MutatingHandler{}
-var _ inject.Client = &MutatingHandler{}
-var _ inject.Logger = &MutatingHandler{}
-var _ admission.DecoderInjector = &MutatingHandler{}
+var (
+	_ inject.Injector           = &MutatingHandler{}
+	_ inject.Client             = &MutatingHandler{}
+	_ inject.Logger             = &MutatingHandler{}
+	_ admission.DecoderInjector = &MutatingHandler{}
+)
 
 // MutatingHandler handles all resources mutating operation
 type MutatingHandler struct {

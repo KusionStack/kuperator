@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/podtransitionrule/utils"
@@ -350,7 +349,7 @@ func (w *Webhook) convTaskInfo(infoMap map[string]*appsv1alpha1.TaskInfo) []apps
 	return states
 }
 
-func (w *Webhook) newTaskInfo(taskId string, msg string, processing, approved []string) {
+func (w *Webhook) newTaskInfo(taskId, msg string, processing, approved []string) {
 	w.taskInfo[taskId] = &appsv1alpha1.TaskInfo{
 		BeginTime:  &metav1.Time{Time: time.Now()},
 		Message:    msg,

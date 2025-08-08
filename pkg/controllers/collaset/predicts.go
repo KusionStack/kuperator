@@ -22,8 +22,7 @@ import (
 	"kusionstack.io/kuperator/pkg/utils"
 )
 
-type PodPredicate struct {
-}
+type PodPredicate struct{}
 
 // Create returns true if the Create event should be processed
 func (p *PodPredicate) Create(e event.CreateEvent) bool {

@@ -22,10 +22,8 @@ import (
 	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 )
 
-var (
-	// ActiveExpectations is used to check the cache in informer is updated, before reconciling.
-	ActiveExpectations *expectations.ActiveExpectations
-)
+// ActiveExpectations is used to check the cache in informer is updated, before reconciling.
+var ActiveExpectations *expectations.ActiveExpectations
 
 func InitExpectations(c client.Client) {
 	ActiveExpectations = expectations.NewActiveExpectations(c)

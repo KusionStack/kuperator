@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -37,8 +38,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
 	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/processor"
 	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/register"
@@ -336,7 +335,7 @@ func updateDetail(details map[string]*appsv1alpha1.PodTransitionDetail, passRule
 	}
 }
 
-func equalStatus(updated *appsv1alpha1.PodTransitionRuleStatus, current *appsv1alpha1.PodTransitionRuleStatus) bool {
+func equalStatus(updated, current *appsv1alpha1.PodTransitionRuleStatus) bool {
 	deepEqual := equality.Semantic.DeepEqual(updated.Targets, current.Targets) &&
 		equality.Semantic.DeepEqual(updated.Details, current.Details) &&
 		equality.Semantic.DeepEqual(updated.RuleStates, current.RuleStates) &&

@@ -17,9 +17,9 @@ limitations under the License.
 package utils
 
 import (
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 )
 
@@ -29,8 +29,7 @@ var (
 )
 
 // CollaSetUpdateOpsLifecycleAdapter tells PodOpsLifecycle the basic workload update ops info
-type CollaSetUpdateOpsLifecycleAdapter struct {
-}
+type CollaSetUpdateOpsLifecycleAdapter struct{}
 
 // GetID indicates ID of one PodOpsLifecycle
 func (a *CollaSetUpdateOpsLifecycleAdapter) GetID() string {
@@ -71,8 +70,7 @@ func (a *CollaSetUpdateOpsLifecycleAdapter) WhenFinish(pod client.Object) (bool,
 }
 
 // CollaSetScaleInOpsLifecycleAdapter tells PodOpsLifecycle the basic workload scaling in ops info
-type CollaSetScaleInOpsLifecycleAdapter struct {
-}
+type CollaSetScaleInOpsLifecycleAdapter struct{}
 
 // GetID indicates ID of one PodOpsLifecycle
 func (a *CollaSetScaleInOpsLifecycleAdapter) GetID() string {

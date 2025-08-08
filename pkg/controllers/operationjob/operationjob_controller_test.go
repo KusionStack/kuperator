@@ -28,6 +28,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -35,14 +36,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
 	"kusionstack.io/kuperator/pkg/controllers/collaset"
 	"kusionstack.io/kuperator/pkg/controllers/operationjob/replace"
@@ -61,7 +61,6 @@ var (
 )
 
 var _ = Describe("operationjob controller", func() {
-
 	It("[replace] reconcile", func() {
 		testcase := "test-replace"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
@@ -283,7 +282,6 @@ var _ = Describe("operationjob controller", func() {
 				assertJobProgressSucceeded(oj, time.Second*5)
 			}
 		}
-
 	})
 
 	It("[replace] new pod", func() {
@@ -551,7 +549,6 @@ var _ = Describe("operationjob controller", func() {
 			return false
 		}, time.Second*20, time.Second).Should(BeTrue())
 	})
-
 })
 
 func assertFailedReplicas(oj *appsv1alpha1.OperationJob, failedPodCount int32, timeout time.Duration) {
@@ -659,13 +656,13 @@ func updatePodWithRetry(namespace, name string, updateFn func(*corev1.Pod) bool)
 func getPodNamesFromCollaSet(cs *appsv1alpha1.CollaSet) (names []string) {
 	podList := &corev1.PodList{}
 	Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
-	for i, _ := range podList.Items {
+	for i := range podList.Items {
 		names = append(names, podList.Items[i].Name)
 	}
 	return
 }
 
-func createCollaSetWithReplicas(name string, namespace string, replicas int) *appsv1alpha1.CollaSet {
+func createCollaSetWithReplicas(name, namespace string, replicas int) *appsv1alpha1.CollaSet {
 	cs := &appsv1alpha1.CollaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
@@ -710,7 +707,8 @@ func createCollaSetWithReplicas(name string, namespace string, replicas int) *ap
 }
 
 func expectedStatusReplicas(c client.Client, cls *appsv1alpha1.CollaSet, scheduledReplicas, readyReplicas, availableReplicas, replicas, updatedReplicas, operatingReplicas,
-	updatedReadyReplicas, updatedAvailableReplicas int32) error {
+	updatedReadyReplicas, updatedAvailableReplicas int32,
+) error {
 	if err := c.Get(context.TODO(), types.NamespacedName{Namespace: cls.Namespace, Name: cls.Name}, cls); err != nil {
 		return err
 	}

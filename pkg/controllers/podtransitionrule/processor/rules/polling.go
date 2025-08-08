@@ -38,9 +38,7 @@ const (
 	TaskDeadLineSeconds = 60
 )
 
-var (
-	PollingManager = newPollingManager(context.TODO())
-)
+var PollingManager = newPollingManager(context.TODO())
 
 type PollingManagerInterface interface {
 	Delete(id string)

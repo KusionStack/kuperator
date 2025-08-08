@@ -48,25 +48,25 @@ manifests: $(API_DIR)
 	rm -f charts/templates/crd/* && cp config/crd/bases/* charts/templates/crd/
 
 .PHONY: fmt
-fmt: ## Run go fmt against code.
-	go fmt ./...
+fmt: golangci
+	$(GOLANGCI) fmt
 
-.PHONY: vet
-vet: ## Run go vet against code.
-	go vet ./...
+.PHONY: lint
+lint: golangci
+	$(GOLANGCI) run
 
 .PHONY: test
-test: manifests fmt vet envtest ## Run tests.
+test: fmt lint manifests envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./pkg/... -coverprofile cover.out
 
 ##@ Build
 
 .PHONY: build
-build: manifests fmt vet ## Build manager binary.
+build: test ## Build manager binary.
 	go build -o bin/manager main.go
 
 .PHONY: run
-run: manifests fmt vet ## Run a controller from your host.
+run: test ## Run a controller from your host.
 	go run ./main.go
 
 # If you wish built the manager image targeting other platforms you can use the --platform flag.
@@ -163,11 +163,13 @@ KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GINKGO ?= $(LOCALBIN)/ginkgo
+GOLANGCI ?= $(LOCALBIN)/golangci-lint
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v4.5.5
 CONTROLLER_TOOLS_VERSION ?= v0.10.0
 GINKGO_VERSION ?= 1.16.5
+GOLANGCI_VERSION ?= v2.0.2
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
@@ -195,3 +197,9 @@ ginkgo: $(GINKGO) ## Download ginkgo locally if necessary. If wrong version is i
 $(GINKGO): $(LOCALBIN)
 	test -s $(LOCALBIN)/ginkgo && $(LOCALBIN)/ginkgo version | grep -q $(GINKGO_VERSION) || \
 	GOBIN=$(LOCALBIN) go install github.com/onsi/ginkgo/ginkgo@v$(GINKGO_VERSION)
+
+
+.PHONY: golangci
+golangci: $(GOLANGCI)
+$(GOLANGCI): $(LOCALBIN)
+	@test -s $(LOCALBIN)/golangci-lint || GOBIN=$(LOCALBIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)

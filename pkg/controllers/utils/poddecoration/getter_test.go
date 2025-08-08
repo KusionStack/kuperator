@@ -26,6 +26,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,8 +52,10 @@ var (
 	revisionMgr history.HistoryManager
 )
 
-const timeoutInterval = 5 * time.Second
-const pollInterval = 500 * time.Millisecond
+const (
+	timeoutInterval = 5 * time.Second
+	pollInterval    = 500 * time.Millisecond
+)
 
 var _ = Describe("Test PodDecoration getter", func() {
 	It("test getter", func() {
@@ -194,7 +197,6 @@ var _ = Describe("Test PodDecoration getter", func() {
 		pds, err = getter.GetByRevisions(ctx, currentRevision, updatedRevision)
 		Expect(err).Should(BeNil())
 		Expect(len(pds)).Should(Equal(2))
-
 	})
 })
 
@@ -218,12 +220,10 @@ var _ = BeforeSuite(func() {
 	revisionMgr = history.NewHistoryManager(history.NewRevisionControl(cl, cl), &revision.RevisionOwnerAdapter{})
 })
 
-var _ = AfterEach(func() {
-
-})
+var _ = AfterEach(func() {})
 
 var _ = AfterSuite(func() {
-	env.Stop()
+	_ = env.Stop()
 })
 
 func createNamespace(namespaceName string) error {

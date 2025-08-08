@@ -27,14 +27,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var (
-	ResourceInitializers map[ExpectedReosourceType]func() client.Object
-)
+var ResourceInitializers map[ExpectedReosourceType]func() client.Object
 
 type ExpectedReosourceType string
 
@@ -119,7 +116,7 @@ func (ae *ActiveExpectations) ExpectDelete(subject metav1.Object, kind ExpectedR
 	return ae.expect(subject, kind, name, Delete)
 }
 
-func (ae *ActiveExpectations) ExpectUpdate(subject metav1.Object, kind ExpectedReosourceType, name string, updatedResourceVersion string) error {
+func (ae *ActiveExpectations) ExpectUpdate(subject metav1.Object, kind ExpectedReosourceType, name, updatedResourceVersion string) error {
 	rv, err := strconv.ParseInt(updatedResourceVersion, 10, 64)
 	if err != nil {
 		panic(fmt.Sprintf("fail to parse resource version %s of resource %s/%s to int64 for subject %s/%s: %s",
@@ -247,7 +244,7 @@ func ActiveExpectationItemKeyFunc(object interface{}) (string, error) {
 	return expectationItem.Key, nil
 }
 
-func NewActiveExpectation(client client.Client, namespace string, key string) *ActiveExpectation {
+func NewActiveExpectation(client client.Client, namespace, key string) *ActiveExpectation {
 	return &ActiveExpectation{
 		Client:          client,
 		namespace:       namespace,

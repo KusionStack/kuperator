@@ -37,6 +37,7 @@ type PluginInterface interface {
 }
 
 type ValidationFunc func(ctx context.Context, req admission.Request, obj runtime.Object) error
+
 type MutationFunc func(ctx context.Context, req admission.Request, obj runtime.Object) error
 
 type DispatchHandler interface {
