@@ -44,10 +44,12 @@ func GetRuler(rule *appsv1alpha1.TransitionRule, client client.Client) Ruler {
 
 	if rule.AvailablePolicy != nil {
 		return &AvailableRuler{
-			Client:              client,
-			MinAvailableValue:   rule.AvailablePolicy.MinAvailableValue,
-			MaxUnavailableValue: rule.AvailablePolicy.MaxUnavailableValue,
-			Name:                rule.Name,
+			Client:               client,
+			MinAvailableValue:    rule.AvailablePolicy.MinAvailableValue,
+			MaxUnavailableValue:  rule.AvailablePolicy.MaxUnavailableValue,
+			MinAvailablePolicy:   rule.AvailablePolicy.MinAvailablePolicy,
+			MaxUnavailablePolicy: rule.AvailablePolicy.MaxUnavailablePolicy,
+			Name:                 rule.Name,
 		}
 	}
 	if rule.LabelCheck != nil {

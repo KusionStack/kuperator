@@ -19,6 +19,8 @@ package rules
 import (
 	"context"
 	"fmt"
+	"math"
+	"strconv"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -30,17 +32,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/register"
 	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/utils"
 )
 
 type AvailableRuler struct {
-	Name string
-
-	MinAvailableValue   *intstr.IntOrString
-	MaxUnavailableValue *intstr.IntOrString
-
+	Name   string
 	Client client.Client
+
+	MinAvailableValue    *intstr.IntOrString
+	MaxUnavailableValue  *intstr.IntOrString
+	MinAvailablePolicy   *appsv1alpha1.AdaptivePolicy
+	MaxUnavailablePolicy *appsv1alpha1.AdaptivePolicy
 }
 
 // Filter unavailable pods and try approve available pods as much as possible
@@ -51,11 +55,12 @@ func (r *AvailableRuler) Filter(podTransitionRule *appsv1alpha1.PodTransitionRul
 	for _, t := range targets {
 		effectiveTargets.Insert(t.Name)
 	}
-	maxUnavailableQuota := len(effectiveTargets)
+	totalCnt := len(effectiveTargets)
+	maxUnavailableQuota := totalCnt
 	allowUnavailable := maxUnavailableQuota
 	minAvailableQuota := 0
 	if r.MaxUnavailableValue != nil {
-		quota, err := intstr.GetScaledValueFromIntOrPercent(r.MaxUnavailableValue, len(effectiveTargets), true)
+		quota, err := intstr.GetScaledValueFromIntOrPercent(r.MaxUnavailableValue, totalCnt, true)
 		if err != nil {
 			return rejectAllWithErr(subjects, pass, rejects, "[%s] fail to get int value from raw max unavailable value(%s), error: %v", r.Name, r.MaxUnavailableValue.String(), err)
 		}
@@ -63,12 +68,33 @@ func (r *AvailableRuler) Filter(podTransitionRule *appsv1alpha1.PodTransitionRul
 		allowUnavailable = quota
 	}
 
+	if r.MaxUnavailablePolicy != nil {
+		quota, coeff, pow, err := getValueFromExponentiation(r.MaxUnavailablePolicy.ExpFunc, totalCnt, true)
+		if err != nil {
+			return rejectAllWithErr(subjects, pass, rejects, "[%s] fail to get max unavailable value with ExpFunc(coeff: %f, pow: %f, total: %d), error: %s", r.Name, coeff, pow, totalCnt, err)
+		}
+		if quota < maxUnavailableQuota {
+			maxUnavailableQuota = quota
+			allowUnavailable = quota
+		}
+	}
+
 	if r.MinAvailableValue != nil {
-		quota, err := intstr.GetScaledValueFromIntOrPercent(r.MinAvailableValue, len(effectiveTargets), false)
+		quota, err := intstr.GetScaledValueFromIntOrPercent(r.MinAvailableValue, totalCnt, false)
 		if err != nil {
 			return rejectAllWithErr(subjects, pass, rejects, "[%s] fail to get int value from raw min available value(%s), error: %v", r.Name, r.MaxUnavailableValue.String(), err)
 		}
 		minAvailableQuota = quota
+	}
+
+	if r.MinAvailablePolicy != nil {
+		quota, coeff, pow, err := getValueFromExponentiation(r.MinAvailablePolicy.ExpFunc, totalCnt, false)
+		if err != nil {
+			return rejectAllWithErr(subjects, pass, rejects, "[%s] fail to get min unavailable value with ExpFunc(coeff: %f, pow: %f, total: %d), error: %s", r.Name, coeff, pow, totalCnt, err)
+		}
+		if quota > minAvailableQuota {
+			minAvailableQuota = quota
+		}
 	}
 	// TODO: UncreatedReplicas
 	// allowUnavailable -= uncreatedReplicas
@@ -121,10 +147,10 @@ func (r *AvailableRuler) Filter(podTransitionRule *appsv1alpha1.PodTransitionRul
 	}
 
 	for podName := range keepMinAvailablePods {
-		rejects[podName] = fmt.Sprintf("blocked by min available policy: [min available]=%d/%d, [current keep available]=%d/%d", minAvailableQuota, len(effectiveTargets), allAvailableSize, len(effectiveTargets))
+		rejects[podName] = fmt.Sprintf("blocked by min available policy: [min available]=%d/%d, [current keep available]=%d/%d", minAvailableQuota, totalCnt, allAvailableSize, totalCnt)
 	}
 	for podName := range rejectByMaxUnavailablePods {
-		rejects[podName] = fmt.Sprintf("[%s] blocked by max unavailable policy: [max unavailable]=%d/%d, [current unavailable]=%d/%d", r.Name, maxUnavailableQuota, len(effectiveTargets), len(effectiveTargets)-allAvailableSize, len(effectiveTargets))
+		rejects[podName] = fmt.Sprintf("[%s] blocked by max unavailable policy: [max unavailable]=%d/%d, [current unavailable]=%d/%d", r.Name, maxUnavailableQuota, totalCnt, totalCnt-allAvailableSize, totalCnt)
 	}
 
 	if minTimeLeft != nil {
@@ -166,6 +192,47 @@ func processUnavailableFunc(pod *corev1.Pod) (bool, *int64) {
 		}
 	}
 	return isUnavailable, minInterval
+}
+
+func getValueFromExponentiation(exp *appsv1alpha1.ExpFunc, total int, roundUp bool) (int, float64, float64, error) {
+	pow := 0.7
+	coeff := 1.0
+	var err error
+
+	if exp.Pow != nil {
+		pow, err = strconv.ParseFloat(*exp.Pow, 64)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+	}
+
+	if exp.Coeff != nil {
+		coeff, err = strconv.ParseFloat(*exp.Coeff, 64)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+	}
+
+	if total == 0 {
+		return 0, coeff, pow, nil
+	}
+
+	val := 0
+	floatVal := coeff * math.Pow(float64(total), pow)
+	if roundUp {
+		val = int(math.Ceil(floatVal))
+	} else {
+		val = int(math.Floor(floatVal))
+	}
+	if val < 0 {
+		return 0, coeff, pow, nil
+	}
+
+	if val > total {
+		return total, coeff, pow, nil
+	}
+
+	return val, coeff, pow, nil
 }
 
 func min(a, b *int64) *int64 {
