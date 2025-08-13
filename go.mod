@@ -1,6 +1,6 @@
 module kusionstack.io/kuperator
 
-go 1.24
+go 1.24.2
 
 require (
 	github.com/evanphx/json-patch v5.7.0+incompatible
