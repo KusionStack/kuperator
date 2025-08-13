@@ -16,7 +16,7 @@ sharding:
 controlPlane: kusionstack-kuperator
 
 image:
-  tag: v0.6.2
+  tag: v0.6.3
   repo: kusionstack/kuperator
   pullPolicy: IfNotPresent
 
