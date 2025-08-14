@@ -1,8 +1,8 @@
 apiVersion: v1
 name: kuperator
 description: Helm chart for KusionStack Kuperator
-version: 0.6.0
-appVersion: 0.6.0
+version: 0.6.3
+appVersion: 0.6.3
 home: https://KusionStack.io
 sources:
   - https://github.com/KusionStack/kuperator
