@@ -52,8 +52,9 @@ func (r *RealSyncControl) cleanReplacePodLabels(
 	podsNeedCleanLabels [][]string,
 	ownedIDs map[int]*appsv1alpha1.ContextDetail,
 	currentIDs map[int]struct{},
-	logger logr.Logger) (bool, sets.Int, error) {
-
+	logger logr.Logger) (
+	bool, sets.Int, error,
+) {
 	needUpdateContext := false
 	needDeletePodsIDs := sets.Int{}
 	mapOriginToNewPodContext := mapReplaceOriginToNewPodContext(ownedIDs)
@@ -110,7 +111,7 @@ func (r *RealSyncControl) cleanReplacePodLabels(
 			return err
 		}
 		if err = r.podControl.PatchPod(pod, client.RawPatch(types.JSONPatchType, patchBytes)); err != nil {
-			return fmt.Errorf("failed to remove replace pair label %s/%s: %s", pod.Namespace, pod.Name, err)
+			return fmt.Errorf("failed to remove replace pair label %s/%s: %w", pod.Namespace, pod.Name, err)
 		}
 		return nil
 	})
@@ -125,8 +126,8 @@ func (r *RealSyncControl) replaceOriginPods(
 	needReplaceOriginPods []*corev1.Pod,
 	ownedIDs map[int]*appsv1alpha1.ContextDetail,
 	availableContexts []*appsv1alpha1.ContextDetail,
-	logger logr.Logger) (int, error) {
-
+	logger logr.Logger,
+) (int, error) {
 	mapNewToOriginPodContext := mapReplaceNewToOriginPodContext(ownedIDs)
 	successCount, err := controllerutils.SlowStartBatch(len(needReplaceOriginPods), controllerutils.SlowStartInitialBatchSize, false, func(i int, _ error) error {
 		originPod := needReplaceOriginPods[i]
@@ -178,7 +179,7 @@ func (r *RealSyncControl) replaceOriginPods(
 		// create pvcs for new pod
 		err = r.pvcControl.CreatePodPvcs(ctx, instance, newPod, resources.ExistingPvcs)
 		if err != nil {
-			return fmt.Errorf("fail to migrate PVCs from origin pod %s to replace pod %s: %s", originPod.Name, newPod.Name, err)
+			return fmt.Errorf("fail to migrate PVCs from origin pod %s to replace pod %s: %w", originPod.Name, newPod.Name, err)
 		}
 		if newCreatedPod, err := r.podControl.CreatePod(newPod); err == nil {
 			r.recorder.Eventf(originPod,
@@ -194,7 +195,7 @@ func (r *RealSyncControl) replaceOriginPods(
 
 			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, appsv1alpha1.PodReplacePairNewId, instanceId)))
 			if err = r.podControl.PatchPod(originPod, patch); err != nil {
-				return fmt.Errorf("fail to update origin pod %s/%s pair label %s when updating by replaceUpdate: %s", originPod.Namespace, originPod.Name, newCreatedPod.Name, err)
+				return fmt.Errorf("fail to update origin pod %s/%s pair label %s when updating by replaceUpdate: %w", originPod.Namespace, originPod.Name, newCreatedPod.Name, err)
 			}
 			logger.Info("replaceOriginPods", "replacing originPod", originPod.Name, "originPodId", originPodId, "newPodContextID", instanceId)
 		} else {
@@ -215,9 +216,10 @@ func (r *RealSyncControl) replaceOriginPods(
 }
 
 func dealReplacePods(pods []*corev1.Pod, logger logr.Logger) (
-	needReplacePods []*corev1.Pod, needCleanLabelPods []*corev1.Pod, podNeedCleanLabels [][]string, needDeletePods []*corev1.Pod) {
-	var podInstanceIdMap = make(map[string]*corev1.Pod)
-	var podNameMap = make(map[string]*corev1.Pod)
+	needReplacePods, needCleanLabelPods []*corev1.Pod, podNeedCleanLabels [][]string, needDeletePods []*corev1.Pod,
+) {
+	podInstanceIdMap := make(map[string]*corev1.Pod)
+	podNameMap := make(map[string]*corev1.Pod)
 	for _, pod := range pods {
 		if instanceId, exist := pod.Labels[appsv1alpha1.PodInstanceIDLabelKey]; exist {
 			podInstanceIdMap[instanceId] = pod
@@ -296,8 +298,8 @@ func updateReplaceOriginPod(
 	ctx context.Context,
 	c client.Client,
 	recorder record.EventRecorder,
-	originPodUpdateInfo, newPodUpdateInfo *PodUpdateInfo) error {
-
+	originPodUpdateInfo, newPodUpdateInfo *PodUpdateInfo,
+) error {
 	originPod := originPodUpdateInfo.Pod
 	// 1. delete the new pod if not updated
 	if newPodUpdateInfo != nil {
@@ -307,7 +309,7 @@ func updateReplaceOriginPod(
 		if exist && currentRevision != originPodUpdateInfo.UpdateRevision.Name && !deletionIndicate {
 			patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%d"}}}`, appsv1alpha1.PodDeletionIndicationLabelKey, time.Now().UnixNano())))
 			if patchErr := c.Patch(ctx, newPod, patch); patchErr != nil {
-				err := fmt.Errorf("failed to delete replace pair new pod %s/%s %s",
+				err := fmt.Errorf("failed to delete replace pair new pod %s/%s %w",
 					newPod.Namespace, newPod.Name, patchErr)
 				return err
 			}
@@ -328,7 +330,7 @@ func updateReplaceOriginPod(
 		now := time.Now().UnixNano()
 		patch := client.RawPatch(types.StrategicMergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%v", "%s": "%v"}}}`, appsv1alpha1.PodReplaceIndicationLabelKey, now, appsv1alpha1.PodReplaceByReplaceUpdateLabelKey, originPodUpdateInfo.UpdateRevision.Name)))
 		if err := c.Patch(ctx, originPod, patch); err != nil {
-			return fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %s", originPod.Namespace, originPod.Name, err)
+			return fmt.Errorf("fail to label origin pod %s/%s with replace indicate label by replaceUpdate: %w", originPod.Namespace, originPod.Name, err)
 		}
 		recorder.Eventf(originPod,
 			corev1.EventTypeNormal,
@@ -371,15 +373,15 @@ func getReplaceRevision(originPod *corev1.Pod, resources *collasetutils.RelatedR
 
 // classify the pair relationship for Pod replacement.
 func classifyPodReplacingMapping(podWrappers []*collasetutils.PodWrapper) map[string]*collasetutils.PodWrapper {
-	var podNameMap = make(map[string]*collasetutils.PodWrapper)
-	var podIdMap = make(map[string]*collasetutils.PodWrapper)
+	podNameMap := make(map[string]*collasetutils.PodWrapper)
+	podIdMap := make(map[string]*collasetutils.PodWrapper)
 	for _, podWrapper := range podWrappers {
 		podNameMap[podWrapper.Name] = podWrapper
 		instanceId := podWrapper.Labels[appsv1alpha1.PodInstanceIDLabelKey]
 		podIdMap[instanceId] = podWrapper
 	}
 
-	var replacePodMapping = make(map[string]*collasetutils.PodWrapper)
+	replacePodMapping := make(map[string]*collasetutils.PodWrapper)
 	for _, podWrapper := range podWrappers {
 		name := podWrapper.Name
 		if replacePairNewIdStr, exist := podWrapper.Labels[appsv1alpha1.PodReplacePairNewId]; exist {

@@ -17,7 +17,6 @@ limitations under the License.
 package rules
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -26,8 +25,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+
 	"kusionstack.io/kuperator/pkg/utils"
 )
 
@@ -405,9 +404,4 @@ func (p *podTemplate) GetPod() *corev1.Pod {
 			Phase: p.Phase,
 		},
 	}
-}
-
-func printJson(obj any) {
-	byt, _ := json.MarshalIndent(obj, "", "  ")
-	fmt.Printf("%s\n", string(byt))
 }

@@ -20,11 +20,12 @@ package framework
 import (
 	"bufio"
 	"bytes"
-	"github.com/onsi/ginkgo"
 	"regexp"
 	"runtime"
 	"runtime/debug"
 	"strings"
+
+	"github.com/onsi/ginkgo"
 )
 
 // FailurePanic is the value that will be panicked from Fail.

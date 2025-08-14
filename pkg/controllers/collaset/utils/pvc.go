@@ -74,12 +74,12 @@ func ExtractPvcTmpName(cls *appsv1alpha1.CollaSet, pvc *corev1.PersistentVolumeC
 func PvcTmpHash(pvc *corev1.PersistentVolumeClaim) (string, error) {
 	bytes, err := json.Marshal(pvc)
 	if err != nil {
-		return "", fmt.Errorf("fail to marshal pvc template: %s", err)
+		return "", fmt.Errorf("fail to marshal pvc template: %w", err)
 	}
 
 	hf := fnv.New32()
 	if _, err = hf.Write(bytes); err != nil {
-		return "", fmt.Errorf("fail to calculate pvc template hash: %s", err)
+		return "", fmt.Errorf("fail to calculate pvc template hash: %w", err)
 	}
 
 	return rand.SafeEncodeString(fmt.Sprint(hf.Sum32())), nil

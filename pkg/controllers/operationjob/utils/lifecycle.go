@@ -40,7 +40,7 @@ func BeginOperateLifecycle(client client.Client, adapter podopslifecycle.Lifecyc
 	}
 
 	if updated, err := podopslifecycle.Begin(client, adapter, pod); err != nil {
-		return false, fmt.Errorf("fail to begin PodOpsLifecycle for %s %s/%s: %s", adapter.GetType(), pod.Namespace, pod.Name, err)
+		return false, fmt.Errorf("fail to begin PodOpsLifecycle for %s %s/%s: %w", adapter.GetType(), pod.Namespace, pod.Name, err)
 	} else if updated {
 		if err := StatusUpToDateExpectation.ExpectUpdate(utils.ObjectKeyString(pod), pod.ResourceVersion); err != nil {
 			return true, err
@@ -54,7 +54,7 @@ func FinishOperateLifecycle(client client.Client, adapter podopslifecycle.Lifecy
 		return nil
 	}
 	if updated, err := podopslifecycle.Finish(client, adapter, pod); err != nil {
-		return fmt.Errorf("failed to finish PodOpsLifecycle for %s %s/%s: %s", adapter.GetType(), pod.Namespace, pod.Name, err)
+		return fmt.Errorf("failed to finish PodOpsLifecycle for %s %s/%s: %w", adapter.GetType(), pod.Namespace, pod.Name, err)
 	} else if updated {
 		// add an expectation for this pod update, before next reconciling
 		if err := StatusUpToDateExpectation.ExpectUpdate(utils.ObjectKeyString(pod), pod.ResourceVersion); err != nil {
@@ -71,7 +71,7 @@ func CancelOpsLifecycle(client client.Client, adapter podopslifecycle.LifecycleA
 
 	// only cancel when lifecycle exist on pod
 	if exist, err := podopslifecycleutil.IsLifecycleOnPod(adapter.GetID(), pod); err != nil {
-		return fmt.Errorf("fail to check %s PodOpsLifecycle on Pod %s/%s: %s", adapter.GetID(), pod.Namespace, pod.Name, err)
+		return fmt.Errorf("fail to check %s PodOpsLifecycle on Pod %s/%s: %w", adapter.GetID(), pod.Namespace, pod.Name, err)
 	} else if !exist {
 		return nil
 	}

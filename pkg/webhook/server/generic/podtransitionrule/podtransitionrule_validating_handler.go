@@ -30,16 +30,18 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	commonutils "kusionstack.io/kuperator/pkg/utils"
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
-var _ inject.Client = &ValidatingHandler{}
-var _ admission.DecoderInjector = &ValidatingHandler{}
+var (
+	_ inject.Client             = &ValidatingHandler{}
+	_ admission.DecoderInjector = &ValidatingHandler{}
+)
 
 type ValidatingHandler struct {
 	*mixin.WebhookHandlerMixin
@@ -102,7 +104,6 @@ func (h *ValidatingHandler) validate(rs *appsv1alpha1.PodTransitionRule) error {
 }
 
 func ValidateWebhook(webhook *appsv1alpha1.TransitionRuleWebhook, f *field.Path) *field.Error {
-
 	if err := CheckServerReachable(webhook.ClientConfig.URL); err != nil {
 		return field.Invalid(f.Child("clientConfig").Child("url"), webhook.ClientConfig.URL, err.Error())
 	}
@@ -115,21 +116,21 @@ func ValidateWebhook(webhook *appsv1alpha1.TransitionRuleWebhook, f *field.Path)
 func CheckServerReachable(serverUrl string) error {
 	u, err := url.Parse(serverUrl)
 	if err != nil {
-		return fmt.Errorf("podtransitionrule validate webhook failed, check server reachable, while parse url error: %s", err)
+		return fmt.Errorf("podtransitionrule validate webhook failed, check server reachable, while parse url error: %w", err)
 	}
 
 	if !strings.Contains(u.Host, ":") {
 		if u.Scheme == "http" {
-			u.Host = u.Host + ":80"
+			u.Host += ":80"
 		} else {
-			u.Host = u.Host + ":443"
+			u.Host += ":443"
 		}
 	}
 
 	timeout := time.Duration(5) * time.Second
 	_, err = net.DialTimeout("tcp", u.Host, timeout)
 	if err != nil {
-		return fmt.Errorf("podtransitionrule validate webhook failed, check server reachable, while server unreachable, error: %s", err)
+		return fmt.Errorf("podtransitionrule validate webhook failed, check server reachable, while server unreachable, error: %w", err)
 	}
 
 	return nil
@@ -149,7 +150,7 @@ func CheckCaBundle(ca string) error {
 	}
 	_, err = x509.ParseCertificate(block.Bytes)
 	if err != nil {
-		return fmt.Errorf("failed to parse CABundle certificate, %v", err)
+		return fmt.Errorf("failed to parse CABundle certificate, %w", err)
 	}
 	return nil
 }

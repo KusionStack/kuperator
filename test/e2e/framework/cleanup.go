@@ -22,8 +22,10 @@ import "sync"
 // CleanupActionHandle defines a type for cleanup action handle
 type CleanupActionHandle *int
 
-var cleanupActionsLock sync.Mutex
-var cleanupActions = map[CleanupActionHandle]func(){}
+var (
+	cleanupActionsLock sync.Mutex
+	cleanupActions     = map[CleanupActionHandle]func(){}
+)
 
 // AddCleanupAction installs a function that will be called in the event of the
 // whole test being terminated.  This allows arbitrary pieces of the overall

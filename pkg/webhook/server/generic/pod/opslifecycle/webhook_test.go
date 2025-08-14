@@ -26,7 +26,6 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"kusionstack.io/kube-api/apps/v1alpha1"
 )
 
@@ -107,9 +106,9 @@ func TestValidating(t *testing.T) {
 
 		err := lifecycle.Validating(context.Background(), nil, nil, pod, admissionv1.Update)
 		if v.keyWords == "" {
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 		} else {
-			assert.NotNil(t, err)
+			assert.Error(t, err)
 			assert.Contains(t, err.Error(), v.keyWords)
 		}
 	}
@@ -512,7 +511,7 @@ func TestMutating(t *testing.T) {
 		if v.keyWords == "" {
 			assert.Nil(t, err)
 		} else {
-			if assert.NotNil(t, err) {
+			if assert.Error(t, err) {
 				assert.Contains(t, err.Error(), v.keyWords)
 			}
 			continue

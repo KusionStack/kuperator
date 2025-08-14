@@ -31,9 +31,11 @@ import (
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
-var _ inject.Client = &ValidatingHandler{}
-var _ inject.Logger = &ValidatingHandler{}
-var _ admission.DecoderInjector = &ValidatingHandler{}
+var (
+	_ inject.Client             = &ValidatingHandler{}
+	_ inject.Logger             = &ValidatingHandler{}
+	_ admission.DecoderInjector = &ValidatingHandler{}
+)
 
 type ValidatingHandler struct {
 	*mixin.WebhookHandlerMixin
@@ -55,7 +57,7 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 	if req.Operation != admissionv1.Delete {
 		if err := h.Decoder.Decode(req, pod); err != nil {
 			s, _ := json.Marshal(req)
-			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to decode old object from request %s: %s", s, err))
+			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to decode old object from request %s: %w", s, err))
 		}
 	}
 
@@ -63,7 +65,7 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 	if req.Operation == admissionv1.Update || req.Operation == admissionv1.Delete {
 		oldPod = &corev1.Pod{}
 		if err := h.Decoder.DecodeRaw(req.OldObject, oldPod); err != nil {
-			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to unmarshal old object: %s", err))
+			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to unmarshal old object: %w", err))
 		}
 	}
 

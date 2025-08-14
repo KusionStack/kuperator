@@ -26,9 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type OperationJobTester struct {
@@ -45,7 +44,7 @@ func NewOperationJobTester(clientSet clientset.Interface, client client.Client, 
 	}
 }
 
-func (t *OperationJobTester) NewOperationJob(name string, action string, targets []appsv1alpha1.PodOpsTarget) *appsv1alpha1.OperationJob {
+func (t *OperationJobTester) NewOperationJob(name, action string, targets []appsv1alpha1.PodOpsTarget) *appsv1alpha1.OperationJob {
 	return &appsv1alpha1.OperationJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: t.ns,

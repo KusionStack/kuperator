@@ -33,9 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/util/retry"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/register"
 	"kusionstack.io/kuperator/pkg/utils/inject"
 )
@@ -426,7 +426,6 @@ const (
 )
 
 func initPodTransitionRuleManager() {
-
 	register.UnAvailableFuncList = []register.UnAvailableFunc{func(pod *corev1.Pod) (bool, *int64) {
 		if pod.GetLabels() == nil {
 			return false, nil
@@ -489,11 +488,6 @@ func genDefaultPod(namespace, name string) *corev1.Pod {
 			},
 		},
 	}
-}
-
-func printJson(obj any) {
-	byt, _ := json.MarshalIndent(obj, "", "  ")
-	fmt.Printf("%s\n", string(byt))
 }
 
 func handleHttpAlwaysSuccess(resp http.ResponseWriter, req *http.Request) {
@@ -602,7 +596,7 @@ func RunPollingServer() (chan<- struct{}, <-chan struct{}, map[string]time.Time,
 			panic(fmt.Sprintf("taskId %s not found", taskId))
 		}
 		idx := taskIdx[taskId]
-		webhookResp := &appsv1alpha1.PollResponse{}
+		var webhookResp *appsv1alpha1.PollResponse
 		if idx == len(pods)-1 {
 			taskFinishTime[taskId] = time.Now()
 			webhookResp = &appsv1alpha1.PollResponse{

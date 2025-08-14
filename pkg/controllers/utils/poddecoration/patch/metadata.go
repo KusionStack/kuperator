@@ -19,7 +19,6 @@ package patch
 import (
 	jsonpatch "github.com/evanphx/json-patch"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 

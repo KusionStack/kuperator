@@ -28,10 +28,12 @@ import (
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 
-var _ inject.Injector = &ValidatingHandler{}
-var _ inject.Client = &ValidatingHandler{}
-var _ inject.Logger = &ValidatingHandler{}
-var _ admission.DecoderInjector = &ValidatingHandler{}
+var (
+	_ inject.Injector           = &ValidatingHandler{}
+	_ inject.Client             = &ValidatingHandler{}
+	_ inject.Logger             = &ValidatingHandler{}
+	_ admission.DecoderInjector = &ValidatingHandler{}
+)
 
 // ValidatingHandler validates all resources requests
 type ValidatingHandler struct {
@@ -80,7 +82,7 @@ func (h *ValidatingHandler) InjectFunc(f inject.Func) error {
 }
 
 func (h *ValidatingHandler) InjectLogger(l logr.Logger) error {
-	h.WebhookHandlerMixin.InjectLogger(l)
+	_ = h.WebhookHandlerMixin.InjectLogger(l)
 
 	// inject logger into subHandlers
 	for kind, handler := range ValidatingTypeHandlerMap {

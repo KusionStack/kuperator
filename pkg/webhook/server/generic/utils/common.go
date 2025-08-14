@@ -18,12 +18,10 @@ package utils
 
 import corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 
-var (
-	PodValidationOptions = corevalidation.PodValidationOptions{
-		AllowDownwardAPIHugePages:       true,
-		AllowInvalidPodDeletionCost:     true,
-		AllowIndivisibleHugePagesValues: true,
-		AllowWindowsHostProcessField:    true,
-		AllowExpandedDNSConfig:          true,
-	}
-)
+var PodValidationOptions = corevalidation.PodValidationOptions{
+	AllowDownwardAPIHugePages:       true,
+	AllowInvalidPodDeletionCost:     true,
+	AllowIndivisibleHugePagesValues: true,
+	AllowWindowsHostProcessField:    true,
+	AllowExpandedDNSConfig:          true,
+}

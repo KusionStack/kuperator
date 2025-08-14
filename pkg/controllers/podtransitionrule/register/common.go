@@ -22,9 +22,7 @@ import (
 	"kusionstack.io/kuperator/pkg/controllers/utils"
 )
 
-var (
-	UnAvailableFuncList []UnAvailableFunc
-)
+var UnAvailableFuncList []UnAvailableFunc
 
 type UnAvailableFunc func(pod *corev1.Pod) (bool, *int64)
 

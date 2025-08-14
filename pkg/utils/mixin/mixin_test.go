@@ -32,7 +32,7 @@ func TestNewReconcilerMixin(t *testing.T) {
 			return apiutil.NewDynamicRESTMapper(c, apiutil.WithLazyDiscovery)
 		},
 	})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	mixin := NewReconcilerMixin("test-controller", mgr)
 	assert.NotNil(t, mixin.APIReader)
@@ -44,5 +44,4 @@ func TestNewReconcilerMixin(t *testing.T) {
 	assert.NotNil(t, mixin.Recorder)
 	assert.NotNil(t, mixin.Scheme)
 	assert.NotNil(t, mixin.StopCh)
-
 }

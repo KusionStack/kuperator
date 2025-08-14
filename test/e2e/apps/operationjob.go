@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
@@ -31,7 +32,6 @@ import (
 )
 
 var _ = SIGDescribe("OperationJob", func() {
-
 	f := framework.NewDefaultFramework("operationjob")
 	var client client.Client
 	var ns string
@@ -50,7 +50,6 @@ var _ = SIGDescribe("OperationJob", func() {
 	})
 
 	framework.KusionstackDescribe("OperationJob Replacing", func() {
-
 		framework.ConformanceIt("operationjob replace pod", func() {
 			cls := clsTester.NewCollaSet("collaset-"+randStr, 1, appsv1alpha1.UpdateStrategy{})
 			Expect(clsTester.CreateCollaSet(cls)).NotTo(HaveOccurred())
@@ -113,7 +112,6 @@ var _ = SIGDescribe("OperationJob", func() {
 
 			By("Wait for replace OperationJob Succeeded")
 			Eventually(func() error { return ojTester.ExpectOperationJobProgress(oj, appsv1alpha1.OperationProgressSucceeded) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
-
 		})
 
 		framework.ConformanceIt("operationjob replace non-exist pod", func() {
@@ -259,5 +257,4 @@ var _ = SIGDescribe("OperationJob", func() {
 			}, 30*time.Second, 3*time.Second).Should(BeTrue())
 		})
 	})
-
 })

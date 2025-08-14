@@ -30,14 +30,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-var _ inject.Cache = &ReconcilerMixin{}
-var _ inject.APIReader = &ReconcilerMixin{}
-var _ inject.Config = &ReconcilerMixin{}
-var _ inject.Client = &ReconcilerMixin{}
-var _ inject.Scheme = &ReconcilerMixin{}
-var _ inject.Stoppable = &ReconcilerMixin{}
-var _ inject.Mapper = &ReconcilerMixin{}
-var _ inject.Logger = &ReconcilerMixin{}
+var (
+	_ inject.Cache     = &ReconcilerMixin{}
+	_ inject.APIReader = &ReconcilerMixin{}
+	_ inject.Config    = &ReconcilerMixin{}
+	_ inject.Client    = &ReconcilerMixin{}
+	_ inject.Scheme    = &ReconcilerMixin{}
+	_ inject.Stoppable = &ReconcilerMixin{}
+	_ inject.Mapper    = &ReconcilerMixin{}
+	_ inject.Logger    = &ReconcilerMixin{}
+)
 
 type ReconcilerMixin struct {
 	name string
@@ -70,10 +72,10 @@ func NewReconcilerMixin(controllerName string, mgr manager.Manager) *ReconcilerM
 	// - Mapper
 	// - StopChannel
 	// - Logger
-	mgr.SetFields(m)
+	_ = mgr.SetFields(m)
 
 	// additional inject fields
-	m.InjectRecorder(mgr)
+	_ = m.InjectRecorder(mgr)
 	return m
 }
 
@@ -134,9 +136,11 @@ func (m *ReconcilerMixin) InjectRecorder(p recorder.Provider) error {
 	return nil
 }
 
-var _ inject.Client = &WebhookHandlerMixin{}
-var _ inject.Logger = &WebhookHandlerMixin{}
-var _ admission.DecoderInjector = &WebhookHandlerMixin{}
+var (
+	_ inject.Client             = &WebhookHandlerMixin{}
+	_ inject.Logger             = &WebhookHandlerMixin{}
+	_ admission.DecoderInjector = &WebhookHandlerMixin{}
+)
 
 type WebhookHandlerMixin struct {
 	Client  client.Client

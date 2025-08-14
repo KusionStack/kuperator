@@ -19,9 +19,8 @@ package opscore
 import (
 	"context"
 
-	"sigs.k8s.io/controller-runtime/pkg/controller"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )

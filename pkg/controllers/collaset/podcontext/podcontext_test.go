@@ -19,15 +19,14 @@ package podcontext
 import (
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func init() {
@@ -35,12 +34,9 @@ func init() {
 	appsv1alpha1.AddToScheme(scheme)
 }
 
-var (
-	scheme = runtime.NewScheme()
-)
+var scheme = runtime.NewScheme()
 
 var _ = Describe("ResourceContext allocation", func() {
-
 	It("allocate ID", func() {
 		c := fake.NewClientBuilder().WithScheme(scheme).Build()
 		namespace := "test"
@@ -86,6 +82,7 @@ var _ = Describe("ResourceContext allocation", func() {
 		}
 
 		ownedIDs, err = AllocateID(c, instance1, "", 10)
+		Expect(err).NotTo(HaveOccurred())
 		delete(ownedIDs, 4)
 		delete(ownedIDs, 6)
 		Expect(UpdateToPodContext(c, instance1, ownedIDs)).Should(BeNil())
@@ -106,7 +103,6 @@ var _ = Describe("ResourceContext allocation", func() {
 			Expect(exist).Should(BeTrue())
 		}
 	})
-
 })
 
 func TestPodContext(t *testing.T) {

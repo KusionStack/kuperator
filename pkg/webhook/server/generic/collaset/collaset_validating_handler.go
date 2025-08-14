@@ -21,22 +21,20 @@ import (
 	"fmt"
 	"net/http"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/capabilities"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/kubernetes/pkg/apis/core"
 	k8scorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/capabilities"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
 	kuperatorv1alpha1 "kusionstack.io/kuperator/apis/apps/v1alpha1"
 	commonutils "kusionstack.io/kuperator/pkg/utils"
@@ -80,7 +78,7 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) (
 	if req.Operation == admissionv1.Update || req.Operation == admissionv1.Delete {
 		oldCls = &appsv1alpha1.CollaSet{}
 		if err := h.Decoder.DecodeRaw(req.OldObject, oldCls); err != nil {
-			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to unmarshal old object: %s", err))
+			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to unmarshal old object: %w", err))
 		}
 		kuperatorv1alpha1.SetDefaultPodSpec(oldCls)
 	}
@@ -153,11 +151,14 @@ func (h *ValidatingHandler) validateUpdateStrategy(cls *appsv1alpha1.CollaSet, f
 		appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType,
 		appsv1alpha1.CollaSetReplacePodUpdateStrategyType:
 	default:
-		allErrs = append(allErrs, field.NotSupported(fSpec.Child("updateStrategy", "podUpdatePolicy"),
-			cls.Spec.UpdateStrategy.PodUpdatePolicy, []string{string(appsv1alpha1.CollaSetRecreatePodUpdateStrategyType),
+		allErrs = append(allErrs, field.NotSupported(fSpec.Child("updateStrategy", "podUpdatePolicy"), cls.Spec.UpdateStrategy.PodUpdatePolicy,
+			[]string{
+				string(appsv1alpha1.CollaSetRecreatePodUpdateStrategyType),
 				string(appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType),
 				string(appsv1alpha1.CollaSetInPlaceOnlyPodUpdateStrategyType),
-				string(appsv1alpha1.CollaSetReplacePodUpdateStrategyType)}))
+				string(appsv1alpha1.CollaSetReplacePodUpdateStrategyType),
+			},
+		))
 	}
 
 	if cls.Spec.UpdateStrategy.RollingUpdate != nil && cls.Spec.UpdateStrategy.RollingUpdate.ByPartition != nil &&

@@ -40,33 +40,31 @@ const (
 	defaultServiceAccountName       = "default"
 )
 
-var (
-	// NewFrameworkExtensions lists functions that get called by
-	// NewFramework after constructing a new framework and after
-	// calling ginkgo.BeforeEach for the framework.
-	//
-	// This can be used by extensions of the core framework to modify
-	// settings in the framework instance or to add additional callbacks
-	// with gingko.BeforeEach/AfterEach/DeferCleanup.
-	//
-	// When a test runs, functions will be invoked in this order:
-	// - BeforeEaches defined by tests before f.NewDefaultFramework
-	//   in the order in which they were defined (first-in-first-out)
-	// - f.BeforeEach
-	// - BeforeEaches defined by tests after f.NewDefaultFramework
-	// - It callback
-	// - all AfterEaches in the order in which they were defined
-	// - all DeferCleanups with the order reversed (first-in-last-out)
-	// - f.AfterEach
-	//
-	// Because a test might skip test execution in a BeforeEach that runs
-	// before f.BeforeEach, AfterEach callbacks that depend on the
-	// framework instance must check whether it was initialized. They can
-	// do that by checking f.ClientSet for nil. DeferCleanup callbacks
-	// don't need to do this because they get defined when the test
-	// runs.
-	NewFrameworkExtensions []func(f *Framework)
-)
+// NewFrameworkExtensions lists functions that get called by
+// NewFramework after constructing a new framework and after
+// calling ginkgo.BeforeEach for the framework.
+//
+// This can be used by extensions of the core framework to modify
+// settings in the framework instance or to add additional callbacks
+// with gingko.BeforeEach/AfterEach/DeferCleanup.
+//
+// When a test runs, functions will be invoked in this order:
+//   - BeforeEaches defined by tests before f.NewDefaultFramework
+//     in the order in which they were defined (first-in-first-out)
+//   - f.BeforeEach
+//   - BeforeEaches defined by tests after f.NewDefaultFramework
+//   - It callback
+//   - all AfterEaches in the order in which they were defined
+//   - all DeferCleanups with the order reversed (first-in-last-out)
+//   - f.AfterEach
+//
+// Because a test might skip test execution in a BeforeEach that runs
+// before f.BeforeEach, AfterEach callbacks that depend on the
+// framework instance must check whether it was initialized. They can
+// do that by checking f.ClientSet for nil. DeferCleanup callbacks
+// don't need to do this because they get defined when the test
+// runs.
+var NewFrameworkExtensions []func(f *Framework)
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
 // Eventual goal is to merge this with integration test framework.
@@ -263,7 +261,7 @@ func (f *Framework) AfterEach() {
 			for namespaceKey, namespaceErr := range nsDeletionErrors {
 				messages = append(messages, fmt.Sprintf("Couldn't delete ns: %q: %s (%#v)", namespaceKey, namespaceErr, namespaceErr))
 			}
-			Failf(strings.Join(messages, ","))
+			Failf("%s", strings.Join(messages, ","))
 		}
 	}()
 
@@ -311,7 +309,6 @@ func (f *Framework) AddNamespacesToDelete(namespaces ...*corev1.Namespace) {
 			continue
 		}
 		f.namespacesToDelete = append(f.namespacesToDelete, ns)
-
 	}
 }
 

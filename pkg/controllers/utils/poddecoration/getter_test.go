@@ -18,7 +18,6 @@ package poddecoration
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,6 +26,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,8 +52,10 @@ var (
 	revisionMgr history.HistoryManager
 )
 
-const timeoutInterval = 5 * time.Second
-const pollInterval = 500 * time.Millisecond
+const (
+	timeoutInterval = 5 * time.Second
+	pollInterval    = 500 * time.Millisecond
+)
 
 var _ = Describe("Test PodDecoration getter", func() {
 	It("test getter", func() {
@@ -138,7 +140,7 @@ var _ = Describe("Test PodDecoration getter", func() {
 		podDecoration.Status.UpdatedRevision = updatedRevision
 		Expect(strategy.SharedStrategyController.UpdateSelectedPods(ctx, podDecoration, nil)).Should(BeNil())
 		strategy.SharedStrategyController.Synced()
-		getter, err := NewPodDecorationGetter(c, testcase)
+		getter, _ := NewPodDecorationGetter(c, testcase)
 		tu := true
 		po0 := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -195,7 +197,6 @@ var _ = Describe("Test PodDecoration getter", func() {
 		pds, err = getter.GetByRevisions(ctx, currentRevision, updatedRevision)
 		Expect(err).Should(BeNil())
 		Expect(len(pds)).Should(Equal(2))
-
 	})
 })
 
@@ -219,12 +220,10 @@ var _ = BeforeSuite(func() {
 	revisionMgr = history.NewHistoryManager(history.NewRevisionControl(cl, cl), &revision.RevisionOwnerAdapter{})
 })
 
-var _ = AfterEach(func() {
-
-})
+var _ = AfterEach(func() {})
 
 var _ = AfterSuite(func() {
-	env.Stop()
+	_ = env.Stop()
 })
 
 func createNamespace(namespaceName string) error {
@@ -234,31 +233,6 @@ func createNamespace(namespaceName string) error {
 		},
 	}
 	return c.Create(context.TODO(), ns)
-}
-
-func getPodDecorationPatch(pd *appsv1alpha1.PodDecoration) ([]byte, error) {
-	dsBytes, err := json.Marshal(pd)
-	if err != nil {
-		return nil, err
-	}
-	var raw map[string]interface{}
-	err = json.Unmarshal(dsBytes, &raw)
-	if err != nil {
-		return nil, err
-	}
-	objCopy := make(map[string]interface{})
-	specCopy := make(map[string]interface{})
-
-	spec := raw["spec"].(map[string]interface{})
-	template := spec["template"].(map[string]interface{})
-	weight := spec["weight"]
-
-	template["$patch"] = "replace"
-	specCopy["template"] = template
-	specCopy["weight"] = weight
-	objCopy["spec"] = specCopy
-	patch, err := json.Marshal(objCopy)
-	return patch, err
 }
 
 func int32Pointer(val int32) *int32 {

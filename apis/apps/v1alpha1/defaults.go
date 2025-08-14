@@ -242,7 +242,6 @@ func SetDefaultPodSpecVolumes(volumes []corev1.Volume) {
 			}
 		}
 	}
-
 }
 
 func SetDefaultCollaSetUpdateStrategy(cls *appsv1alpha1.CollaSet) {

@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
-
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 
@@ -38,7 +37,7 @@ func (l *LabelCheckRuler) Filter(podTransitionRule *appsv1alpha1.PodTransitionRu
 	rejected := map[string]string{}
 	sel, err := metav1.LabelSelectorAsSelector(l.Selector)
 	if err != nil {
-		return rejectAllWithErr(subjects, passed, rejected, fmt.Sprintf("labelCheck error: %v", err))
+		return rejectAllWithErr(subjects, passed, rejected, "labelCheck error: %s", err.Error())
 	}
 
 	for podName := range subjects {

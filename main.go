@@ -22,10 +22,11 @@ import (
 	"os"
 	"path/filepath"
 
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+
 	"github.com/spf13/pflag"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
@@ -38,7 +39,6 @@ import (
 	"kusionstack.io/kuperator/pkg/utils/feature"
 	"kusionstack.io/kuperator/pkg/utils/inject"
 	"kusionstack.io/kuperator/pkg/webhook"
-	//+kubebuilder:scaffold:imports
 )
 
 var (
