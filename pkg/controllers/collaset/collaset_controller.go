@@ -25,7 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/clock"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	kubeutilsclient "kusionstack.io/kube-utils/client"
+	kubeutilsexpectations "kusionstack.io/kube-utils/controller/expectations"
 	"kusionstack.io/kube-utils/controller/history"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -42,7 +45,6 @@ import (
 	"kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
-	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration"
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/strategy"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
@@ -59,9 +61,11 @@ const (
 // CollaSetReconciler reconciles a CollaSet object
 type CollaSetReconciler struct {
 	*mixin.ReconcilerMixin
-
-	revisionManager history.HistoryManager
-	syncControl     synccontrol.Interface
+	revisionManager   history.HistoryManager
+	syncControl       synccontrol.Interface
+	pvcControl        pvccontrol.Interface
+	podContextControl podcontext.Interface
+	cacheExpectations kubeutilsexpectations.CacheExpectationsInterface
 }
 
 func Add(mgr ctrl.Manager) error {
@@ -71,12 +75,20 @@ func Add(mgr ctrl.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr ctrl.Manager) reconcile.Reconciler {
 	mixin := mixin.NewReconcilerMixin(controllerName, mgr)
-	collasetutils.InitExpectations(mixin.Client)
+
+	cacheExpectations := kubeutilsexpectations.NewxCacheExpectations(mixin.Client, mixin.Scheme, clock.RealClock{})
+	pvcControl := pvccontrol.NewRealPvcControl(mixin.Client, mixin.Scheme, cacheExpectations)
+	podContextControl := podcontext.NewRealPodContextControl(mixin.Client, cacheExpectations)
+	syncControl := synccontrol.NewRealSyncControl(mixin.Client, mixin.Logger, podcontrol.NewRealPodControl(mixin.Client, mixin.Scheme), pvcControl, podContextControl, mixin.Recorder, cacheExpectations)
+	revisionManager := history.NewHistoryManager(history.NewRevisionControl(mixin.Client, mixin.Client), &revisionOwnerAdapter{podControl: podcontrol.NewRealPodControl(mixin.Client, mixin.Scheme)})
 
 	return &CollaSetReconciler{
-		ReconcilerMixin: mixin,
-		revisionManager: history.NewHistoryManager(history.NewRevisionControl(mixin.Client, mixin.Client), &revisionOwnerAdapter{podControl: podcontrol.NewRealPodControl(mixin.Client, mixin.Scheme)}),
-		syncControl:     synccontrol.NewRealSyncControl(mixin.Client, mixin.Logger, podcontrol.NewRealPodControl(mixin.Client, mixin.Scheme), pvccontrol.NewRealPvcControl(mixin.Client, mixin.Scheme), mixin.Recorder),
+		ReconcilerMixin:   mixin,
+		revisionManager:   revisionManager,
+		syncControl:       syncControl,
+		pvcControl:        pvcControl,
+		podContextControl: podContextControl,
+		cacheExpectations: cacheExpectations,
 	}
 }
 
@@ -143,13 +155,11 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 
 		logger.Info("collaSet is deleted")
-		return ctrl.Result{}, collasetutils.ActiveExpectations.Delete(req.Namespace, req.Name)
+		return ctrl.Result{}, r.cacheExpectations.ExpectDeletion(req.String(), collasetutils.CollaSetGVK, req.Namespace, req.Name)
 	}
 
 	// if expectation not satisfied, shortcut this reconciling till informer cache is updated.
-	if satisfied, err := collasetutils.ActiveExpectations.IsSatisfied(instance); err != nil {
-		return ctrl.Result{}, err
-	} else if !satisfied {
+	if satisfied := r.cacheExpectations.SatisfiedExpectations(req.String()); !satisfied {
 		logger.Info("CollaSet is not satisfied to reconcile")
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
@@ -169,7 +179,7 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 		if controllerutil.ContainsFinalizer(instance, preReclaimFinalizer) {
 			// reclaim owner IDs in ResourceContext
-			if err := r.reclaimResourceContext(instance); err != nil {
+			if err := r.reclaimResourceContext(ctx, instance); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -332,14 +342,15 @@ func (r *CollaSetReconciler) updateStatus(
 
 	err := r.Client.Status().Update(ctx, instance)
 	if err == nil {
-		return collasetutils.ActiveExpectations.ExpectUpdate(instance, expectations.CollaSet, instance.Name, instance.ResourceVersion)
+		return r.cacheExpectations.ExpectUpdation(kubeutilsclient.ObjectKeyString(instance),
+			collasetutils.CollaSetGVK, instance.Namespace, instance.Name, instance.ResourceVersion)
 	}
 	return err
 }
 
-func (r *CollaSetReconciler) reclaimResourceContext(cls *appsv1alpha1.CollaSet) error {
+func (r *CollaSetReconciler) reclaimResourceContext(ctx context.Context, cls *appsv1alpha1.CollaSet) error {
 	// clean the owner IDs from this CollaSet
-	if err := podcontext.UpdateToPodContext(r.Client, cls, nil); err != nil {
+	if err := r.podContextControl.UpdateToPodContext(ctx, cls, nil); err != nil {
 		return err
 	}
 
@@ -358,8 +369,7 @@ func requeueResult(requeueTime *time.Duration) reconcile.Result {
 
 func (r *CollaSetReconciler) ensureReclaimPvcs(ctx context.Context, cls *appsv1alpha1.CollaSet) error {
 	var needReclaimPvcs []*corev1.PersistentVolumeClaim
-	pvcControl := pvccontrol.NewRealPvcControl(r.Client, r.Scheme)
-	pvcs, err := pvcControl.GetFilteredPvcs(ctx, cls)
+	pvcs, err := r.pvcControl.GetFilteredPvcs(ctx, cls)
 	if err != nil {
 		return err
 	}
@@ -371,7 +381,7 @@ func (r *CollaSetReconciler) ensureReclaimPvcs(ctx context.Context, cls *appsv1a
 		}
 	}
 	for i := range needReclaimPvcs {
-		if err = pvcControl.OrphanPvc(cls, needReclaimPvcs[i]); err != nil {
+		if err = r.pvcControl.OrphanPvc(cls, needReclaimPvcs[i]); err != nil {
 			return err
 		}
 	}
