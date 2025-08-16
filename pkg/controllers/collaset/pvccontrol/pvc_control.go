@@ -25,10 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	kubeutilsclient "kusionstack.io/kube-utils/client"
+	kubeutilsexpectations "kusionstack.io/kube-utils/controller/expectations"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
-	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	refmanagerutil "kusionstack.io/kuperator/pkg/controllers/utils/refmanager"
 	"kusionstack.io/kuperator/pkg/utils/inject"
 )
@@ -43,14 +44,16 @@ type Interface interface {
 }
 
 type RealPvcControl struct {
-	client client.Client
-	scheme *runtime.Scheme
+	client            client.Client
+	scheme            *runtime.Scheme
+	cacheExpectations *kubeutilsexpectations.CacheExpectations
 }
 
-func NewRealPvcControl(client client.Client, scheme *runtime.Scheme) Interface {
+func NewRealPvcControl(client client.Client, scheme *runtime.Scheme, cacheExpectations *kubeutilsexpectations.CacheExpectations) Interface {
 	return &RealPvcControl{
-		client: client,
-		scheme: scheme,
+		client:            client,
+		scheme:            scheme,
+		cacheExpectations: cacheExpectations,
 	}
 }
 
@@ -79,7 +82,7 @@ func (pc *RealPvcControl) CreatePodPvcs(ctx context.Context, cls *appsv1alpha1.C
 
 	// provision pvcs related to pod using pvc template, and reuse
 	// pvcs if "instance-id" and "pvc-template-hash" label matched
-	pvcsMap, err := provisionUpdatedPvc(pc.client, ctx, cls, id, existingPvcs)
+	pvcsMap, err := pc.provisionUpdatedPvc(pc.client, ctx, cls, id, existingPvcs)
 	if err != nil {
 		return err
 	}
@@ -110,7 +113,7 @@ func (pc *RealPvcControl) CreatePodPvcs(ctx context.Context, cls *appsv1alpha1.C
 	return nil
 }
 
-func provisionUpdatedPvc(c client.Client, ctx context.Context, cls *appsv1alpha1.CollaSet, id string, existingPvcs []*corev1.PersistentVolumeClaim) (*map[string]*corev1.PersistentVolumeClaim, error) {
+func (pc *RealPvcControl) provisionUpdatedPvc(c client.Client, ctx context.Context, cls *appsv1alpha1.CollaSet, id string, existingPvcs []*corev1.PersistentVolumeClaim) (*map[string]*corev1.PersistentVolumeClaim, error) {
 	updatedPvcs, _, err := classifyPodPvcs(cls, id, existingPvcs)
 	if err != nil {
 		return nil, err
@@ -130,7 +133,7 @@ func provisionUpdatedPvc(c client.Client, ctx context.Context, cls *appsv1alpha1
 		if err := c.Create(ctx, claim); err != nil {
 			return nil, fmt.Errorf("fail to create pvc for id %s: %w", id, err)
 		} else {
-			if err = collasetutils.ActiveExpectations.ExpectCreate(cls, expectations.Pvc, claim.Name); err != nil {
+			if err = pc.cacheExpectations.ExpectCreation(kubeutilsclient.ObjectKeyString(cls), collasetutils.PVCGVK, claim.Namespace, claim.Name); err != nil {
 				return nil, err
 			}
 		}
@@ -156,7 +159,7 @@ func (pc *RealPvcControl) DeletePodPvcs(ctx context.Context, cls *appsv1alpha1.C
 		// delete pvcs labeled same id with pod
 		if err := pc.client.Delete(ctx, pvc); err != nil {
 			return err
-		} else if err := collasetutils.ActiveExpectations.ExpectDelete(cls, expectations.Pvc, pvc.Name); err != nil {
+		} else if err := pc.cacheExpectations.ExpectDeletion(kubeutilsclient.ObjectKeyString(cls), collasetutils.PVCGVK, pvc.Namespace, pvc.Name); err != nil {
 			return err
 		}
 	}
@@ -185,13 +188,13 @@ func (pc *RealPvcControl) DeletePodUnusedPvcs(ctx context.Context, cls *appsv1al
 	}
 
 	// delete pvc which is not claimed in templates
-	if err := deleteUnclaimedPvcs(pc.client, ctx, cls, oldPvcs, mountedPvcNames); err != nil {
+	if err := pc.deleteUnclaimedPvcs(pc.client, ctx, cls, oldPvcs, mountedPvcNames); err != nil {
 		return err
 	}
 
 	// delete old pvc if new pvc is provisioned and WhenScaled is "Delete"
 	if collasetutils.PvcPolicyWhenScaled(cls) == appsv1alpha1.DeletePersistentVolumeClaimRetentionPolicyType {
-		return deleteOldPvcs(pc.client, ctx, cls, newPvcs, oldPvcs)
+		return pc.deleteOldPvcs(pc.client, ctx, cls, newPvcs, oldPvcs)
 	}
 	return nil
 }
@@ -310,7 +313,7 @@ func IsPodPvcTmpChanged(cls *appsv1alpha1.CollaSet, pod *corev1.Pod, existingPvc
 	return false, nil
 }
 
-func deleteUnclaimedPvcs(c client.Client, ctx context.Context, cls *appsv1alpha1.CollaSet, oldPvcs *map[string]*corev1.PersistentVolumeClaim, mountedPvcNames sets.String) error {
+func (pc *RealPvcControl) deleteUnclaimedPvcs(c client.Client, ctx context.Context, cls *appsv1alpha1.CollaSet, oldPvcs *map[string]*corev1.PersistentVolumeClaim, mountedPvcNames sets.String) error {
 	expectedNames := sets.String{}
 	for _, pvcTmp := range cls.Spec.VolumeClaimTemplates {
 		expectedNames.Insert(pvcTmp.Name)
@@ -326,21 +329,21 @@ func deleteUnclaimedPvcs(c client.Client, ctx context.Context, cls *appsv1alpha1
 		}
 		if err := c.Delete(ctx, pvc); err != nil {
 			return err
-		} else if err := collasetutils.ActiveExpectations.ExpectDelete(cls, expectations.Pvc, pvc.Name); err != nil {
+		} else if err := pc.cacheExpectations.ExpectDeletion(kubeutilsclient.ObjectKeyString(cls), collasetutils.PVCGVK, pvc.Namespace, pvc.Name); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func deleteOldPvcs(c client.Client, ctx context.Context, cls *appsv1alpha1.CollaSet, newPvcs, oldPvcs *map[string]*corev1.PersistentVolumeClaim) error {
+func (pc *RealPvcControl) deleteOldPvcs(c client.Client, ctx context.Context, cls *appsv1alpha1.CollaSet, newPvcs, oldPvcs *map[string]*corev1.PersistentVolumeClaim) error {
 	for pvcTmpName, pvc := range *oldPvcs {
 		if _, newPvcExist := (*newPvcs)[pvcTmpName]; !newPvcExist {
 			continue
 		}
 		if err := c.Delete(ctx, pvc); err != nil {
 			return err
-		} else if err := collasetutils.ActiveExpectations.ExpectDelete(cls, expectations.Pvc, pvc.Name); err != nil {
+		} else if err := pc.cacheExpectations.ExpectDeletion(kubeutilsclient.ObjectKeyString(cls), collasetutils.PVCGVK, pvc.Namespace, pvc.Name); err != nil {
 			return err
 		}
 	}

@@ -32,6 +32,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	kubeutilsclient "kusionstack.io/kube-utils/client"
+	kubeutilsexpectations "kusionstack.io/kube-utils/controller/expectations"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontext"
@@ -39,7 +41,6 @@ import (
 	"kusionstack.io/kuperator/pkg/controllers/collaset/pvccontrol"
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
-	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration"
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
@@ -82,24 +83,35 @@ type Interface interface {
 	) (bool, *time.Duration, error)
 }
 
-func NewRealSyncControl(client client.Client, logger logr.Logger, podControl podcontrol.Interface, pvcControl pvccontrol.Interface, recorder record.EventRecorder) Interface {
+func NewRealSyncControl(client client.Client,
+	logger logr.Logger,
+	podControl podcontrol.Interface,
+	pvcControl pvccontrol.Interface,
+	podContextControl podcontext.Interface,
+	recorder record.EventRecorder,
+	cacheExpectations *kubeutilsexpectations.CacheExpectations,
+) Interface {
 	return &RealSyncControl{
-		client:     client,
-		logger:     logger,
-		podControl: podControl,
-		pvcControl: pvcControl,
-		recorder:   recorder,
+		client:            client,
+		logger:            logger,
+		podControl:        podControl,
+		pvcControl:        pvcControl,
+		podContextControl: podContextControl,
+		recorder:          recorder,
+		cacheExpectations: cacheExpectations,
 	}
 }
 
 var _ Interface = &RealSyncControl{}
 
 type RealSyncControl struct {
-	client     client.Client
-	logger     logr.Logger
-	podControl podcontrol.Interface
-	pvcControl pvccontrol.Interface
-	recorder   record.EventRecorder
+	client            client.Client
+	logger            logr.Logger
+	podControl        podcontrol.Interface
+	pvcControl        pvccontrol.Interface
+	podContextControl podcontext.Interface
+	recorder          record.EventRecorder
+	cacheExpectations *kubeutilsexpectations.CacheExpectations
 }
 
 // SyncPods is used to parse podWrappers and reclaim Pod instance ID
@@ -133,7 +145,7 @@ func (r *RealSyncControl) SyncPods(
 	// get owned IDs
 	var ownedIDs map[int]*appsv1alpha1.ContextDetail
 	if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		ownedIDs, err = podcontext.AllocateID(r.client, instance, resources.UpdatedRevision.Name, int(realValue(instance.Spec.Replicas)))
+		ownedIDs, err = r.podContextControl.AllocateID(ctx, instance, resources.UpdatedRevision.Name, int(realValue(instance.Spec.Replicas)))
 		return err
 	}); err != nil {
 		return false, nil, ownedIDs, fmt.Errorf("fail to allocate %d IDs using context when sync Pods: %w", instance.Spec.Replicas, err)
@@ -201,7 +213,7 @@ func (r *RealSyncControl) SyncPods(
 	if len(toExcludePodNames) > 0 || len(toIncludePodNames) > 0 {
 		var availableContexts []*appsv1alpha1.ContextDetail
 		var getErr error
-		availableContexts, ownedIDs, getErr = r.getAvailablePodIDs(len(toIncludePodNames), instance, resources, ownedIDs, resources.CurrentIDs)
+		availableContexts, ownedIDs, getErr = r.getAvailablePodIDs(ctx, len(toIncludePodNames), instance, resources, ownedIDs, resources.CurrentIDs)
 		if getErr != nil {
 			return false, nil, nil, getErr
 		}
@@ -213,7 +225,7 @@ func (r *RealSyncControl) SyncPods(
 	}
 
 	// reclaim Pod ID which is (1) during ScalingIn, (2) ExcludePods
-	err = r.reclaimOwnedIDs(false, instance, idToReclaim, ownedIDs, resources.CurrentIDs)
+	err = r.reclaimOwnedIDs(ctx, false, instance, idToReclaim, ownedIDs, resources.CurrentIDs)
 	if err != nil {
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReclaimOwnedIDs", "reclaim pod contexts with error: %s", err.Error())
 		return false, nil, nil, err
@@ -262,7 +274,7 @@ func (r *RealSyncControl) Replace(
 	if len(needReplaceOriginPods) > 0 {
 		var availableContexts []*appsv1alpha1.ContextDetail
 		var getErr error
-		availableContexts, ownedIDs, getErr = r.getAvailablePodIDs(len(needReplaceOriginPods), instance, resources, ownedIDs, resources.CurrentIDs)
+		availableContexts, ownedIDs, getErr = r.getAvailablePodIDs(ctx, len(needReplaceOriginPods), instance, resources, ownedIDs, resources.CurrentIDs)
 		if getErr != nil {
 			return podWrappers, ownedIDs, getErr
 		}
@@ -275,7 +287,7 @@ func (r *RealSyncControl) Replace(
 	}
 
 	// reclaim Pod ID which is ReplaceOriginPod
-	err = r.reclaimOwnedIDs(needUpdateContext, instance, idToReclaim, ownedIDs, resources.CurrentIDs)
+	err = r.reclaimOwnedIDs(ctx, needUpdateContext, instance, idToReclaim, ownedIDs, resources.CurrentIDs)
 	if err != nil {
 		r.recorder.Eventf(instance, corev1.EventTypeWarning, "ReclaimOwnedIDs", "reclaim pod contexts with error: %s", err.Error())
 		return podWrappers, ownedIDs, err
@@ -331,7 +343,7 @@ func (r *RealSyncControl) Scale(
 			// find IDs and their contexts which have not been used by owned Pods
 			var availableContexts []*appsv1alpha1.ContextDetail
 			var getErr error
-			availableContexts, ownedIDs, getErr = r.getAvailablePodIDs(diff, cls, resources, ownedIDs, podInstanceIDSet)
+			availableContexts, ownedIDs, getErr = r.getAvailablePodIDs(ctx, diff, cls, resources, ownedIDs, podInstanceIDSet)
 			if getErr != nil {
 				return false, recordedRequeueAfter, getErr
 			}
@@ -408,12 +420,12 @@ func (r *RealSyncControl) Scale(
 					return err
 				}
 				// add an expectation for this pod creation, before next reconciling
-				return collasetutils.ActiveExpectations.ExpectCreate(cls, expectations.Pod, pod.Name)
+				return r.cacheExpectations.ExpectCreation(kubeutilsclient.ObjectKeyString(cls), collasetutils.PodGVK, pod.Namespace, pod.Name)
 			})
 			if needUpdateContext.Load() {
 				logger.Info("try to update ResourceContext for CollaSet after scaling out", "Context", ownedIDs)
 				if updateContextErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-					return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
+					return r.podContextControl.UpdateToPodContext(ctx, cls, ownedIDs)
 				}); updateContextErr != nil {
 					err = controllerutils.AggregateErrors([]error{updateContextErr, err})
 				}
@@ -451,11 +463,10 @@ func (r *RealSyncControl) Scale(
 			} else if updated {
 				r.recorder.Eventf(pod.Pod, corev1.EventTypeNormal, "BeginScaleInLifecycle", "succeed to begin PodOpsLifecycle for scaling in")
 				// add an expectation for this pod creation, before next reconciling
-				if err := collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.Pod, pod.Name, pod.ResourceVersion); err != nil {
+				if err := r.cacheExpectations.ExpectUpdation(kubeutilsclient.ObjectKeyString(cls), collasetutils.PodGVK, pod.Namespace, pod.Name, pod.ResourceVersion); err != nil {
 					return err
 				}
 			}
-
 			return nil
 		})
 		scaling = succCount > 0
@@ -501,7 +512,7 @@ func (r *RealSyncControl) Scale(
 		if needUpdateContext {
 			logger.Info("try to update ResourceContext for CollaSet when scaling in Pod", "Context", ownedIDs)
 			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
+				return r.podContextControl.UpdateToPodContext(ctx, cls, ownedIDs)
 			})
 
 			if err != nil {
@@ -521,7 +532,7 @@ func (r *RealSyncControl) Scale(
 			}
 
 			r.recorder.Eventf(cls, corev1.EventTypeNormal, "PodDeleted", "succeed to scale in Pod %s/%s", pod.Namespace, pod.Name)
-			if err := collasetutils.ActiveExpectations.ExpectDelete(cls, expectations.Pod, pod.Name); err != nil {
+			if err := r.cacheExpectations.ExpectDeletion(kubeutilsclient.ObjectKeyString(cls), collasetutils.PodGVK, pod.Namespace, pod.Name); err != nil {
 				return err
 			}
 
@@ -559,7 +570,7 @@ func (r *RealSyncControl) Scale(
 	if needUpdatePodContext {
 		logger.Info("try to update ResourceContext for CollaSet after scaling", "Context", ownedIDs)
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
+			return r.podContextControl.UpdateToPodContext(ctx, cls, ownedIDs)
 		}); err != nil {
 			return scaling, recordedRequeueAfter, fmt.Errorf("fail to reset ResourceContext: %w", err)
 		}
@@ -665,7 +676,7 @@ func (r *RealSyncControl) Update(
 	candidates := decidePodToUpdate(cls, podUpdateInfos)
 	podToUpdate := filterOutPlaceHolderUpdateInfos(candidates)
 	podCh := make(chan *PodUpdateInfo, len(podToUpdate))
-	updater := newPodUpdater(r.client, cls, r.podControl, r.recorder)
+	updater := newPodUpdater(r.client, cls, r.podControl, r.podContextControl, r.recorder, r.cacheExpectations)
 	updating := false
 
 	// 3. filter already updated revision,
@@ -792,6 +803,7 @@ func (r *RealSyncControl) Update(
 
 // getAvailablePodIDs try to extract and re-allocate want available IDs.
 func (r *RealSyncControl) getAvailablePodIDs(
+	ctx context.Context,
 	want int,
 	instance *appsv1alpha1.CollaSet,
 	resources *collasetutils.RelatedResources,
@@ -808,7 +820,7 @@ func (r *RealSyncControl) getAvailablePodIDs(
 	var newOwnedIDs map[int]*appsv1alpha1.ContextDetail
 	var err error
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		newOwnedIDs, err = podcontext.AllocateID(r.client, instance, resources.UpdatedRevision.Name, len(ownedIDs)+diff)
+		newOwnedIDs, err = r.podContextControl.AllocateID(ctx, instance, resources.UpdatedRevision.Name, len(ownedIDs)+diff)
 		return err
 	}); err != nil {
 		return nil, ownedIDs, fmt.Errorf("fail to allocate IDs using context when include Pods: %w", err)
@@ -819,6 +831,7 @@ func (r *RealSyncControl) getAvailablePodIDs(
 
 // reclaimOwnedIDs delete and reclaim unused IDs
 func (r *RealSyncControl) reclaimOwnedIDs(
+	ctx context.Context,
 	needUpdateContext bool,
 	cls *appsv1alpha1.CollaSet,
 	idToReclaim sets.Int,
@@ -850,7 +863,7 @@ func (r *RealSyncControl) reclaimOwnedIDs(
 		logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(cls))
 		logger.Info("try to update ResourceContext for CollaSet when sync", "Context", ownedIDs)
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			return podcontext.UpdateToPodContext(r.client, cls, ownedIDs)
+			return r.podContextControl.UpdateToPodContext(ctx, cls, ownedIDs)
 		}); err != nil {
 			return fmt.Errorf("fail to update ResourceContext when reclaiming IDs: %w", err)
 		}

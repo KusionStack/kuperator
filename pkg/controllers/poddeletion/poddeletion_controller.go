@@ -23,8 +23,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"kusionstack.io/kube-api/apps/v1alpha1"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	kubeutilsclient "kusionstack.io/kube-utils/client"
+	kubeutilsexpectations "kusionstack.io/kube-utils/controller/expectations"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -32,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"kusionstack.io/kuperator/pkg/controllers/collaset/pvccontrol"
-	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
@@ -44,7 +46,8 @@ const (
 // PodDeletionReconciler reconciles and reclaims a Pod object
 type PodDeletionReconciler struct {
 	*mixin.ReconcilerMixin
-	pvcControl pvccontrol.Interface
+	pvcControl     pvccontrol.Interface
+	rvExpectations *kubeutilsexpectations.ResourceVersionExpectation
 }
 
 func Add(mgr ctrl.Manager) error {
@@ -54,12 +57,13 @@ func Add(mgr ctrl.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr ctrl.Manager) reconcile.Reconciler {
 	mixin := mixin.NewReconcilerMixin(controllerName, mgr)
-
-	InitExpectations(mixin.Client)
-
+	rvExpectation := kubeutilsexpectations.NewResourceVersionExpectation()
+	cacheExpectations := kubeutilsexpectations.NewxCacheExpectations(mixin.Client, mixin.Scheme, clock.RealClock{})
+	pvcControl := pvccontrol.NewRealPvcControl(mixin.Client, mixin.Scheme, cacheExpectations)
 	return &PodDeletionReconciler{
 		ReconcilerMixin: mixin,
-		pvcControl:      pvccontrol.NewRealPvcControl(mixin.Client, mixin.Scheme),
+		pvcControl:      pvcControl,
+		rvExpectations:  rvExpectation,
 	}
 }
 
@@ -98,13 +102,12 @@ func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 
 		logger.Info("pod is deleted")
-		return ctrl.Result{}, activeExpectations.Delete(req.Namespace, req.Name)
+		r.rvExpectations.DeleteExpectations(kubeutilsclient.ObjectKeyString(instance))
+		return ctrl.Result{}, nil
 	}
 
 	// if expectation not satisfied, shortcut this reconciling till informer cache is updated.
-	if satisfied, err := activeExpectations.IsSatisfied(instance); err != nil {
-		return ctrl.Result{}, err
-	} else if !satisfied {
+	if satisfied := r.rvExpectations.SatisfiedExpectations(kubeutilsclient.ObjectKeyString(instance), instance.ResourceVersion); !satisfied {
 		logger.Info("pod is not satisfied to reconcile")
 		return ctrl.Result{}, nil
 	}
@@ -118,7 +121,7 @@ func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		if updated, err := podopslifecycle.Begin(r.Client, OpsLifecycleAdapter, instance); err != nil {
 			return ctrl.Result{}, fmt.Errorf("fail to begin PodOpsLifecycle to delete Pod %s: %w", req, err)
 		} else if updated {
-			if err := activeExpectations.ExpectUpdate(instance, expectations.Pod, instance.Name, instance.ResourceVersion); err != nil {
+			if err := r.rvExpectations.ExpectUpdate(kubeutilsclient.ObjectKeyString(instance), instance.ResourceVersion); err != nil {
 				return ctrl.Result{}, fmt.Errorf("fail to expect Pod updated after beginning PodOpsLifecycle to delete Pod %s: %w", req, err)
 			}
 		}
@@ -131,10 +134,6 @@ func (r *PodDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			return ctrl.Result{}, fmt.Errorf("fail to delete Pod %s with deletion indication: %w", req, err)
 		} else {
 			r.Recorder.Event(instance, corev1.EventTypeNormal, v1alpha1.PodDeletionEvent, "Deleted pod")
-
-			if err := activeExpectations.ExpectDelete(instance, expectations.Pod, instance.Name); err != nil {
-				return ctrl.Result{}, fmt.Errorf("fail to expect Pod %s to be deleted: %w", req, err)
-			}
 		}
 		// if this pod in replaced update, delete pvcs
 		_, isReplaceOriginPod := instance.Labels[appsv1alpha1.PodReplaceIndicationLabelKey]
