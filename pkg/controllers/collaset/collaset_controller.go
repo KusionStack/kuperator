@@ -155,7 +155,8 @@ func (r *CollaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 
 		logger.Info("collaSet is deleted")
-		return ctrl.Result{}, r.cacheExpectations.ExpectDeletion(req.String(), collasetutils.CollaSetGVK, req.Namespace, req.Name)
+		r.cacheExpectations.DeleteExpectations(req.String())
+		return ctrl.Result{}, nil
 	}
 
 	// if expectation not satisfied, shortcut this reconciling till informer cache is updated.
