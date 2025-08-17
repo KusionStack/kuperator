@@ -391,7 +391,6 @@ func (r *RealSyncControl) reclaimScaleStrategy(ctx context.Context, deletedPods,
 		}); err != nil {
 			return err
 		}
-		//return collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.CollaSet, cls.Name, cls.ResourceVersion)
 		return r.cacheExpectations.ExpectUpdation(kubeutilsclient.ObjectKeyString(cls), collasetutils.CollaSetGVK, cls.Namespace, cls.Name, cls.ResourceVersion)
 	}
 	return nil

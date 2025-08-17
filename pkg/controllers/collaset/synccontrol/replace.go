@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-
 	kubeutilsclient "kusionstack.io/kube-utils/client"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 

@@ -47,6 +47,10 @@ manifests: $(API_DIR)
 	cp $(API_DIR)/config/crd/apps/* config/crd/bases
 	rm -f charts/templates/crd/* && cp config/crd/bases/* charts/templates/crd/
 
+.PHONY: lint
+lint: golangci
+	$(GOFLAGS) $(GOLANGCI) run
+
 .PHONY: fmt
 fmt: ## Run go fmt against code.
 	go fmt ./...
@@ -161,6 +165,7 @@ $(LOCALBIN):
 ## Tool Binaries
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+GOLANGCI ?= $(LOCALBIN)/golangci-lint
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GINKGO ?= $(LOCALBIN)/ginkgo
 
@@ -195,4 +200,9 @@ ginkgo: $(GINKGO) ## Download ginkgo locally if necessary. If wrong version is i
 $(GINKGO): $(LOCALBIN)
 	test -s $(LOCALBIN)/ginkgo && $(LOCALBIN)/ginkgo version | grep -q $(GINKGO_VERSION) || \
 	GOBIN=$(LOCALBIN) go install github.com/onsi/ginkgo/ginkgo@v$(GINKGO_VERSION)
+
+.PHONY: golangci
+golangci: $(GOLANGCI)
+$(GOLANGCI): $(LOCALBIN)
+	@test -s $(LOCALBIN)/golangci-lint || GOBIN=$(LOCALBIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)
 
