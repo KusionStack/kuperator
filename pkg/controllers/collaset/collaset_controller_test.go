@@ -2819,6 +2819,7 @@ var _ = Describe("collaset controller", func() {
 		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 3, 3, 0, 0, 0)).Should(BeNil())
 		for _, partition := range []int32{3, 2, 1, 0} {
 			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			observedGeneration := cs.Status.ObservedGeneration
 			Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
 				cls.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
 					{
@@ -2857,24 +2858,39 @@ var _ = Describe("collaset controller", func() {
 				cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
 				return true
 			})).Should(BeNil())
+			Eventually(func() bool {
+				Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+				return cs.Status.ObservedGeneration != observedGeneration
+			}, 5*time.Second, 1*time.Second).Should(BeTrue())
 			podList := &corev1.PodList{}
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 			// mock opsLifecycle webhook to allow Pod update
-			for i := range podList.Items {
-				pod := &podList.Items[i]
-				if !podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, pod) {
-					continue
-				}
-
-				if _, allowed := podopslifecycle.AllowOps(collasetutils.UpdateOpsLifecycleAdapter, 0, pod); allowed {
-					continue
-				}
-				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
-					pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+			Eventually(func() bool {
+				if partition == 3 {
 					return true
-				})).Should(BeNil())
-			}
+				}
+				for i := range podList.Items {
+					pod := &podList.Items[i]
+					if !podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, pod) {
+						continue
+					}
+
+					if _, allowed := podopslifecycle.AllowOps(collasetutils.UpdateOpsLifecycleAdapter, 0, pod); allowed {
+						continue
+					}
+					Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+						labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+						pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+						return true
+					})).Should(BeNil())
+					return true
+				}
+				return false
+			}, 30*time.Second, 1*time.Second).Should(BeTrue())
+			Eventually(func() error {
+				// check updated pod replicas by CollaSet status
+				return expectedStatusReplicas(c, cs, 0, 0, 0, 3, 3-partition, 0, 0, 0)
+			}, 30*time.Second, 1*time.Second).Should(BeNil())
 			// there should be 6 pvcs
 			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
 			Eventually(func() int {
