@@ -25,10 +25,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	kubeutilsclient "kusionstack.io/kube-utils/client"
+	kubeutilsexpectations "kusionstack.io/kube-utils/controller/expectations"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"kusionstack.io/kuperator/pkg/controllers/collaset/utils"
-	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
+	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 )
 
 const (
@@ -39,11 +40,28 @@ const (
 	RecreateUpdateContextDataKey = "PodRecreateUpdate"
 )
 
-func AllocateID(c client.Client, instance *appsv1alpha1.CollaSet, defaultRevision string, replicas int) (map[int]*appsv1alpha1.ContextDetail, error) {
+type Interface interface {
+	AllocateID(ctx context.Context, instance *appsv1alpha1.CollaSet, defaultRevision string, replicas int) (map[int]*appsv1alpha1.ContextDetail, error)
+	UpdateToPodContext(ctx context.Context, instance *appsv1alpha1.CollaSet, ownedIDs map[int]*appsv1alpha1.ContextDetail) error
+}
+
+type RealPodContextControl struct {
+	client.Client
+	cacheExpectations kubeutilsexpectations.CacheExpectationsInterface
+}
+
+func NewRealPodContextControl(c client.Client, cacheExpectations kubeutilsexpectations.CacheExpectationsInterface) Interface {
+	return &RealPodContextControl{
+		Client:            c,
+		cacheExpectations: cacheExpectations,
+	}
+}
+
+func (r *RealPodContextControl) AllocateID(ctx context.Context, instance *appsv1alpha1.CollaSet, defaultRevision string, replicas int) (map[int]*appsv1alpha1.ContextDetail, error) {
 	contextName := getContextName(instance)
 	podContext := &appsv1alpha1.ResourceContext{}
 	notFound := false
-	if err := c.Get(context.TODO(), types.NamespacedName{Namespace: instance.Namespace, Name: contextName}, podContext); err != nil {
+	if err := r.Client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: contextName}, podContext); err != nil {
 		if !errors.IsNotFound(err) {
 			return nil, fmt.Errorf("fail to find ResourceContext %s/%s for owner %s: %w", instance.Namespace, contextName, instance.Name, err)
 		}
@@ -100,16 +118,16 @@ func AllocateID(c client.Client, instance *appsv1alpha1.CollaSet, defaultRevisio
 	}
 
 	if notFound {
-		return ownedIDs, doCreatePodContext(c, instance, ownedIDs)
+		return ownedIDs, r.doCreatePodContext(ctx, instance, ownedIDs)
 	}
 
-	return ownedIDs, doUpdatePodContext(c, instance, ownedIDs, podContext)
+	return ownedIDs, r.doUpdatePodContext(ctx, instance, ownedIDs, podContext)
 }
 
-func UpdateToPodContext(c client.Client, instance *appsv1alpha1.CollaSet, ownedIDs map[int]*appsv1alpha1.ContextDetail) error {
+func (r *RealPodContextControl) UpdateToPodContext(ctx context.Context, instance *appsv1alpha1.CollaSet, ownedIDs map[int]*appsv1alpha1.ContextDetail) error {
 	contextName := getContextName(instance)
 	podContext := &appsv1alpha1.ResourceContext{}
-	if err := c.Get(context.TODO(), types.NamespacedName{Namespace: instance.Namespace, Name: contextName}, podContext); err != nil {
+	if err := r.Client.Get(context.TODO(), types.NamespacedName{Namespace: instance.Namespace, Name: contextName}, podContext); err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("fail to find ResourceContext %s/%s: %w", instance.Namespace, contextName, err)
 		}
@@ -118,15 +136,15 @@ func UpdateToPodContext(c client.Client, instance *appsv1alpha1.CollaSet, ownedI
 			return nil
 		}
 
-		if err := doCreatePodContext(c, instance, ownedIDs); err != nil {
+		if err := r.doCreatePodContext(ctx, instance, ownedIDs); err != nil {
 			return fmt.Errorf("fail to create ResourceContext %s/%s after not found: %w", instance.Namespace, contextName, err)
 		}
 	}
 
-	return doUpdatePodContext(c, instance, ownedIDs, podContext)
+	return r.doUpdatePodContext(ctx, instance, ownedIDs, podContext)
 }
 
-func doCreatePodContext(c client.Client, instance *appsv1alpha1.CollaSet, ownerIDs map[int]*appsv1alpha1.ContextDetail) error {
+func (r *RealPodContextControl) doCreatePodContext(ctx context.Context, instance *appsv1alpha1.CollaSet, ownerIDs map[int]*appsv1alpha1.ContextDetail) error {
 	contextName := getContextName(instance)
 	podContext := &appsv1alpha1.ResourceContext{
 		ObjectMeta: metav1.ObjectMeta{
@@ -144,10 +162,10 @@ func doCreatePodContext(c client.Client, instance *appsv1alpha1.CollaSet, ownerI
 		i++
 	}
 
-	return c.Create(context.TODO(), podContext)
+	return r.Client.Create(ctx, podContext)
 }
 
-func doUpdatePodContext(c client.Client, instance client.Object, ownedIDs map[int]*appsv1alpha1.ContextDetail, podContext *appsv1alpha1.ResourceContext) error {
+func (r *RealPodContextControl) doUpdatePodContext(ctx context.Context, instance client.Object, ownedIDs map[int]*appsv1alpha1.ContextDetail, podContext *appsv1alpha1.ResourceContext) error {
 	// store all IDs crossing all workload
 	existingIDs := map[int]*appsv1alpha1.ContextDetail{}
 
@@ -169,14 +187,11 @@ func doUpdatePodContext(c client.Client, instance client.Object, ownedIDs map[in
 
 	// delete PodContext if it is empty
 	if len(existingIDs) == 0 {
-		err := c.Delete(context.TODO(), podContext)
+		err := r.Client.Delete(context.TODO(), podContext)
 		if err != nil {
-			if err := utils.ActiveExpectations.ExpectDelete(instance, expectations.ResourceContext, podContext.Name); err != nil {
-				return err
-			}
+			return err
 		}
-
-		return err
+		return r.cacheExpectations.ExpectDeletion(kubeutilsclient.ObjectKeyString(instance), collasetutils.ResourceContextGVK, podContext.Namespace, podContext.Name)
 	}
 
 	podContext.Spec.Contexts = make([]appsv1alpha1.ContextDetail, len(existingIDs))
@@ -188,14 +203,12 @@ func doUpdatePodContext(c client.Client, instance client.Object, ownedIDs map[in
 
 	// keep context detail in order by ID
 	sort.Sort(ContextDetailsByOrder(podContext.Spec.Contexts))
-	err := c.Update(context.TODO(), podContext)
+	err := r.Client.Update(ctx, podContext)
 	if err != nil {
-		if err := utils.ActiveExpectations.ExpectUpdate(instance, expectations.ResourceContext, podContext.Name, podContext.ResourceVersion); err != nil {
-			return err
-		}
+		return err
 	}
 
-	return err
+	return r.cacheExpectations.ExpectUpdation(kubeutilsclient.ObjectKeyString(instance), collasetutils.ResourceContextGVK, podContext.Namespace, podContext.Name, podContext.ResourceVersion)
 }
 
 func getContextName(instance *appsv1alpha1.CollaSet) string {

@@ -17,6 +17,7 @@ limitations under the License.
 package podcontext
 
 import (
+	"context"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -25,7 +26,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	kubeutilsexpectations "kusionstack.io/kube-utils/controller/expectations"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -39,6 +42,7 @@ var scheme = runtime.NewScheme()
 var _ = Describe("ResourceContext allocation", func() {
 	It("allocate ID", func() {
 		c := fake.NewClientBuilder().WithScheme(scheme).Build()
+		rpc := NewRealPodContextControl(c, kubeutilsexpectations.NewxCacheExpectations(c, scheme, clock.RealClock{}))
 		namespace := "test"
 
 		instance1 := &appsv1alpha1.CollaSet{
@@ -65,7 +69,7 @@ var _ = Describe("ResourceContext allocation", func() {
 			},
 		}
 
-		ownedIDs, err := AllocateID(c, instance1, "", 10)
+		ownedIDs, err := rpc.AllocateID(context.TODO(), instance1, "", 10)
 		Expect(err).Should(BeNil())
 		Expect(len(ownedIDs)).Should(BeEquivalentTo(10))
 		for i := 0; i < 10; i++ {
@@ -73,7 +77,7 @@ var _ = Describe("ResourceContext allocation", func() {
 			Expect(exist).Should(BeTrue())
 		}
 
-		ownedIDs, err = AllocateID(c, instance2, "", 4)
+		ownedIDs, err = rpc.AllocateID(context.TODO(), instance2, "", 4)
 		Expect(err).Should(BeNil())
 		Expect(len(ownedIDs)).Should(BeEquivalentTo(4))
 		for i := 10; i < 14; i++ {
@@ -81,13 +85,13 @@ var _ = Describe("ResourceContext allocation", func() {
 			Expect(exist).Should(BeTrue())
 		}
 
-		ownedIDs, err = AllocateID(c, instance1, "", 10)
+		ownedIDs, err = rpc.AllocateID(context.TODO(), instance1, "", 10)
 		Expect(err).NotTo(HaveOccurred())
 		delete(ownedIDs, 4)
 		delete(ownedIDs, 6)
-		Expect(UpdateToPodContext(c, instance1, ownedIDs)).Should(BeNil())
+		Expect(rpc.UpdateToPodContext(context.TODO(), instance1, ownedIDs)).Should(BeNil())
 
-		ownedIDs, err = AllocateID(c, instance2, "", 7)
+		ownedIDs, err = rpc.AllocateID(context.TODO(), instance2, "", 7)
 		Expect(err).Should(BeNil())
 		Expect(len(ownedIDs)).Should(BeEquivalentTo(7))
 		for _, i := range []int{4, 6, 10, 11, 12, 13, 14} {
@@ -95,7 +99,7 @@ var _ = Describe("ResourceContext allocation", func() {
 			Expect(exist).Should(BeTrue())
 		}
 
-		ownedIDs, err = AllocateID(c, instance1, "", 12)
+		ownedIDs, err = rpc.AllocateID(context.TODO(), instance1, "", 12)
 		Expect(err).Should(BeNil())
 		Expect(len(ownedIDs)).Should(BeEquivalentTo(12))
 		for _, i := range []int{0, 1, 2, 3, 5, 7, 8, 9, 15, 16, 17, 18} {

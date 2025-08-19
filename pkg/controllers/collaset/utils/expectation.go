@@ -17,14 +17,13 @@ limitations under the License.
 package utils
 
 import (
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
+	corev1 "k8s.io/api/core/v1"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 )
 
-// ActiveExpectations is used to check the cache in informer is updated, before reconciling.
-var ActiveExpectations *expectations.ActiveExpectations
-
-func InitExpectations(c client.Client) {
-	ActiveExpectations = expectations.NewActiveExpectations(c)
-}
+var (
+	PodGVK             = corev1.SchemeGroupVersion.WithKind("Pod")
+	PVCGVK             = corev1.SchemeGroupVersion.WithKind("PersistentVolumeClaim")
+	CollaSetGVK        = appsv1alpha1.SchemeGroupVersion.WithKind("CollaSet")
+	ResourceContextGVK = appsv1alpha1.SchemeGroupVersion.WithKind("ResourceContext")
+)

@@ -32,12 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	kubeutilsclient "kusionstack.io/kube-utils/client"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontext"
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
-	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 )
@@ -189,7 +189,7 @@ func (r *RealSyncControl) replaceOriginPods(
 				originPod.Namespace,
 				originPod.Name,
 				replaceRevision.Name)
-			if err := collasetutils.ActiveExpectations.ExpectCreate(instance, expectations.Pod, newCreatedPod.Name); err != nil {
+			if err := r.cacheExpectations.ExpectCreation(kubeutilsclient.ObjectKeyString(instance), collasetutils.PodGVK, newCreatedPod.Namespace, newCreatedPod.Name); err != nil {
 				return err
 			}
 

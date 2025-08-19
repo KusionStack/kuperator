@@ -31,11 +31,11 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	kubeutilsclient "kusionstack.io/kube-utils/client"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
-	"kusionstack.io/kuperator/pkg/controllers/utils/expectations"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/kuperator/pkg/features"
 	"kusionstack.io/kuperator/pkg/utils/feature"
@@ -273,7 +273,7 @@ func (r *RealSyncControl) excludePod(ctx context.Context, cls *appsv1alpha1.Coll
 			return err
 		}
 	}
-	return collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.Pod, pod.Name, pod.ResourceVersion)
+	return r.cacheExpectations.ExpectUpdation(kubeutilsclient.ObjectKeyString(cls), collasetutils.PodGVK, pod.Namespace, pod.Name, pod.ResourceVersion)
 }
 
 // includePod try to include a pod into collaset
@@ -311,7 +311,7 @@ func (r *RealSyncControl) includePod(ctx context.Context, cls *appsv1alpha1.Coll
 			return err
 		}
 	}
-	return collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.Pod, pod.Name, pod.ResourceVersion)
+	return r.cacheExpectations.ExpectUpdation(kubeutilsclient.ObjectKeyString(cls), collasetutils.PodGVK, pod.Namespace, pod.Name, pod.ResourceVersion)
 }
 
 // adoptPvcsLeftByRetainPolicy adopts pvcs with respect of "whenDelete=true" pvc retention policy
@@ -391,7 +391,7 @@ func (r *RealSyncControl) reclaimScaleStrategy(ctx context.Context, deletedPods,
 		}); err != nil {
 			return err
 		}
-		return collasetutils.ActiveExpectations.ExpectUpdate(cls, expectations.CollaSet, cls.Name, cls.ResourceVersion)
+		return r.cacheExpectations.ExpectUpdation(kubeutilsclient.ObjectKeyString(cls), collasetutils.CollaSetGVK, cls.Namespace, cls.Name, cls.ResourceVersion)
 	}
 	return nil
 }
