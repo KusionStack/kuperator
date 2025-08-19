@@ -47,10 +47,10 @@ type Interface interface {
 
 type RealPodContextControl struct {
 	client.Client
-	cacheExpectations *kubeutilsexpectations.CacheExpectations
+	cacheExpectations kubeutilsexpectations.CacheExpectationsInterface
 }
 
-func NewRealPodContextControl(c client.Client, cacheExpectations *kubeutilsexpectations.CacheExpectations) Interface {
+func NewRealPodContextControl(c client.Client, cacheExpectations kubeutilsexpectations.CacheExpectationsInterface) Interface {
 	return &RealPodContextControl{
 		Client:            c,
 		cacheExpectations: cacheExpectations,

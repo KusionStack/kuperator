@@ -364,7 +364,7 @@ func (o orderByDefault) Less(i, j int) bool {
 }
 
 type PodUpdater interface {
-	Setup(client.Client, *appsv1alpha1.CollaSet, podcontrol.Interface, podcontext.Interface, record.EventRecorder, *kubeutilsexpectations.CacheExpectations)
+	Setup(client.Client, *appsv1alpha1.CollaSet, podcontrol.Interface, podcontext.Interface, record.EventRecorder, kubeutilsexpectations.CacheExpectationsInterface)
 	FulfillPodUpdatedInfo(ctx context.Context, revision *appsv1.ControllerRevision, podUpdateInfo *PodUpdateInfo) error
 	BeginUpdatePod(ctx context.Context, resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (bool, error)
 	FilterAllowOpsPods(ctx context.Context, podToUpdate []*PodUpdateInfo, ownedIDs map[int]*appsv1alpha1.ContextDetail, resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (*time.Duration, error)
@@ -379,10 +379,10 @@ type GenericPodUpdater struct {
 	podContextControl podcontext.Interface
 	Recorder          record.EventRecorder
 	client.Client
-	cacheExpectations *kubeutilsexpectations.CacheExpectations
+	cacheExpectations kubeutilsexpectations.CacheExpectationsInterface
 }
 
-func (u *GenericPodUpdater) Setup(client client.Client, cls *appsv1alpha1.CollaSet, podControl podcontrol.Interface, podContextControl podcontext.Interface, recorder record.EventRecorder, cacheExpectations *kubeutilsexpectations.CacheExpectations) {
+func (u *GenericPodUpdater) Setup(client client.Client, cls *appsv1alpha1.CollaSet, podControl podcontrol.Interface, podContextControl podcontext.Interface, recorder record.EventRecorder, cacheExpectations kubeutilsexpectations.CacheExpectationsInterface) {
 	u.Client = client
 	u.CollaSet = cls
 	u.PodControl = podControl
@@ -517,7 +517,7 @@ func RegisterInPlaceOnlyUpdater(podUpdater PodUpdater) {
 	inPlaceOnlyPodUpdater = podUpdater
 }
 
-func newPodUpdater(client client.Client, cls *appsv1alpha1.CollaSet, podControl podcontrol.Interface, podContextControl podcontext.Interface, recorder record.EventRecorder, cacheExpectations *kubeutilsexpectations.CacheExpectations) PodUpdater {
+func newPodUpdater(client client.Client, cls *appsv1alpha1.CollaSet, podControl podcontrol.Interface, podContextControl podcontext.Interface, recorder record.EventRecorder, cacheExpectations kubeutilsexpectations.CacheExpectationsInterface) PodUpdater {
 	var podUpdater PodUpdater
 	switch cls.Spec.UpdateStrategy.PodUpdatePolicy {
 	case appsv1alpha1.CollaSetRecreatePodUpdateStrategyType:
@@ -799,10 +799,10 @@ type replaceUpdatePodUpdater struct {
 	podControl podcontrol.Interface
 	recorder   record.EventRecorder
 	client.Client
-	cacheExpectations *kubeutilsexpectations.CacheExpectations
+	cacheExpectations kubeutilsexpectations.CacheExpectationsInterface
 }
 
-func (u *replaceUpdatePodUpdater) Setup(client client.Client, cls *appsv1alpha1.CollaSet, podControl podcontrol.Interface, _ podcontext.Interface, recorder record.EventRecorder, cacheExpectations *kubeutilsexpectations.CacheExpectations) {
+func (u *replaceUpdatePodUpdater) Setup(client client.Client, cls *appsv1alpha1.CollaSet, podControl podcontrol.Interface, _ podcontext.Interface, recorder record.EventRecorder, cacheExpectations kubeutilsexpectations.CacheExpectationsInterface) {
 	u.Client = client
 	u.collaSet = cls
 	u.podControl = podControl

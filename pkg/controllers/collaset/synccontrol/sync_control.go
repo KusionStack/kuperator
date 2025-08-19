@@ -89,7 +89,7 @@ func NewRealSyncControl(client client.Client,
 	pvcControl pvccontrol.Interface,
 	podContextControl podcontext.Interface,
 	recorder record.EventRecorder,
-	cacheExpectations *kubeutilsexpectations.CacheExpectations,
+	cacheExpectations kubeutilsexpectations.CacheExpectationsInterface,
 ) Interface {
 	return &RealSyncControl{
 		client:            client,
@@ -111,7 +111,7 @@ type RealSyncControl struct {
 	pvcControl        pvccontrol.Interface
 	podContextControl podcontext.Interface
 	recorder          record.EventRecorder
-	cacheExpectations *kubeutilsexpectations.CacheExpectations
+	cacheExpectations kubeutilsexpectations.CacheExpectationsInterface
 }
 
 // SyncPods is used to parse podWrappers and reclaim Pod instance ID

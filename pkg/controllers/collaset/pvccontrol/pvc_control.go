@@ -46,10 +46,10 @@ type Interface interface {
 type RealPvcControl struct {
 	client            client.Client
 	scheme            *runtime.Scheme
-	cacheExpectations *kubeutilsexpectations.CacheExpectations
+	cacheExpectations kubeutilsexpectations.CacheExpectationsInterface
 }
 
-func NewRealPvcControl(client client.Client, scheme *runtime.Scheme, cacheExpectations *kubeutilsexpectations.CacheExpectations) Interface {
+func NewRealPvcControl(client client.Client, scheme *runtime.Scheme, cacheExpectations kubeutilsexpectations.CacheExpectationsInterface) Interface {
 	return &RealPvcControl{
 		client:            client,
 		scheme:            scheme,
