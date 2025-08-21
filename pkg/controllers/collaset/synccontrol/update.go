@@ -376,19 +376,19 @@ type PodUpdater interface {
 type GenericPodUpdater struct {
 	*appsv1alpha1.CollaSet
 	PodControl        podcontrol.Interface
-	podContextControl podcontext.Interface
+	PodContextControl podcontext.Interface
 	Recorder          record.EventRecorder
 	client.Client
-	cacheExpectations kubeutilsexpectations.CacheExpectationsInterface
+	CacheExpectations kubeutilsexpectations.CacheExpectationsInterface
 }
 
 func (u *GenericPodUpdater) Setup(client client.Client, cls *appsv1alpha1.CollaSet, podControl podcontrol.Interface, podContextControl podcontext.Interface, recorder record.EventRecorder, cacheExpectations kubeutilsexpectations.CacheExpectationsInterface) {
 	u.Client = client
 	u.CollaSet = cls
 	u.PodControl = podControl
-	u.podContextControl = podContextControl
+	u.PodContextControl = podContextControl
 	u.Recorder = recorder
-	u.cacheExpectations = cacheExpectations
+	u.CacheExpectations = cacheExpectations
 }
 
 func (u *GenericPodUpdater) BeginUpdatePod(_ context.Context, resources *collasetutils.RelatedResources, podCh chan *PodUpdateInfo) (bool, error) {
@@ -405,7 +405,7 @@ func (u *GenericPodUpdater) BeginUpdatePod(_ context.Context, resources *collase
 			return fmt.Errorf("fail to begin PodOpsLifecycle for updating Pod %s/%s: %w", podInfo.Namespace, podInfo.Name, err)
 		} else if updated {
 			// add an expectation for this pod update, before next reconciling
-			if err := u.cacheExpectations.ExpectUpdation(kubeutilsclient.ObjectKeyString(u.CollaSet), collasetutils.PodGVK, podInfo.Pod.Namespace, podInfo.Pod.Name, podInfo.Pod.ResourceVersion); err != nil {
+			if err := u.CacheExpectations.ExpectUpdation(kubeutilsclient.ObjectKeyString(u.CollaSet), collasetutils.PodGVK, podInfo.Pod.Namespace, podInfo.Pod.Name, podInfo.Pod.ResourceVersion); err != nil {
 				return err
 			}
 		}
@@ -482,7 +482,7 @@ func (u *GenericPodUpdater) FilterAllowOpsPods(ctx context.Context, candidates [
 	if needUpdateContext {
 		u.Recorder.Eventf(u.CollaSet, corev1.EventTypeNormal, "UpdateToPodContext", "try to update ResourceContext for CollaSet")
 		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			return u.podContextControl.UpdateToPodContext(ctx, u.CollaSet, ownedIDs)
+			return u.PodContextControl.UpdateToPodContext(ctx, u.CollaSet, ownedIDs)
 		})
 		return recordedRequeueAfter, err
 	}
@@ -500,7 +500,7 @@ func (u *GenericPodUpdater) FinishUpdatePod(_ context.Context, podInfo *PodUpdat
 		return fmt.Errorf("failed to finish PodOpsLifecycle for updating Pod %s/%s: %w", podInfo.Namespace, podInfo.Name, err)
 	} else if updated {
 		// add an expectation for this pod update, before next reconciling
-		if err := u.cacheExpectations.ExpectUpdation(kubeutilsclient.ObjectKeyString(u.CollaSet), collasetutils.PodGVK, podInfo.Pod.Namespace, podInfo.Pod.Name, podInfo.Pod.ResourceVersion); err != nil {
+		if err := u.CacheExpectations.ExpectUpdation(kubeutilsclient.ObjectKeyString(u.CollaSet), collasetutils.PodGVK, podInfo.Pod.Namespace, podInfo.Pod.Name, podInfo.Pod.ResourceVersion); err != nil {
 			return err
 		}
 		u.Recorder.Eventf(podInfo.Pod,
@@ -647,7 +647,7 @@ func (u *inPlaceIfPossibleUpdater) UpgradePod(_ context.Context, podInfo *PodUpd
 				podInfo.Namespace, podInfo.Name,
 				podInfo.CurrentRevision.Name,
 				podInfo.UpdateRevision.Name)
-			if err := u.cacheExpectations.ExpectUpdation(kubeutilsclient.ObjectKeyString(u.CollaSet), collasetutils.PodGVK, podInfo.Namespace, podInfo.Name, podInfo.Pod.ResourceVersion); err != nil {
+			if err := u.CacheExpectations.ExpectUpdation(kubeutilsclient.ObjectKeyString(u.CollaSet), collasetutils.PodGVK, podInfo.Namespace, podInfo.Name, podInfo.Pod.ResourceVersion); err != nil {
 				return err
 			}
 		}
@@ -656,7 +656,7 @@ func (u *inPlaceIfPossibleUpdater) UpgradePod(_ context.Context, podInfo *PodUpd
 		if err := RecreatePod(podInfo, u.PodControl, u.Recorder); err != nil {
 			return err
 		}
-		return u.cacheExpectations.ExpectDeletion(kubeutilsclient.ObjectKeyString(u.CollaSet), collasetutils.PodGVK, podInfo.Namespace, podInfo.Name)
+		return u.CacheExpectations.ExpectDeletion(kubeutilsclient.ObjectKeyString(u.CollaSet), collasetutils.PodGVK, podInfo.Namespace, podInfo.Name)
 	}
 	return nil
 }
@@ -786,7 +786,7 @@ func (u *recreatePodUpdater) UpgradePod(_ context.Context, podInfo *PodUpdateInf
 	if err := RecreatePod(podInfo, u.PodControl, u.Recorder); err != nil {
 		return err
 	}
-	return u.cacheExpectations.ExpectDeletion(kubeutilsclient.ObjectKeyString(u.CollaSet), collasetutils.PodGVK, podInfo.Namespace, podInfo.Name)
+	return u.CacheExpectations.ExpectDeletion(kubeutilsclient.ObjectKeyString(u.CollaSet), collasetutils.PodGVK, podInfo.Namespace, podInfo.Name)
 }
 
 func (u *recreatePodUpdater) GetPodUpdateFinishStatus(_ context.Context, podInfo *PodUpdateInfo) (finished bool, msg string, err error) {
