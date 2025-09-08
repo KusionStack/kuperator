@@ -120,10 +120,16 @@ func (r *RealSyncControl) SyncPods(
 	instance *appsv1alpha1.CollaSet,
 	resources *collasetutils.RelatedResources,
 ) (bool, []*collasetutils.PodWrapper, map[int]*appsv1alpha1.ContextDetail, error) {
-	var err error
-	resources.FilteredPods, err = r.podControl.GetFilteredPods(instance.Spec.Selector, instance)
+	filteredPods, allPods, err := r.podControl.GetFilteredPods(instance.Spec.Selector, instance)
 	if err != nil {
 		return false, nil, nil, fmt.Errorf("fail to get filtered Pods: %w", err)
+	}
+
+	if instance.Spec.ScaleStrategy.PodNamingPolicy == appsv1alpha1.PodNamingPolicyPersistentSequence {
+		// pods with same number should not exist at same time
+		resources.FilteredPods = allPods
+	} else {
+		resources.FilteredPods = filteredPods
 	}
 
 	// list pvcs using ownerReference
@@ -176,7 +182,8 @@ func (r *RealSyncControl) SyncPods(
 			}
 		}
 
-		if pod.DeletionTimestamp != nil {
+		// naming policy is default, try to filter out terminating pods
+		if pod.DeletionTimestamp != nil && instance.Spec.ScaleStrategy.PodNamingPolicy == appsv1alpha1.PodNamingPolicyDefault {
 			// 1. Reclaim ID from Pod which is scaling in and terminating.
 			if contextDetail, exist := ownedIDs[id]; exist && contextDetail.Contains(ScaleInContextDataKey, "true") {
 				idToReclaim.Insert(id)
@@ -254,7 +261,7 @@ func (r *RealSyncControl) Replace(
 	var idToReclaim sets.Int
 	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(instance))
 
-	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(resources.FilteredPods, logger)
+	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(instance, resources.FilteredPods, logger)
 
 	// delete origin pods for replace
 	err = DeletePodsByLabel(r.podControl, needDeletePods)
@@ -367,12 +374,13 @@ func (r *RealSyncControl) Scale(
 				}
 				// scale out new Pods with updatedRevision
 				// TODO use cache
+				instanceId := fmt.Sprintf("%d", availableIDContext.ID)
 				pod, err := collasetutils.NewPodFrom(
 					cls,
 					metav1.NewControllerRef(cls, appsv1alpha1.SchemeGroupVersion.WithKind("CollaSet")),
 					revision,
+					instanceId,
 					func(in *corev1.Pod) (localErr error) {
-						in.Labels[appsv1alpha1.PodInstanceIDLabelKey] = fmt.Sprintf("%d", availableIDContext.ID)
 						if availableIDContext.Data[podcontext.JustCreateContextDataKey] == "true" {
 							in.Labels[appsv1alpha1.PodCreatingLabel] = strconv.FormatInt(time.Now().UnixNano(), 10)
 						} else {

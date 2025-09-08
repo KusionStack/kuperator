@@ -75,7 +75,7 @@ func GetPodInstanceID(pod *corev1.Pod) (int, error) {
 	return int(id), nil
 }
 
-func NewPodFrom(owner metav1.Object, ownerRef *metav1.OwnerReference, revision *appsv1.ControllerRevision, updateFn ...func(*corev1.Pod) error) (*corev1.Pod, error) {
+func NewPodFrom(owner metav1.Object, ownerRef *metav1.OwnerReference, revision *appsv1.ControllerRevision, instanceId string, updateFn ...func(*corev1.Pod) error) (*corev1.Pod, error) {
 	pod, err := GetPodFromRevision(revision)
 	if err != nil {
 		return pod, err
@@ -85,6 +85,12 @@ func NewPodFrom(owner metav1.Object, ownerRef *metav1.OwnerReference, revision *
 	pod.GenerateName = GetPodsPrefix(owner.GetName())
 	pod.OwnerReferences = append(pod.OwnerReferences, *ownerRef)
 
+	cls, _ := owner.(*appsv1alpha1.CollaSet)
+	if cls.Spec.ScaleStrategy.PodNamingPolicy == appsv1alpha1.PodNamingPolicyPersistentSequence {
+		pod.Name = pod.GenerateName + instanceId
+	}
+
+	pod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
 	pod.Labels[appsv1.ControllerRevisionHashLabelKey] = revision.Name
 
 	utils.ControlByKusionStack(pod)

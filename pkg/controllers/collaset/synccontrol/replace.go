@@ -143,13 +143,6 @@ func (r *RealSyncControl) replaceOriginPods(
 		if err != nil {
 			return err
 		}
-		// create pod using update revision if replaced by update, otherwise using current revision
-		newPod, err := collasetutils.NewPodFrom(instance, ownerRef, replaceRevision, func(in *corev1.Pod) error {
-			return utilspoddecoration.PatchListOfDecorations(in, updatedPDs)
-		})
-		if err != nil {
-			return err
-		}
 		// add instance id and replace pair label
 		var instanceId string
 		var newPodContext *appsv1alpha1.ContextDetail
@@ -157,7 +150,6 @@ func (r *RealSyncControl) replaceOriginPods(
 			newPodContext = contextDetail
 			// reuse podContext ID if pair-relation exists
 			instanceId = fmt.Sprintf("%d", newPodContext.ID)
-			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
 			logger.Info("replaceOriginPods", "try to reuse new pod resourceContext id", instanceId)
 		} else {
 			if availableContexts[i] == nil {
@@ -167,11 +159,16 @@ func (r *RealSyncControl) replaceOriginPods(
 			newPodContext = availableContexts[i]
 			// add replace pair-relation to podContexts for originPod and newPod
 			instanceId = fmt.Sprintf("%d", newPodContext.ID)
-			newPod.Labels[appsv1alpha1.PodInstanceIDLabelKey] = instanceId
-			newPodId, _ := collasetutils.GetPodInstanceID(newPod)
-			ownedIDs[originPodId].Put(ReplaceNewPodIDContextDataKey, strconv.Itoa(newPodId))
-			ownedIDs[newPodId].Put(ReplaceOriginPodIDContextDataKey, strconv.Itoa(originPodId))
-			ownedIDs[newPodId].Remove(podcontext.JustCreateContextDataKey)
+			ownedIDs[originPodId].Put(ReplaceNewPodIDContextDataKey, instanceId)
+			ownedIDs[newPodContext.ID].Put(ReplaceOriginPodIDContextDataKey, strconv.Itoa(originPodId))
+			ownedIDs[newPodContext.ID].Remove(podcontext.JustCreateContextDataKey)
+		}
+		// create pod using update revision if replaced by update, otherwise using current revision
+		newPod, err := collasetutils.NewPodFrom(instance, ownerRef, replaceRevision, instanceId, func(in *corev1.Pod) error {
+			return utilspoddecoration.PatchListOfDecorations(in, updatedPDs)
+		})
+		if err != nil {
+			return err
 		}
 		newPod.Labels[appsv1alpha1.PodReplacePairOriginName] = originPod.GetName()
 		newPod.Labels[appsv1alpha1.PodCreatingLabel] = strconv.FormatInt(time.Now().UnixNano(), 10)
@@ -215,9 +212,14 @@ func (r *RealSyncControl) replaceOriginPods(
 	return successCount, err
 }
 
-func dealReplacePods(pods []*corev1.Pod, logger logr.Logger) (
+func dealReplacePods(instance *appsv1alpha1.CollaSet, pods []*corev1.Pod, logger logr.Logger) (
 	needReplacePods, needCleanLabelPods []*corev1.Pod, podNeedCleanLabels [][]string, needDeletePods []*corev1.Pod,
 ) {
+	// PersistentSequence naming policy is not allowed to replace
+	if instance.Spec.ScaleStrategy.PodNamingPolicy == appsv1alpha1.PodNamingPolicyPersistentSequence {
+		return
+	}
+
 	podInstanceIdMap := make(map[string]*corev1.Pod)
 	podNameMap := make(map[string]*corev1.Pod)
 	for _, pod := range pods {

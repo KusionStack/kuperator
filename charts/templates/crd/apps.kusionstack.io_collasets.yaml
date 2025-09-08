@@ -134,6 +134,9 @@ spec:
                           the replica count to be deleted.
                         type: string
                     type: object
+                  podNamingPolicy:
+                    description: PodNamingPolicy indicates how a new pod name is generated.
+                    type: string
                   podToDelete:
                     description: PodToDelete indicates the pods which will be deleted
                       by CollaSet.

@@ -102,8 +102,8 @@ func (roa *revisionOwnerAdapter) GetInUsedRevisions(obj metav1.Object) (sets.Str
 	if cls.Status.CurrentRevision != "" {
 		inUsed.Insert(cls.Status.CurrentRevision)
 	}
-	pods, _ := roa.podControl.GetFilteredPods(cls.Spec.Selector, cls)
-	for _, pod := range pods {
+	filteredPods, _, _ := roa.podControl.GetFilteredPods(cls.Spec.Selector, cls)
+	for _, pod := range filteredPods {
 		if pod.Labels != nil {
 			if currentRevisionName, exist := pod.Labels[appsv1.ControllerRevisionHashLabelKey]; exist {
 				inUsed.Insert(currentRevisionName)
