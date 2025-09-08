@@ -279,7 +279,6 @@ func calculateStatus(
 
 	activePods := synccontrol.FilterOutPlaceHolderPodWrappers(podWrappers)
 	for _, podWrapper := range activePods {
-		// naming policy is default, try to filter out terminating pods
 		if podWrapper.DeletionTimestamp != nil && instance.Spec.ScaleStrategy.PodNamingPolicy == appsv1alpha1.PodNamingPolicyDefault {
 			continue
 		}
