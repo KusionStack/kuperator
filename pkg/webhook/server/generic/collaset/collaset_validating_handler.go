@@ -117,6 +117,21 @@ func (h *ValidatingHandler) validateScaleStrategy(cls, oldCls *appsv1alpha1.Coll
 		allErrs = append(allErrs, field.Forbidden(fSpec.Child("scaleStrategy", "context"), "scaleStrategy.context is not allowed to be changed"))
 	}
 
+	if cls.Spec.ScaleStrategy.PodNamingPolicy != appsv1alpha1.PodNamingPolicyPersistentSequence && cls.Spec.ScaleStrategy.PodNamingPolicy != appsv1alpha1.PodNamingPolicyDefault {
+		allErrs = append(allErrs, field.NotSupported(fSpec.Child("scaleStrategy", "podNamingPolicy"), cls.Spec.ScaleStrategy.PodNamingPolicy,
+			[]string{
+				string(appsv1alpha1.PodNamingPolicyPersistentSequence),
+				string(appsv1alpha1.PodNamingPolicyDefault),
+			},
+		))
+	}
+
+	if cls.Spec.ScaleStrategy.PodNamingPolicy == appsv1alpha1.PodNamingPolicyPersistentSequence &&
+		(len(cls.Spec.ScaleStrategy.PodToExclude) > 0 || len(cls.Spec.ScaleStrategy.PodToInclude) > 0) {
+		allErrs = append(allErrs, field.Forbidden(fSpec.Child("scaleStrategy", "podToExclude[podToInclude]"),
+			"scaleStrategy.podToExclude[podToInclude] is not allowed when podNamingPolicy is PodNamingPolicyPersistentSequence"))
+	}
+
 	allErrs = append(allErrs, h.validateScaleStrategyPodList(cls, fSpec)...)
 
 	return allErrs

@@ -257,3 +257,9 @@ func SetDefaultCollaSetUpdateStrategy(cls *appsv1alpha1.CollaSet) {
 		cls.Spec.UpdateStrategy.RollingUpdate.ByPartition = &appsv1alpha1.ByPartition{}
 	}
 }
+
+func SetDefaultCollaSetScaleStrategy(cls *appsv1alpha1.CollaSet) {
+	if cls.Spec.ScaleStrategy.PodNamingPolicy == "" {
+		cls.Spec.ScaleStrategy.PodNamingPolicy = appsv1alpha1.PodNamingPolicyDefault
+	}
+}

@@ -58,6 +58,7 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) (re
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	kuperatorv1alpha1.SetDefaultCollaSetUpdateStrategy(cls)
+	kuperatorv1alpha1.SetDefaultCollaSetScaleStrategy(cls)
 
 	marshaled, err := json.Marshal(cls)
 	if err != nil {
