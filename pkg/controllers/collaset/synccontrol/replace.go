@@ -212,14 +212,9 @@ func (r *RealSyncControl) replaceOriginPods(
 	return successCount, err
 }
 
-func dealReplacePods(instance *appsv1alpha1.CollaSet, pods []*corev1.Pod, logger logr.Logger) (
+func dealReplacePods(pods []*corev1.Pod, logger logr.Logger) (
 	needReplacePods, needCleanLabelPods []*corev1.Pod, podNeedCleanLabels [][]string, needDeletePods []*corev1.Pod,
 ) {
-	// PersistentSequence naming policy is not allowed to replace
-	if instance.Spec.ScaleStrategy.PodNamingPolicy == appsv1alpha1.PodNamingPolicyPersistentSequence {
-		return
-	}
-
 	podInstanceIdMap := make(map[string]*corev1.Pod)
 	podNameMap := make(map[string]*corev1.Pod)
 	for _, pod := range pods {

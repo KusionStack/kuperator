@@ -182,8 +182,8 @@ func (r *RealSyncControl) SyncPods(
 			}
 		}
 
-		// naming policy is default, try to filter out terminating pods
-		if pod.DeletionTimestamp != nil && instance.Spec.ScaleStrategy.PodNamingPolicy == appsv1alpha1.PodNamingPolicyDefault {
+		// pods with PersistentSequence naming policy should always count a replicas, to avoid scaleOut a pod with the same name
+		if pod.DeletionTimestamp != nil && instance.Spec.ScaleStrategy.PodNamingPolicy != appsv1alpha1.PodNamingPolicyPersistentSequence {
 			// 1. Reclaim ID from Pod which is scaling in and terminating.
 			if contextDetail, exist := ownedIDs[id]; exist && contextDetail.Contains(ScaleInContextDataKey, "true") {
 				idToReclaim.Insert(id)
@@ -261,7 +261,7 @@ func (r *RealSyncControl) Replace(
 	var idToReclaim sets.Int
 	logger := r.logger.WithValues("collaset", commonutils.ObjectKeyString(instance))
 
-	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(instance, resources.FilteredPods, logger)
+	needReplaceOriginPods, needCleanLabelPods, podsNeedCleanLabels, needDeletePods := dealReplacePods(resources.FilteredPods, logger)
 
 	// delete origin pods for replace
 	err = DeletePodsByLabel(r.podControl, needDeletePods)
