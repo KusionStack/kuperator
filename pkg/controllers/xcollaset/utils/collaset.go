@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The KusionStack Authors.
+Copyright 2025 The KusionStack Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package utils
 
-import (
-	"kusionstack.io/kuperator/pkg/controllers/xcollaset"
-)
+import appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
-func init() {
-	AddToManagerFuncs = append(AddToManagerFuncs, xcollaset.Add)
+func PodNamingSuffixPersistentSequence(cls *appsv1alpha1.CollaSet) bool {
+	if cls.Spec.NamingStrategy == nil {
+		return false
+	}
+	return cls.Spec.NamingStrategy.PodNamingSuffixPolicy == appsv1alpha1.PodNamingSuffixPolicyPersistentSequence
 }
