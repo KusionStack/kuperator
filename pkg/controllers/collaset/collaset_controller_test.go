@@ -4647,7 +4647,6 @@ var _ = Describe("collaset controller", func() {
 			return expectedStatusReplicas(c, cs, 0, 0, 0, 0, 0, 0, 0, 0)
 		}, 5*time.Second, 1*time.Second).Should(BeNil())
 	})
-
 })
 
 func expectedStatusReplicas(c client.Client, cls *appsv1alpha1.CollaSet, scheduledReplicas, readyReplicas, availableReplicas, replicas, updatedReplicas, operatingReplicas,
