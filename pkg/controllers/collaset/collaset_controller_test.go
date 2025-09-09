@@ -4596,6 +4596,10 @@ var _ = Describe("collaset controller", func() {
 			pod.Finalizers = []string{}
 			return true
 		})).Should(BeNil())
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 2
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
 
 		// scale in pods with delay seconds
 		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
@@ -4643,6 +4647,7 @@ var _ = Describe("collaset controller", func() {
 			return expectedStatusReplicas(c, cs, 0, 0, 0, 0, 0, 0, 0, 0)
 		}, 5*time.Second, 1*time.Second).Should(BeNil())
 	})
+
 })
 
 func expectedStatusReplicas(c client.Client, cls *appsv1alpha1.CollaSet, scheduledReplicas, readyReplicas, availableReplicas, replicas, updatedReplicas, operatingReplicas,
