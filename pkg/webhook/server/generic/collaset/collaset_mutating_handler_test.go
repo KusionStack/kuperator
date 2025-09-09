@@ -48,4 +48,8 @@ func TestMutatingCollaSet(t *testing.T) {
 	if cls.Spec.UpdateStrategy.RollingUpdate.ByPartition == nil {
 		t.Fatalf("expected default byPartition, got nil")
 	}
+
+	if cls.Spec.ScaleStrategy.PodNamingPolicy != appsv1alpha1.PodNamingPolicyDefault {
+		t.Fatalf("expected default PodNamingPolicy, got nil")
+	}
 }

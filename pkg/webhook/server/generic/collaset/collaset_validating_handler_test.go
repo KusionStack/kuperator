@@ -48,6 +48,9 @@ func TestValidatingCollaSet(t *testing.T) {
 							"app": "foo",
 						},
 					},
+					ScaleStrategy: appsv1alpha1.ScaleStrategy{
+						PodNamingPolicy: appsv1alpha1.PodNamingPolicyDefault,
+					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -602,6 +605,75 @@ func TestValidatingCollaSet(t *testing.T) {
 					},
 					ScaleStrategy: appsv1alpha1.ScaleStrategy{
 						Context: "context",
+					},
+				},
+			},
+		},
+		"unsupported-pod-naming-policy": {
+			messageKeyWords: "spec.scaleStrategy.podNamingPolicy: Unsupported value: \"test\": supported values: \"PersistentSequence\", \"Default\"",
+			cls: &appsv1alpha1.CollaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: appsv1alpha1.CollaSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "foo",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "foo",
+									Image: "image:v1",
+								},
+							},
+						},
+					},
+					ScaleStrategy: appsv1alpha1.ScaleStrategy{
+						PodNamingPolicy: "test",
+					},
+				},
+			},
+		},
+		"pod-naming-policy-conflict-with-pod-include-exclude": {
+			messageKeyWords: "spec.scaleStrategy.podToExclude[podToInclude]: Forbidden: scaleStrategy.podToExclude[podToInclude] is not allowed when podNamingPolicy is PodNamingPolicyPersistentSequence",
+			cls: &appsv1alpha1.CollaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: appsv1alpha1.CollaSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "foo",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "foo",
+									Image: "image:v1",
+								},
+							},
+						},
+					},
+					ScaleStrategy: appsv1alpha1.ScaleStrategy{
+						Context:         "context",
+						PodToInclude:    []string{"pod-1"},
+						PodToExclude:    []string{"pod-2"},
+						PodNamingPolicy: appsv1alpha1.PodNamingPolicyPersistentSequence,
 					},
 				},
 			},

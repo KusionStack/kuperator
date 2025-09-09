@@ -25,6 +25,7 @@ import (
 func SetDefaultCollaSet(cls *appsv1alpha1.CollaSet) {
 	SetDefaultPodSpec(cls)
 	SetDefaultCollaSetUpdateStrategy(cls)
+	SetDefaultCollaSetScaleStrategy(cls)
 }
 
 func SetDefaultPodSpec(in *appsv1alpha1.CollaSet) {
