@@ -86,7 +86,7 @@ func NewPodFrom(owner metav1.Object, ownerRef *metav1.OwnerReference, revision *
 	pod.OwnerReferences = append(pod.OwnerReferences, *ownerRef)
 
 	cls, _ := owner.(*appsv1alpha1.CollaSet)
-	if cls.Spec.ScaleStrategy.PodNamingPolicy == appsv1alpha1.PodNamingPolicyPersistentSequence {
+	if PodNamingSuffixPersistentSequence(cls) {
 		pod.Name = pod.GenerateName + instanceId
 	}
 

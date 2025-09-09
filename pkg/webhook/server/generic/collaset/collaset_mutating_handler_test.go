@@ -31,7 +31,9 @@ func TestMutatingCollaSet(t *testing.T) {
 			Name:      "foo",
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.CollaSetSpec{},
+		Spec: appsv1alpha1.CollaSetSpec{
+			NamingStrategy: &appsv1alpha1.NamingStrategy{},
+		},
 	}
 
 	kuperatorv1alpha1.SetDefaultCollaSet(cls)
@@ -49,7 +51,7 @@ func TestMutatingCollaSet(t *testing.T) {
 		t.Fatalf("expected default byPartition, got nil")
 	}
 
-	if cls.Spec.ScaleStrategy.PodNamingPolicy != appsv1alpha1.PodNamingPolicyDefault {
-		t.Fatalf("expected default PodNamingPolicy, got nil")
+	if cls.Spec.NamingStrategy.PodNamingSuffixPolicy != appsv1alpha1.PodNamingSuffixPolicyRandom {
+		t.Fatalf("expected default PodNamingSuffixPolicy, got nil")
 	}
 }

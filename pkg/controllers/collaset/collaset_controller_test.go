@@ -4540,8 +4540,8 @@ var _ = Describe("collaset controller", func() {
 				},
 			},
 		}
-		cs.Spec.ScaleStrategy = appsv1alpha1.ScaleStrategy{
-			PodNamingPolicy: appsv1alpha1.PodNamingPolicyPersistentSequence,
+		cs.Spec.NamingStrategy = &appsv1alpha1.NamingStrategy{
+			PodNamingSuffixPolicy: appsv1alpha1.PodNamingSuffixPolicyPersistentSequence,
 		}
 		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
 

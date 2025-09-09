@@ -48,9 +48,6 @@ func TestValidatingCollaSet(t *testing.T) {
 							"app": "foo",
 						},
 					},
-					ScaleStrategy: appsv1alpha1.ScaleStrategy{
-						PodNamingPolicy: appsv1alpha1.PodNamingPolicyDefault,
-					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -610,7 +607,7 @@ func TestValidatingCollaSet(t *testing.T) {
 			},
 		},
 		"unsupported-pod-naming-policy": {
-			messageKeyWords: "spec.scaleStrategy.podNamingPolicy: Unsupported value: \"test\": supported values: \"PersistentSequence\", \"Default\"",
+			messageKeyWords: "spec.namingStrategy.podNamingSuffixPolicy: Unsupported value: \"test\": supported values: \"PersistentSequence\", \"Random\"",
 			cls: &appsv1alpha1.CollaSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -636,8 +633,8 @@ func TestValidatingCollaSet(t *testing.T) {
 							},
 						},
 					},
-					ScaleStrategy: appsv1alpha1.ScaleStrategy{
-						PodNamingPolicy: "test",
+					NamingStrategy: &appsv1alpha1.NamingStrategy{
+						PodNamingSuffixPolicy: "test",
 					},
 				},
 			},
@@ -670,10 +667,12 @@ func TestValidatingCollaSet(t *testing.T) {
 						},
 					},
 					ScaleStrategy: appsv1alpha1.ScaleStrategy{
-						Context:         "context",
-						PodToInclude:    []string{"pod-1"},
-						PodToExclude:    []string{"pod-2"},
-						PodNamingPolicy: appsv1alpha1.PodNamingPolicyPersistentSequence,
+						Context:      "context",
+						PodToInclude: []string{"pod-1"},
+						PodToExclude: []string{"pod-2"},
+					},
+					NamingStrategy: &appsv1alpha1.NamingStrategy{
+						PodNamingSuffixPolicy: appsv1alpha1.PodNamingSuffixPolicyPersistentSequence,
 					},
 				},
 			},

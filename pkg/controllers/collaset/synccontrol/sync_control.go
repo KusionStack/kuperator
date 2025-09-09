@@ -125,7 +125,7 @@ func (r *RealSyncControl) SyncPods(
 		return false, nil, nil, fmt.Errorf("fail to get filtered Pods: %w", err)
 	}
 
-	if instance.Spec.ScaleStrategy.PodNamingPolicy == appsv1alpha1.PodNamingPolicyPersistentSequence {
+	if collasetutils.PodNamingSuffixPersistentSequence(instance) {
 		// pods with same number should not exist at same time
 		resources.FilteredPods = allPods
 	} else {
@@ -183,7 +183,7 @@ func (r *RealSyncControl) SyncPods(
 		}
 
 		// pods with PersistentSequence naming policy should always count a replicas, to avoid scaleOut a pod with the same name
-		if pod.DeletionTimestamp != nil && instance.Spec.ScaleStrategy.PodNamingPolicy != appsv1alpha1.PodNamingPolicyPersistentSequence {
+		if pod.DeletionTimestamp != nil && !collasetutils.PodNamingSuffixPersistentSequence(instance) {
 			// 1. Reclaim ID from Pod which is scaling in and terminating.
 			if contextDetail, exist := ownedIDs[id]; exist && contextDetail.Contains(ScaleInContextDataKey, "true") {
 				idToReclaim.Insert(id)

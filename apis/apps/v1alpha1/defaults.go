@@ -25,7 +25,7 @@ import (
 func SetDefaultCollaSet(cls *appsv1alpha1.CollaSet) {
 	SetDefaultPodSpec(cls)
 	SetDefaultCollaSetUpdateStrategy(cls)
-	SetDefaultCollaSetScaleStrategy(cls)
+	SetDefaultCollaSetNamingStrategy(cls)
 }
 
 func SetDefaultPodSpec(in *appsv1alpha1.CollaSet) {
@@ -259,8 +259,11 @@ func SetDefaultCollaSetUpdateStrategy(cls *appsv1alpha1.CollaSet) {
 	}
 }
 
-func SetDefaultCollaSetScaleStrategy(cls *appsv1alpha1.CollaSet) {
-	if cls.Spec.ScaleStrategy.PodNamingPolicy == "" {
-		cls.Spec.ScaleStrategy.PodNamingPolicy = appsv1alpha1.PodNamingPolicyDefault
+func SetDefaultCollaSetNamingStrategy(cls *appsv1alpha1.CollaSet) {
+	if cls.Spec.NamingStrategy == nil {
+		return
+	}
+	if len(cls.Spec.NamingStrategy.PodNamingSuffixPolicy) == 0 {
+		cls.Spec.NamingStrategy.PodNamingSuffixPolicy = appsv1alpha1.PodNamingSuffixPolicyRandom
 	}
 }

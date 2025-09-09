@@ -22,7 +22,7 @@ require (
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubernetes v0.0.0-00010101000000-000000000000
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
-	kusionstack.io/kube-api v0.7.4-0.20250908112418-c6ecce7b08e9
+	kusionstack.io/kube-api v0.7.4-0.20250909095208-496f60eea9b5
 	kusionstack.io/kube-utils v0.2.1-0.20250815100310-6288d167061a
 	kusionstack.io/resourceconsist v0.0.1
 	sigs.k8s.io/controller-runtime v0.17.3
