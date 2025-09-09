@@ -279,7 +279,7 @@ func calculateStatus(
 
 	activePods := synccontrol.FilterOutPlaceHolderPodWrappers(podWrappers)
 	for _, podWrapper := range activePods {
-		if podWrapper.DeletionTimestamp != nil && instance.Spec.ScaleStrategy.PodNamingPolicy == appsv1alpha1.PodNamingPolicyDefault {
+		if podWrapper.DeletionTimestamp != nil && instance.Spec.ScaleStrategy.PodNamingPolicy != appsv1alpha1.PodNamingPolicyPersistentSequence {
 			continue
 		}
 
