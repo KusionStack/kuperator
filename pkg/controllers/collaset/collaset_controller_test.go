@@ -4506,6 +4506,143 @@ var _ = Describe("collaset controller", func() {
 		}, 5*time.Second, 1*time.Second).Should(BeTrue())
 		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 	})
+
+	It("naming policy PersistentSequence scale", func() {
+		testcase := "test-persistent-sequence-scale"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+
+		cs := &appsv1alpha1.CollaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.CollaSetSpec{
+				Replicas: int32Pointer(2),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "foo",
+								Image: "nginx:v1",
+							},
+						},
+					},
+				},
+			},
+		}
+		cs.Spec.ScaleStrategy = appsv1alpha1.ScaleStrategy{
+			PodNamingPolicy: appsv1alpha1.PodNamingPolicyPersistentSequence,
+		}
+		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
+
+		podList := &corev1.PodList{}
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 2
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
+		for _, pod := range podList.Items {
+			Expect(pod.Labels[appsv1alpha1.PodCreatingLabel]).ShouldNot(BeEquivalentTo(""))
+		}
+
+		// pod replica will be kept, after deleted
+		podToDelete := &podList.Items[0]
+		// add finalizer to block its deletion
+		Expect(updatePodWithRetry(c, podToDelete.Namespace, podToDelete.Name, func(pod *corev1.Pod) bool {
+			pod.Finalizers = append(pod.Finalizers, "block/deletion")
+			return true
+		})).Should(BeNil())
+		Expect(c.Delete(context.TODO(), podToDelete)).Should(BeNil())
+		Eventually(func() bool {
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: podToDelete.Namespace, Name: podToDelete.Name}, podToDelete)).Should(BeNil())
+			return podToDelete.DeletionTimestamp != nil
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+
+		// there should be 2 pods and one of them is terminating
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 2
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		Expect(len(podList.Items)).Should(BeEquivalentTo(2))
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
+		// should use Pod instance ID: 0, 1
+		podInstanceID := sets.Int{}
+		podNames := sets.String{}
+		for _, pod := range podList.Items {
+			id, err := collasetutils.GetPodInstanceID(&pod)
+			Expect(err).Should(BeNil())
+			podInstanceID.Insert(id)
+			podNames.Insert(pod.Name)
+			Expect(pod.Name).Should(BeEquivalentTo(fmt.Sprintf("foo-%d", id)))
+		}
+		Expect(podInstanceID.Len()).Should(BeEquivalentTo(2))
+		Expect(podInstanceID.Has(0)).Should(BeTrue())
+		Expect(podInstanceID.Has(1)).Should(BeTrue())
+		Expect(podNames.Has(podToDelete.Name)).Should(BeTrue())
+		// let terminating Pod disappeared
+		Expect(updatePodWithRetry(c, podToDelete.Namespace, podToDelete.Name, func(pod *corev1.Pod) bool {
+			pod.Finalizers = []string{}
+			return true
+		})).Should(BeNil())
+
+		// scale in pods with delay seconds
+		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+			cls.Spec.Replicas = int32Pointer(1)
+			cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
+			return true
+		})).Should(BeNil())
+
+		// mark all pods allowed to operate in PodOpsLifecycle
+		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+		Expect(len(podList.Items)).Should(BeEquivalentTo(2))
+		for i := range podList.Items {
+			pod := &podList.Items[i]
+			Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+				return true
+			})).Should(BeNil())
+		}
+
+		Eventually(func() error {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			if len(podList.Items) != 1 {
+				return fmt.Errorf("expected 1 pods, got %d", len(podList.Items))
+			}
+
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 1, 1, 0, 0, 0)
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
+
+		// scale in pods with delay seconds
+		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+			cls.Spec.Replicas = int32Pointer(0)
+			cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
+			return true
+		}))
+
+		Eventually(func() error {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			if len(podList.Items) != 0 {
+				return fmt.Errorf("expected 0 pods, got %d", len(podList.Items))
+			}
+
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 0, 0, 0, 0, 0)
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
+	})
 })
 
 func expectedStatusReplicas(c client.Client, cls *appsv1alpha1.CollaSet, scheduledReplicas, readyReplicas, availableReplicas, replicas, updatedReplicas, operatingReplicas,
