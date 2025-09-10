@@ -18,7 +18,7 @@ package utils
 
 import appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 
-func IsPodNamingSuffixPersistentSequence(cls *appsv1alpha1.CollaSet) bool {
+func IsPodNamingSuffixPolicyPersistentSequence(cls *appsv1alpha1.CollaSet) bool {
 	if cls.Spec.NamingStrategy == nil {
 		return false
 	}

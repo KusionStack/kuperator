@@ -69,8 +69,8 @@ func TestPodNamingSuffixPersistentSequence(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsPodNamingSuffixPersistentSequence(tt.args.cls); got != tt.want {
-				t.Errorf("IsPodNamingSuffixPersistentSequence() = %v, want %v", got, tt.want)
+			if got := IsPodNamingSuffixPolicyPersistentSequence(tt.args.cls); got != tt.want {
+				t.Errorf("IsPodNamingSuffixPolicyPersistentSequence() = %v, want %v", got, tt.want)
 			}
 		})
 	}
