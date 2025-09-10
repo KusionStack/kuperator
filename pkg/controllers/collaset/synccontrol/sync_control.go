@@ -120,10 +120,16 @@ func (r *RealSyncControl) SyncPods(
 	instance *appsv1alpha1.CollaSet,
 	resources *collasetutils.RelatedResources,
 ) (bool, []*collasetutils.PodWrapper, map[int]*appsv1alpha1.ContextDetail, error) {
-	var err error
-	resources.FilteredPods, err = r.podControl.GetFilteredPods(instance.Spec.Selector, instance)
+	filteredPods, allPods, err := r.podControl.GetFilteredPods(instance.Spec.Selector, instance)
 	if err != nil {
 		return false, nil, nil, fmt.Errorf("fail to get filtered Pods: %w", err)
+	}
+
+	if collasetutils.IsPodNamingSuffixPolicyPersistentSequence(instance) {
+		// pods with same number should not exist at same time
+		resources.FilteredPods = allPods
+	} else {
+		resources.FilteredPods = filteredPods
 	}
 
 	// list pvcs using ownerReference
@@ -176,7 +182,8 @@ func (r *RealSyncControl) SyncPods(
 			}
 		}
 
-		if pod.DeletionTimestamp != nil {
+		// pods with PersistentSequence naming policy should always count a replicas, to avoid scaleOut a pod with the same name
+		if pod.DeletionTimestamp != nil && !collasetutils.IsPodNamingSuffixPolicyPersistentSequence(instance) {
 			// 1. Reclaim ID from Pod which is scaling in and terminating.
 			if contextDetail, exist := ownedIDs[id]; exist && contextDetail.Contains(ScaleInContextDataKey, "true") {
 				idToReclaim.Insert(id)
@@ -367,12 +374,13 @@ func (r *RealSyncControl) Scale(
 				}
 				// scale out new Pods with updatedRevision
 				// TODO use cache
+				instanceId := fmt.Sprintf("%d", availableIDContext.ID)
 				pod, err := collasetutils.NewPodFrom(
 					cls,
 					metav1.NewControllerRef(cls, appsv1alpha1.SchemeGroupVersion.WithKind("CollaSet")),
 					revision,
+					instanceId,
 					func(in *corev1.Pod) (localErr error) {
-						in.Labels[appsv1alpha1.PodInstanceIDLabelKey] = fmt.Sprintf("%d", availableIDContext.ID)
 						if availableIDContext.Data[podcontext.JustCreateContextDataKey] == "true" {
 							in.Labels[appsv1alpha1.PodCreatingLabel] = strconv.FormatInt(time.Now().UnixNano(), 10)
 						} else {

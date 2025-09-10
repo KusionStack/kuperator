@@ -243,6 +243,184 @@ var _ = Describe("collaset controller", func() {
 		}
 	})
 
+	It("replace pod with update [persistent sequence]", func() {
+		for _, updateStrategy := range []appsv1alpha1.PodUpdateStrategyType{appsv1alpha1.CollaSetRecreatePodUpdateStrategyType, appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType, appsv1alpha1.CollaSetReplacePodUpdateStrategyType} {
+			testcase := fmt.Sprintf("test-replace-persistent-sequence-pod-with-%s", strings.ToLower(string(updateStrategy)))
+			Expect(createNamespace(c, testcase)).Should(BeNil())
+			csName := fmt.Sprintf("foo-%s", strings.ToLower(string(updateStrategy)))
+			cs := &appsv1alpha1.CollaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testcase,
+					Name:      csName,
+				},
+				Spec: appsv1alpha1.CollaSetSpec{
+					Replicas: int32Pointer(1),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"app": csName,
+						},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": csName,
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  csName,
+									Image: "nginx:v1",
+								},
+							},
+						},
+					},
+					UpdateStrategy: appsv1alpha1.UpdateStrategy{
+						PodUpdatePolicy:       updateStrategy,
+						OperationDelaySeconds: int32Pointer(1),
+					},
+					NamingStrategy: &appsv1alpha1.NamingStrategy{
+						PodNamingSuffixPolicy: appsv1alpha1.PodNamingSuffixPolicyPersistentSequence,
+					},
+				},
+			}
+
+			Expect(c.Create(context.TODO(), cs)).Should(BeNil())
+			var originPodName, replaceNewPodName, replaceNewPodUid, replaceNewUpdatedPodName string
+
+			podList := &corev1.PodList{}
+			Eventually(func() bool {
+				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+				return len(podList.Items) == 1
+			}, 5*time.Second, 1*time.Second).Should(BeTrue())
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			Eventually(func() error { return expectedStatusReplicas(c, cs, 0, 0, 0, 1, 1, 0, 0, 0) }, 5*time.Second, 1*time.Second).Should(BeNil())
+
+			// label pod to trigger replace
+			originPod := podList.Items[0]
+			originPodName = originPod.Name
+			Expect(updatePodWithRetry(c, originPod.Namespace, originPodName, func(pod *corev1.Pod) bool {
+				pod.Labels[appsv1alpha1.PodReplaceIndicationLabelKey] = "true"
+				return true
+			})).Should(BeNil())
+			Eventually(func() error {
+				return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)
+			}, 30*time.Second, 1*time.Second).Should(BeNil())
+
+			Eventually(func() bool {
+				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+				return len(podList.Items) == 2
+			}, 5*time.Second, 1*time.Second).Should(BeTrue())
+
+			for _, pod := range podList.Items {
+				if pod.Name == originPodName {
+					continue
+				}
+
+				Expect(pod.Labels[appsv1alpha1.PodCreatingLabel]).ShouldNot(BeEquivalentTo(""))
+			}
+
+			// update collaset with recreate update
+			observedGeneration := cs.Status.ObservedGeneration
+			Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+				cls.Spec.UpdateStrategy.PodUpdatePolicy = updateStrategy
+				cls.Spec.Template.Spec.Containers[0].Image = "nginx:v2"
+				return true
+			})).Should(BeNil())
+			Expect(observedGeneration != cs.Status.ObservedGeneration)
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			Eventually(func() error {
+				if updateStrategy == appsv1alpha1.CollaSetReplacePodUpdateStrategyType {
+					return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 0, 0, 0, 0)
+				} else {
+					return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 0, 1, 0, 0)
+				}
+			}, 5*time.Second, 1*time.Second).Should(BeNil())
+
+			// allow origin pod to update
+			Expect(updatePodWithRetry(c, originPod.Namespace, originPodName, func(pod *corev1.Pod) bool {
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+				return true
+			})).Should(BeNil())
+			if updateStrategy == appsv1alpha1.CollaSetReplacePodUpdateStrategyType {
+				Eventually(func() error {
+					return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 0, 0, 0, 0)
+				}, 10*time.Second, 1*time.Second).Should(BeNil())
+			} else {
+				Eventually(func() error {
+					return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 0, 1, 0, 0)
+				}, 10*time.Second, 1*time.Second).Should(BeNil())
+			}
+			// allow replaceNewPod to delete
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range podList.Items {
+				pod := &podList.Items[i]
+				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+					if _, exist := pod.Labels[appsv1alpha1.PodReplacePairOriginName]; exist {
+						replaceNewPodName = pod.Name
+						replaceNewPodUid = string(pod.UID)
+						labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID())
+						pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+					}
+					return true
+				})).Should(BeNil())
+			}
+
+			// wait for replaceNewPod deleted and replaceNewUpdatedPod created
+			Eventually(func() bool {
+				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+				for _, pod := range podList.Items {
+					if pod.Name == replaceNewPodName {
+						return replaceNewPodUid != string(pod.UID)
+					}
+				}
+				return true
+			}, 5*time.Second, time.Second).Should(BeTrue())
+			Eventually(func() error {
+				if updateStrategy == appsv1alpha1.CollaSetReplacePodUpdateStrategyType {
+					return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 1, 0, 0, 0)
+				} else {
+					return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 1, 1, 0, 0)
+				}
+			}, 5*time.Second, 1*time.Second).Should(BeNil())
+
+			// mock replaceNewUpdatedPod pod service available
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for _, pod := range podList.Items {
+				if pod.Labels[appsv1alpha1.PodReplacePairOriginName] == originPodName {
+					replaceNewUpdatedPodName = pod.Name
+					Expect(replaceNewUpdatedPodName).Should(BeEquivalentTo(replaceNewPodName))
+					Expect(pod.Spec.Containers[0].Image).Should(BeEquivalentTo("nginx:v2"))
+					Expect(updatePodWithRetry(c, pod.Namespace, replaceNewUpdatedPodName, func(pod *corev1.Pod) bool {
+						pod.Labels[appsv1alpha1.PodServiceAvailableLabel] = "true"
+						return true
+					})).Should(BeNil())
+				}
+			}
+
+			// wait for originPod is deleted
+			Eventually(func() bool {
+				Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+				for _, pod := range podList.Items {
+					if pod.Name == originPodName {
+						// allow originPod pod to be deleted
+						Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+							labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, poddeletion.OpsLifecycleAdapter.GetID())
+							pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+							return true
+						})).Should(BeNil())
+						return false
+					}
+				}
+				return true
+			}, 5*time.Second, time.Second).Should(BeTrue())
+			Eventually(func() error {
+				return expectedStatusReplicas(c, cs, 0, 0, 1, 1, 1, 0, 0, 1)
+			}, 5*time.Second, 1*time.Second).Should(BeNil())
+		}
+	})
+
 	It("scale reconcile", func() {
 		testcase := "test-scale"
 		Expect(createNamespace(c, testcase)).Should(BeNil())
@@ -343,6 +521,153 @@ var _ = Describe("collaset controller", func() {
 		// mark all pods allowed to operate in PodOpsLifecycle
 		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 		Expect(len(podList.Items)).Should(BeEquivalentTo(2))
+		for i := range podList.Items {
+			pod := &podList.Items[i]
+			Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+				return true
+			})).Should(BeNil())
+		}
+
+		Eventually(func() error {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			if len(podList.Items) != 1 {
+				return fmt.Errorf("expected 1 pods, got %d", len(podList.Items))
+			}
+
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 1, 1, 0, 0, 0)
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
+
+		// scale in pods with delay seconds
+		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+			cls.Spec.Replicas = int32Pointer(0)
+			cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
+			return true
+		}))
+
+		Eventually(func() error {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			if len(podList.Items) != 0 {
+				return fmt.Errorf("expected 0 pods, got %d", len(podList.Items))
+			}
+
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 0, 0, 0, 0, 0)
+		}, 5*time.Second, 1*time.Second).Should(BeNil())
+	})
+
+	It("scale reconcile [persistent sequence]", func() {
+		testcase := "test-persistent-sequence-scale"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+
+		cs := &appsv1alpha1.CollaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.CollaSetSpec{
+				Replicas: int32Pointer(20),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "foo",
+								Image: "nginx:v1",
+							},
+						},
+					},
+				},
+			},
+		}
+		cs.Spec.NamingStrategy = &appsv1alpha1.NamingStrategy{
+			PodNamingSuffixPolicy: appsv1alpha1.PodNamingSuffixPolicyPersistentSequence,
+		}
+		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
+
+		podList := &corev1.PodList{}
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 20
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 20, 20, 0, 0, 0)).Should(BeNil())
+		for _, pod := range podList.Items {
+			Expect(pod.Labels[appsv1alpha1.PodCreatingLabel]).ShouldNot(BeEquivalentTo(""))
+		}
+
+		// pod replica will be kept, after deleted
+		podToDelete := &podList.Items[0]
+		// add finalizer to block its deletion
+		Expect(updatePodWithRetry(c, podToDelete.Namespace, podToDelete.Name, func(pod *corev1.Pod) bool {
+			pod.Finalizers = append(pod.Finalizers, "block/deletion")
+			return true
+		})).Should(BeNil())
+		Expect(c.Delete(context.TODO(), podToDelete)).Should(BeNil())
+		Eventually(func() bool {
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: podToDelete.Namespace, Name: podToDelete.Name}, podToDelete)).Should(BeNil())
+			return podToDelete.DeletionTimestamp != nil
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+
+		// there should be 2 pods and one of them is terminating
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 20
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 20, 20, 0, 0, 0)).Should(BeNil())
+		// should use Pod instance ID: 0, 1
+		podInstanceID := sets.Int{}
+		podNames := sets.String{}
+		for _, pod := range podList.Items {
+			id, err := collasetutils.GetPodInstanceID(&pod)
+			Expect(err).Should(BeNil())
+			podInstanceID.Insert(id)
+			podNames.Insert(pod.Name)
+			Expect(pod.Name).Should(BeEquivalentTo(fmt.Sprintf("foo-%d", id)))
+		}
+		Expect(podInstanceID.Len()).Should(BeEquivalentTo(20))
+		for i := range 20 {
+			Expect(podInstanceID.Has(i)).Should(BeTrue())
+		}
+		Expect(podNames.Has(podToDelete.Name)).Should(BeTrue())
+		// let terminating Pod disappeared
+		Expect(updatePodWithRetry(c, podToDelete.Namespace, podToDelete.Name, func(pod *corev1.Pod) bool {
+			pod.Finalizers = []string{}
+			return true
+		})).Should(BeNil())
+		// waiting for scale out
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for _, pod := range podList.Items {
+				if pod.DeletionTimestamp != nil {
+					return false
+				}
+			}
+			return len(podList.Items) == 20
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+
+		// scale in pods with delay seconds
+		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+			cls.Spec.Replicas = int32Pointer(1)
+			cls.Spec.ScaleStrategy.OperationDelaySeconds = int32Pointer(1)
+			return true
+		})).Should(BeNil())
+
+		// mark all pods allowed to operate in PodOpsLifecycle
+		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+		Expect(len(podList.Items)).Should(BeEquivalentTo(20))
 		for i := range podList.Items {
 			pod := &podList.Items[i]
 			Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {

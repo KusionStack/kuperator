@@ -606,6 +606,77 @@ func TestValidatingCollaSet(t *testing.T) {
 				},
 			},
 		},
+		"unsupported-pod-naming-policy": {
+			messageKeyWords: "spec.namingStrategy.podNamingSuffixPolicy: Unsupported value: \"test\": supported values: \"PersistentSequence\", \"Random\"",
+			cls: &appsv1alpha1.CollaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: appsv1alpha1.CollaSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "foo",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "foo",
+									Image: "image:v1",
+								},
+							},
+						},
+					},
+					NamingStrategy: &appsv1alpha1.NamingStrategy{
+						PodNamingSuffixPolicy: "test",
+					},
+				},
+			},
+		},
+		"pod-naming-policy-conflict-with-pod-include-exclude": {
+			messageKeyWords: "spec.scaleStrategy.podToExclude[podToInclude]: Forbidden: scaleStrategy.podToExclude[podToInclude] is not allowed when podNamingPolicy is PodNamingPolicyPersistentSequence",
+			cls: &appsv1alpha1.CollaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: appsv1alpha1.CollaSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "foo",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "foo",
+									Image: "image:v1",
+								},
+							},
+						},
+					},
+					ScaleStrategy: appsv1alpha1.ScaleStrategy{
+						Context:      "context",
+						PodToInclude: []string{"pod-1"},
+						PodToExclude: []string{"pod-2"},
+					},
+					NamingStrategy: &appsv1alpha1.NamingStrategy{
+						PodNamingSuffixPolicy: appsv1alpha1.PodNamingSuffixPolicyPersistentSequence,
+					},
+				},
+			},
+		},
 	}
 
 	for key, tc := range failureCases {

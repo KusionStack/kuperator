@@ -555,8 +555,9 @@ type inPlaceIfPossibleUpdater struct {
 func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(_ context.Context, _ *appsv1.ControllerRevision, podUpdateInfo *PodUpdateInfo) error {
 	// 1. build pod from current and updated revision
 	ownerRef := metav1.NewControllerRef(u.CollaSet, appsv1alpha1.SchemeGroupVersion.WithKind("CollaSet"))
+	instanceId := podUpdateInfo.Labels[appsv1alpha1.PodInstanceIDLabelKey]
 	// TODO: use cache
-	currentPod, err := collasetutils.NewPodFrom(u.CollaSet, ownerRef, podUpdateInfo.CurrentRevision, func(in *corev1.Pod) error {
+	currentPod, err := collasetutils.NewPodFrom(u.CollaSet, ownerRef, podUpdateInfo.CurrentRevision, instanceId, func(in *corev1.Pod) error {
 		return utilspoddecoration.PatchListOfDecorations(in, podUpdateInfo.CurrentPodDecorations)
 	})
 	if err != nil {
@@ -564,7 +565,7 @@ func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(_ context.Context, _ *a
 	}
 
 	// TODO: use cache
-	podUpdateInfo.UpdatedPod, err = collasetutils.NewPodFrom(u.CollaSet, ownerRef, podUpdateInfo.UpdateRevision, func(in *corev1.Pod) error {
+	podUpdateInfo.UpdatedPod, err = collasetutils.NewPodFrom(u.CollaSet, ownerRef, podUpdateInfo.UpdateRevision, instanceId, func(in *corev1.Pod) error {
 		return utilspoddecoration.PatchListOfDecorations(in, podUpdateInfo.UpdatedPodDecorations)
 	})
 	if err != nil {

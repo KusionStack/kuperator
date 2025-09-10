@@ -32,7 +32,7 @@ import (
 )
 
 type Interface interface {
-	GetFilteredPods(selector *metav1.LabelSelector, owner client.Object) ([]*corev1.Pod, error)
+	GetFilteredPods(selector *metav1.LabelSelector, owner client.Object) ([]*corev1.Pod, []*corev1.Pod, error)
 	CreatePod(pod *corev1.Pod) (*corev1.Pod, error)
 	DeletePod(pod *corev1.Pod) error
 	UpdatePod(pod *corev1.Pod) error
@@ -53,21 +53,27 @@ type RealPodControl struct {
 	scheme *runtime.Scheme
 }
 
-func (pc *RealPodControl) GetFilteredPods(selector *metav1.LabelSelector, owner client.Object) ([]*corev1.Pod, error) {
+// GetFilteredPods returns filtered pods and all pods
+func (pc *RealPodControl) GetFilteredPods(selector *metav1.LabelSelector, owner client.Object) ([]*corev1.Pod, []*corev1.Pod, error) {
 	// get the pods with ownerReference points to this CollaSet
 	podList := &corev1.PodList{}
 	err := pc.client.List(context.TODO(), podList, &client.ListOptions{Namespace: owner.GetNamespace(), FieldSelector: fields.OneTermEqualSelector(inject.FieldIndexOwnerRefUID, string(owner.GetUID()))})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+
+	var allPods []*corev1.Pod
+	for i := range podList.Items {
+		allPods = append(allPods, &podList.Items[i])
 	}
 
 	filteredPods := FilterOutInactivePod(podList.Items)
 	filteredPods, err = pc.getPodSetPods(filteredPods, selector, owner)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return filteredPods, nil
+	return filteredPods, allPods, nil
 }
 
 func (pc *RealPodControl) CreatePod(pod *corev1.Pod) (*corev1.Pod, error) {

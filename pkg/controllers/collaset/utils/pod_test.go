@@ -84,7 +84,8 @@ var _ = Describe("Pod utils", func() {
 				Data: runtime.RawExtension{
 					Raw: raw,
 				},
-			})
+			},
+			"1")
 		Expect(err).Should(BeNil())
 		Expect(pod.Labels["foo"]).Should(Equal("bar"))
 		_, err = NewPodFrom(
@@ -96,7 +97,8 @@ var _ = Describe("Pod utils", func() {
 				Data: runtime.RawExtension{
 					Raw: []byte("x"),
 				},
-			})
+			},
+			"1")
 		Expect(err).ShouldNot(BeNil())
 	})
 	It("test patch pods", func() {

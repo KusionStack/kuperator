@@ -279,7 +279,7 @@ func calculateStatus(
 
 	activePods := synccontrol.FilterOutPlaceHolderPodWrappers(podWrappers)
 	for _, podWrapper := range activePods {
-		if podWrapper.DeletionTimestamp != nil {
+		if podWrapper.DeletionTimestamp != nil && !collasetutils.IsPodNamingSuffixPolicyPersistentSequence(instance) {
 			continue
 		}
 
@@ -391,25 +391,25 @@ func (r *CollaSetReconciler) ensureReclaimPvcs(ctx context.Context, cls *appsv1a
 
 func (r *CollaSetReconciler) ensureReclaimPodOwnerReferences(cls *appsv1alpha1.CollaSet) error {
 	podControl := podcontrol.NewRealPodControl(r.Client, r.Scheme)
-	pods, err := podControl.GetFilteredPods(cls.Spec.Selector, cls)
+	filteredPods, _, err := podControl.GetFilteredPods(cls.Spec.Selector, cls)
 	if err != nil {
 		return fmt.Errorf("fail to get filtered Pods: %w", err)
 	}
-	// reclaim podDecoration ownerReferences on pods
-	for i := range pods {
-		if len(pods[i].OwnerReferences) == 0 {
+	// reclaim podDecoration ownerReferences on filteredPods
+	for i := range filteredPods {
+		if len(filteredPods[i].OwnerReferences) == 0 {
 			continue
 		}
 		var newOwnerRefs []v1.OwnerReference
-		for j := range pods[i].OwnerReferences {
-			if pods[i].OwnerReferences[j].Kind == "PodDecoration" {
+		for j := range filteredPods[i].OwnerReferences {
+			if filteredPods[i].OwnerReferences[j].Kind == "PodDecoration" {
 				continue
 			}
-			newOwnerRefs = append(newOwnerRefs, pods[i].OwnerReferences[j])
+			newOwnerRefs = append(newOwnerRefs, filteredPods[i].OwnerReferences[j])
 		}
-		if len(newOwnerRefs) != len(pods[i].OwnerReferences) {
-			pods[i].OwnerReferences = newOwnerRefs
-			if err := podControl.UpdatePod(pods[i]); err != nil {
+		if len(newOwnerRefs) != len(filteredPods[i].OwnerReferences) {
+			filteredPods[i].OwnerReferences = newOwnerRefs
+			if err := podControl.UpdatePod(filteredPods[i]); err != nil {
 				return err
 			}
 		}
@@ -419,9 +419,9 @@ func (r *CollaSetReconciler) ensureReclaimPodOwnerReferences(cls *appsv1alpha1.C
 
 func (r *CollaSetReconciler) ensureReclaimPodsDeletion(cls *appsv1alpha1.CollaSet) error {
 	podControl := podcontrol.NewRealPodControl(r.Client, r.Scheme)
-	pods, err := podControl.GetFilteredPods(cls.Spec.Selector, cls)
+	filteredPods, _, err := podControl.GetFilteredPods(cls.Spec.Selector, cls)
 	if err != nil {
 		return fmt.Errorf("fail to get filtered Pods: %w", err)
 	}
-	return synccontrol.DeletePodsByLabel(podControl, pods)
+	return synccontrol.DeletePodsByLabel(podControl, filteredPods)
 }
