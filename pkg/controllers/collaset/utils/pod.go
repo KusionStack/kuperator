@@ -86,7 +86,7 @@ func NewPodFrom(owner metav1.Object, ownerRef *metav1.OwnerReference, revision *
 	pod.OwnerReferences = append(pod.OwnerReferences, *ownerRef)
 
 	cls, _ := owner.(*appsv1alpha1.CollaSet)
-	if PodNamingSuffixPersistentSequence(cls) {
+	if IsPodNamingSuffixPersistentSequence(cls) {
 		pod.Name = pod.GenerateName + instanceId
 	}
 

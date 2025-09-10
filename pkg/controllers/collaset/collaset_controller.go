@@ -279,7 +279,7 @@ func calculateStatus(
 
 	activePods := synccontrol.FilterOutPlaceHolderPodWrappers(podWrappers)
 	for _, podWrapper := range activePods {
-		if podWrapper.DeletionTimestamp != nil && !collasetutils.PodNamingSuffixPersistentSequence(instance) {
+		if podWrapper.DeletionTimestamp != nil && !collasetutils.IsPodNamingSuffixPersistentSequence(instance) {
 			continue
 		}
 
