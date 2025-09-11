@@ -53,6 +53,7 @@ type CollaSetController struct {
 	XOperation
 	LifecycleAdapterGetter
 	GetLabelManagerAdapterGetter
+	SubResourcePvcAdapter
 }
 
 func (m *CollaSetController) ControllerName() string {

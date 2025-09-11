@@ -113,7 +113,7 @@ var _ = Describe("Pod utils", func() {
 		}
 		pod, err := PatchToPod(currentRevisionPod, updateRevisionPod, currentPod)
 		Expect(err).Should(BeNil())
-		Expect(pod.Labels["foo"]).Should(Equal("bar-1"))
+		Expect(pod.GetLabels()["foo"]).Should(Equal("bar-1"))
 	})
 	It("test ComparePod", func() {
 		pods := []*corev1.Pod{

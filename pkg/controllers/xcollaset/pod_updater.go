@@ -73,6 +73,7 @@ func (u *inPlaceIfPossibleUpdater) FulfillTargetUpdatedInfo(ctx context.Context,
 
 	if targetUpdateInfo.PvcTmpHashChanged {
 		targetUpdateInfo.InPlaceUpdateSupport, targetUpdateInfo.OnlyMetadataChanged = false, false
+		return nil
 	}
 
 	// TODO check diff
