@@ -19,9 +19,6 @@ package inject
 import (
 	"context"
 
-	appv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
@@ -47,42 +44,6 @@ func NewCacheWithFieldIndex(config *rest.Config, opts cache.Options) (cache.Cach
 	//		Label: labels.Set(map[string]string{v1alpha1.ControlledByKusionStackLabelKey: "true"}).AsSelector(),
 	//	},
 	//}
-
-	runtime.Must(c.IndexField(
-		context.TODO(),
-		&corev1.Pod{},
-		FieldIndexOwnerRefUID,
-		func(pod client.Object) []string {
-			ownerRef := metav1.GetControllerOf(pod)
-			if ownerRef == nil {
-				return nil
-			}
-			return []string{string(ownerRef.UID)}
-		}))
-
-	runtime.Must(c.IndexField(
-		context.TODO(),
-		&corev1.PersistentVolumeClaim{},
-		FieldIndexOwnerRefUID,
-		func(pvc client.Object) []string {
-			ownerRef := metav1.GetControllerOf(pvc)
-			if ownerRef == nil {
-				return nil
-			}
-			return []string{string(ownerRef.UID)}
-		}))
-
-	runtime.Must(c.IndexField(
-		context.TODO(),
-		&appv1.ControllerRevision{},
-		FieldIndexOwnerRefUID,
-		func(revision client.Object) []string {
-			ownerRef := metav1.GetControllerOf(revision)
-			if ownerRef == nil {
-				return nil
-			}
-			return []string{string(ownerRef.UID)}
-		}))
 
 	runtime.Must(c.IndexField(
 		context.TODO(),
