@@ -1332,7 +1332,7 @@ var _ = Describe("collaset controller", func() {
 			// check updated pod replicas by CollaSet status
 			Eventually(func() error {
 				return expectedStatusReplicas(c, cs, 0, 0, 0, 8-partition, 4-partition, 0, 0, 0)
-			}, 3000*time.Second, 1*time.Second).Should(BeNil())
+			}, 30*time.Second, 1*time.Second).Should(BeNil())
 
 			// double check updated pod replicas
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
@@ -3285,7 +3285,7 @@ var _ = Describe("collaset controller", func() {
 			Eventually(func() bool {
 				err := c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)
 				return errors.IsNotFound(err)
-			}, time.Second*1000, time.Second).Should(BeTrue())
+			}, time.Second*10, time.Second).Should(BeTrue())
 			// there should be 8 pvcs
 			allPvcs := &corev1.PersistentVolumeClaimList{}
 			activePvcs := make([]*corev1.PersistentVolumeClaim, 0)
@@ -3321,6 +3321,19 @@ var _ = Describe("collaset controller", func() {
 					Expect(pvcNames.Has(volume.PersistentVolumeClaim.ClaimName)).Should(BeTrue())
 				}
 			}
+			Eventually(func() int {
+				Expect(c.List(context.TODO(), allPvcs, client.InNamespace(cs.Namespace))).Should(BeNil())
+				activePvcs = make([]*corev1.PersistentVolumeClaim, 0)
+				pvcNames = sets.String{}
+				for i := range allPvcs.Items {
+					if allPvcs.Items[i].DeletionTimestamp != nil {
+						continue
+					}
+					activePvcs = append(activePvcs, &allPvcs.Items[i])
+					pvcNames.Insert(allPvcs.Items[i].Name)
+				}
+				return len(activePvcs)
+			}, time.Second*10, time.Second).Should(BeEquivalentTo(8))
 		}
 	})
 
@@ -4237,6 +4250,10 @@ var _ = Describe("collaset controller", func() {
 		// delete this CollaSet
 		Expect(c.Delete(context.TODO(), cs)).Should(BeNil())
 		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range podList.Items {
+				Expect(c.Delete(context.TODO(), &podList.Items[i])).Should(BeNil())
+			}
 			if err := c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs); err != nil && errors.IsNotFound(err) {
 				return true
 			}
