@@ -47,8 +47,11 @@ func (u *inPlaceIfPossibleUpdater) FulfillTargetUpdatedInfo(ctx context.Context,
 	currentTarget, err := synccontrols.NewTargetFrom(u.XsetController, u.XsetLabelAnnoMgr, u.OwnerObject, targetUpdateInfo.CurrentRevision, targetUpdateInfo.ID,
 		func(object client.Object) error {
 			if decorationAdapter, ok := u.XsetController.(api.DecorationAdapter); ok {
-				patcherFn := decorationAdapter.GetDecorationPatcherFromTarget(ctx, targetUpdateInfo.TargetWrapper.Object)
-				return patcherFn(object)
+				if fn, err := decorationAdapter.GetCurrentDecorationsPatcher(ctx, u.Client, targetUpdateInfo.TargetWrapper.Object); err != nil {
+					return err
+				} else {
+					return fn(object)
+				}
 			}
 			return nil
 		},
@@ -61,8 +64,11 @@ func (u *inPlaceIfPossibleUpdater) FulfillTargetUpdatedInfo(ctx context.Context,
 	targetUpdateInfo.UpdatedTarget, err = synccontrols.NewTargetFrom(u.XsetController, u.XsetLabelAnnoMgr, u.OwnerObject, targetUpdateInfo.UpdateRevision, targetUpdateInfo.ID,
 		func(object client.Object) error {
 			if decorationAdapter, ok := u.XsetController.(api.DecorationAdapter); ok {
-				patcherFn := decorationAdapter.GetDecorationPatcherFromTarget(ctx, targetUpdateInfo.UpdatedTarget)
-				return patcherFn(object)
+				if fn, err := decorationAdapter.GetUpdatedDecorationsPatcher(ctx, u.Client, targetUpdateInfo.TargetWrapper.Object); err != nil {
+					return err
+				} else {
+					return fn(object)
+				}
 			}
 			return nil
 		},

@@ -54,6 +54,7 @@ type CollaSetController struct {
 	LifecycleAdapterGetter
 	GetLabelManagerAdapterGetter
 	SubResourcePvcAdapter
+	DecorationAdapter
 }
 
 func (m *CollaSetController) ControllerName() string {
