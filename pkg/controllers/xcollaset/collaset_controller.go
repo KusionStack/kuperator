@@ -125,7 +125,19 @@ func (s *XSetOperation) GetXSetSpec(xset xsetapi.XSetObject) *xsetapi.XSetSpec {
 	xSetSpec.ScaleStrategy.TargetToInclude = set.Spec.ScaleStrategy.PodToInclude
 	xSetSpec.ScaleStrategy.Context = set.Spec.ScaleStrategy.Context
 	xSetSpec.ScaleStrategy.OperationDelaySeconds = set.Spec.ScaleStrategy.OperationDelaySeconds
-	// TODO naming strategy
+	// naming strategy
+	if set.Spec.NamingStrategy != nil {
+		namingStrategy := &xsetapi.NamingStrategy{}
+		switch set.Spec.NamingStrategy.PodNamingSuffixPolicy {
+		case appsv1alpha1.PodNamingSuffixPolicyPersistentSequence:
+			namingStrategy.TargetNamingSuffixPolicy = xsetapi.TargetNamingSuffixPolicyPersistentSequence
+		case appsv1alpha1.PodNamingSuffixPolicyRandom:
+			namingStrategy.TargetNamingSuffixPolicy = xsetapi.TargetNamingSuffixPolicyRandom
+		default:
+			namingStrategy.TargetNamingSuffixPolicy = xsetapi.TargetNamingSuffixPolicyRandom
+		}
+		xSetSpec.NamingStrategy = namingStrategy
+	}
 	return &xSetSpec
 }
 
