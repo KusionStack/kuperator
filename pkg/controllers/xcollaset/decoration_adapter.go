@@ -63,41 +63,6 @@ func (d *DecorationAdapter) GetDecorationGroupVersionKind() metav1.GroupVersionK
 		Kind:    "PodDecoration",
 	}
 }
-
-func (d *DecorationAdapter) GetCurrentDecorationsPatcher(ctx context.Context, c client.Client, target client.Object) (func(client.Object) error, error) {
-	var pds map[string]*appsv1alpha1.PodDecoration
-	pod := target.(*corev1.Pod)
-	getter, err := utilspoddecoration.NewPodDecorationGetter(c, pod.Namespace)
-	if err != nil {
-		return nil, err
-	}
-	pds, err = getter.GetOnPod(ctx, pod)
-	if err != nil {
-		return nil, err
-	}
-	return func(object client.Object) error {
-		p := object.(*corev1.Pod)
-		return utilspoddecoration.PatchListOfDecorations(p, pds)
-	}, nil
-}
-
-func (d *DecorationAdapter) GetUpdatedDecorationsPatcher(ctx context.Context, c client.Client, target client.Object) (func(client.Object) error, error) {
-	var pds map[string]*appsv1alpha1.PodDecoration
-	pod := target.(*corev1.Pod)
-	getter, err := utilspoddecoration.NewPodDecorationGetter(c, pod.Namespace)
-	if err != nil {
-		return nil, err
-	}
-	pds, err = getter.GetEffective(ctx, pod)
-	if err != nil {
-		return nil, err
-	}
-	return func(object client.Object) error {
-		p := object.(*corev1.Pod)
-		return utilspoddecoration.PatchListOfDecorations(p, pds)
-	}, nil
-}
-
 func (d *DecorationAdapter) GetDecorationPatcherByRevisions(ctx context.Context, c client.Client, target client.Object, revision string) (func(client.Object) error, error) {
 	var pds map[string]*appsv1alpha1.PodDecoration
 	pod := target.(*corev1.Pod)
@@ -130,7 +95,7 @@ func (d *DecorationAdapter) GetTargetCurrentDecorationRevisions(ctx context.Cont
 	if err != nil {
 		return "", err
 	}
-	pds, err = getter.GetEffective(ctx, pod)
+	pds, err = getter.GetOnPod(ctx, pod)
 	return anno.GetDecorationInfoString(pds), nil
 }
 
@@ -145,29 +110,25 @@ func (d *DecorationAdapter) GetTargetUpdatedDecorationRevisions(ctx context.Cont
 	return anno.GetDecorationInfoString(pds), nil
 }
 
-func (d *DecorationAdapter) IsTargetDecorationChanged(ctx context.Context, c client.Client, target client.Object) (bool, error) {
-	pod := target.(*corev1.Pod)
-	getter, err := utilspoddecoration.NewPodDecorationGetter(c, pod.Namespace)
-	if err != nil {
+func (d *DecorationAdapter) IsTargetDecorationChanged(current, updated string) (bool, error) {
+	var currentInfos, updatedInfos []*anno.DecorationInfo
+	var err error
+	if currentInfos, err = anno.UnmarshallFromString(current); err != nil {
 		return false, err
 	}
-	currentPDs, err := getter.GetOnPod(ctx, pod)
-	if err != nil {
+	if updatedInfos, err = anno.UnmarshallFromString(updated); err != nil {
 		return false, err
 	}
-	updatedPDs, err := getter.GetEffective(ctx, pod)
-	if err != nil {
-		return false, err
-	}
-	if len(currentPDs) != len(updatedPDs) {
+
+	if len(currentInfos) != len(updatedInfos) {
 		return true, nil
 	} else {
 		revisionSets := sets.NewString()
-		for rev := range currentPDs {
-			revisionSets.Insert(rev)
+		for i := range currentInfos {
+			revisionSets.Insert(currentInfos[i].Revision)
 		}
-		for rev := range updatedPDs {
-			if !revisionSets.Has(rev) {
+		for i := range updatedInfos {
+			if !revisionSets.Has(currentInfos[i].Revision) {
 				return true, nil
 			}
 		}

@@ -47,7 +47,7 @@ func (u *inPlaceIfPossibleUpdater) FulfillTargetUpdatedInfo(ctx context.Context,
 	currentTarget, err := synccontrols.NewTargetFrom(u.XsetController, u.XsetLabelAnnoMgr, u.OwnerObject, targetUpdateInfo.CurrentRevision, targetUpdateInfo.ID,
 		func(object client.Object) error {
 			if decorationAdapter, ok := u.XsetController.(api.DecorationAdapter); ok {
-				if fn, err := decorationAdapter.GetCurrentDecorationsPatcher(ctx, u.Client, targetUpdateInfo.TargetWrapper.Object); err != nil {
+				if fn, err := decorationAdapter.GetDecorationPatcherByRevisions(ctx, u.Client, targetUpdateInfo.TargetWrapper.Object, targetUpdateInfo.TargetWrapper.DecorationCurrentRevisions); err != nil {
 					return err
 				} else {
 					return fn(object)
@@ -64,7 +64,7 @@ func (u *inPlaceIfPossibleUpdater) FulfillTargetUpdatedInfo(ctx context.Context,
 	targetUpdateInfo.UpdatedTarget, err = synccontrols.NewTargetFrom(u.XsetController, u.XsetLabelAnnoMgr, u.OwnerObject, targetUpdateInfo.UpdateRevision, targetUpdateInfo.ID,
 		func(object client.Object) error {
 			if decorationAdapter, ok := u.XsetController.(api.DecorationAdapter); ok {
-				if fn, err := decorationAdapter.GetUpdatedDecorationsPatcher(ctx, u.Client, targetUpdateInfo.TargetWrapper.Object); err != nil {
+				if fn, err := decorationAdapter.GetDecorationPatcherByRevisions(ctx, u.Client, targetUpdateInfo.TargetWrapper.Object, targetUpdateInfo.TargetWrapper.DecorationUpdatedRevisions); err != nil {
 					return err
 				} else {
 					return fn(object)

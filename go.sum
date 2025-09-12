@@ -1195,6 +1195,14 @@ kusionstack.io/kube-utils v0.2.1-0.20250912050454-759770e43f55 h1:bSmadjcLRtd2+Q
 kusionstack.io/kube-utils v0.2.1-0.20250912050454-759770e43f55/go.mod h1:pThYvlUgm58SXyax5nxHRln6EW7l6sqkNmlUqa/6OR0=
 kusionstack.io/kube-utils v0.2.1-0.20250912052233-655a1c00ae65 h1:6FYW8oj0gLkRYrpX8bMBbmA32SFnckqkc7bPLuuEpeE=
 kusionstack.io/kube-utils v0.2.1-0.20250912052233-655a1c00ae65/go.mod h1:pThYvlUgm58SXyax5nxHRln6EW7l6sqkNmlUqa/6OR0=
+kusionstack.io/kube-utils v0.2.1-0.20250912073812-1f1fc4b17790 h1:uj9jWZUFCOjcEOGMtxfBkDe2ZkA0t352oNjlaFkhrsU=
+kusionstack.io/kube-utils v0.2.1-0.20250912073812-1f1fc4b17790/go.mod h1:pThYvlUgm58SXyax5nxHRln6EW7l6sqkNmlUqa/6OR0=
+kusionstack.io/kube-utils v0.2.1-0.20250912080309-54cfa59aff55 h1:1V1HYk4rsj8/ViJUkQBJ8EHV+zakmiYUK/Un7NzYpqc=
+kusionstack.io/kube-utils v0.2.1-0.20250912080309-54cfa59aff55/go.mod h1:pThYvlUgm58SXyax5nxHRln6EW7l6sqkNmlUqa/6OR0=
+kusionstack.io/kube-utils v0.2.1-0.20250912080708-86305c41b290 h1:uFAoeKYtuGGIyO+9A0+GQSmT3yMlzT7nq5ZWLh5UazI=
+kusionstack.io/kube-utils v0.2.1-0.20250912080708-86305c41b290/go.mod h1:pThYvlUgm58SXyax5nxHRln6EW7l6sqkNmlUqa/6OR0=
+kusionstack.io/kube-utils v0.2.1-0.20250912081635-e8c3adff70e2 h1:8uusOhzBqntRfmIFtF1bD9HGMiCfVAtofWr0lLw+W9w=
+kusionstack.io/kube-utils v0.2.1-0.20250912081635-e8c3adff70e2/go.mod h1:pThYvlUgm58SXyax5nxHRln6EW7l6sqkNmlUqa/6OR0=
 kusionstack.io/resourceconsist v0.0.1 h1:+k/jriq5Ld7fQUYfWSMGynz/FesHtl3Rk2fmQPjBe0g=
 kusionstack.io/resourceconsist v0.0.1/go.mod h1:816xS/fY6EOUbPFjXIWW/TGs8/YE46qP4ElKeIiwFdU=
 modernc.org/cc v1.0.0/go.mod h1:1Sk4//wdnYJiUIxnW8ddKpaOJCF37yAdqYnkxUpaYxw=
