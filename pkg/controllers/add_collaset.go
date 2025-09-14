@@ -16,8 +16,10 @@ limitations under the License.
 
 package controllers
 
-import "kusionstack.io/kuperator/pkg/controllers/collaset"
+import (
+	"kusionstack.io/kuperator/pkg/controllers/xcollaset"
+)
 
 func init() {
-	AddToManagerFuncs = append(AddToManagerFuncs, collaset.Add)
+	AddToManagerFuncs = append(AddToManagerFuncs, xcollaset.Add)
 }

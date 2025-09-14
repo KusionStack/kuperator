@@ -128,7 +128,7 @@ func (d *DecorationAdapter) IsTargetDecorationChanged(current, updated string) (
 			revisionSets.Insert(currentInfos[i].Revision)
 		}
 		for i := range updatedInfos {
-			if !revisionSets.Has(currentInfos[i].Revision) {
+			if !revisionSets.Has(updatedInfos[i].Revision) {
 				return true, nil
 			}
 		}
