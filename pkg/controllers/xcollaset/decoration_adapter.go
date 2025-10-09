@@ -63,6 +63,7 @@ func (d *DecorationAdapter) GetDecorationGroupVersionKind() metav1.GroupVersionK
 		Kind:    "PodDecoration",
 	}
 }
+
 func (d *DecorationAdapter) GetDecorationPatcherByRevisions(ctx context.Context, c client.Client, target client.Object, revision string) (func(client.Object) error, error) {
 	var pds map[string]*appsv1alpha1.PodDecoration
 	pod := target.(*corev1.Pod)
@@ -96,7 +97,7 @@ func (d *DecorationAdapter) GetTargetCurrentDecorationRevisions(ctx context.Cont
 		return "", err
 	}
 	pds, err = getter.GetOnPod(ctx, pod)
-	return anno.GetDecorationInfoString(pds), nil
+	return anno.GetDecorationInfoString(pds), err
 }
 
 func (d *DecorationAdapter) GetTargetUpdatedDecorationRevisions(ctx context.Context, c client.Client, target client.Object) (string, error) {
@@ -107,7 +108,7 @@ func (d *DecorationAdapter) GetTargetUpdatedDecorationRevisions(ctx context.Cont
 		return "", err
 	}
 	pds, err = getter.GetEffective(ctx, pod)
-	return anno.GetDecorationInfoString(pds), nil
+	return anno.GetDecorationInfoString(pds), err
 }
 
 func (d *DecorationAdapter) IsTargetDecorationChanged(current, updated string) (bool, error) {
