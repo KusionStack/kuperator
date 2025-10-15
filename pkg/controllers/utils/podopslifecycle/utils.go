@@ -120,7 +120,7 @@ func AllowOps(adapter LifecycleAdapter, operationDelaySeconds int32, obj client.
 	delay := time.Duration(operationDelaySeconds) * time.Second
 	if duration < delay {
 		du := delay - duration
-		return &du, started
+		return &du, false
 	}
 
 	return nil, started
