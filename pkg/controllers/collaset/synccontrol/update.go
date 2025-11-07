@@ -713,7 +713,7 @@ func (u *inPlaceIfPossibleUpdater) diffPod(currentPod, updatedPod *corev1.Pod) (
 
 func (u *inPlaceIfPossibleUpdater) GetPodUpdateFinishStatus(_ context.Context, podUpdateInfo *PodUpdateInfo) (finished bool, msg string, err error) {
 	if !podUpdateInfo.IsUpdatedRevision || podUpdateInfo.PodDecorationChanged {
-		return false, "add on not updated", nil
+		return false, "pod is not updated or add on not updated", nil
 	}
 
 	if podUpdateInfo.Status.ContainerStatuses == nil {
