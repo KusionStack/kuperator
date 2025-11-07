@@ -70,6 +70,109 @@ var (
 )
 
 var _ = Describe("collaset controller", func() {
+	It("inplaceUpdate with only metadata changed", func() {
+		testcase := "test-inplace-update-with-only-metadata-changed"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+
+		cs := &appsv1alpha1.CollaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "foo",
+			},
+			Spec: appsv1alpha1.CollaSetSpec{
+				Replicas: int32Pointer(2),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "foo",
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"app": "foo",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "foo",
+								Image: "nginx:v1",
+							},
+						},
+					},
+				},
+				UpdateStrategy: appsv1alpha1.UpdateStrategy{
+					OperationDelaySeconds: int32Pointer(1),
+					PodUpdatePolicy:       appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType,
+				},
+			},
+		}
+		Expect(c.Create(context.TODO(), cs)).Should(BeNil())
+
+		podList := &corev1.PodList{}
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			return len(podList.Items) == 2
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
+
+		observedGeneration := cs.Status.ObservedGeneration
+		// update CollaSet template metadata
+		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+			cls.Spec.Template.Annotations = map[string]string{
+				"test": "v1",
+			}
+			return true
+		})).Should(BeNil())
+		Eventually(func() bool {
+			Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
+			return cs.Status.ObservedGeneration != observedGeneration
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+
+		// allow origin pod to update
+		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+		for i := range podList.Items {
+			pod := &podList.Items[i]
+			Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
+				return true
+			})).Should(BeNil())
+		}
+
+		// waiting for update finished
+		Eventually(func() error {
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 2, 0, 0)
+		}, 10*time.Second, 1*time.Second).Should(BeNil())
+
+		// mock container status
+		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+		for i := range podList.Items {
+			Expect(updatePodStatusWithRetry(c, podList.Items[i].Namespace, podList.Items[i].Name, func(pod *corev1.Pod) bool {
+				pod.Status.ContainerStatuses = []corev1.ContainerStatus{
+					{
+						Name:    "foo",
+						ImageID: "nginx:v1",
+					},
+				}
+				return true
+			})).Should(BeNil())
+		}
+
+		// check pods update are finished
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
+			for i := range podList.Items {
+				pod := &podList.Items[i]
+				if podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, pod) {
+					return false
+				}
+			}
+			return true
+		}, 10*time.Second, 1*time.Second).Should(BeTrue())
+	})
+
 	It("replace pod with update", func() {
 		for _, updateStrategy := range []appsv1alpha1.PodUpdateStrategyType{appsv1alpha1.CollaSetRecreatePodUpdateStrategyType, appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType, appsv1alpha1.CollaSetReplacePodUpdateStrategyType} {
 			testcase := fmt.Sprintf("test-replace-pod-with-%s-update", strings.ToLower(string(updateStrategy)))

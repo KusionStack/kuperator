@@ -591,10 +591,9 @@ func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(_ context.Context, _ *a
 		return err
 	}
 
+	var podStatus *PodStatus
 	if podUpdateInfo.OnlyMetadataChanged {
-		if podUpdateInfo.UpdatedPod.Annotations != nil {
-			delete(podUpdateInfo.UpdatedPod.Annotations, appsv1alpha1.LastPodStatusAnnotationKey)
-		}
+		podStatus = &PodStatus{ContainerStates: nil}
 	} else {
 		containerCurrentStatusMapping := map[string]*corev1.ContainerStatus{}
 		for i := range podUpdateInfo.Status.ContainerStatuses {
@@ -605,7 +604,7 @@ func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(_ context.Context, _ *a
 			}
 		}
 
-		podStatus := &PodStatus{ContainerStates: map[string]*ContainerStatus{}}
+		podStatus = &PodStatus{ContainerStates: map[string]*ContainerStatus{}}
 		for _, container := range podUpdateInfo.UpdatedPod.Spec.Containers {
 			podStatus.ContainerStates[container.Name] = &ContainerStatus{
 				// store image of each container in updated Pod
@@ -620,17 +619,21 @@ func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(_ context.Context, _ *a
 			// store image ID of each container in current Pod
 			podStatus.ContainerStates[container.Name].LastImageID = containerCurrentStatus.ImageID
 		}
-
-		podStatusStr, err := json.Marshal(podStatus)
-		if err != nil {
-			return err
-		}
-
-		if podUpdateInfo.UpdatedPod.Annotations == nil {
-			podUpdateInfo.UpdatedPod.Annotations = map[string]string{}
-		}
-		podUpdateInfo.UpdatedPod.Annotations[appsv1alpha1.LastPodStatusAnnotationKey] = string(podStatusStr)
 	}
+
+	if podUpdateInfo.UpdatedPod.Annotations != nil {
+		podUpdateInfo.UpdatedPod.Annotations = map[string]string{}
+	}
+
+	podStatusStr, err := json.Marshal(podStatus)
+	if err != nil {
+		return err
+	}
+
+	if podUpdateInfo.UpdatedPod.Annotations == nil {
+		podUpdateInfo.UpdatedPod.Annotations = map[string]string{}
+	}
+	podUpdateInfo.UpdatedPod.Annotations[appsv1alpha1.LastPodStatusAnnotationKey] = string(podStatusStr)
 	return nil
 }
 
@@ -709,7 +712,7 @@ func (u *inPlaceIfPossibleUpdater) diffPod(currentPod, updatedPod *corev1.Pod) (
 }
 
 func (u *inPlaceIfPossibleUpdater) GetPodUpdateFinishStatus(_ context.Context, podUpdateInfo *PodUpdateInfo) (finished bool, msg string, err error) {
-	if podUpdateInfo.PodDecorationChanged {
+	if !podUpdateInfo.IsUpdatedRevision || podUpdateInfo.PodDecorationChanged {
 		return false, "add on not updated", nil
 	}
 
@@ -738,7 +741,7 @@ func (u *inPlaceIfPossibleUpdater) GetPodUpdateFinishStatus(_ context.Context, p
 	}
 
 	if podLastState.ContainerStates == nil {
-		return true, "empty last container state recorded", nil
+		return true, "pod is updated with only metadata changed", nil
 	}
 
 	imageMapping := map[string]string{}
