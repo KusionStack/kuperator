@@ -621,10 +621,6 @@ func (u *inPlaceIfPossibleUpdater) FulfillPodUpdatedInfo(_ context.Context, _ *a
 		}
 	}
 
-	if podUpdateInfo.UpdatedPod.Annotations != nil {
-		podUpdateInfo.UpdatedPod.Annotations = map[string]string{}
-	}
-
 	podStatusStr, err := json.Marshal(podStatus)
 	if err != nil {
 		return err
