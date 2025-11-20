@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package xcollaset
+package collaset
 
 import (
 	"context"
@@ -49,11 +49,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"kusionstack.io/kuperator/pkg/controllers/collaset/legacy"
+	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	"kusionstack.io/kuperator/pkg/controllers/poddecoration"
 	"kusionstack.io/kuperator/pkg/controllers/poddeletion"
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/strategy"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
-	collasetutils "kusionstack.io/kuperator/pkg/controllers/xcollaset/utils"
 	"kusionstack.io/kuperator/pkg/utils/inject"
 )
 
@@ -113,7 +114,10 @@ var _ = Describe("collaset controller", func() {
 			return len(podList.Items) == 2
 		}, 5*time.Second, 1*time.Second).Should(BeTrue())
 		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
-		Expect(expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)).Should(BeNil())
+
+		Eventually(func() error {
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 2, 2, 0, 0, 0)
+		}, time.Second*10, time.Second).Should(Succeed())
 
 		observedGeneration := cs.Status.ObservedGeneration
 		// update CollaSet template metadata
@@ -133,7 +137,7 @@ var _ = Describe("collaset controller", func() {
 		for i := range podList.Items {
 			pod := &podList.Items[i]
 			Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.UpdateOpsLifecycleAdapter.GetID())
 				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 				return true
 			})).Should(BeNil())
@@ -163,7 +167,7 @@ var _ = Describe("collaset controller", func() {
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 			for i := range podList.Items {
 				pod := &podList.Items[i]
-				if podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, pod) {
+				if podopslifecycle.IsDuringOps(legacy.UpdateOpsLifecycleAdapter, pod) {
 					return false
 				}
 			}
@@ -264,7 +268,7 @@ var _ = Describe("collaset controller", func() {
 
 			// allow origin pod to update
 			Expect(updatePodWithRetry(c, originPod.Namespace, originPodName, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.UpdateOpsLifecycleAdapter.GetID())
 				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 				return true
 			})).Should(BeNil())
@@ -440,7 +444,7 @@ var _ = Describe("collaset controller", func() {
 
 			// allow origin pod to update
 			Expect(updatePodWithRetry(c, originPod.Namespace, originPodName, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.UpdateOpsLifecycleAdapter.GetID())
 				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 				return true
 			})).Should(BeNil())
@@ -625,7 +629,7 @@ var _ = Describe("collaset controller", func() {
 		for i := range podList.Items {
 			pod := &podList.Items[i]
 			Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.ScaleInOpsLifecycleAdapter.GetID())
 				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 				return true
 			})).Should(BeNil())
@@ -772,7 +776,7 @@ var _ = Describe("collaset controller", func() {
 		for i := range podList.Items {
 			pod := &podList.Items[i]
 			Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.ScaleInOpsLifecycleAdapter.GetID())
 				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 				return true
 			})).Should(BeNil())
@@ -862,7 +866,7 @@ var _ = Describe("collaset controller", func() {
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 			for i := range podList.Items {
 				pod := podList.Items[i]
-				if podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, &pod) {
+				if podopslifecycle.IsDuringOps(legacy.ScaleInOpsLifecycleAdapter, &pod) {
 					podToScaleIn = &pod
 					return true
 				}
@@ -883,8 +887,8 @@ var _ = Describe("collaset controller", func() {
 			for i := range podList.Items {
 				pod := podList.Items[i]
 				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-					if podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, pod) {
-						labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+					if podopslifecycle.IsDuringOps(legacy.ScaleInOpsLifecycleAdapter, pod) {
+						labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.ScaleInOpsLifecycleAdapter.GetID())
 						pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 						triggerAllowed = podToScaleIn.Name == pod.Name
 					}
@@ -980,8 +984,8 @@ var _ = Describe("collaset controller", func() {
 			for i := range podList.Items {
 				pod := podList.Items[i]
 				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-					if podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, pod) {
-						labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+					if podopslifecycle.IsDuringOps(legacy.ScaleInOpsLifecycleAdapter, pod) {
+						labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.ScaleInOpsLifecycleAdapter.GetID())
 						pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 						triggerAllowed = true
 					}
@@ -1073,16 +1077,16 @@ var _ = Describe("collaset controller", func() {
 			Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 			for i := range podList.Items {
 				pod := &podList.Items[i]
-				if !podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, pod) {
+				if !podopslifecycle.IsDuringOps(legacy.UpdateOpsLifecycleAdapter, pod) {
 					continue
 				}
 
-				if _, allowed := podopslifecycle.AllowOps(collasetutils.UpdateOpsLifecycleAdapter, 0, pod); allowed {
+				if _, allowed := podopslifecycle.AllowOps(legacy.UpdateOpsLifecycleAdapter, 0, pod); allowed {
 					continue
 				}
 				// allow Pod to do update
 				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.UpdateOpsLifecycleAdapter.GetID())
 					pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 					return true
 				})).Should(BeNil())
@@ -1161,12 +1165,12 @@ var _ = Describe("collaset controller", func() {
 
 			Eventually(func() bool {
 				Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, &pod)).Should(BeNil())
-				if !podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, &pod) {
+				if !podopslifecycle.IsDuringOps(legacy.UpdateOpsLifecycleAdapter, &pod) {
 					return false
 				}
 				// allow Pod to do update
 				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.UpdateOpsLifecycleAdapter.GetID())
 					pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 					return true
 				})).Should(BeNil())
@@ -1277,14 +1281,14 @@ var _ = Describe("collaset controller", func() {
 		// allow Pod to do update
 		for i := range podList.Items {
 			pod := &podList.Items[i]
-			if !podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, pod) {
+			if !podopslifecycle.IsDuringOps(legacy.UpdateOpsLifecycleAdapter, pod) {
 				continue
 			}
-			if _, allowed := podopslifecycle.AllowOps(collasetutils.UpdateOpsLifecycleAdapter, 0, pod); allowed {
+			if _, allowed := podopslifecycle.AllowOps(legacy.UpdateOpsLifecycleAdapter, 0, pod); allowed {
 				continue
 			}
 			Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.UpdateOpsLifecycleAdapter.GetID())
 				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 				return true
 			})).Should(BeNil())
@@ -1379,14 +1383,14 @@ var _ = Describe("collaset controller", func() {
 		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 		for i := range podList.Items {
 			pod := &podList.Items[i]
-			if !podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, pod) {
+			if !podopslifecycle.IsDuringOps(legacy.UpdateOpsLifecycleAdapter, pod) {
 				continue
 			}
-			if _, allowed := podopslifecycle.AllowOps(collasetutils.UpdateOpsLifecycleAdapter, 0, pod); allowed {
+			if _, allowed := podopslifecycle.AllowOps(legacy.UpdateOpsLifecycleAdapter, 0, pod); allowed {
 				continue
 			}
 			Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.UpdateOpsLifecycleAdapter.GetID())
 				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 				return true
 			})).Should(BeNil())
@@ -1404,14 +1408,14 @@ var _ = Describe("collaset controller", func() {
 		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
 		for i := range podList.Items {
 			pod := &podList.Items[i]
-			if !podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, pod) {
+			if !podopslifecycle.IsDuringOps(legacy.UpdateOpsLifecycleAdapter, pod) {
 				continue
 			}
-			if _, allowed := podopslifecycle.AllowOps(collasetutils.UpdateOpsLifecycleAdapter, 0, pod); allowed {
+			if _, allowed := podopslifecycle.AllowOps(legacy.UpdateOpsLifecycleAdapter, 0, pod); allowed {
 				continue
 			}
 			Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.UpdateOpsLifecycleAdapter.GetID())
 				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 				return true
 			})).Should(BeNil())
@@ -1516,7 +1520,7 @@ var _ = Describe("collaset controller", func() {
 
 		// allow Pod to update
 		Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.UpdateOpsLifecycleAdapter.GetID())
 			pod.Labels[labelOperate] = "true"
 			return true
 		})).Should(BeNil())
@@ -1636,7 +1640,7 @@ var _ = Describe("collaset controller", func() {
 						count++
 						// allow Pod to update
 						Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-							labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+							labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.UpdateOpsLifecycleAdapter.GetID())
 							pod.Labels[labelOperate] = "true"
 							return true
 						})).Should(BeNil())
@@ -2574,7 +2578,7 @@ var _ = Describe("collaset controller", func() {
 
 		// allow new pod to scaleIn
 		Expect(updatePodWithRetry(c, newPod.Namespace, newPod.Name, func(pod *corev1.Pod) bool {
-			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.ScaleInOpsLifecycleAdapter.GetID())
 			pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 			return true
 		})).Should(BeNil())
@@ -2924,7 +2928,7 @@ var _ = Describe("collaset controller", func() {
 			return false
 		}, time.Second*10, time.Second).Should(BeTrue())
 		Expect(updatePodWithRetry(c, originPod2.Namespace, originPod2.Name, func(pod *corev1.Pod) bool {
-			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.UpdateOpsLifecycleAdapter.GetID())
 			pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 			return true
 		})).Should(BeNil())
@@ -2940,7 +2944,7 @@ var _ = Describe("collaset controller", func() {
 			// originPod1 is during inPlaceUpdate lifecycle, but continue to be replaced by updated pod
 			// originPod2 is during inPlaceUpdate lifecycle, and being updated by inPlace
 			if pod.Name == originPod1.Name || pod.Name == originPod2.Name {
-				Expect(podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, &pod)).Should(BeTrue())
+				Expect(podopslifecycle.IsDuringOps(legacy.UpdateOpsLifecycleAdapter, &pod)).Should(BeTrue())
 			}
 		}
 	})
@@ -3070,7 +3074,7 @@ var _ = Describe("collaset controller", func() {
 			for i := range podList.Items {
 				pod := &podList.Items[i]
 				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.ScaleInOpsLifecycleAdapter.GetID())
 					pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 					return true
 				})).Should(BeNil())
@@ -3112,7 +3116,7 @@ var _ = Describe("collaset controller", func() {
 			for i := range podList.Items {
 				pod := &podList.Items[i]
 				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.ScaleInOpsLifecycleAdapter.GetID())
 					delete(pod.Labels, labelOperate)
 					return true
 				})).Should(BeNil())
@@ -3297,15 +3301,15 @@ var _ = Describe("collaset controller", func() {
 				}
 				for i := range podList.Items {
 					pod := &podList.Items[i]
-					if !podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, pod) {
+					if !podopslifecycle.IsDuringOps(legacy.UpdateOpsLifecycleAdapter, pod) {
 						continue
 					}
 
-					if _, allowed := podopslifecycle.AllowOps(collasetutils.UpdateOpsLifecycleAdapter, 0, pod); allowed {
+					if _, allowed := podopslifecycle.AllowOps(legacy.UpdateOpsLifecycleAdapter, 0, pod); allowed {
 						continue
 					}
 					Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-						labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+						labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.UpdateOpsLifecycleAdapter.GetID())
 						pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 						return true
 					})).Should(BeNil())
@@ -3628,7 +3632,7 @@ var _ = Describe("collaset controller", func() {
 			for i := range podList.Items {
 				pod := &podList.Items[i]
 				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.ScaleInOpsLifecycleAdapter.GetID())
 					pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 					return true
 				})).Should(BeNil())
@@ -3661,7 +3665,7 @@ var _ = Describe("collaset controller", func() {
 			for i := range podList.Items {
 				pod := &podList.Items[i]
 				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+					labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.ScaleInOpsLifecycleAdapter.GetID())
 					delete(pod.Labels, labelOperate)
 					return true
 				})).Should(BeNil())
@@ -3901,7 +3905,7 @@ var _ = Describe("collaset controller", func() {
 		// mark pod allowed to operate in ScaleInPodOpsLifecycle
 		pod := &podList.Items[0]
 		Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+			labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.ScaleInOpsLifecycleAdapter.GetID())
 			pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 			return true
 		})).Should(BeNil())
@@ -4241,8 +4245,8 @@ var _ = Describe("collaset controller", func() {
 			for i := range podList.Items {
 				pod := podList.Items[i]
 				Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-					if podopslifecycle.IsDuringOps(collasetutils.ScaleInOpsLifecycleAdapter, pod) {
-						labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.ScaleInOpsLifecycleAdapter.GetID())
+					if podopslifecycle.IsDuringOps(legacy.ScaleInOpsLifecycleAdapter, pod) {
+						labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.ScaleInOpsLifecycleAdapter.GetID())
 						pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 						triggerAllowed = true
 					}
@@ -4602,7 +4606,7 @@ var _ = Describe("collaset controller", func() {
 		for i := range podList.Items {
 			pod := podList.Items[i]
 			Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.UpdateOpsLifecycleAdapter.GetID())
 				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 				return true
 			})).Should(BeNil())
@@ -4790,7 +4794,7 @@ var _ = Describe("collaset controller", func() {
 				return false
 			}, time.Second*10, time.Second).Should(BeTrue())
 			Expect(updatePodWithRetry(c, pod.Namespace, pod.Name, func(pod *corev1.Pod) bool {
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.UpdateOpsLifecycleAdapter.GetID())
 				pod.Labels[labelOperate] = fmt.Sprintf("%d", time.Now().UnixNano())
 				return true
 			})).Should(BeNil())

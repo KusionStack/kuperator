@@ -42,11 +42,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	"kusionstack.io/kuperator/pkg/controllers/collaset"
+	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/legacy"
 	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/strategy"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
-	"kusionstack.io/kuperator/pkg/controllers/xcollaset"
-	collasetutils "kusionstack.io/kuperator/pkg/controllers/xcollaset/utils"
 	"kusionstack.io/kuperator/pkg/utils/inject"
 )
 
@@ -916,7 +916,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	c = mgr.GetClient()
 	Expect(Add(mgr)).NotTo(HaveOccurred())
-	Expect(xcollaset.Add(mgr)).NotTo(HaveOccurred())
+	Expect(collaset.Add(mgr)).NotTo(HaveOccurred())
 
 	go func() {
 		err = mgr.Start(ctx)

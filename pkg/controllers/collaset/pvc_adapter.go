@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package xcollaset
+package collaset
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -22,7 +22,7 @@ import (
 	xsetapi "kusionstack.io/kube-xset/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"kusionstack.io/kuperator/pkg/controllers/xcollaset/utils"
+	"kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 )
 
 type SubResourcePvcAdapter struct{}

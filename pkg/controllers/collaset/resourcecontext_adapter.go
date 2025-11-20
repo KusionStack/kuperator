@@ -14,27 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package xcollaset
+package collaset
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	xsetapi "kusionstack.io/kube-xset/api"
 
-	"kusionstack.io/kuperator/pkg/controllers/xcollaset/utils"
+	"kusionstack.io/kuperator/pkg/controllers/collaset/legacy"
 )
 
 var _ xsetapi.ResourceContextAdapter = &ResourceContextAdapter{}
 
 var defaultResourceContextKeys = map[xsetapi.ResourceContextKeyEnum]string{
-	xsetapi.EnumOwnerContextKey:                     utils.OwnerContextKey,
-	xsetapi.EnumRevisionContextDataKey:              utils.RevisionContextDataKey,
-	xsetapi.EnumTargetDecorationRevisionKey:         utils.PodDecorationRevisionKey,
-	xsetapi.EnumJustCreateContextDataKey:            utils.JustCreateContextDataKey,
-	xsetapi.EnumRecreateUpdateContextDataKey:        utils.RecreateUpdateContextDataKey,
-	xsetapi.EnumScaleInContextDataKey:               utils.ScaleInContextDataKey,
-	xsetapi.EnumReplaceNewTargetIDContextDataKey:    utils.ReplaceNewPodIDContextDataKey,
-	xsetapi.EnumReplaceOriginTargetIDContextDataKey: utils.ReplaceOriginPodIDContextDataKey,
+	xsetapi.EnumOwnerContextKey:                     legacy.OwnerContextKey,
+	xsetapi.EnumRevisionContextDataKey:              legacy.RevisionContextDataKey,
+	xsetapi.EnumTargetDecorationRevisionKey:         legacy.PodDecorationRevisionKey,
+	xsetapi.EnumJustCreateContextDataKey:            legacy.JustCreateContextDataKey,
+	xsetapi.EnumRecreateUpdateContextDataKey:        legacy.RecreateUpdateContextDataKey,
+	xsetapi.EnumScaleInContextDataKey:               legacy.ScaleInContextDataKey,
+	xsetapi.EnumReplaceNewTargetIDContextDataKey:    legacy.ReplaceNewPodIDContextDataKey,
+	xsetapi.EnumReplaceOriginTargetIDContextDataKey: legacy.ReplaceOriginPodIDContextDataKey,
 }
 
 // ResourceContextAdapter is the adapter to xsetapi apps.kusionstack.io.resourcecontexts

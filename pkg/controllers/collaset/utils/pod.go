@@ -1,5 +1,4 @@
 /*
-Copyright 2014 The Kubernetes Authors.
 Copyright 2023 The KusionStack Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -250,14 +249,6 @@ func afterOrZero(t1, t2 *metav1.Time) bool {
 		return t1.Time.IsZero()
 	}
 	return t1.After(t2.Time)
-}
-
-func IsPodUpdatedRevision(pod *corev1.Pod, revision string) bool {
-	if pod.Labels == nil {
-		return false
-	}
-
-	return pod.Labels[appsv1.ControllerRevisionHashLabelKey] == revision
 }
 
 func IsPodInactive(pod *corev1.Pod) bool {

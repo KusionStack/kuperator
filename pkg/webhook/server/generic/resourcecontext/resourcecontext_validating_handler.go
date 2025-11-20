@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	podcontext "kusionstack.io/kuperator/pkg/controllers/xcollaset/utils"
+	podcontext "kusionstack.io/kuperator/pkg/controllers/collaset/legacy"
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )
 

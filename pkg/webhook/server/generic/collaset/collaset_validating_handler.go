@@ -117,7 +117,6 @@ func (h *ValidatingHandler) validateScaleStrategy(cls, oldCls *appsv1alpha1.Coll
 		allErrs = append(allErrs, field.Forbidden(fSpec.Child("scaleStrategy", "context"), "scaleStrategy.context is not allowed to be changed"))
 	}
 
-<<<<<<< HEAD
 	if cls.Spec.NamingStrategy != nil {
 		if cls.Spec.NamingStrategy.PodNamingSuffixPolicy != appsv1alpha1.PodNamingSuffixPolicyPersistentSequence && cls.Spec.NamingStrategy.PodNamingSuffixPolicy != appsv1alpha1.PodNamingSuffixPolicyRandom {
 			allErrs = append(allErrs, field.NotSupported(fSpec.Child("namingStrategy", "podNamingSuffixPolicy"), cls.Spec.NamingStrategy.PodNamingSuffixPolicy,
@@ -133,21 +132,6 @@ func (h *ValidatingHandler) validateScaleStrategy(cls, oldCls *appsv1alpha1.Coll
 			allErrs = append(allErrs, field.Forbidden(fSpec.Child("scaleStrategy", "podToExclude[podToInclude]"),
 				"scaleStrategy.podToExclude[podToInclude] is not allowed when podNamingPolicy is PodNamingPolicyPersistentSequence"))
 		}
-=======
-	if cls.Spec.NamingStrategy != nil && cls.Spec.NamingStrategy.PodNamingSuffixPolicy != appsv1alpha1.PodNamingSuffixPolicyPersistentSequence && cls.Spec.NamingStrategy.PodNamingSuffixPolicy != appsv1alpha1.PodNamingSuffixPolicyRandom {
-		allErrs = append(allErrs, field.NotSupported(fSpec.Child("namingStrategy", "podNamingSuffixPolicy"), cls.Spec.NamingStrategy.PodNamingSuffixPolicy,
-			[]string{
-				string(appsv1alpha1.PodNamingSuffixPolicyPersistentSequence),
-				string(appsv1alpha1.PodNamingSuffixPolicyRandom),
-			},
-		))
-	}
-
-	if cls.Spec.NamingStrategy != nil && cls.Spec.NamingStrategy.PodNamingSuffixPolicy == appsv1alpha1.PodNamingSuffixPolicyPersistentSequence &&
-		(len(cls.Spec.ScaleStrategy.PodToExclude) > 0 || len(cls.Spec.ScaleStrategy.PodToInclude) > 0) {
-		allErrs = append(allErrs, field.Forbidden(fSpec.Child("scaleStrategy", "podToExclude[podToInclude]"),
-			"scaleStrategy.podToExclude[podToInclude] is not allowed when podNamingPolicy is PodNamingPolicyPersistentSequence"))
->>>>>>> 42a4ace (init)
 	}
 
 	allErrs = append(allErrs, h.validateScaleStrategyPodList(cls, fSpec)...)

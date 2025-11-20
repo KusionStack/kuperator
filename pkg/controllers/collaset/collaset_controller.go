@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package xcollaset
+package collaset
 
 import (
 	"context"
@@ -30,8 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	"kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
-	"kusionstack.io/kuperator/pkg/controllers/xcollaset/utils"
 )
 
 const (
@@ -120,6 +120,7 @@ func (s *XSetOperation) GetXSetSpec(xset xsetapi.XSetObject) *xsetapi.XSetSpec {
 		}
 		xSetSpec.UpdateStrategy.RollingUpdate = &rollingUpdate
 	}
+	xSetSpec.UpdateStrategy.OperationDelaySeconds = set.Spec.UpdateStrategy.OperationDelaySeconds
 	// scale strategy
 	xSetSpec.ScaleStrategy.TargetToDelete = set.Spec.ScaleStrategy.PodToDelete
 	xSetSpec.ScaleStrategy.TargetToExclude = set.Spec.ScaleStrategy.PodToExclude

@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The KusionStack Authors.
+Copyright 2025 The KusionStack Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package legacy
 
-import "kusionstack.io/kuperator/pkg/controllers/collaset"
-
-func init() {
-	AddToManagerFuncs = append(AddToManagerFuncs, collaset.Add)
-}
+const (
+	OwnerContextKey                  = "Owner"
+	RevisionContextDataKey           = "Revision"
+	PodDecorationRevisionKey         = "PodDecorationRevisions"
+	JustCreateContextDataKey         = "PodJustCreate"
+	RecreateUpdateContextDataKey     = "PodRecreateUpdate"
+	ScaleInContextDataKey            = "ScaleIn"
+	ReplaceNewPodIDContextDataKey    = "ReplaceNewPodID"
+	ReplaceOriginPodIDContextDataKey = "ReplaceOriginPodID"
+)
