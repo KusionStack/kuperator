@@ -16,7 +16,17 @@ limitations under the License.
 
 package utils
 
-import appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+import (
+	corev1 "k8s.io/api/core/v1"
+	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+)
+
+var (
+	PodGVK             = corev1.SchemeGroupVersion.WithKind("Pod")
+	PVCGVK             = corev1.SchemeGroupVersion.WithKind("PersistentVolumeClaim")
+	CollaSetGVK        = appsv1alpha1.SchemeGroupVersion.WithKind("CollaSet")
+	ResourceContextGVK = appsv1alpha1.SchemeGroupVersion.WithKind("ResourceContext")
+)
 
 func PodNamingSuffixPersistentSequence(cls *appsv1alpha1.CollaSet) bool {
 	if cls.Spec.NamingStrategy == nil {

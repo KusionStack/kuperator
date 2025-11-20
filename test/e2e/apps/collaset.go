@@ -39,9 +39,9 @@ import (
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontext"
-	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
+	collasetutils "kusionstack.io/kuperator/pkg/controllers/xcollaset/utils"
+	podcontext "kusionstack.io/kuperator/pkg/controllers/xcollaset/utils"
 	"kusionstack.io/kuperator/pkg/utils"
 	"kusionstack.io/kuperator/test/e2e/framework"
 )

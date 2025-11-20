@@ -55,6 +55,7 @@ type CollaSetController struct {
 	GetLabelManagerAdapterGetter
 	SubResourcePvcAdapter
 	DecorationAdapter
+	ResourceContextAdapterGetter
 }
 
 func (m *CollaSetController) ControllerName() string {
@@ -299,4 +300,10 @@ type GetLabelManagerAdapterGetter struct{}
 
 func (g *GetLabelManagerAdapterGetter) GetLabelManagerAdapter() map[xsetapi.XSetLabelAnnotationEnum]string {
 	return defaultXSetControllerLabelManager
+}
+
+type ResourceContextAdapterGetter struct{}
+
+func (r *ResourceContextAdapterGetter) GetResourceContextAdapter() xsetapi.ResourceContextAdapter {
+	return &ResourceContextAdapter{}
 }

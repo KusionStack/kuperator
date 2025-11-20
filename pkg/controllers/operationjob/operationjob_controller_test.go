@@ -44,9 +44,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"kusionstack.io/kuperator/pkg/controllers/collaset"
 	"kusionstack.io/kuperator/pkg/controllers/operationjob/replace"
 	"kusionstack.io/kuperator/pkg/controllers/poddeletion"
+	"kusionstack.io/kuperator/pkg/controllers/xcollaset"
 	"kusionstack.io/kuperator/pkg/utils/inject"
 )
 
@@ -806,8 +806,7 @@ var _ = BeforeSuite(func() {
 	err = AddToMgr(mgr, r)
 	Expect(err).NotTo(HaveOccurred())
 	// collaset controller
-	r, request = testReconcile(collaset.NewReconciler(mgr))
-	err = collaset.AddToMgr(mgr, r)
+	err = xcollaset.Add(mgr)
 	Expect(err).NotTo(HaveOccurred())
 	// poddeletion controller
 	r, request = testReconcile(poddeletion.NewReconciler(mgr))

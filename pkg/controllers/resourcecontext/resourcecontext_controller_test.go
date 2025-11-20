@@ -43,10 +43,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"kusionstack.io/kuperator/pkg/controllers/collaset"
-	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	"kusionstack.io/kuperator/pkg/controllers/poddeletion"
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/strategy"
+	"kusionstack.io/kuperator/pkg/controllers/xcollaset"
+	collasetutils "kusionstack.io/kuperator/pkg/controllers/xcollaset/utils"
 	"kusionstack.io/kuperator/pkg/utils/inject"
 )
 
@@ -350,8 +350,7 @@ var _ = BeforeSuite(func() {
 	err = AddToMgr(mgr, r)
 	Expect(err).NotTo(HaveOccurred())
 
-	r, request = testReconcile(collaset.NewReconciler(mgr))
-	err = collaset.AddToMgr(mgr, r)
+	err = xcollaset.Add(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
 	r, request = testReconcile(poddeletion.NewReconciler(mgr))
