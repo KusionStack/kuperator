@@ -24,9 +24,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	"kusionstack.io/kube-utils/xset"
-	xsetapi "kusionstack.io/kube-utils/xset/api"
-	"kusionstack.io/kube-utils/xset/synccontrols"
+	kubexset "kusionstack.io/kube-xset"
+	xsetapi "kusionstack.io/kube-xset/api"
+	"kusionstack.io/kube-xset/synccontrols"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -43,7 +43,7 @@ const (
 func Add(mgr manager.Manager) error {
 	xSetController := &CollaSetController{}
 	synccontrols.RegisterInPlaceIfPossibleUpdater(&inPlaceIfPossibleUpdater{})
-	return xset.SetUpWithManager(mgr, xSetController)
+	return kubexset.SetUpWithManager(mgr, xSetController)
 }
 
 var _ xsetapi.XSetController = &CollaSetController{}
@@ -297,6 +297,6 @@ func (l *LifecycleAdapterGetter) GetUpdateOpsLifecycleAdapter() xsetapi.Lifecycl
 
 type GetLabelManagerAdapterGetter struct{}
 
-func (g *GetLabelManagerAdapterGetter) GetLabelManagerAdapter() xsetapi.XSetLabelAnnotationManager {
-	return NewXSetControllerLabelManager()
+func (g *GetLabelManagerAdapterGetter) GetLabelManagerAdapter() map[xsetapi.XSetLabelAnnotationEnum]string {
+	return defaultXSetControllerLabelManager
 }

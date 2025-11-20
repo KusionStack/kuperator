@@ -18,16 +18,8 @@ package xcollaset
 
 import (
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	"kusionstack.io/kube-utils/xset/api"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"kusionstack.io/kube-xset/api"
 )
-
-// NewXSetControllerLabelManager returns a new XSetControllerLabelManager
-func NewXSetControllerLabelManager() api.XSetLabelAnnotationManager {
-	return &xSetControllerLabelManager{
-		labelManager: defaultXSetControllerLabelManager,
-	}
-}
 
 var defaultXSetControllerLabelManager = map[api.XSetLabelAnnotationEnum]string{
 	api.OperatingLabelPrefix:         appsv1alpha1.PodOperatingLabelPrefix,
@@ -52,37 +44,4 @@ var defaultXSetControllerLabelManager = map[api.XSetLabelAnnotationEnum]string{
 
 	api.SubResourcePvcTemplateLabelKey:     appsv1alpha1.PvcTemplateLabelKey,
 	api.SubResourcePvcTemplateHashLabelKey: appsv1alpha1.PvcTemplateHashLabelKey,
-}
-
-type xSetControllerLabelManager struct {
-	labelManager map[api.XSetLabelAnnotationEnum]string
-}
-
-func (m *xSetControllerLabelManager) Get(labels map[string]string, key api.XSetLabelAnnotationEnum) (string, bool) {
-	if labels == nil {
-		return "", false
-	}
-	labelKey := m.labelManager[key]
-	val, exist := labels[labelKey]
-	return val, exist
-}
-
-func (m *xSetControllerLabelManager) Set(obj client.Object, key api.XSetLabelAnnotationEnum, val string) {
-	if obj.GetLabels() == nil {
-		obj.SetLabels(map[string]string{})
-	}
-	labelKey := m.labelManager[key]
-	obj.GetLabels()[labelKey] = val
-}
-
-func (m *xSetControllerLabelManager) Delete(labels map[string]string, key api.XSetLabelAnnotationEnum) {
-	if labels == nil {
-		return
-	}
-	labelKey := m.labelManager[key]
-	delete(labels, labelKey)
-}
-
-func (m *xSetControllerLabelManager) Value(key api.XSetLabelAnnotationEnum) string {
-	return m.labelManager[key]
 }

@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	clientutil "kusionstack.io/kube-utils/client"
-	"kusionstack.io/kube-utils/xset/api"
-	"kusionstack.io/kube-utils/xset/synccontrols"
+	"kusionstack.io/kube-xset/api"
+	"kusionstack.io/kube-xset/synccontrols"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/kuperator/pkg/controllers/xcollaset/utils"
@@ -95,10 +95,9 @@ func (u *inPlaceIfPossibleUpdater) FulfillTargetUpdatedInfo(ctx context.Context,
 		return err
 	}
 
+	var podStatus *PodStatus
 	if targetUpdateInfo.OnlyMetadataChanged {
-		if targetUpdateInfo.UpdatedTarget.GetAnnotations() != nil {
-			delete(targetUpdateInfo.UpdatedTarget.GetAnnotations(), appsv1alpha1.LastPodStatusAnnotationKey)
-		}
+		podStatus = &PodStatus{ContainerStates: nil}
 	} else {
 		containerCurrentStatusMapping := map[string]*corev1.ContainerStatus{}
 		currentPod := targetUpdateInfo.TargetWrapper.Object.(*corev1.Pod)
@@ -110,7 +109,7 @@ func (u *inPlaceIfPossibleUpdater) FulfillTargetUpdatedInfo(ctx context.Context,
 			}
 		}
 
-		podStatus := &PodStatus{ContainerStates: map[string]*ContainerStatus{}}
+		podStatus = &PodStatus{ContainerStates: map[string]*ContainerStatus{}}
 		updatedPod := targetUpdateInfo.UpdatedTarget.(*corev1.Pod)
 		for _, container := range updatedPod.Spec.Containers {
 			podStatus.ContainerStates[container.Name] = &ContainerStatus{
@@ -126,17 +125,18 @@ func (u *inPlaceIfPossibleUpdater) FulfillTargetUpdatedInfo(ctx context.Context,
 			// store image ID of each container in current Pod
 			podStatus.ContainerStates[container.Name].LastImageID = containerCurrentStatus.ImageID
 		}
-
-		podStatusStr, err := json.Marshal(podStatus)
-		if err != nil {
-			return err
-		}
-
-		if targetUpdateInfo.UpdatedTarget.GetAnnotations() == nil {
-			targetUpdateInfo.UpdatedTarget.SetAnnotations(map[string]string{})
-		}
-		targetUpdateInfo.UpdatedTarget.GetAnnotations()[appsv1alpha1.LastPodStatusAnnotationKey] = string(podStatusStr)
 	}
+
+	podStatusStr, err := json.Marshal(podStatus)
+	if err != nil {
+		return err
+	}
+	anno := targetUpdateInfo.UpdatedTarget.GetAnnotations()
+	if anno == nil {
+		anno = make(map[string]string)
+	}
+	anno[appsv1alpha1.LastPodStatusAnnotationKey] = string(podStatusStr)
+	targetUpdateInfo.UpdatedTarget.SetAnnotations(anno)
 	return nil
 }
 
@@ -198,7 +198,7 @@ func (u *inPlaceIfPossibleUpdater) UpgradeTarget(ctx context.Context, targetInfo
 }
 
 func (u *inPlaceIfPossibleUpdater) GetTargetUpdateFinishStatus(_ context.Context, targetUpdateInfo *synccontrols.TargetUpdateInfo) (finished bool, msg string, err error) {
-	if targetUpdateInfo.DecorationChanged {
+	if !targetUpdateInfo.IsUpdatedRevision || targetUpdateInfo.DecorationChanged {
 		return false, "add on not updated", nil
 	}
 
@@ -221,14 +221,14 @@ func (u *inPlaceIfPossibleUpdater) GetTargetUpdateFinishStatus(_ context.Context
 
 	targetLastState := &PodStatus{}
 	if lastStateJson, exist := targetUpdateInfo.GetAnnotations()[appsv1alpha1.LastPodStatusAnnotationKey]; !exist {
-		return false, "no target last state annotation", nil
+		return false, "no pod last state annotation", nil
 	} else if err := json.Unmarshal([]byte(lastStateJson), targetLastState); err != nil {
 		msg := fmt.Sprintf("malformat target last state annotation [%s]: %s", lastStateJson, err.Error())
 		return false, msg, errors.New(msg)
 	}
 
 	if targetLastState.ContainerStates == nil {
-		return true, "empty last container state recorded", nil
+		return true, "pod updated with only metadata changed", nil
 	}
 
 	imageMapping := map[string]string{}

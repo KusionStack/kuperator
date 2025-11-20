@@ -18,7 +18,7 @@ package xcollaset
 
 import (
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	xsetapi "kusionstack.io/kube-utils/xset/api"
+	xsetapi "kusionstack.io/kube-xset/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"

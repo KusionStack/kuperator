@@ -22,7 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	"kusionstack.io/kube-utils/xset/api"
+	"kusionstack.io/kube-xset/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -31,8 +31,8 @@ func Test_xSetControllerLabelManager_Get(t *testing.T) {
 		labelManager map[api.XSetLabelAnnotationEnum]string
 	}
 	type args struct {
-		labels map[string]string
-		key    api.XSetLabelAnnotationEnum
+		pod *corev1.Pod
+		key api.XSetLabelAnnotationEnum
 	}
 	tests := []struct {
 		name   string
@@ -47,8 +47,12 @@ func Test_xSetControllerLabelManager_Get(t *testing.T) {
 				labelManager: defaultXSetControllerLabelManager,
 			},
 			args: args{
-				labels: map[string]string{
-					appsv1alpha1.PodInstanceIDLabelKey: "0",
+				pod: &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							appsv1alpha1.PodInstanceIDLabelKey: "0",
+						},
+					},
 				},
 				key: api.XInstanceIdLabelKey,
 			},
@@ -61,8 +65,8 @@ func Test_xSetControllerLabelManager_Get(t *testing.T) {
 				labelManager: defaultXSetControllerLabelManager,
 			},
 			args: args{
-				labels: nil,
-				key:    api.XInstanceIdLabelKey,
+				pod: &corev1.Pod{},
+				key: api.XInstanceIdLabelKey,
 			},
 			want:  "",
 			want1: false,
@@ -70,10 +74,8 @@ func Test_xSetControllerLabelManager_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &xSetControllerLabelManager{
-				labelManager: tt.fields.labelManager,
-			}
-			got, got1 := m.Get(tt.args.labels, tt.args.key)
+			m := api.NewXSetLabelAnnotationManager(defaultXSetControllerLabelManager)
+			got, got1 := m.Get(tt.args.pod, tt.args.key)
 			if got != tt.want {
 				t.Errorf("Get() got = %v, want %v", got, tt.want)
 			}
@@ -129,11 +131,9 @@ func Test_xSetControllerLabelManager_Set(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &xSetControllerLabelManager{
-				labelManager: tt.fields.labelManager,
-			}
+			m := api.NewXSetLabelAnnotationManager(defaultXSetControllerLabelManager)
 			m.Set(tt.args.obj, tt.args.key, tt.args.val)
-			if val, ok := m.Get(tt.args.obj.GetLabels(), tt.args.key); !ok || val != tt.args.val {
+			if val, ok := m.Get(tt.args.obj, tt.args.key); !ok || val != tt.args.val {
 				t.Errorf("Set() = %v, want %v", val, tt.args.val)
 			}
 		})
@@ -145,8 +145,8 @@ func Test_xSetControllerLabelManager_Delete(t *testing.T) {
 		labelManager map[api.XSetLabelAnnotationEnum]string
 	}
 	type args struct {
-		labels map[string]string
-		key    api.XSetLabelAnnotationEnum
+		pod *corev1.Pod
+		key api.XSetLabelAnnotationEnum
 	}
 	tests := []struct {
 		name   string
@@ -159,8 +159,12 @@ func Test_xSetControllerLabelManager_Delete(t *testing.T) {
 				labelManager: defaultXSetControllerLabelManager,
 			},
 			args: args{
-				labels: map[string]string{
-					appsv1alpha1.PodInstanceIDLabelKey: "0",
+				pod: &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							appsv1alpha1.PodInstanceIDLabelKey: "0",
+						},
+					},
 				},
 				key: api.XInstanceIdLabelKey,
 			},
@@ -171,18 +175,16 @@ func Test_xSetControllerLabelManager_Delete(t *testing.T) {
 				labelManager: defaultXSetControllerLabelManager,
 			},
 			args: args{
-				labels: nil,
-				key:    api.XInstanceIdLabelKey,
+				pod: &corev1.Pod{},
+				key: api.XInstanceIdLabelKey,
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &xSetControllerLabelManager{
-				labelManager: tt.fields.labelManager,
-			}
-			m.Delete(tt.args.labels, tt.args.key)
-			if val, ok := m.Get(tt.args.labels, tt.args.key); ok || val != "" {
+			m := api.NewXSetLabelAnnotationManager(defaultXSetControllerLabelManager)
+			m.Delete(tt.args.pod, tt.args.key)
+			if val, ok := m.Get(tt.args.pod, tt.args.key); ok || val != "" {
 				t.Errorf("Delete() = %v, want %v", val, "")
 			}
 		})

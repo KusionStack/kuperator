@@ -33,9 +33,8 @@ const (
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	AlibabaCloudSlb:         {Default: false, PreRelease: featuregate.Alpha},
-	GraceDeleteWebhook:      {Default: false, PreRelease: featuregate.Alpha},
-	ReclaimPodScaleStrategy: {Default: false, PreRelease: featuregate.Alpha},
+	AlibabaCloudSlb:    {Default: false, PreRelease: featuregate.Alpha},
+	GraceDeleteWebhook: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
