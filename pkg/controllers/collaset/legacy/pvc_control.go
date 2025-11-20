@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pvccontrol
+package legacy
 
 import (
 	"context"
@@ -29,7 +29,7 @@ import (
 	kubeutilsexpectations "kusionstack.io/kube-utils/controller/expectations"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
+	"kusionstack.io/kuperator/pkg/controllers/collaset/utils"
 	refmanagerutil "kusionstack.io/kuperator/pkg/controllers/utils/refmanager"
 	"kusionstack.io/kuperator/pkg/utils/inject"
 )
@@ -125,7 +125,7 @@ func (pc *RealPvcControl) provisionUpdatedPvc(c client.Client, ctx context.Conte
 		}
 
 		// create new pvc
-		claim, err := collasetutils.BuildPvcWithHash(cls, &pvcTmp, id)
+		claim, err := utils.BuildPvcWithHash(cls, &pvcTmp, id)
 		if err != nil {
 			return nil, err
 		}
@@ -133,7 +133,7 @@ func (pc *RealPvcControl) provisionUpdatedPvc(c client.Client, ctx context.Conte
 		if err := c.Create(ctx, claim); err != nil {
 			return nil, fmt.Errorf("fail to create pvc for id %s: %w", id, err)
 		} else {
-			if err = pc.cacheExpectations.ExpectCreation(kubeutilsclient.ObjectKeyString(cls), collasetutils.PVCGVK, claim.Namespace, claim.Name); err != nil {
+			if err = pc.cacheExpectations.ExpectCreation(kubeutilsclient.ObjectKeyString(cls), utils.PVCGVK, claim.Namespace, claim.Name); err != nil {
 				return nil, err
 			}
 		}
@@ -159,7 +159,7 @@ func (pc *RealPvcControl) DeletePodPvcs(ctx context.Context, cls *appsv1alpha1.C
 		// delete pvcs labeled same id with pod
 		if err := pc.client.Delete(ctx, pvc); err != nil {
 			return err
-		} else if err := pc.cacheExpectations.ExpectDeletion(kubeutilsclient.ObjectKeyString(cls), collasetutils.PVCGVK, pvc.Namespace, pvc.Name); err != nil {
+		} else if err := pc.cacheExpectations.ExpectDeletion(kubeutilsclient.ObjectKeyString(cls), utils.PVCGVK, pvc.Namespace, pvc.Name); err != nil {
 			return err
 		}
 	}
@@ -193,7 +193,7 @@ func (pc *RealPvcControl) DeletePodUnusedPvcs(ctx context.Context, cls *appsv1al
 	}
 
 	// delete old pvc if new pvc is provisioned and WhenScaled is "Delete"
-	if collasetutils.PvcPolicyWhenScaled(cls) == appsv1alpha1.DeletePersistentVolumeClaimRetentionPolicyType {
+	if utils.PvcPolicyWhenScaled(cls) == appsv1alpha1.DeletePersistentVolumeClaimRetentionPolicyType {
 		return pc.deleteOldPvcs(pc.client, ctx, cls, newPvcs, oldPvcs)
 	}
 	return nil
@@ -237,7 +237,7 @@ func (pc *RealPvcControl) AdoptPvc(cls *appsv1alpha1.CollaSet, pvc *corev1.Persi
 func classifyPodPvcs(cls *appsv1alpha1.CollaSet, id string, existingPvcs []*corev1.PersistentVolumeClaim) (*map[string]*corev1.PersistentVolumeClaim, *map[string]*corev1.PersistentVolumeClaim, error) {
 	newPvcs := map[string]*corev1.PersistentVolumeClaim{}
 	oldPvcs := map[string]*corev1.PersistentVolumeClaim{}
-	newTmpHash, err := collasetutils.PvcTmpHashMapping(cls.Spec.VolumeClaimTemplates)
+	newTmpHash, err := utils.PvcTmpHashMapping(cls.Spec.VolumeClaimTemplates)
 	if err != nil {
 		return &newPvcs, &oldPvcs, err
 	}
@@ -261,7 +261,7 @@ func classifyPodPvcs(cls *appsv1alpha1.CollaSet, id string, existingPvcs []*core
 			continue
 		}
 		hash := pvc.Labels[appsv1alpha1.PvcTemplateHashLabelKey]
-		pvcTmpName, err := collasetutils.ExtractPvcTmpName(cls, pvc)
+		pvcTmpName, err := utils.ExtractPvcTmpName(cls, pvc)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -279,7 +279,7 @@ func classifyPodPvcs(cls *appsv1alpha1.CollaSet, id string, existingPvcs []*core
 
 func IsPodPvcTmpChanged(cls *appsv1alpha1.CollaSet, pod *corev1.Pod, existingPvcs []*corev1.PersistentVolumeClaim) (bool, error) {
 	// get pvc template hash values
-	newHashMapping, err := collasetutils.PvcTmpHashMapping(cls.Spec.VolumeClaimTemplates)
+	newHashMapping, err := utils.PvcTmpHashMapping(cls.Spec.VolumeClaimTemplates)
 	if err != nil {
 		return false, err
 	}
@@ -329,7 +329,7 @@ func (pc *RealPvcControl) deleteUnclaimedPvcs(c client.Client, ctx context.Conte
 		}
 		if err := c.Delete(ctx, pvc); err != nil {
 			return err
-		} else if err := pc.cacheExpectations.ExpectDeletion(kubeutilsclient.ObjectKeyString(cls), collasetutils.PVCGVK, pvc.Namespace, pvc.Name); err != nil {
+		} else if err := pc.cacheExpectations.ExpectDeletion(kubeutilsclient.ObjectKeyString(cls), utils.PVCGVK, pvc.Namespace, pvc.Name); err != nil {
 			return err
 		}
 	}
@@ -343,7 +343,7 @@ func (pc *RealPvcControl) deleteOldPvcs(c client.Client, ctx context.Context, cl
 		}
 		if err := c.Delete(ctx, pvc); err != nil {
 			return err
-		} else if err := pc.cacheExpectations.ExpectDeletion(kubeutilsclient.ObjectKeyString(cls), collasetutils.PVCGVK, pvc.Namespace, pvc.Name); err != nil {
+		} else if err := pc.cacheExpectations.ExpectDeletion(kubeutilsclient.ObjectKeyString(cls), utils.PVCGVK, pvc.Namespace, pvc.Name); err != nil {
 			return err
 		}
 	}

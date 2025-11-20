@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"kusionstack.io/kuperator/pkg/controllers/collaset/pvccontrol"
+	pvccontrol "kusionstack.io/kuperator/pkg/controllers/collaset/legacy"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/kuperator/pkg/utils/mixin"
 )

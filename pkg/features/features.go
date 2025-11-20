@@ -28,14 +28,11 @@ const (
 	AlibabaCloudSlb featuregate.Feature = "AlibabaCloudSlb"
 	// GraceDeleteWebhook enables the gracedelete webhook
 	GraceDeleteWebhook featuregate.Feature = "GraceDeleteWebhook"
-	// ReclaimPodScaleStrategy enables reclaim of collaset.spec.scaleStrategy.podToDelete
-	ReclaimPodScaleStrategy featuregate.Feature = "ReclaimPodScaleStrategy"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	AlibabaCloudSlb:         {Default: false, PreRelease: featuregate.Alpha},
-	GraceDeleteWebhook:      {Default: false, PreRelease: featuregate.Alpha},
-	ReclaimPodScaleStrategy: {Default: false, PreRelease: featuregate.Alpha},
+	AlibabaCloudSlb:    {Default: false, PreRelease: featuregate.Alpha},
+	GraceDeleteWebhook: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

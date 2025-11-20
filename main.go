@@ -22,20 +22,18 @@ import (
 	"os"
 	"path/filepath"
 
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
 	"github.com/spf13/pflag"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	xsetfeatures "kusionstack.io/kube-xset/features"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	"kusionstack.io/kuperator/pkg/controllers"
 	"kusionstack.io/kuperator/pkg/controllers/operationjob"
-	_ "kusionstack.io/kuperator/pkg/features"
 	"kusionstack.io/kuperator/pkg/utils/feature"
 	"kusionstack.io/kuperator/pkg/utils/inject"
 	"kusionstack.io/kuperator/pkg/webhook"
@@ -71,6 +69,7 @@ func main() {
 	defer klog.Flush()
 
 	feature.DefaultMutableFeatureGate.AddFlag(pflag.CommandLine)
+	xsetfeatures.DefaultMutableFeatureGate.AddFlag(pflag.CommandLine)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 

@@ -23,17 +23,13 @@ require (
 	k8s.io/kubernetes v0.0.0-00010101000000-000000000000
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 	kusionstack.io/kube-api v0.7.4-0.20250909095208-496f60eea9b5
-	kusionstack.io/kube-utils v0.2.1-0.20251031115408-8f00ba110277
+	kusionstack.io/kube-utils v0.2.1-0.20251120063041-6043805ee00d
+	kusionstack.io/kube-xset v0.0.0-20251111060928-069410a15229
 	kusionstack.io/resourceconsist v0.0.1
 	sigs.k8s.io/controller-runtime v0.17.3
 )
 
 require (
-	github.com/Azure/go-autorest/autorest v0.11.18 // indirect
-	github.com/Azure/go-autorest/autorest/adal v0.9.13 // indirect
-	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
-	github.com/Azure/go-autorest/logger v0.2.1 // indirect
-	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/docker/distribution v2.8.2+incompatible // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
@@ -41,8 +37,6 @@ require (
 )
 
 require (
-	cloud.google.com/go v0.65.0 // indirect
-	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/alibabacloud-go/alibabacloud-gateway-spi v0.0.4 // indirect
 	github.com/alibabacloud-go/darabonba-openapi/v2 v2.0.4 // indirect
 	github.com/alibabacloud-go/debug v0.0.0-20190504072949-9472017b5c68 // indirect
@@ -59,7 +53,6 @@ require (
 	github.com/clbanning/mxj/v2 v2.5.5 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-logr/zapr v1.2.4 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -81,7 +74,6 @@ require (
 	github.com/tjfoc/gmsm v1.3.2 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
-	golang.org/x/crypto v0.26.0 // indirect
 	golang.org/x/oauth2 v0.15.0 // indirect
 	golang.org/x/sys v0.23.0 // indirect
 	golang.org/x/term v0.23.0 // indirect

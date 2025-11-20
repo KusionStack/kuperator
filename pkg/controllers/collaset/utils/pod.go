@@ -1,5 +1,4 @@
 /*
-Copyright 2014 The Kubernetes Authors.
 Copyright 2023 The KusionStack Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes/scheme"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	controllerutils "kusionstack.io/kuperator/pkg/controllers/utils"
 	"kusionstack.io/kuperator/pkg/utils"
@@ -86,7 +86,7 @@ func NewPodFrom(owner metav1.Object, ownerRef *metav1.OwnerReference, revision *
 	pod.OwnerReferences = append(pod.OwnerReferences, *ownerRef)
 
 	cls, _ := owner.(*appsv1alpha1.CollaSet)
-	if IsPodNamingSuffixPolicyPersistentSequence(cls) {
+	if PodNamingSuffixPersistentSequence(cls) {
 		pod.Name = pod.GenerateName + instanceId
 	}
 
@@ -133,7 +133,10 @@ func ApplyPatchFromRevision(pod *corev1.Pod, revision *appsv1.ControllerRevision
 }
 
 // PatchToPod Use three-way merge to get a updated pod.
-func PatchToPod(currentRevisionPod, updateRevisionPod, currentPod *corev1.Pod) (*corev1.Pod, error) {
+func PatchToPod(currentRevisionObj, updateRevisionObj, currentObj client.Object) (client.Object, error) {
+	currentRevisionPod := currentRevisionObj.(*corev1.Pod)
+	updateRevisionPod := updateRevisionObj.(*corev1.Pod)
+	currentPod := currentObj.(*corev1.Pod)
 	currentRevisionPodBytes, err := json.Marshal(currentRevisionPod)
 	if err != nil {
 		return nil, err
@@ -203,8 +206,8 @@ func ComparePod(l, r *corev1.Pod) bool {
 	//       see https://github.com/kubernetes/kubernetes/issues/22065
 	// 4. Been ready for empty time < less time < more time
 	// If both pods are ready, the latest ready one is smaller
-	if controllerutils.IsPodReady(l) && controllerutils.IsPodReady(r) && !podReadyTime(l).Equal(podReadyTime(r)) {
-		return afterOrZero(podReadyTime(l), podReadyTime(r))
+	if controllerutils.IsPodReady(l) && controllerutils.IsPodReady(r) && !PodReadyTime(l).Equal(PodReadyTime(r)) {
+		return afterOrZero(PodReadyTime(l), PodReadyTime(r))
 	}
 	// 5. Pods with containers with higher restart counts < lower restart counts
 	if maxContainerRestarts(l) != maxContainerRestarts(r) {
@@ -227,7 +230,7 @@ func maxContainerRestarts(pod *corev1.Pod) int {
 	return int(maxRestarts)
 }
 
-func podReadyTime(pod *corev1.Pod) *metav1.Time {
+func PodReadyTime(pod *corev1.Pod) *metav1.Time {
 	if controllerutils.IsPodReady(pod) {
 		for _, c := range pod.Status.Conditions {
 			// we only care about pod ready conditions
@@ -248,10 +251,6 @@ func afterOrZero(t1, t2 *metav1.Time) bool {
 	return t1.After(t2.Time)
 }
 
-func IsPodUpdatedRevision(pod *corev1.Pod, revision string) bool {
-	if pod.Labels == nil {
-		return false
-	}
-
-	return pod.Labels[appsv1.ControllerRevisionHashLabelKey] == revision
+func IsPodInactive(pod *corev1.Pod) bool {
+	return pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed
 }

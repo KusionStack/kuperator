@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The KusionStack Authors.
+Copyright 2025 The KusionStack Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,16 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package legacy
 
-import (
-	corev1 "k8s.io/api/core/v1"
-	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-)
-
-var (
-	PodGVK             = corev1.SchemeGroupVersion.WithKind("Pod")
-	PVCGVK             = corev1.SchemeGroupVersion.WithKind("PersistentVolumeClaim")
-	CollaSetGVK        = appsv1alpha1.SchemeGroupVersion.WithKind("CollaSet")
-	ResourceContextGVK = appsv1alpha1.SchemeGroupVersion.WithKind("ResourceContext")
+const (
+	OwnerContextKey                  = "Owner"
+	RevisionContextDataKey           = "Revision"
+	PodDecorationRevisionKey         = "PodDecorationRevisions"
+	JustCreateContextDataKey         = "PodJustCreate"
+	RecreateUpdateContextDataKey     = "PodRecreateUpdate"
+	ScaleInContextDataKey            = "ScaleIn"
+	ReplaceNewPodIDContextDataKey    = "ReplaceNewPodID"
+	ReplaceOriginPodIDContextDataKey = "ReplaceOriginPodID"
 )

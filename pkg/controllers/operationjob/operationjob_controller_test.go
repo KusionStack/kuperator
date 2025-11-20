@@ -806,8 +806,7 @@ var _ = BeforeSuite(func() {
 	err = AddToMgr(mgr, r)
 	Expect(err).NotTo(HaveOccurred())
 	// collaset controller
-	r, request = testReconcile(collaset.NewReconciler(mgr))
-	err = collaset.AddToMgr(mgr, r)
+	err = collaset.Add(mgr)
 	Expect(err).NotTo(HaveOccurred())
 	// poddeletion controller
 	r, request = testReconcile(poddeletion.NewReconciler(mgr))

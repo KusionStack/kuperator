@@ -43,7 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"kusionstack.io/kuperator/pkg/controllers/collaset"
-	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
+	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/legacy"
 	utilspoddecoration "kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/anno"
 	"kusionstack.io/kuperator/pkg/controllers/utils/poddecoration/strategy"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"

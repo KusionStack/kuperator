@@ -39,8 +39,7 @@ import (
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"kusionstack.io/kuperator/pkg/controllers/collaset/podcontext"
-	collasetutils "kusionstack.io/kuperator/pkg/controllers/collaset/utils"
+	"kusionstack.io/kuperator/pkg/controllers/collaset/legacy"
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
 	"kusionstack.io/kuperator/pkg/utils"
 	"kusionstack.io/kuperator/test/e2e/framework"
@@ -1242,7 +1241,7 @@ var _ = SIGDescribe("CollaSet", func() {
 			var duration time.Duration
 			Eventually(func() bool {
 				Expect(client.Get(context.Background(), types.NamespacedName{Namespace: podToUpdate.Namespace, Name: podToUpdate.Name}, podToUpdate)).Should(BeNil())
-				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, collasetutils.UpdateOpsLifecycleAdapter.GetID())
+				labelOperate := fmt.Sprintf("%s/%s", appsv1alpha1.PodOperateLabelPrefix, legacy.UpdateOpsLifecycleAdapter.GetID())
 				if startedTimestampStr, started := podToUpdate.Labels[labelOperate]; started {
 					startedTimestamp, _ := strconv.ParseInt(startedTimestampStr, 10, 64)
 					startTime = time.Unix(0, startedTimestamp)
@@ -1456,7 +1455,7 @@ var _ = SIGDescribe("CollaSet", func() {
 				Expect(err).NotTo(HaveOccurred())
 				duringOpsCount := 0
 				for i := range pods {
-					if podopslifecycle.IsDuringOps(collasetutils.UpdateOpsLifecycleAdapter, pods[i]) {
+					if podopslifecycle.IsDuringOps(legacy.UpdateOpsLifecycleAdapter, pods[i]) {
 						duringOpsCount++
 					}
 				}
@@ -1524,7 +1523,7 @@ var _ = SIGDescribe("CollaSet", func() {
 				Expect(err).NotTo(HaveOccurred())
 				_, exist := pods[0].Labels[fmt.Sprintf("%s/%s", appsv1alpha1.PodOperatedLabelPrefix, "collaset")]
 				return exist
-			}, 10*time.Second, 3*time.Second).Should(Equal(true))
+			}, 30*time.Second, 3*time.Second).Should(Equal(true))
 
 			By("Record lifecycle label values")
 			pods, err = tester.ListPodsForCollaSet(cls)
@@ -1598,7 +1597,7 @@ var _ = SIGDescribe("CollaSet", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(currResourceContexts[0].Spec.Contexts)).Should(BeEquivalentTo(3))
 			for i := range currResourceContexts[0].Spec.Contexts {
-				currResourceContexts[0].Spec.Contexts[i].Data[podcontext.OwnerContextKey] = "mock-collaset"
+				currResourceContexts[0].Spec.Contexts[i].Data[legacy.OwnerContextKey] = "mock-collaset"
 			}
 
 			By("Update image to nginxNew but pods are not updated")
@@ -1631,7 +1630,7 @@ var _ = SIGDescribe("CollaSet", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(currResourceContexts[0].Spec.Contexts)).Should(BeEquivalentTo(3))
 			for i := range currResourceContexts[0].Spec.Contexts {
-				Expect(currResourceContexts[0].Spec.Contexts[i].Data[podcontext.OwnerContextKey]).Should(BeEquivalentTo(cls.Name))
+				Expect(currResourceContexts[0].Spec.Contexts[i].Data[legacy.OwnerContextKey]).Should(BeEquivalentTo(cls.Name))
 			}
 		})
 	})

@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package collaset
 
 import (
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
+	xsetapi "kusionstack.io/kube-xset/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"kusionstack.io/kuperator/pkg/controllers/utils/podopslifecycle"
@@ -37,8 +38,8 @@ func (a *CollaSetUpdateOpsLifecycleAdapter) GetID() string {
 }
 
 // GetType indicates type for an Operator
-func (a *CollaSetUpdateOpsLifecycleAdapter) GetType() podopslifecycle.OperationType {
-	return podopslifecycle.OpsLifecycleTypeUpdate
+func (a *CollaSetUpdateOpsLifecycleAdapter) GetType() xsetapi.OperationType {
+	return xsetapi.OpsLifecycleTypeUpdate
 }
 
 // AllowMultiType indicates whether multiple IDs which have the same Type are allowed
@@ -78,8 +79,8 @@ func (a *CollaSetScaleInOpsLifecycleAdapter) GetID() string {
 }
 
 // GetType indicates type for an Operator
-func (a *CollaSetScaleInOpsLifecycleAdapter) GetType() podopslifecycle.OperationType {
-	return podopslifecycle.OpsLifecycleTypeScaleIn
+func (a *CollaSetScaleInOpsLifecycleAdapter) GetType() xsetapi.OperationType {
+	return xsetapi.OpsLifecycleTypeScaleIn
 }
 
 // AllowMultiType indicates whether multiple IDs which have the same Type are allowed
