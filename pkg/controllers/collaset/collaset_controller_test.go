@@ -1308,6 +1308,23 @@ var _ = Describe("collaset controller", func() {
 		Eventually(func() error {
 			return expectedStatusReplicas(c, cs, 0, 0, 0, 3, 2, 0, 0, 0)
 		}, 10*time.Second, 1*time.Second).Should(BeNil())
+
+		// scale out partition and replicas parallel
+		Expect(updateCollaSetWithRetry(c, cs.Namespace, cs.Name, func(cls *appsv1alpha1.CollaSet) bool {
+			cls.Spec.Replicas = int32Pointer(10)
+			cls.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateCollaSetStrategy{
+				ByPartition: &appsv1alpha1.ByPartition{
+					Partition: int32Pointer(8),
+				},
+			}
+			cls.Spec.Template.Spec.Containers[0].Image = "nginx:v2"
+			return true
+		})).Should(BeNil())
+
+		// scale out 7 replicas with current revision
+		Eventually(func() error {
+			return expectedStatusReplicas(c, cs, 0, 0, 0, 10, 2, 0, 0, 0)
+		}, 10*time.Second, 1*time.Second).Should(BeNil())
 	})
 
 	It("scale failed and update parallel", func() {
