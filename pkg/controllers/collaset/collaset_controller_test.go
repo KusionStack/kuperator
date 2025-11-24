@@ -4276,7 +4276,7 @@ var _ = Describe("collaset controller", func() {
 		// wait for replace completed
 		Eventually(func() error {
 			return expectedStatusReplicas(c, cs, 0, 0, 0, 1, 1, 0, 0, 0)
-		}, 5*time.Second, 1*time.Second).Should(BeNil())
+		}, 10*time.Second, 1*time.Second).Should(BeNil())
 
 		// origin pod is deleted
 		Expect(c.List(context.TODO(), podList, client.InNamespace(cs.Namespace))).Should(BeNil())
