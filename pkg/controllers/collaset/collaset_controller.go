@@ -42,7 +42,7 @@ const (
 
 func Add(mgr manager.Manager) error {
 	xSetController := &CollaSetController{}
-	synccontrols.RegisterInPlaceIfPossibleUpdater(&inPlaceIfPossibleUpdater{})
+	synccontrols.RegisterInPlaceIfPossibleUpdater(NewInPlaceIfPossibleUpdater)
 	return kubexset.SetUpWithManager(mgr, xSetController)
 }
 
