@@ -37,6 +37,10 @@ import (
 
 var _ synccontrols.TargetUpdater = &inPlaceIfPossibleUpdater{}
 
+func NewInPlaceIfPossibleUpdater() synccontrols.TargetUpdater {
+	return &inPlaceIfPossibleUpdater{}
+}
+
 type inPlaceIfPossibleUpdater struct {
 	synccontrols.GenericTargetUpdater
 }

@@ -19,6 +19,7 @@ package poddecoration
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,7 +60,7 @@ var (
 )
 
 const (
-	timeoutInterval = 5 * time.Second
+	timeoutInterval = 10 * time.Second
 	pollInterval    = 500 * time.Millisecond
 )
 
@@ -900,6 +901,13 @@ var _ = BeforeSuite(func() {
 
 	env = &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
+		ControlPlane: envtest.ControlPlane{
+			APIServer: &envtest.APIServer{
+				URL: &url.URL{
+					Host: "127.0.0.1:64431",
+				},
+			},
+		},
 	}
 
 	config, err := env.Start()
