@@ -510,11 +510,11 @@ func (u *GenericPodUpdater) FinishUpdatePod(_ context.Context, podInfo *PodUpdat
 	return nil
 }
 
-// Support users to define inPlaceOnlyPodUpdater and register through RegisterInPlaceOnlyUpdater
-var inPlaceOnlyPodUpdater PodUpdater
+// NewInPlaceOnlyUpdaterFunc Support users to define inPlaceOnlyPodUpdater and register through RegisterInPlaceOnlyUpdater
+var NewInPlaceOnlyUpdaterFunc func() PodUpdater
 
-func RegisterInPlaceOnlyUpdater(podUpdater PodUpdater) {
-	inPlaceOnlyPodUpdater = podUpdater
+func RegisterInPlaceOnlyUpdater(f func() PodUpdater) {
+	NewInPlaceOnlyUpdaterFunc = f
 }
 
 func newPodUpdater(client client.Client, cls *appsv1alpha1.CollaSet, podControl podcontrol.Interface, podContextControl podcontext.Interface, recorder record.EventRecorder, cacheExpectations kubeutilsexpectations.CacheExpectationsInterface) PodUpdater {
@@ -523,8 +523,8 @@ func newPodUpdater(client client.Client, cls *appsv1alpha1.CollaSet, podControl 
 	case appsv1alpha1.CollaSetRecreatePodUpdateStrategyType:
 		podUpdater = &recreatePodUpdater{}
 	case appsv1alpha1.CollaSetInPlaceOnlyPodUpdateStrategyType:
-		if inPlaceOnlyPodUpdater != nil {
-			podUpdater = inPlaceOnlyPodUpdater
+		if NewInPlaceOnlyUpdaterFunc != nil {
+			podUpdater = NewInPlaceOnlyUpdaterFunc()
 		} else {
 			// In case of using native K8s, Pod is only allowed to update with container image, so InPlaceOnly policy is
 			// implemented with InPlaceIfPossible policy as default for compatibility.
