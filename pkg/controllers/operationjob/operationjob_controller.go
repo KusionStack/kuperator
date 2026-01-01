@@ -227,25 +227,25 @@ func (r *ReconcileOperationJob) calculateStatus(instance *appsv1alpha1.Operation
 	return
 }
 
-func (r *ReconcileOperationJob) updateStatus(ctx context.Context, newJob *appsv1alpha1.OperationJob) error {
-	oldJob := &appsv1alpha1.OperationJob{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Namespace: newJob.Namespace, Name: newJob.Name}, oldJob); err != nil {
+func (r *ReconcileOperationJob) updateStatus(ctx context.Context, jobReconciled *appsv1alpha1.OperationJob) error {
+	jobInCache := &appsv1alpha1.OperationJob{}
+	if err := r.Client.Get(ctx, types.NamespacedName{Namespace: jobReconciled.Namespace, Name: jobReconciled.Name}, jobInCache); err != nil {
 		return err
 	}
 
-	if equality.Semantic.DeepEqual(oldJob.Status, newJob.Status) {
+	if equality.Semantic.DeepEqual(jobInCache.Status, jobReconciled.Status) {
 		return nil
 	}
 
-	if err := ojutils.StatusUpToDateExpectation.ExpectUpdate(utils.ObjectKeyString(newJob), newJob.ResourceVersion); err != nil {
+	if err := ojutils.StatusUpToDateExpectation.ExpectUpdate(utils.ObjectKeyString(jobInCache), jobInCache.ResourceVersion); err != nil {
 		return err
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		oldJob.Status = newJob.Status
-		return r.Client.Status().Update(ctx, oldJob)
+		jobInCache.Status = jobReconciled.Status
+		return r.Client.Status().Update(ctx, jobInCache)
 	}); err != nil {
-		ojutils.StatusUpToDateExpectation.DeleteExpectations(utils.ObjectKeyString(newJob))
+		ojutils.StatusUpToDateExpectation.DeleteExpectations(utils.ObjectKeyString(jobInCache))
 		return err
 	}
 
