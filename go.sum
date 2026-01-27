@@ -1083,6 +1083,8 @@ kusionstack.io/kube-utils v0.2.1-0.20251120063041-6043805ee00d h1:iQtnK03ia/MN4K
 kusionstack.io/kube-utils v0.2.1-0.20251120063041-6043805ee00d/go.mod h1:KEHTfo1Y8SWMODnckF6daO2cSIW0FJ8fkk8PBA5O2GU=
 kusionstack.io/kube-xset v0.0.2-0.20251127122852-ae98b507b2cc h1:wOqqe15yj1EeXKzAtVMRNRa4Iw2N59hLOgnu3u0p5SI=
 kusionstack.io/kube-xset v0.0.2-0.20251127122852-ae98b507b2cc/go.mod h1:FceKgqapMHhwiyIqCziTQRW27fsSXpPS611AApnyiYI=
+kusionstack.io/kube-xset v0.0.2-0.20260127071447-57806fa500d2 h1:E7zeCirHYPpNKEA277YWV+D+cX9n7mm5Xwmat72NIhM=
+kusionstack.io/kube-xset v0.0.2-0.20260127071447-57806fa500d2/go.mod h1:FceKgqapMHhwiyIqCziTQRW27fsSXpPS611AApnyiYI=
 kusionstack.io/resourceconsist v0.0.1 h1:+k/jriq5Ld7fQUYfWSMGynz/FesHtl3Rk2fmQPjBe0g=
 kusionstack.io/resourceconsist v0.0.1/go.mod h1:816xS/fY6EOUbPFjXIWW/TGs8/YE46qP4ElKeIiwFdU=
 modernc.org/cc v1.0.0/go.mod h1:1Sk4//wdnYJiUIxnW8ddKpaOJCF37yAdqYnkxUpaYxw=
