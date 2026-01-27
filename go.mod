@@ -22,9 +22,9 @@ require (
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubernetes v0.0.0-00010101000000-000000000000
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
-	kusionstack.io/kube-api v0.7.4-0.20260127111715-62d084058f4e
+	kusionstack.io/kube-api v0.7.5-0.20260127130112-9424ce325e09
 	kusionstack.io/kube-utils v0.2.1-0.20251120063041-6043805ee00d
-	kusionstack.io/kube-xset v0.0.2-0.20260127093834-765507a83723
+	kusionstack.io/kube-xset v0.0.2-0.20260127130229-a7a010eba7e0
 	kusionstack.io/resourceconsist v0.0.1
 	sigs.k8s.io/controller-runtime v0.17.3
 )
