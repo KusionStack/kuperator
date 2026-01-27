@@ -672,6 +672,11 @@ spec:
                 description: the number of scheduled replicas for the CollaSet.
                 format: int32
                 type: integer
+              terminatingReplicas:
+                description: TerminatingReplicas indicates the number of replicas
+                  with deletionTimestamps.
+                format: int32
+                type: integer
               updatedAvailableReplicas:
                 description: |-
                   UpdatedAvailableReplicas indicates the number of available updated revision replicas for this CollaSet.
