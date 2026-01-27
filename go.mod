@@ -24,7 +24,7 @@ require (
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 	kusionstack.io/kube-api v0.7.4-0.20250909095208-496f60eea9b5
 	kusionstack.io/kube-utils v0.2.1-0.20251120063041-6043805ee00d
-	kusionstack.io/kube-xset v0.0.2-0.20260127092742-d57e513966ba
+	kusionstack.io/kube-xset v0.0.2-0.20260127093834-765507a83723
 	kusionstack.io/resourceconsist v0.0.1
 	sigs.k8s.io/controller-runtime v0.17.3
 )
