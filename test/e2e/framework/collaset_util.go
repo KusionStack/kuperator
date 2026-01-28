@@ -83,6 +83,31 @@ func (t *CollaSetTester) GetCollaSet(cls *appsv1alpha1.CollaSet) error {
 	return t.client.Get(context.TODO(), types.NamespacedName{Namespace: cls.Namespace, Name: cls.Name}, cls)
 }
 
+func (t *CollaSetTester) GetAllCollaSet(namespace string) (clsList *appsv1alpha1.CollaSetList, err error) {
+	clsList = &appsv1alpha1.CollaSetList{}
+	if err := t.client.List(context.TODO(), clsList, client.InNamespace(namespace)); err != nil {
+		return nil, err
+	}
+	return clsList, nil
+}
+
+func (t *CollaSetTester) DeleteAllCollaSet(namespace string) error {
+	clsList, err := t.GetAllCollaSet(namespace)
+	if err != nil {
+		return err
+	}
+	for i := range clsList.Items {
+		cls := &clsList.Items[i]
+		if cls.Namespace != namespace {
+			continue
+		}
+		if err := t.DeleteCollaSet(cls); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (t *CollaSetTester) UpdateCollaSet(cls *appsv1alpha1.CollaSet, fn func(cls *appsv1alpha1.CollaSet)) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		err := t.GetCollaSet(cls)

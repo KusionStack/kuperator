@@ -256,5 +256,9 @@ var _ = SIGDescribe("OperationJob", func() {
 				return pods[0].Name == podToReplace.Name
 			}, 30*time.Second, 3*time.Second).Should(BeTrue())
 		})
+
+		AfterEach(func() {
+			afterEach(clsTester, ns)
+		})
 	})
 })

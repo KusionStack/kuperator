@@ -82,6 +82,17 @@ var _ = SIGDescribe("CollaSet", func() {
 				Expect(*privileged).Should(BeTrue())
 			}
 		})
+
+		AfterEach(func() {
+			Expect(tester.DeleteAllCollaSet(ns)).NotTo(HaveOccurred())
+			Eventually(func() bool {
+				clsList, err := tester.GetAllCollaSet(ns)
+				if err != nil {
+					return false
+				}
+				return len(clsList.Items) == 0
+			}, 10*time.Second, 3*time.Second).Should(Equal(true))
+		})
 	})
 
 	framework.KusionstackDescribe("CollaSet Scaling", func() {
@@ -1045,6 +1056,17 @@ var _ = SIGDescribe("CollaSet", func() {
 				return true
 			}, 30*time.Second, 3*time.Second).Should(Equal(true))
 		})
+
+		AfterEach(func() {
+			Expect(tester.DeleteAllCollaSet(ns)).NotTo(HaveOccurred())
+			Eventually(func() bool {
+				clsList, err := tester.GetAllCollaSet(ns)
+				if err != nil {
+					return false
+				}
+				return len(clsList.Items) == 0
+			}, 10*time.Second, 3*time.Second).Should(Equal(true))
+		})
 	})
 
 	framework.KusionstackDescribe("CollaSet Updating", func() {
@@ -1633,6 +1655,10 @@ var _ = SIGDescribe("CollaSet", func() {
 				Expect(currResourceContexts[0].Spec.Contexts[i].Data[legacy.OwnerContextKey]).Should(BeEquivalentTo(cls.Name))
 			}
 		})
+
+		AfterEach(func() {
+			afterEach(tester, ns)
+		})
 	})
 
 	framework.KusionstackDescribe("CollaSet Replacing", func() {
@@ -2145,6 +2171,10 @@ var _ = SIGDescribe("CollaSet", func() {
 				Expect(err).Should(BeNil())
 				return len(currResourceContexts) == 0
 			}, 30*time.Second, 3*time.Second).Should(BeTrue())
+		})
+
+		AfterEach(func() {
+			afterEach(tester, ns)
 		})
 	})
 })
