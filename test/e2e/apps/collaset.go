@@ -84,14 +84,7 @@ var _ = SIGDescribe("CollaSet", func() {
 		})
 
 		AfterEach(func() {
-			Expect(tester.DeleteAllCollaSet(ns)).NotTo(HaveOccurred())
-			Eventually(func() bool {
-				clsList, err := tester.GetAllCollaSet(ns)
-				if err != nil {
-					return false
-				}
-				return len(clsList.Items) == 0
-			}, 10*time.Second, 3*time.Second).Should(Equal(true))
+			afterEach(tester, ns)
 		})
 	})
 
@@ -1058,14 +1051,7 @@ var _ = SIGDescribe("CollaSet", func() {
 		})
 
 		AfterEach(func() {
-			Expect(tester.DeleteAllCollaSet(ns)).NotTo(HaveOccurred())
-			Eventually(func() bool {
-				clsList, err := tester.GetAllCollaSet(ns)
-				if err != nil {
-					return false
-				}
-				return len(clsList.Items) == 0
-			}, 10*time.Second, 3*time.Second).Should(Equal(true))
+			afterEach(tester, ns)
 		})
 	})
 
