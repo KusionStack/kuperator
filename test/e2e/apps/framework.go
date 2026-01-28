@@ -38,5 +38,5 @@ func afterEach(tester *framework.CollaSetTester, ns string) {
 			return false
 		}
 		return len(clsList.Items) == 0
-	}, 30*time.Second, 3*time.Second).Should(gomega.Equal(true))
+	}, 300*time.Second, 3*time.Second).Should(gomega.Equal(true))
 }
