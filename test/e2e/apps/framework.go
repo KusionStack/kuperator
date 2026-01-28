@@ -16,9 +16,27 @@ limitations under the License.
 
 package apps
 
-import "github.com/onsi/ginkgo"
+import (
+	"time"
+
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
+
+	"kusionstack.io/kuperator/test/e2e/framework"
+)
 
 // SIGDescribe annotates the test with the SIG label.
 func SIGDescribe(text string, body func()) bool {
 	return ginkgo.Describe("[apps] "+text, body)
+}
+
+func afterEach(tester *framework.CollaSetTester, ns string) {
+	gomega.Expect(tester.DeleteAllCollaSet(ns)).NotTo(gomega.HaveOccurred())
+	gomega.Eventually(func() bool {
+		clsList, err := tester.GetAllCollaSet(ns)
+		if err != nil {
+			return false
+		}
+		return len(clsList.Items) == 0
+	}, 300*time.Second, 3*time.Second).Should(gomega.Equal(true))
 }

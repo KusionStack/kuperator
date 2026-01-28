@@ -179,6 +179,7 @@ func (s *XSetOperation) GetXSetStatus(object xsetapi.XSetObject) *xsetapi.XSetSt
 	xSetStatus.ReadyReplicas = set.Status.ReadyReplicas
 	xSetStatus.UpdatedReplicas = set.Status.UpdatedReplicas
 	xSetStatus.OperatingReplicas = set.Status.OperatingReplicas
+	xSetStatus.TerminatingReplicas = set.Status.TerminatingReplicas
 	xSetStatus.UpdatedReadyReplicas = set.Status.UpdatedReadyReplicas
 	xSetStatus.AvailableReplicas = set.Status.AvailableReplicas
 	xSetStatus.UpdatedAvailableReplicas = set.Status.UpdatedAvailableReplicas
@@ -211,6 +212,7 @@ func (s *XSetOperation) SetXSetStatus(object xsetapi.XSetObject, xSetStatus *xse
 	set.Status.ReadyReplicas = xSetStatus.ReadyReplicas
 	set.Status.UpdatedReplicas = xSetStatus.UpdatedReplicas
 	set.Status.OperatingReplicas = xSetStatus.OperatingReplicas
+	set.Status.TerminatingReplicas = xSetStatus.TerminatingReplicas
 	set.Status.UpdatedReadyReplicas = xSetStatus.UpdatedReadyReplicas
 	set.Status.AvailableReplicas = xSetStatus.AvailableReplicas
 	set.Status.UpdatedAvailableReplicas = xSetStatus.UpdatedAvailableReplicas
