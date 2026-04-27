@@ -15,12 +15,6 @@
 make build lint fmt vet
 ```
 
-These commands ensure:
-- `make build`: Compiles the manager binary (includes manifests, fmt, vet)
-- `make lint`: Runs golangci-lint for code quality
-- `make fmt`: Formats code with `go fmt`
-- `make vet`: Runs `go vet` for static analysis
-
 ## Key Dependencies
 
 - `kusionstack.io/kube-api`: CRD API definitions
