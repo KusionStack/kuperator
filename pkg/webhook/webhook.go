@@ -21,9 +21,8 @@ import (
 	"os"
 
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-
 	certmanager "kusionstack.io/kube-utils/webhook/certmanager"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 const (
