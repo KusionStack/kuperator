@@ -52,6 +52,10 @@ spec:
           periodSeconds: 10
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
+        volumeMounts:
+        - name: webhook-certs
+          mountPath: /webhook-certs
+          readOnly: false
       serviceAccountName: {{ .Values.serviceAccountName }}
       terminationGracePeriodSeconds: 0
       volumes:

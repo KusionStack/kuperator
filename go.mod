@@ -22,7 +22,7 @@ require (
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubernetes v0.0.0-00010101000000-000000000000
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
-	kusionstack.io/kube-api v0.7.5-0.20260512114711-9570d38337c2
+kusionstack.io/kube-api v0.7.5-0.20260512114711-9570d38337c2
 	kusionstack.io/kube-utils v0.2.1-0.20251120063041-6043805ee00d
 	kusionstack.io/kube-xset v0.0.2-0.20260515171226-5fb80db19c40
 	kusionstack.io/resourceconsist v0.0.1
@@ -34,6 +34,8 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
 	github.com/samber/lo v1.47.0 // indirect
+	github.com/spf13/afero v1.11.0 // indirect
+	github.com/zoumo/golib v0.2.0 // indirect
 )
 
 require (

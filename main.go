@@ -20,7 +20,6 @@ import (
 	"context"
 	"flag"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/pflag"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -62,8 +61,8 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&certDir, "cert-dir", webhookTempCertDir(), "The directory that contains the server key and certificate. If not set, webhook server would look up the server key and certificate in {TempDir}/k8s-webhook-server/serving-certs")
-	flag.StringVar(&dnsName, "dns-name", "kusionstack-controller-manager.kusionstack-system.svc", "The DNS name of the webhook server.")
+	flag.StringVar(&certDir, "cert-dir", "/webhook-certs", "The directory that contains the server key and certificate for webhook.")
+	flag.StringVar(&dnsName, "dns-name", "controller-manager.kusionstack-system.svc", "The DNS name of the webhook server.")
 
 	klog.InitFlags(nil)
 	defer klog.Flush()
@@ -122,9 +121,9 @@ func main() {
 	}
 
 	// +kubebuilder:scaffold:builder
-	setupLog.Info("initialize webhook")
-	if err := webhook.Initialize(context.Background(), config, dnsName, certDir); err != nil {
-		setupLog.Error(err, "unable to initialize webhook")
+	setupLog.Info("initialize webhook cert manager")
+	if err := webhook.Initialize(context.Background(), mgr, dnsName); err != nil {
+		setupLog.Error(err, "unable to initialize webhook cert manager")
 		os.Exit(1)
 	}
 
@@ -142,8 +141,4 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
-}
-
-func webhookTempCertDir() string {
-	return filepath.Join(os.TempDir(), "k8s-webhook-server", "serving-certs")
 }
