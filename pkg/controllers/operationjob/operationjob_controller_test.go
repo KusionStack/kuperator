@@ -19,7 +19,6 @@ package operationjob
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -773,13 +772,7 @@ var _ = BeforeSuite(func() {
 
 	env = &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases"), filepath.Join("..", "..", "..", "config", "crd", "externals")},
-		ControlPlane: envtest.ControlPlane{
-			APIServer: &envtest.APIServer{
-				URL: &url.URL{
-					Host: "127.0.0.1:64431",
-				},
-			},
-		},
+		ControlPlane:      envtest.ControlPlane{},
 	}
 
 	config, err := env.Start()
