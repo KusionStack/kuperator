@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -5119,12 +5118,12 @@ var _ = BeforeSuite(func() {
 
 	env = &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
-		ControlPlane: envtest.ControlPlane{
-			APIServer: &envtest.APIServer{
-				URL: &url.URL{
-					Host: "127.0.0.1:64431",
-				},
-			},
+		ControlPlane:      envtest.ControlPlane{
+			//APIServer: &envtest.APIServer{
+			//	URL: &url.URL{
+			//		Host: "127.0.0.1:64431",
+			//	},
+			//},
 		},
 	}
 
