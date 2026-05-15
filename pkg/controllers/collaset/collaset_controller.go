@@ -56,6 +56,7 @@ type CollaSetController struct {
 	SubResourcePvcAdapter
 	DecorationAdapter
 	ResourceContextAdapterGetter
+	SubResourceAdapterGetter
 }
 
 func (m *CollaSetController) ControllerName() string {
@@ -309,4 +310,12 @@ type ResourceContextAdapterGetter struct{}
 
 func (r *ResourceContextAdapterGetter) GetResourceContextAdapter() xsetapi.ResourceContextAdapter {
 	return &ResourceContextAdapter{}
+}
+
+type SubResourceAdapterGetter struct{}
+
+func (s *SubResourceAdapterGetter) GetSubResourceAdapters() []xsetapi.SubResourceAdapter {
+	return []xsetapi.SubResourceAdapter{
+		NewPvcAdapter(),
+	}
 }
