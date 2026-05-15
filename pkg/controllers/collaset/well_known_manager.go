@@ -42,6 +42,8 @@ var defaultXSetControllerLabelManager = map[api.XSetLabelAnnotationEnum]string{
 	api.XCompletingLabel:                appsv1alpha1.PodCompletingLabel,
 	api.XExcludeIndicationLabelKey:      appsv1alpha1.PodExcludeIndicationLabelKey,
 
+	api.SubResourceTemplateLabelKey:      appsv1alpha1.PvcTemplateLabelKey,
+	api.SubResourceTemplateHashLabelKey:  appsv1alpha1.PvcTemplateHashLabelKey,
 	api.SubResourcePvcTemplateLabelKey:     appsv1alpha1.PvcTemplateLabelKey,
 	api.SubResourcePvcTemplateHashLabelKey: appsv1alpha1.PvcTemplateHashLabelKey,
 }

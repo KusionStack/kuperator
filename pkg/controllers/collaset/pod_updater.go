@@ -81,7 +81,7 @@ func (u *inPlaceIfPossibleUpdater) FulfillTargetUpdatedInfo(ctx context.Context,
 		return fmt.Errorf("fail to build Target from updated revision %s: %v", targetUpdateInfo.UpdateRevision.GetName(), err.Error())
 	}
 
-	if targetUpdateInfo.PvcTmpHashChanged {
+	if targetUpdateInfo.SubResourceTemplateChanged {
 		targetUpdateInfo.InPlaceUpdateSupport, targetUpdateInfo.OnlyMetadataChanged = false, false
 		return nil
 	}
