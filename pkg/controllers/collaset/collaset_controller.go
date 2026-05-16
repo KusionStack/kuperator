@@ -143,6 +143,21 @@ func (s *XSetOperation) GetXSetSpec(xset xsetapi.XSetObject) *xsetapi.XSetSpec {
 	return &xSetSpec
 }
 
+func (s *XSetOperation) GetPostCreateFunc(xset xsetapi.XSetObject) func(client.Object) error {
+	set := xset.(*appsv1alpha1.CollaSet)
+	if set.Spec.NamingStrategy == nil || set.Spec.NamingStrategy.PodNamingSuffixPolicy != appsv1alpha1.PodNamingSuffixPolicyPersistentSequence {
+		return nil
+	}
+	return func(object client.Object) error {
+		pod, ok := object.(*corev1.Pod)
+		if !ok {
+			return nil
+		}
+		pod.Spec.Hostname = pod.Name
+		return nil
+	}
+}
+
 func (s *XSetOperation) GetXSetPatch(object metav1.Object) ([]byte, error) {
 	set := object.(*appsv1alpha1.CollaSet)
 	dsBytes, err := json.Marshal(set)

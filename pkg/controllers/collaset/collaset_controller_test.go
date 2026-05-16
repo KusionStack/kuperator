@@ -4977,6 +4977,87 @@ var _ = Describe("collaset controller", func() {
 		}, 5*time.Second, 1*time.Second).Should(BeTrue())
 		Expect(c.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, cs)).Should(BeNil())
 	})
+
+	It("[hostnamePolicy] auto hostname for fixed pod names", func() {
+		testcase := "test-hostname-policy"
+		Expect(createNamespace(c, testcase)).Should(BeNil())
+
+		podList := &corev1.PodList{}
+
+		// Scenario 1: no hostname set when NamingStrategy is not PersistentSequence
+		csRandom := &appsv1alpha1.CollaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "random",
+			},
+			Spec: appsv1alpha1.CollaSetSpec{
+				Replicas: int32Pointer(1),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "random"},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{"app": "random"},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{Name: "foo", Image: "nginx:v1"}},
+					},
+				},
+			},
+		}
+		Expect(c.Create(context.TODO(), csRandom)).Should(BeNil())
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(csRandom.Namespace), client.MatchingLabels{"app": "random"})).Should(BeNil())
+			return len(podList.Items) == 1
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		Expect(podList.Items[0].Spec.Hostname).Should(BeEmpty(), "pod should not have hostname when namingStrategy is not PersistentSequence")
+
+		// Scenario 2: hostname is automatically set to pod name when using PersistentSequence
+		csFixed := &appsv1alpha1.CollaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testcase,
+				Name:      "fixed",
+			},
+			Spec: appsv1alpha1.CollaSetSpec{
+				Replicas: int32Pointer(3),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "fixed"},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{"app": "fixed"},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{Name: "foo", Image: "nginx:v1"}},
+					},
+				},
+				NamingStrategy: &appsv1alpha1.NamingStrategy{
+					PodNamingSuffixPolicy: appsv1alpha1.PodNamingSuffixPolicyPersistentSequence,
+				},
+			},
+		}
+		Expect(c.Create(context.TODO(), csFixed)).Should(BeNil())
+		Eventually(func() bool {
+			Expect(c.List(context.TODO(), podList, client.InNamespace(csFixed.Namespace), client.MatchingLabels{"app": "fixed"})).Should(BeNil())
+			return len(podList.Items) == 3
+		}, 5*time.Second, 1*time.Second).Should(BeTrue())
+		for _, pod := range podList.Items {
+			Expect(pod.Spec.Hostname).Should(Equal(pod.Name), "pod %s should have hostname equal to its name with PersistentSequence", pod.Name)
+		}
+
+		// Scenario 3: in-place update keeps hostname (hostname is not part of version comparison)
+		Expect(updateCollaSetWithRetry(c, csFixed.Namespace, csFixed.Name, func(cls *appsv1alpha1.CollaSet) bool {
+			cls.Spec.Template.Spec.Containers[0].Image = "nginx:v2"
+			return true
+		})).Should(BeNil())
+		Eventually(func() error {
+			return expectedStatusReplicas(c, csFixed, 0, 0, 0, 3, 3, 0, 0, 0)
+		}, 10*time.Second, 1*time.Second).Should(BeNil())
+		Expect(c.List(context.TODO(), podList, client.InNamespace(csFixed.Namespace), client.MatchingLabels{"app": "fixed"})).Should(BeNil())
+		for _, pod := range podList.Items {
+			Expect(pod.Spec.Hostname).Should(Equal(pod.Name), "pod %s hostname should remain after in-place update", pod.Name)
+		}
+	})
 })
 
 func expectedStatusReplicas(c client.Client, cls *appsv1alpha1.CollaSet, scheduledReplicas, readyReplicas, availableReplicas, replicas, updatedReplicas, operatingReplicas,

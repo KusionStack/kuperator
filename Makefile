@@ -172,6 +172,7 @@ GINKGO ?= $(LOCALBIN)/ginkgo
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v4.5.5
 CONTROLLER_TOOLS_VERSION ?= v0.10.0
+GOLANGCI_VERSION ?= v2.0.2
 GINKGO_VERSION ?= 1.16.5
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
