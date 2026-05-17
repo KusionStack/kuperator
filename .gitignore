@@ -25,6 +25,9 @@ local-test.sh
 # Plan documents
 docs/plans
 
+# Claude Code
+CLAUDE.md
+
 # editor and IDE paraphernalia
 .idea
 *.swp
