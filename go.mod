@@ -34,6 +34,8 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
 	github.com/samber/lo v1.47.0 // indirect
+	github.com/spf13/afero v1.11.0 // indirect
+	github.com/zoumo/golib v0.2.0 // indirect
 )
 
 require (
