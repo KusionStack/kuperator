@@ -1700,21 +1700,19 @@ var _ = SIGDescribe("CollaSet", func() {
 				}
 			})).NotTo(HaveOccurred())
 
-			By("Poll status and assert availableReplicas never drops below 1 during rolling")
+			By("Poll status, assert availableReplicas never drops below 1, and stop once upgrade completes")
 			timeout := 120 * time.Second
 			start := time.Now()
 			minAvailable := int32(2)
-			Consistently(func() int32 {
+			Eventually(func() bool {
 				Expect(tester.GetCollaSet(cls)).NotTo(HaveOccurred())
 				avail := cls.Status.AvailableReplicas
 				if avail < minAvailable {
 					minAvailable = avail
 				}
-				return avail
-			}, timeout, time.Second).Should(BeNumerically(">=", int32(1)))
-
-			By("Wait for upgrade to finish")
-			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 2, 2, 2, 2) }, 120*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+				Expect(avail).To(BeNumerically(">=", int32(1)), fmt.Sprintf("availableReplicas dropped to %d during rolling (elapsed=%v)", avail, time.Since(start)))
+				return tester.ExpectedStatusReplicas(cls, 2, 2, 2, 2, 2) == nil
+			}, timeout, time.Second).Should(BeTrue())
 
 			By(fmt.Sprintf("observed min available replicas during rolling: %d (elapsed=%v)", minAvailable, time.Since(start)))
 			Expect(minAvailable).To(BeNumerically(">=", int32(1)))

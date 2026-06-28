@@ -178,9 +178,12 @@ func (r *AvailableRuler) considerOwnerReplicas(targets map[string]*corev1.Pod) (
 	}
 	ownerStats := map[types.UID]*ownerStat{}
 
+	collasetAPIVersion := appsv1alpha1.SchemeGroupVersion.String()
 	for _, pod := range targets {
 		ownerRef := metav1.GetControllerOf(pod)
-		if ownerRef == nil || ownerRef.Kind != "CollaSet" {
+		// Only treat CollaSet owners from our own API group; other groups could
+		// reuse the same Kind name and would otherwise trigger spurious Gets.
+		if ownerRef == nil || ownerRef.Kind != "CollaSet" || ownerRef.APIVersion != collasetAPIVersion {
 			continue
 		}
 
@@ -189,13 +192,22 @@ func (r *AvailableRuler) considerOwnerReplicas(targets map[string]*corev1.Pod) (
 			cls := &appsv1alpha1.CollaSet{}
 			if err := r.Client.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: ownerRef.Name}, cls); err != nil {
 				if errors.IsNotFound(err) {
-					// Owner gone; nothing to offset, keep behavior unchanged.
+					// Owner gone; cache a zero-desired stat so siblings of the
+					// same owner don't repeat this Get. Zero desired yields a
+					// non-positive deficit, leaving the quota unchanged.
+					stat = &ownerStat{desired: 0}
+					ownerStats[ownerRef.UID] = stat
+					stat.current++
 					continue
 				}
 				return 0, fmt.Errorf("fail to get controller CollaSet %s/%s: %w", pod.Namespace, ownerRef.Name, err)
 			}
-			// UID mismatch means the ref reused a recycled name; skip to be safe.
+			// UID mismatch means the ref reused a recycled name; cache a zero
+			// stat for the same reason as above.
 			if cls.UID != ownerRef.UID {
+				stat = &ownerStat{desired: 0}
+				ownerStats[ownerRef.UID] = stat
+				stat.current++
 				continue
 			}
 			desired := 1
