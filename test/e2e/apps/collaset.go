@@ -1718,6 +1718,13 @@ var _ = SIGDescribe("CollaSet", func() {
 
 			By(fmt.Sprintf("observed min available replicas during rolling: %d (elapsed=%v)", minAvailable, time.Since(start)))
 			Expect(minAvailable).To(BeNumerically(">=", int32(1)))
+
+			By("Delete PodTransitionRule so the framework AfterEach can clean up CollaSet cleanly")
+			Expect(client.Delete(context.TODO(), ptr)).NotTo(HaveOccurred())
+			Eventually(func() bool {
+				err := client.Get(context.TODO(), types.NamespacedName{Namespace: ptr.Namespace, Name: ptr.Name}, &appsv1alpha1.PodTransitionRule{})
+				return errors.IsNotFound(err)
+			}, 120*time.Second, 3*time.Second).Should(BeTrue())
 		})
 
 		AfterEach(func() {
