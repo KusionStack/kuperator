@@ -98,6 +98,7 @@ type PodTransitionRuleReconciler struct {
 // +kubebuilder:rbac:groups=apps.kusionstack.io,resources=podtransitionrules,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kusionstack.io,resources=podtransitionrules/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kusionstack.io,resources=podtransitionrules/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps.kusionstack.io,resources=collasets,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch
 
