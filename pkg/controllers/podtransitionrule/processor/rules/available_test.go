@@ -28,8 +28,9 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
-	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/register"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"kusionstack.io/kuperator/pkg/controllers/podtransitionrule/register"
 )
 
 func newCollaSet(name string, uid types.UID, replicas int32) *appsv1alpha1.CollaSet {
@@ -46,7 +47,7 @@ func newCollaSet(name string, uid types.UID, replicas int32) *appsv1alpha1.Colla
 	}
 }
 
-func newOwnedPod(name string, ownerName string, ownerUID types.UID) *corev1.Pod {
+func newOwnedPod(name, ownerName string, ownerUID types.UID) *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
