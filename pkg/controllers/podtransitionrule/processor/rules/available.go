@@ -17,10 +17,14 @@ limitations under the License.
 package rules
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	appsv1alpha1 "kusionstack.io/kube-api/apps/v1alpha1"
@@ -66,8 +70,20 @@ func (r *AvailableRuler) Filter(podTransitionRule *appsv1alpha1.PodTransitionRul
 		}
 		minAvailableQuota = quota
 	}
-	// TODO: UncreatedReplicas
-	// allowUnavailable -= uncreatedReplicas
+	// Subtract uncreated owner replicas so that the quota is not over-granted
+	// when some pods are temporarily missing. With PersistentSequence naming,
+	// a rebuild upgrade deletes the old pod before the new one (same name)
+	// can be created, leaving a window where targets shrink. Reading the
+	// owner's desired replicas and subtracting the deficit keeps the watermark
+	// on the desired fleet size instead of the fluctuating live pod count.
+	uncreatedReplicas, err := r.considerOwnerReplicas(targets)
+	if err != nil {
+		return rejectAllWithErr(subjects, pass, rejects, "[%s] fail to count owner uncreated replicas: %v", r.Name, err)
+	}
+	allowUnavailable -= uncreatedReplicas
+	if allowUnavailable < 0 {
+		allowUnavailable = 0
+	}
 	allAvailableSize := 0
 	var minTimeLeft *int64
 	// filter unavailable pods
@@ -147,6 +163,71 @@ func processUnavailableFunc(pod *corev1.Pod) (bool, *int64) {
 		}
 	}
 	return isUnavailable, minInterval
+}
+
+// considerOwnerReplicas counts the deficit between each target pod owner's
+// desired replicas and the number of pods currently listed for that owner.
+// The returned value is used to shrink the max-unavailable quota so that a
+// temporarily shrunken target list (e.g. during a PersistentSequence rebuild
+// where the old pod is gone and the new one is not yet created) does not
+// inflate the quota and let through more changes than the policy allows.
+func (r *AvailableRuler) considerOwnerReplicas(targets map[string]*corev1.Pod) (int, error) {
+	type ownerStat struct {
+		desired int
+		current int
+	}
+	ownerStats := map[types.UID]*ownerStat{}
+
+	collasetAPIVersion := appsv1alpha1.SchemeGroupVersion.String()
+	for _, pod := range targets {
+		ownerRef := metav1.GetControllerOf(pod)
+		// Only treat CollaSet owners from our own API group; other groups could
+		// reuse the same Kind name and would otherwise trigger spurious Gets.
+		if ownerRef == nil || ownerRef.Kind != "CollaSet" || ownerRef.APIVersion != collasetAPIVersion {
+			continue
+		}
+
+		stat, exist := ownerStats[ownerRef.UID]
+		if !exist {
+			cls := &appsv1alpha1.CollaSet{}
+			if err := r.Client.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: ownerRef.Name}, cls); err != nil {
+				if errors.IsNotFound(err) {
+					// Owner gone; cache a zero-desired stat so siblings of the
+					// same owner don't repeat this Get. Zero desired yields a
+					// non-positive deficit, leaving the quota unchanged.
+					stat = &ownerStat{desired: 0}
+					ownerStats[ownerRef.UID] = stat
+					stat.current++
+					continue
+				}
+				return 0, fmt.Errorf("fail to get controller CollaSet %s/%s: %w", pod.Namespace, ownerRef.Name, err)
+			}
+			// UID mismatch means the ref reused a recycled name; cache a zero
+			// stat for the same reason as above.
+			if cls.UID != ownerRef.UID {
+				stat = &ownerStat{desired: 0}
+				ownerStats[ownerRef.UID] = stat
+				stat.current++
+				continue
+			}
+			desired := 1
+			if cls.Spec.Replicas != nil {
+				desired = int(*cls.Spec.Replicas)
+			}
+			stat = &ownerStat{desired: desired}
+			ownerStats[ownerRef.UID] = stat
+		}
+		stat.current++
+	}
+
+	uncreated := 0
+	for _, stat := range ownerStats {
+		deficit := stat.desired - stat.current
+		if deficit > 0 {
+			uncreated += deficit
+		}
+	}
+	return uncreated, nil
 }
 
 func min(a, b *int64) *int64 {

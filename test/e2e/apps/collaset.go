@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
@@ -1640,6 +1641,88 @@ var _ = SIGDescribe("CollaSet", func() {
 			for i := range currResourceContexts[0].Spec.Contexts {
 				Expect(currResourceContexts[0].Spec.Contexts[i].Data[legacy.OwnerContextKey]).Should(BeEquivalentTo(cls.Name))
 			}
+		})
+
+		framework.ConformanceIt("PersistentSequence rebuild upgrade respects PodTransitionRule maxUnavailable", func() {
+			// Reproduces the gap where PersistentSequence naming deletes the old pod
+			// before the new one (same name) can be created, leaving the
+			// PodTransitionRule target list temporarily shrunken. Without the
+			// owner-replicas offset this would let both pods be unavailable at
+			// once. The test forces a rebuild (non-image env change) and asserts
+			// that availableReplicas never drops below 1 during the rolling.
+			cls := tester.NewCollaSet("collaset-"+randStr, 2, appsv1alpha1.UpdateStrategy{
+				PodUpdatePolicy: appsv1alpha1.CollaSetInPlaceIfPossiblePodUpdateStrategyType,
+			})
+			cls.Spec.NamingStrategy = &appsv1alpha1.NamingStrategy{
+				PodNamingSuffixPolicy: appsv1alpha1.PodNamingSuffixPolicyPersistentSequence,
+			}
+			Expect(tester.CreateCollaSet(cls)).NotTo(HaveOccurred())
+
+			By("Wait for status replicas satisfied")
+			Eventually(func() error { return tester.ExpectedStatusReplicas(cls, 2, 2, 2, 2, 2) }, 30*time.Second, 3*time.Second).ShouldNot(HaveOccurred())
+
+			By("Create PodTransitionRule with maxUnavailable=1 selecting the CollaSet pods")
+			maxUnavailable := intstr.FromInt(1)
+			ptr := &appsv1alpha1.PodTransitionRule{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ptr-" + randStr,
+					Namespace: ns,
+				},
+				Spec: appsv1alpha1.PodTransitionRuleSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"owner": cls.Name}},
+					Rules: []appsv1alpha1.TransitionRule{
+						{
+							Name: "serviceAvailable",
+							TransitionRuleDefinition: appsv1alpha1.TransitionRuleDefinition{
+								AvailablePolicy: &appsv1alpha1.AvailableRule{
+									MaxUnavailableValue: &maxUnavailable,
+								},
+							},
+						},
+					},
+				},
+			}
+			Expect(client.Create(context.TODO(), ptr)).NotTo(HaveOccurred())
+
+			By("Wait for PodTransitionRule to observe both pods as targets")
+			Eventually(func() int {
+				got := &appsv1alpha1.PodTransitionRule{}
+				if err := client.Get(context.TODO(), types.NamespacedName{Namespace: ptr.Namespace, Name: ptr.Name}, got); err != nil {
+					return 0
+				}
+				return len(got.Status.Targets)
+			}, 30*time.Second, 3*time.Second).Should(Equal(2))
+
+			By("Trigger rebuild upgrade by changing env (not in-place supported)")
+			Expect(tester.UpdateCollaSet(cls, func(cls *appsv1alpha1.CollaSet) {
+				cls.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{
+					{Name: "test", Value: "bar"},
+				}
+			})).NotTo(HaveOccurred())
+
+			By("Poll status, assert availableReplicas never drops below 1, and stop once upgrade completes")
+			timeout := 120 * time.Second
+			start := time.Now()
+			minAvailable := int32(2)
+			Eventually(func() bool {
+				Expect(tester.GetCollaSet(cls)).NotTo(HaveOccurred())
+				avail := cls.Status.AvailableReplicas
+				if avail < minAvailable {
+					minAvailable = avail
+				}
+				Expect(avail).To(BeNumerically(">=", int32(1)), fmt.Sprintf("availableReplicas dropped to %d during rolling (elapsed=%v)", avail, time.Since(start)))
+				return tester.ExpectedStatusReplicas(cls, 2, 2, 2, 2, 2) == nil
+			}, timeout, time.Second).Should(BeTrue())
+
+			By(fmt.Sprintf("observed min available replicas during rolling: %d (elapsed=%v)", minAvailable, time.Since(start)))
+			Expect(minAvailable).To(BeNumerically(">=", int32(1)))
+
+			By("Delete PodTransitionRule so the framework AfterEach can clean up CollaSet cleanly")
+			Expect(client.Delete(context.TODO(), ptr)).NotTo(HaveOccurred())
+			Eventually(func() bool {
+				err := client.Get(context.TODO(), types.NamespacedName{Namespace: ptr.Namespace, Name: ptr.Name}, &appsv1alpha1.PodTransitionRule{})
+				return errors.IsNotFound(err)
+			}, 120*time.Second, 3*time.Second).Should(BeTrue())
 		})
 
 		AfterEach(func() {
